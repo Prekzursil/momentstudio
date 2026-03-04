@@ -1421,4 +1421,109 @@ describe('AdminComponent sweep coverage', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it('covers clipboard fallback and blog publish accessibility confirmation guard', async () => {
+    const { component, admin } = createComponent();
+    const dynamic = component as any;
+    const navAny = navigator as any;
+    if (!navAny.clipboard) {
+      Object.defineProperty(navAny, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true });
+    }
+    if (typeof navAny.clipboard.writeText !== 'function') {
+      navAny.clipboard.writeText = () => Promise.resolve();
+    }
+    spyOn(navAny.clipboard, 'writeText').and.returnValue(Promise.reject(new Error('clipboard-denied')));
+    (document as any).execCommand ??= () => true;
+    const execSpy = spyOn(document as any, 'execCommand').and.returnValue(true);
+
+    await dynamic.copyToClipboard('coverage-text');
+    expect(execSpy).toHaveBeenCalledWith('copy');
+
+    dynamic.selectedBlogKey = 'blog.entry';
+    dynamic.blogBaseLang = 'en';
+    dynamic.blogEditLang = 'en';
+    dynamic.blogMeta = {};
+    dynamic.blogForm = { title: 'Post title', body_markdown: 'Body', status: 'published', published_at: '', published_until: '' };
+    dynamic.blogA11yOpen = false;
+    spyOn(dynamic, 'buildBlogMeta').and.returnValue({});
+    spyOn(dynamic, 'blogA11yIssues').and.returnValue(['missing-alt']);
+    const confirmSpy = spyOn(globalThis, 'confirm').and.returnValue(false);
+    dynamic.saveBlogPost();
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(admin.updateContentBlock).not.toHaveBeenCalled();
+  });
+
+  it('covers page selection reset, reusable-key collision, and redirect creation success branches', () => {
+    const { component, admin } = createComponent();
+    const dynamic = component as any;
+    dynamic.showHiddenPages = false;
+    dynamic.contentPages = [{ key: 'page.about', hidden: false }, { key: 'page.contact', hidden: false }];
+    dynamic.pageBlocksKey = 'page.ghost';
+    spyOn(dynamic, 'loadPageBlocks').and.stub();
+
+    dynamic.onShowHiddenPagesChange();
+    expect(dynamic.pageBlocksKey).toBe('page.about');
+    expect(dynamic.loadPageBlocks).toHaveBeenCalledWith('page.about');
+
+    dynamic.pagePreviewForSlug = 'preview-page';
+    dynamic.pagePreviewToken = 'preview-token';
+    dynamic.pagePreviewOrigin = '/preview';
+    dynamic.pagePreviewExpiresAt = Date.now();
+    dynamic.pagePreviewNonce = 42;
+    dynamic.onPageBlocksKeyChange('page.contact');
+    expect(dynamic.pagePreviewForSlug).toBeNull();
+    expect(dynamic.pagePreviewToken).toBeNull();
+    expect(dynamic.pagePreviewNonce).toBe(0);
+
+    spyOn(Date, 'now').and.returnValue(1000);
+    dynamic.pageBlocks = { 'page.about': [{ key: 'text_reuse_1000', type: 'text' }, { key: 'text_reuse_1000_1', type: 'text' }] };
+    dynamic.reusableBlocks = [{ id: 'reuse', title: 'Reusable', block: { type: 'text', title: {}, body_markdown: {}, enabled: true, layout: 'full' } }];
+    dynamic.insertReusableBlockIntoPage('page.about', 'reuse');
+    expect(dynamic.pageBlocks['page.about'].some((b: any) => b.key === 'text_reuse_1000_2')).toBeTrue();
+
+    dynamic.redirectCreateFrom = 'page.old';
+    dynamic.redirectCreateTo = 'page.new';
+    spyOn(dynamic, 'loadContentRedirects').and.stub();
+    admin.upsertContentRedirect.and.returnValue(of({}));
+    dynamic.createContentRedirect();
+    expect(dynamic.redirectCreateFrom).toBe('');
+    expect(dynamic.redirectCreateTo).toBe('');
+    expect(dynamic.loadContentRedirects).toHaveBeenCalledWith(true);
+  });
+
+  it('covers page-block reorder, image attachment, and removal guard branches', () => {
+    const { component } = createComponent();
+    const dynamic = component as any;
+    dynamic.pageBlocks = {
+      'page.about': [
+        { key: 'banner-1', type: 'banner', slide: {} },
+        { key: 'gallery-1', type: 'gallery', images: [{ id: 'a' }, { id: 'b' }] },
+        { key: 'columns-1', type: 'columns', columns: [{}, {}, {}] },
+        { key: 'faq-1', type: 'faq', faq_items: [{}, {}] },
+        { key: 'testimonials-1', type: 'testimonials', testimonials: [{}, {}] },
+        { key: 'target', type: 'text' },
+        { key: 'moving', type: 'text' }
+      ]
+    };
+    dynamic.draggingPageBlocksKey = 'page.about';
+    dynamic.draggingPageBlockKey = 'moving';
+    spyOn(dynamic, 'onPageBlockDragEnd').and.callFake(() => undefined);
+
+    const dropEvent = { preventDefault: () => undefined, dataTransfer: { files: [], types: [], getData: () => '' } } as unknown as DragEvent;
+    dynamic.onPageBlockDrop(dropEvent, 'page.about', 'target');
+    expect(dynamic.pageBlocks['page.about'][5].key).toBe('moving');
+    expect(dynamic.onPageBlockDragEnd).toHaveBeenCalled();
+
+    const asset = { url: '/asset.jpg', focal_x: 40, focal_y: 60 };
+    dynamic.setPageBannerSlideImage('page.about', 'banner-1', asset as any);
+    dynamic.addPageGalleryImageFromAsset('page.about', 'gallery-1', asset as any);
+    dynamic.removePageColumnsColumn('page.about', 'columns-1', 1);
+    dynamic.removePageFaqItem('page.about', 'faq-1', 0);
+    dynamic.removePageTestimonial('page.about', 'testimonials-1', 1);
+
+    const after = dynamic.pageBlocks['page.about'];
+    expect(after.find((b: any) => b.key === 'banner-1').slide.image_url).toBe('/asset.jpg');
+    expect(after.find((b: any) => b.key === 'columns-1').columns.length).toBe(2);
+    expect(after.find((b: any) => b.key === 'faq-1').faq_items.length).toBe(1);
+    expect(after.find((b: any) => b.key === 'testimonials-1').testimonials.length).toBe(1);
+  });
 });

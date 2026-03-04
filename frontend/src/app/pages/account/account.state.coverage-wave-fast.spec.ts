@@ -262,6 +262,7 @@ function primeProfile(state: any): void {
   state.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
   state.translate = { instant: (key: string) => key };
   state.profileThemePreference = 'system';
+    state.profileUsernamePassword = ACCOUNT_FAST_CRED;
   state.profileLanguage = 'en';
   state.completeForcedProfileFlowIfSatisfied = jasmine.createSpy('completeForcedProfileFlowIfSatisfied');
 }
@@ -1149,6 +1150,136 @@ describe('AccountState fast residual branch closures', () => {
     (AccountState.prototype as any).loadLatestExportJob.call(state);
     expect(state.exportError).toBe('load-job-failed');
     expect(state.toast.error).toHaveBeenCalledWith('load-job-failed');
+  });
+  it('covers saveProfile invalid-phone and backend error branches', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.theme = { setPreference: jasmine.createSpy('setPreference') };
+    state.lang = { setLanguage: jasmine.createSpy('setLanguage') };
+    state.translate = { instant: (key: string) => key };
+    state.profile = mockSignal({ id: 'u1', username: 'old-user' });
+    state.profileCompletionRequired = () => true;
+    state.auth = {
+      isAuthenticated: () => true,
+      updateUsername: jasmine.createSpy('updateUsername').and.returnValue(of(null)),
+      updateProfile: jasmine.createSpy('updateProfile').and.returnValue(throwError(() => ({ error: { detail: 'save-failed' } }))),
+    };
+    state.profileName = 'Name';
+    state.profileUsername = 'validuser';
+    state.profileFirstName = 'First';
+    state.profileMiddleName = '';
+    state.profileLastName = 'Last';
+    state.profileDateOfBirth = '2000-01-01';
+    state.profilePhoneCountry = 'RO';
+    state.profilePhoneNational = '';
+    state.profileLanguage = 'en';
+    state.profileThemePreference = 'system';
+    state.profileUsernamePassword = ACCOUNT_FAST_CRED;
+
+    state.saveProfile();
+    expect(state.profileError).toBe('validation.phoneInvalid');
+
+    state.profileCompletionRequired = () => false;
+    state.profilePhoneCountry = '??';
+    state.profilePhoneNational = '071234';
+    state.saveProfile();
+    expect(state.profileError).toBe('validation.phoneInvalid');
+
+    state.profilePhoneCountry = 'RO';
+    state.profilePhoneNational = '0712345678';
+    state.saveProfile();
+    expect(state.profileError).toBe('save-failed');
+    expect(state.toast.error).toHaveBeenCalledWith('save-failed');
+  });
+
+  it('covers secondary-email add/verify error detail branches', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.secondaryEmails = mockSignal<any[]>([]);
+    state.secondaryEmailResendUntilById = mockSignal<Record<string, number>>({});
+    state.auth = {
+      addSecondaryEmail: jasmine.createSpy('addSecondaryEmail').and.returnValue(throwError(() => ({ error: { detail: 'add-failed' } }))),
+      confirmSecondaryEmailVerification: jasmine
+        .createSpy('confirmSecondaryEmailVerification')
+        .and.returnValue(throwError(() => ({ error: { detail: 'verify-failed' } }))),
+    };
+
+    state.secondaryEmailToAdd = 'a@example.com';
+    state.addSecondaryEmail();
+    expect(state.secondaryEmailMessage).toBe('add-failed');
+
+    state.secondaryVerificationEmailId = 'mail-1';
+    state.secondaryVerificationToken = '123456';
+    state.confirmSecondaryEmailVerification();
+    expect(state.secondaryVerificationStatus).toBe('verify-failed');
+    expect(state.toast.error).toHaveBeenCalledWith('verify-failed');
+  });
+
+  it('covers passkey/two-factor and google-link error branches', () => {
+    const state = createAccountHarness();
+    primeAsyncSignals(state);
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.passkeys = mockSignal<any[]>([{ id: 'pk1' }]);
+    state.passkeysError = mockSignal<string | null>(null);
+    state.twoFactorError = mockSignal<string | null>(null);
+    state.twoFactorStatus = mockSignal<any>(null);
+    state.twoFactorLoaded = mockSignal(false);
+    state.profile = mockSignal<any>({ id: 'u1' });
+    state.googleEmail = mockSignal<string | null>(null);
+    state.googlePicture = mockSignal<string | null>(null);
+    state.refreshSecurityEvents = jasmine.createSpy('refreshSecurityEvents');
+    state.loadTwoFactorStatus = jasmine.createSpy('loadTwoFactorStatus');
+    state.cancelMakePrimary = jasmine.createSpy('cancelMakePrimary');
+    state.loadSecondaryEmails = jasmine.createSpy('loadSecondaryEmails');
+    state.loadCooldowns = jasmine.createSpy('loadCooldowns');
+    state.readPendingGoogleLinkContext = () => ({ code: 'code', state: 'state' });
+    state.clearPendingGoogleLinkContext = jasmine.createSpy('clearPendingGoogleLinkContext');
+    state.auth = {
+      isAuthenticated: () => true,
+      deletePasskey: jasmine.createSpy('deletePasskey').and.returnValue(throwError(() => ({ error: { detail: 'remove-passkey-failed' } }))),
+      startTwoFactorSetup: jasmine.createSpy('startTwoFactorSetup').and.returnValue(throwError(() => ({ error: { detail: 'start-2fa-failed' } }))),
+      enableTwoFactor: jasmine.createSpy('enableTwoFactor').and.returnValue(throwError(() => ({ error: { detail: 'enable-2fa-failed' } }))),
+      regenerateTwoFactorRecoveryCodes: jasmine
+        .createSpy('regenerateTwoFactorRecoveryCodes')
+        .and.returnValue(throwError(() => ({ error: { detail: 'regen-2fa-failed' } }))),
+      disableTwoFactor: jasmine.createSpy('disableTwoFactor').and.returnValue(throwError(() => ({ error: { detail: 'disable-2fa-failed' } }))),
+      makeSecondaryEmailPrimary: jasmine
+        .createSpy('makeSecondaryEmailPrimary')
+        .and.returnValue(throwError(() => ({ error: { detail: 'primary-email-failed' } }))),
+      completeGoogleLink: jasmine.createSpy('completeGoogleLink').and.returnValue(throwError(() => ({ error: { detail: 'google-link-failed' } }))),
+      unlinkGoogle: jasmine.createSpy('unlinkGoogle').and.returnValue(throwError(() => ({ error: { detail: 'google-unlink-failed' } }))),
+    };
+
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+    state.removePasskeyConfirmId = 'pk1';
+    state.removePasskeyPassword = 'current-pass';
+    state.confirmRemovePasskey();
+    expect(state.passkeysError()).toBe('remove-passkey-failed');
+
+    state.twoFactorSetupPassword = 'current-pass';
+    state.startTwoFactorSetup();
+    state.twoFactorEnableCode = '123456';
+    state.enableTwoFactor();
+    state.twoFactorManagePassword = 'current-pass';
+    state.twoFactorManageCode = '123456';
+    state.regenerateTwoFactorRecoveryCodes();
+    state.disableTwoFactor();
+    expect(state.twoFactorError()).toBe('disable-2fa-failed');
+
+    state.makePrimarySecondaryEmailId = 'mail-1';
+    state.makePrimaryPassword = 'current-pass';
+    state.confirmMakePrimary();
+    expect(state.makePrimaryError).toBe('primary-email-failed');
+
+    state.googlePassword = 'current-pass';
+    state.linkGoogle();
+    state.unlinkGoogle();
+    expect(state.googleError).toBe('google-unlink-failed');
   });
 });
 
