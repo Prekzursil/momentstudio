@@ -7,8 +7,11 @@ type ApiSpy = jasmine.SpyObj<Pick<ApiService, 'get' | 'post' | 'patch' | 'delete
 type RouterSpy = jasmine.SpyObj<Pick<Router, 'navigateByUrl'>>;
 
 function base64UrlEncode(input: string): string {
-  const encoded = btoa(input).replaceAll('+', '-').replaceAll('/', '_');
-  return encoded.replace(/=+$/g, '');
+  let encoded = btoa(input).replaceAll('+', '-').replaceAll('/', '_');
+  while (encoded.endsWith('=')) {
+    encoded = encoded.slice(0, -1);
+  }
+  return encoded;
 }
 
 function createJwt(payload: Record<string, unknown>): string {
@@ -117,4 +120,5 @@ describe('AuthService coverage fast wave', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
   });
 });
+
 

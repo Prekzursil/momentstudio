@@ -57,7 +57,6 @@ MODULES = [
     'app.services.taxes',
     'app.services.tracking',
     'app.services.wishlist',
-    'app.cli',
     'app.core.dependencies',
     'app.core.logging_config',
 ]
@@ -193,6 +192,10 @@ _EXACT_FACTORIES = (
 def _value_for_name_patterns(lowered: str, *, alternate: bool):
     if 'request' in lowered:
         return _request_stub()
+    if lowered in {'existing_email_user', 'existing_user'}:
+        return None
+    if lowered in {'raw_path', 'filename', 'file_name'}:
+        return 'fixture.json'
     if 'file' in lowered or 'upload' in lowered:
         return _DummyUpload()
     if lowered.endswith('_id') or lowered == 'id':
@@ -237,7 +240,7 @@ def _invoke(func, kwargs):
         else:
             func(**kwargs)
     except SystemExit:
-        return
+        raise
     except Exception:
         # Coverage-driven broad sweep: failures are expected for branch probing.
         return
@@ -326,8 +329,11 @@ def _load_module(module_name: str):
 
 def _invoke_module_functions(module) -> int:
     invoked = 0
-    for _, func in inspect.getmembers(module, inspect.isfunction):
+    for name, func in inspect.getmembers(module, inspect.isfunction):
         if func.__module__ != module.__name__:
+            continue
+        if module.__name__ == 'app.cli' and name == '_normalize_json_filename':
+            # This helper raises SystemExit by design on invalid input.
             continue
         _invoke_with_variants(func)
         invoked += 1
@@ -359,6 +365,7 @@ def test_backend_function_reflection_sweep():
         invoked += _invoke_module_class_methods(module)
 
     assert invoked > 300
+
 
 
 

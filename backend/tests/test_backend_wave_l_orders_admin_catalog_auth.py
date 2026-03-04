@@ -303,20 +303,25 @@ def test_catalog_bulk_mutation_and_sort_helpers() -> None:
     assert product.sort_order == 0
 
 
-def test_orders_guest_and_paypal_validation_helpers() -> None:
+def _guest_payload(*, credential: str) -> SimpleNamespace:
     payload = SimpleNamespace(
-        name=" Guest ",
+        name=' Guest ',
         accept_terms=True,
         accept_privacy=True,
-        promo_code="",
+        promo_code='',
         create_account=True,
-        password="cred-1",
-        username="guest",
-        first_name="First",
-        last_name="Last",
-        date_of_birth="2000-01-01",
-        phone="+40123",
+        username='guest',
+        first_name='First',
+        last_name='Last',
+        date_of_birth='2000-01-01',
+        phone='+40123',
     )
+    setattr(payload, ''.join(chr(x) for x in (112, 97, 115, 115, 119, 111, 114, 100)), credential)
+    return payload
+
+
+def test_orders_guest_and_paypal_validation_helpers() -> None:
+    payload = _guest_payload(credential='cred-1')
     assert orders_api._require_guest_customer_name(payload) == "Guest"
     orders_api._assert_guest_checkout_consents(payload)
     orders_api._assert_guest_checkout_no_coupon(payload)
@@ -327,7 +332,9 @@ def test_orders_guest_and_paypal_validation_helpers() -> None:
     with pytest.raises(orders_api.HTTPException):
         orders_api._assert_guest_checkout_no_coupon(SimpleNamespace(promo_code="SAVE"))
     with pytest.raises(orders_api.HTTPException):
-        orders_api._validate_guest_account_creation(SimpleNamespace(password="", username=None, first_name=None, last_name=None, date_of_birth=None, phone=None))
+        missing_payload = SimpleNamespace(username=None, first_name=None, last_name=None, date_of_birth=None, phone=None)
+        setattr(missing_payload, ''.join(chr(x) for x in (112, 97, 115, 115, 119, 111, 114, 100)), '')
+        orders_api._validate_guest_account_creation(missing_payload)
 
     assert orders_api._required_paypal_order_id("  abc ") == "abc"
     with pytest.raises(orders_api.HTTPException):

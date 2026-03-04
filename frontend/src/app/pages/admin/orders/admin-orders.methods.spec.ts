@@ -320,7 +320,7 @@ describe('AdminOrdersComponent private storage and coercion paths', () => {
     expect(component.loadViewMode()).toBe('kanban');
 
     const setSpy = spyOn(localStorage, 'setItem');
-    (component as any).persistViewMode = (AdminOrdersComponent.prototype as any)['persistViewMode'];
+    component['persistViewMode'] = (AdminOrdersComponent.prototype as any)['persistViewMode'];
     component.viewMode.set('kanban');
     component.persistViewMode();
     expect(setSpy).toHaveBeenCalled();

@@ -577,7 +577,7 @@ describe('AccountState coverage wave 4 FE-W2 orders and receipt flows', () => {
     );
     state.cancelRequestedOrderIds = new Set<string>();
     state.orders = makeSignal<any[]>([{ id: 'o-1', status: 'paid' }]);
-    state.latestOrder = makeSignal<unknown | null>(null);
+    state.latestOrder = makeSignal<Record<string, unknown> | null>(null);
     spyOn(globalThis, 'confirm').and.returnValues(false, true);
 
     const order = { id: 'o-1', status: 'paid', reference_code: 'REF-1', events: [] } as any;

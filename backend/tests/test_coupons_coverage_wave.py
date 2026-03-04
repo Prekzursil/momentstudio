@@ -1102,7 +1102,11 @@ async def test_coupon_api_admin_create_cancel_retry_and_bulk_assignment_paths(mo
         revoke_reason=None,
     )
     bad_bucket_session = _AdminSessionStub(get_map={failed_job.id: failed_job})
-    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_: (_ for _ in ()).throw(ValueError('bad bucket')))
+
+    def _raise_bad_bucket(**_kwargs):
+        raise ValueError('bad bucket')
+
+    monkeypatch.setattr(coupons_api, '_parse_bucket_config', _raise_bad_bucket)
     with pytest.raises(HTTPException, match='bad bucket'):
         await coupons_api.admin_retry_bulk_job(
             failed_job.id,

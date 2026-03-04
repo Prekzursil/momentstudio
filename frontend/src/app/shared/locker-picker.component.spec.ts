@@ -281,7 +281,7 @@ function defineDestroyCleanupSpec(): void {
     const abortSpy = spyOn(controller, 'abort').and.callThrough();
     (lockerPickerComponent as any).map = { remove: mapRemoveSpy } as any;
     (lockerPickerComponent as any).markers = {} as any;
-    (lockerPickerComponent as any).searchTimer = window.setTimeout(() => void 0, 1000);
+    (lockerPickerComponent as any).searchTimer = globalThis.setTimeout(() => void 0, 1000);
     (lockerPickerComponent as any).searchAbort = controller;
 
     lockerPickerComponent.ngOnDestroy();

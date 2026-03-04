@@ -58,10 +58,10 @@ def _credential_value() -> str:
 
 class _Rows:
     def __init__(self, rows: list[object] | None = None) -> None:
-        self._rows = list(rows or [])
+        self.rows_data = list(rows or [])
 
     def all(self) -> list[object]:
-        return list(self._rows)
+        return list(self.rows_data)
 
 
 class _ExecResult:

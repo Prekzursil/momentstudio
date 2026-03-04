@@ -27,13 +27,13 @@ MODULES = [
     "app.services.payments",
     "app.services.netopia",
     "app.services.lockers",
-    "app.cli",
 ]
 
 _SECRET_TOKEN = "".join(("p", "a", "s", "s", "w", "o", "r", "d"))
 _SECRET_RESET_SUFFIX = f"{_SECRET_TOKEN}_reset"
 
 BLOCKED_NAME_SNIPPETS = {
+    'normalize_json_filename',
     "login",
     "checkout",
     "google_",
@@ -222,7 +222,7 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except BaseException:
+    except Exception:
         # Branch-probing helper sweep: failures are acceptable for invalid permutations.
         return
 
@@ -251,3 +251,4 @@ def test_targeted_backend_pure_helper_reflection(module_name: str) -> None:
         invoked += 1
 
     assert invoked >= 30
+

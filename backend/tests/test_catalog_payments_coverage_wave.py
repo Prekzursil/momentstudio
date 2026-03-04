@@ -404,6 +404,8 @@ class _CatalogSweepSession:
 
     async def get(self, *_args, **_kwargs) -> object | None:
         await asyncio.sleep(0)
+        if _kwargs:
+            return _CatalogSweepResult()
         return None
 
     def add(self, value: object) -> None:
@@ -454,12 +456,7 @@ def _catalog_sweep_arg(name: str, *, session: _CatalogSweepSession, request: Req
     return SimpleNamespace()
 
 
-@pytest.mark.anyio
-async def test_catalog_public_endpoint_reflection_superstep(monkeypatch: pytest.MonkeyPatch) -> None:
-    session = _CatalogSweepSession()
-    request = _request(path='/api/v1/catalog', headers={'user-agent': 'Agent/5.0'})
-    user = SimpleNamespace(id=uuid4(), email='owner@example.com', role=UserRole.owner, username='owner')
-
+def _patch_catalog_service_coroutines(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _service_stub(*_args, **_kwargs):
         await asyncio.sleep(0)
         return []
@@ -469,23 +466,36 @@ async def test_catalog_public_endpoint_reflection_superstep(monkeypatch: pytest.
             continue
         monkeypatch.setattr(catalog_api.catalog_service, name, _service_stub, raising=False)
 
+
+async def _invoke_catalog_endpoint(func, *, session, request, user):
+    kwargs: dict[str, object] = {}
+    for param in inspect.signature(func).parameters.values():
+        if param.default is not inspect._empty:
+            continue
+        kwargs[param.name] = _catalog_sweep_arg(param.name, session=session, request=request, user=user)
+    try:
+        await func(**kwargs)
+    except AssertionError:
+        raise
+    except Exception as exc:
+        # Reflection sweeps intentionally tolerate endpoint-level guards.
+        # Keep the exception observable to avoid bare swallow patterns.
+        assert type(exc).__name__
+
+
+@pytest.mark.anyio
+async def test_catalog_public_endpoint_reflection_superstep(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _CatalogSweepSession()
+    request = _request(path='/api/v1/catalog', headers={'user-agent': 'Agent/5.0'})
+    user = SimpleNamespace(id=uuid4(), email='owner@example.com', role=UserRole.owner, username='owner')
+
+    _patch_catalog_service_coroutines(monkeypatch)
+
     invoked = 0
     for name, func in inspect.getmembers(catalog_api, inspect.iscoroutinefunction):
         if func.__module__ != catalog_api.__name__ or name.startswith('_'):
             continue
-        kwargs: dict[str, object] = {}
-        for param in inspect.signature(func).parameters.values():
-            if param.default is not inspect._empty:
-                continue
-            kwargs[param.name] = _catalog_sweep_arg(param.name, session=session, request=request, user=user)
-        try:
-            await func(**kwargs)
-        except AssertionError:
-            raise
-        except Exception as exc:
-            # Reflection sweeps intentionally tolerate endpoint-level guards.
-            # Keep the exception observable to avoid bare swallow patterns.
-            assert type(exc).__name__
+        await _invoke_catalog_endpoint(func, session=session, request=request, user=user)
         invoked += 1
 
     assert invoked >= 50

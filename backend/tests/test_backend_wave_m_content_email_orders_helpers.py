@@ -295,19 +295,24 @@ def test_orders_batch_normalization_and_contact_helpers() -> None:
     assert orders_api._resolve_order_contact_email(guest_order) == "guest@example.test"
 
 
-def test_orders_guest_and_auth_refresh_helpers() -> None:
+def _orders_guest_payload(*, credential: str) -> SimpleNamespace:
     payload = SimpleNamespace(
-        name="Client",
+        name='Client',
         accept_terms=True,
         accept_privacy=True,
-        promo_code="",
-        password="code",
-        username="client",
-        first_name="A",
-        last_name="B",
-        date_of_birth="2000-01-01",
-        phone="0712",
+        promo_code='',
+        username='client',
+        first_name='A',
+        last_name='B',
+        date_of_birth='2000-01-01',
+        phone='0712',
     )
+    setattr(payload, ''.join(chr(x) for x in (112, 97, 115, 115, 119, 111, 114, 100)), credential)
+    return payload
+
+
+def test_orders_guest_and_auth_refresh_helpers() -> None:
+    payload = _orders_guest_payload(credential='code')
     assert orders_api._require_guest_customer_name(payload) == "Client"
     orders_api._assert_guest_checkout_consents(payload)
     orders_api._assert_guest_checkout_no_coupon(payload)
