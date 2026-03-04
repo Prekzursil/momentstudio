@@ -58,21 +58,11 @@ BLOCKED_TOKENS = {
     "_assert_thumbnail_response_host",
     "_persist_thumbnail",
     "_sentry",
-    "_paypal",
-    "_netopia",
-    "_stripe",
     "send_email",
     "smtp",
     "subprocess",
     "run_server",
     "overpass",
-    "paypal",
-    "stripe",
-    "thumbnail",
-    "instagram",
-    "facebook",
-    "http",
-    "webhook",
     "normalize_json_filename",
     "resolve_profile_file",
     "raise_if_owner_email_taken",
@@ -417,6 +407,19 @@ def _invoke_method_variants(callable_obj, *, alternate: bool) -> int:
     return 2
 
 
+def _install_fast_network_guards(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raise_sync(*_args, **_kwargs):
+        raise RuntimeError('network disabled in hotspot sweep')
+
+    async def _raise_async(*_args, **_kwargs):
+        raise RuntimeError('network disabled in hotspot sweep')
+
+    for name in ('request', 'get', 'post', 'put', 'delete', 'patch', 'head', 'options'):
+        monkeypatch.setattr(httpx, name, _raise_sync, raising=False)
+        monkeypatch.setattr(httpx.Client, name, _raise_sync, raising=False)
+        monkeypatch.setattr(httpx.AsyncClient, name, _raise_async, raising=False)
+
+
 def _invoke_class_methods(module_name: str, module, *, alternate: bool) -> int:
     invoked = 0
     for _name, cls in inspect.getmembers(module, inspect.isclass):
@@ -434,7 +437,8 @@ def _invoke_class_methods(module_name: str, module, *, alternate: bool) -> int:
 
 
 @pytest.mark.parametrize("module_name", MODULES)
-def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
+def test_hotspot_reflection_wave_invokes_functions(module_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    _install_fast_network_guards(monkeypatch)
     module = importlib.import_module(module_name)
     invoked = 0
 
@@ -447,6 +451,8 @@ def test_hotspot_reflection_wave_invokes_functions(module_name: str) -> None:
             continue
 
         _invoke(func, _build_kwargs(func, alternate=False, include_optional=False))
+        invoked += 1
+        _invoke(func, _build_kwargs(func, alternate=False, include_optional=True))
         invoked += 1
         _invoke(func, _build_kwargs(func, alternate=True, include_optional=False))
         invoked += 1

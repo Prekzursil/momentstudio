@@ -207,6 +207,28 @@ function callAdminMethodSafely(component: any, method: string, args: unknown[]):
   }
 }
 
+function createTextareaStub(initial = 'Sample line'): HTMLTextAreaElement {
+  const state = {
+    value: initial,
+    selectionStart: 0,
+    selectionEnd: initial.length,
+    focus: () => undefined,
+    dispatchEvent: () => true,
+    setRangeText(text: string, start?: number, end?: number) {
+      const from = typeof start === 'number' ? start : state.selectionStart;
+      const to = typeof end === 'number' ? end : state.selectionEnd;
+      state.value = `${state.value.slice(0, from)}${text}${state.value.slice(to)}`;
+      state.selectionStart = from + text.length;
+      state.selectionEnd = state.selectionStart;
+    },
+    setSelectionRange(start: number, end: number) {
+      state.selectionStart = start;
+      state.selectionEnd = end;
+    }
+  };
+  return state as unknown as HTMLTextAreaElement;
+}
+
 const ADMIN_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
   normalizeSection: ['content'],
   applySection: ['content'],
@@ -255,6 +277,17 @@ const ADMIN_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
   saveInfoInternal: ['page.about', 'Body', 'en', () => undefined, () => undefined],
   saveLegalMetaIfNeeded: ['page.about', () => undefined, () => undefined],
   savePageMarkdownInternal: ['page.about', 'Body', 'en', () => undefined, () => undefined],
+  applyBlogHeading: [createTextareaStub('Heading sample'), 1],
+  applyBlogList: [createTextareaStub('List sample')],
+  wrapBlogSelection: [createTextareaStub('Selection sample'), '**', '**', 'sample'],
+  insertBlogLink: [createTextareaStub('Link sample')],
+  insertBlogCodeBlock: [createTextareaStub('Code sample')],
+  insertBlogEmbed: [createTextareaStub('Embed sample'), 'product'],
+  prefixBlogLines: [createTextareaStub('Line one\nLine two'), '- '],
+  insertAtCursor: [createTextareaStub('Cursor sample'), 'injected'],
+  updateBlogBody: [createTextareaStub('Body sample'), 'Body sample update', 0, 4],
+  setBlogMarkdownImageAlt: [0, 'Accessible alt'],
+  promptFixBlogImageAlt: [0],
 };
 
 const ADMIN_SWEEP_BLOCKED = new Set([
@@ -268,17 +301,6 @@ const ADMIN_SWEEP_BLOCKED = new Set([
   'onImageUpload',
   'uploadAndInsertBlogImage',
   'exportContentRedirects',
-  // Textarea cursor/focus helpers need real textarea instances.
-  'applyBlogHeading',
-  'applyBlogList',
-  'wrapBlogSelection',
-  'insertBlogLink',
-  'insertBlogCodeBlock',
-  'insertBlogEmbed',
-  'prefixBlogLines',
-  'insertAtCursor',
-  'updateBlogBody',
-  'setBlogMarkdownImageAlt',
   // Large fan-out loaders already covered by targeted tests.
   'loadAll',
   'retryLoadAll',
@@ -989,6 +1011,7 @@ describe('AdminComponent sweep coverage', () => {
   it('covers user/content and bulk/order legacy error branches', async () => {
     const { component, admin, toast } = createComponent();
     const dynamic = component as any;
+    void toast;
 
     component.selectedUserId = 'user-1';
     component.selectedUserRole = 'admin';
@@ -1061,4 +1084,65 @@ describe('AdminComponent sweep coverage', () => {
     const attempted = runAdminPrototypeSweep(dynamic);
     expect(attempted).toBeGreaterThan(150);
   });
+
+  it('covers reusable/page-drop/media and blog-bulk helper branches', () => {
+    const { component, admin, toast } = createComponent();
+    const dynamic = component as any;
+    void toast;
+    spyOn(globalThis, 'prompt').and.returnValues('Reusable hero', '');
+    spyOn(globalThis, 'confirm').and.returnValue(true);
+
+    component.pageBlocks = {
+      'page.about': [
+        {
+          key: 'hero',
+          type: 'text',
+          title: { en: 'Hero title', ro: 'Titlu hero' },
+          body_markdown: { en: 'Hero body', ro: 'Corp hero' },
+          enabled: true,
+          layout: { width: 'full', align: 'left' }
+        } as any
+      ]
+    } as any;
+    component.reusableBlocks = [];
+    dynamic.reusableBlocksExists = true;
+    dynamic.reusableBlocksMeta = {};
+    dynamic.reusableBlocksKey = 'site.reusable';
+    component.savePageBlockAsReusable('page.about', 'hero');
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+
+    admin.updateContentBlock.calls.reset();
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    component.savePageBlockAsReusable('page.about', 'hero');
+
+
+    const dragEvent = {
+      preventDefault: () => undefined,
+      dataTransfer: {
+        files: [],
+        types: ['text/plain'],
+        getData: (key: string) =>
+          key === 'text/cms-block'
+            ? JSON.stringify({ scope: 'page', type: 'text', template: 'blank' })
+            : ''
+      }
+    } as unknown as DragEvent;
+    component.pageBlocks = { 'page.about': [{ key: 'target', type: 'text', enabled: true }] as any[] } as any;
+    component.onPageBlockDrop(dragEvent, 'page.about', 'target');
+    expect(component.pageBlocks['page.about'].length).toBeGreaterThan(0);
+
+    component.blogBulkAction = 'schedule';
+    component.blogBulkPublishAt = '2026-03-05T10:00';
+    component.blogBulkUnpublishAt = '2026-03-05T09:00';
+    const invalidSchedule = dynamic.buildBlogBulkPayload({ meta: {} });
+    expect(invalidSchedule).toBeNull();
+    expect(component.blogBulkError).toBe('adminUi.blog.bulk.invalidSchedule');
+
+    component.blogBulkAction = 'tags_add';
+    component.blogBulkTags = 'tag-1, tag-2, tag-1';
+    const tagsPayload = dynamic.buildBlogBulkPayload({ meta: { tags: ['tag-0'] } });
+    expect(tagsPayload).toEqual({ meta: { tags: ['tag-0', 'tag-1', 'tag-2'] } });
+  });
 });
+
+
