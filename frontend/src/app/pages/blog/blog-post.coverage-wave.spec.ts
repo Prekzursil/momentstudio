@@ -353,3 +353,114 @@ describe('BlogPostComponent coverage wave', () => {
     expect(attempted).toBeGreaterThan(30);
   });
 });
+
+
+describe('BlogPostComponent coverage wave: article interaction matrix', () => {
+  it('covers article click routing/code/gallery branches and reading progress helpers', () => {
+    const { component, toast } = createHarness();
+    const cmp = component as any;
+    Object.defineProperty(cmp, 'document', { value: document, configurable: true });
+    const doc = cmp['document'] as Document;
+    const win = doc.defaultView as Window & typeof globalThis;
+
+    spyOn(cmp.router, 'navigateByUrl').and.returnValue(Promise.resolve(true));
+    spyOn(cmp, 'openLightbox').and.callThrough();
+
+    const link = doc.createElement('a');
+    link.setAttribute('data-router-link', '/blog/next');
+    const linkTarget = doc.createElement('span');
+    link.appendChild(linkTarget);
+    const linkEvent: any = {
+      target: linkTarget,
+      defaultPrevented: false,
+      button: 0,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    };
+    cmp.handleArticleClick(linkEvent as MouseEvent);
+    expect(cmp.router.navigateByUrl).toHaveBeenCalledWith('/blog/next');
+
+    const wrapper = doc.createElement('div');
+    wrapper.className = 'blog-codeblock';
+    const button = doc.createElement('button');
+    button.setAttribute('data-code-action', 'copy');
+    const inner = doc.createElement('span');
+    button.appendChild(inner);
+    const pre = doc.createElement('pre');
+    const code = doc.createElement('code');
+    code.textContent = 'const x = 1;';
+    pre.appendChild(code);
+    wrapper.appendChild(button);
+    wrapper.appendChild(pre);
+
+    const writeText = jasmine.createSpy('writeText').and.returnValue(Promise.resolve());
+    Object.defineProperty(win.navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const codeEvent: any = {
+      target: inner,
+      defaultPrevented: false,
+      button: 0,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    };
+    cmp.handleArticleClick(codeEvent as MouseEvent);
+    expect(writeText).toHaveBeenCalled();
+
+    button.setAttribute('data-code-action', 'wrap');
+    button.setAttribute('data-wrap-label', 'Wrap');
+    button.setAttribute('data-unwrap-label', 'Unwrap');
+    cmp.handleArticleClick(codeEvent as MouseEvent);
+    expect(wrapper.classList.contains('blog-codeblock--wrap')).toBeTrue();
+
+    const img = doc.createElement('img');
+    img.src = 'https://cdn.test/gallery.jpg';
+    cmp.galleryImages.set([{ src: 'https://cdn.test/gallery.jpg', alt: 'A' }]);
+    const imgEvent: any = {
+      target: img,
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    };
+    cmp.handleArticleClick(imgEvent as MouseEvent);
+    expect(cmp.openLightbox).toHaveBeenCalledWith(0);
+
+    (doc as any).execCommand = () => false;
+    const copyExecSpy = spyOn(doc as any, 'execCommand').and.returnValue(false);
+    Object.defineProperty(win.navigator, 'clipboard', { value: undefined, configurable: true });
+    cmp.copyShareLink();
+    cmp['copyCode']('let a = 1;');
+    expect(copyExecSpy).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
+
+    const article = doc.createElement('article');
+    const heading = doc.createElement('h2');
+    heading.id = 'h-1';
+    const articleImg = doc.createElement('img');
+    articleImg.src = 'https://cdn.test/article.jpg';
+    article.appendChild(heading);
+    article.appendChild(articleImg);
+    Object.defineProperty(article, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ top: 100, bottom: 1900, left: 0, right: 0, width: 100, height: 1800 })
+    });
+    Object.defineProperty(heading, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({ top: -10, bottom: 20, left: 0, right: 0, width: 100, height: 30 })
+    });
+    doc.body.appendChild(article);
+    cmp.articleContent = { nativeElement: article };
+    Object.defineProperty(win, 'innerHeight', { configurable: true, value: 700 });
+    Object.defineProperty(win, 'scrollY', { configurable: true, value: 800, writable: true });
+    cmp['measureReadingProgress']();
+    cmp['updateReadingProgress']();
+    expect(cmp.galleryImages().length).toBeGreaterThan(0);
+    expect(cmp.readingProgress()).toBeGreaterThanOrEqual(0);
+  });
+});
+

@@ -607,6 +607,39 @@ describe('ShopComponent coverage fast wave: prototype sweep states', () => {
 });
 
 
+describe('ShopComponent coverage fast wave: reorder guard matrix', () => {
+  it('covers canReorderProducts and reorder commit paths', () => {
+    const cmp = createShopHarness();
+    cmp.canEditProducts = jasmine.createSpy('canEditProducts').and.returnValue(true);
+    cmp.bulkSelectMode.set(false);
+    cmp.productReorderSaving.set(false);
+    cmp.loading.set(false);
+    cmp.hasError.set(false);
+    cmp.filters.sort = 'recommended';
+    cmp.activeCategorySlug = 'rings';
+    cmp.activeSubcategorySlug = '';
+    cmp.categoriesBySlug.set('rings', { id: 'c1', slug: 'rings', parent_id: null });
+    cmp.getSubcategories = jasmine.createSpy('getSubcategories').and.returnValue([]);
+    cmp.pageMeta = { page: 1, total_pages: 1, total_items: 3, limit: 12 };
+    cmp.products = [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }];
 
+    expect(cmp.canReorderProducts()).toBeTrue();
 
+    const event: any = { preventDefault: jasmine.createSpy('preventDefault'), dataTransfer: {} };
+    cmp.draggingProductId = 'p1';
+    cmp.dragOverProductId = 'p2';
+    cmp.onProductDrop(event, 'p3');
+    expect(cmp.admin.bulkUpdateProducts).toHaveBeenCalled();
+    expect(cmp.toast.action).toHaveBeenCalled();
+
+    cmp.admin.bulkUpdateProducts.and.returnValue(throwError(() => new Error('fail')));
+    cmp.draggingProductId = 'p2';
+    cmp.onProductDrop(event, 'p1');
+    expect(cmp.toast.error).toHaveBeenCalled();
+
+    cmp.admin.bulkUpdateProducts.and.returnValue(of([]));
+    cmp.pinProductToTop('p3');
+    expect(cmp.admin.bulkUpdateProducts.calls.count()).toBeGreaterThan(2);
+  });
+});
 
