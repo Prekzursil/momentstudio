@@ -53,7 +53,10 @@ function createComponent() {
     'createCoupon',
     'updateCoupon',
     'invalidateCouponStripeMappings',
-    'listContentVersions'
+    'listContentVersions',
+    'createFeaturedCollection',
+    'updateFeaturedCollection',
+    'uploadContentImage'
   ]);
 
   admin.products.and.returnValue(of([]));
@@ -108,15 +111,19 @@ function createComponent() {
   admin.updateCoupon.and.returnValue(of({ id: 'coupon-1', code: 'SAVE10', active: false }));
   admin.invalidateCouponStripeMappings.and.returnValue(of({ deleted_mappings: 1 }));
   admin.listContentVersions.and.returnValue(of([]));
+  admin.createFeaturedCollection.and.returnValue(of({ slug: 'new-collection', name: 'New', description: '', product_ids: [] }));
+  admin.updateFeaturedCollection.and.returnValue(of({ slug: 'updated-collection', name: 'Updated', description: '', product_ids: [] }));
+  admin.uploadContentImage.and.returnValue(of({ version: 2, images: [{ id: 'asset-1', url: '/asset-1.jpg', alt_text: null }] }));
 
 
   const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
   adminProducts.search.and.returnValue(of({ items: [] }));
 
-  const blog = jasmine.createSpyObj('BlogService', ['listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin', 'pinPostAdmin', 'unpinPostAdmin']);
+  const blog = jasmine.createSpyObj('BlogService', ['listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin', 'unhideCommentAdmin', 'pinPostAdmin', 'unpinPostAdmin']);
   blog.listFlaggedComments.and.returnValue(of({ items: [] }));
   blog.resolveCommentFlagsAdmin.and.returnValue(of({}));
   blog.hideCommentAdmin.and.returnValue(of({}));
+  blog.unhideCommentAdmin.and.returnValue(of({}));
   blog.pinPostAdmin.and.returnValue(of({}));
   blog.unpinPostAdmin.and.returnValue(of({}));
   const fxAdmin = jasmine.createSpyObj('FxAdminService', [
@@ -288,6 +295,16 @@ const ADMIN_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
   updateBlogBody: [createTextareaStub('Body sample'), 'Body sample update', 0, 4],
   setBlogMarkdownImageAlt: [0, 'Accessible alt'],
   promptFixBlogImageAlt: [0],
+  blogBulkPreview: [],
+  saveBlogPost: [],
+  toggleHide: [{ id: 'comment-1', is_hidden: true }],
+  selectBlogCoverAsset: [{ id: 'asset-1', url: '/cover.jpg', alt_text: 'Alt', sort_order: 1, focal_x: 50, focal_y: 50 }],
+  saveCollection: [],
+  savePageBlockAsReusable: ['page.about', 'hero'],
+  insertReusableBlockIntoPage: ['page.about', 'reuse-1'],
+  onPageBlockDrop: [{ preventDefault: () => undefined, dataTransfer: { files: [], types: ['text/plain'], getData: () => '' } }, 'page.about', 'hero'],
+  onHomeBlockDrop: [{ preventDefault: () => undefined, dataTransfer: { files: [], types: ['text/plain'], getData: () => '' } }, 'hero'],
+  applyStarterTemplateToCustomBlock: ['text', { key: 'tmp', type: 'text', title: {}, body_markdown: {}, enabled: true }],
 };
 
 const ADMIN_SWEEP_BLOCKED = new Set([
@@ -300,11 +317,7 @@ const ADMIN_SWEEP_BLOCKED = new Set([
   // Upload/download methods with browser file side effects.
   'onImageUpload',
   'uploadAndInsertBlogImage',
-  'exportContentRedirects',
-  // Large fan-out loaders already covered by targeted tests.
-  'loadAll',
-  'retryLoadAll',
-]);
+  'exportContentRedirects',]);
 
 const ADMIN_SWEEP_FALLBACK_VARIANTS: unknown[][] = [
   ['sample'],
@@ -1143,6 +1156,99 @@ describe('AdminComponent sweep coverage', () => {
     const tagsPayload = dynamic.buildBlogBulkPayload({ meta: { tags: ['tag-0'] } });
     expect(tagsPayload).toEqual({ meta: { tags: ['tag-0', 'tag-1', 'tag-2'] } });
   });
+
+  it('covers additional high-miss blog preview and collection save branches', () => {
+    const { component, admin, toast } = createComponent();
+    void toast;
+
+    component.blogBulkSelection = new Set(['blog.1', 'blog.2']);
+    component.blogBulkAction = 'publish';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewPublish');
+    component.blogBulkAction = 'unpublish';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewUnpublish');
+    component.blogBulkAction = 'tags_remove';
+    component.blogBulkTags = 'a,b';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewTagsRemove');
+
+    component.collectionForm = { name: '', description: '', product_ids: [] } as any;
+    component.saveCollection();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.home.collections.errors.required');
+
+    component.collectionForm = { name: 'Wave', description: 'Desc', product_ids: ['p-1'] } as any;
+    component.editingCollection = null;
+    component.featuredCollections = [] as any;
+    component.saveCollection();
+    expect(admin.createFeaturedCollection).toHaveBeenCalled();
+
+    admin.updateFeaturedCollection.and.returnValue(throwError(() => ({ status: 500 })));
+    component.editingCollection = 'updated-collection';
+    component.saveCollection();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.home.collections.errors.save');
+  });
+
+  it('covers moderation toggle and cover-asset branches', () => {
+    const { component } = createComponent();
+    const blog = (component as any).blog as jasmine.SpyObj<any>;
+
+    component.flaggedComments = {
+      set: () => undefined,
+      update: (fn: (items: any[]) => any[]) => {
+        const current = [{ id: 'c-1', is_hidden: true }, { id: 'c-2', is_hidden: false }] as any[];
+        return fn(current);
+      },
+      asReadonly: () => ({})
+    } as any;
+
+    component.toggleHide({ id: 'c-1', is_hidden: true } as any);
+    expect(blog.unhideCommentAdmin).toHaveBeenCalledWith('c-1');
+
+    spyOn(globalThis, 'prompt').and.returnValue('reason text');
+    component.toggleHide({ id: 'c-2', is_hidden: false } as any);
+    expect(blog.hideCommentAdmin).toHaveBeenCalledWith('c-2', { reason: 'reason text' });
+
+    component.blogEditLang = 'en';
+    component.blogBaseLang = 'en';
+    component.blogImages = [];
+    component.selectBlogCoverAsset({ id: 'asset-2', url: '/cover.jpg', alt_text: 'alt', sort_order: 2, focal_x: 55, focal_y: 45 } as any);
+    expect(component.blogForm.cover_image_url).toBe('/cover.jpg');
+    expect(component.blogImages.length).toBeGreaterThan(0);
+
+    component.blogEditLang = 'ro';
+    component.selectBlogCoverAsset({ id: 'asset-3', url: '/ignored.jpg' } as any);
+    expect(component.blogForm.cover_image_url).toBe('/cover.jpg');
+  });
+
+  it('covers starter-template and media-drop helper branches', () => {
+    const { component } = createComponent();
+    const dynamic = component as any;
+
+    const textDraft = { key: 'k1', type: 'text', title: {}, body_markdown: {}, enabled: true } as any;
+    dynamic.applyStarterTemplateToCustomBlock('text', textDraft);
+    expect(textDraft.title.en).toContain('Section');
+
+    const columnsDraft = { key: 'k2', type: 'columns', title: {}, columns: [], enabled: true } as any;
+    dynamic.applyStarterTemplateToCustomBlock('columns', columnsDraft);
+    expect(columnsDraft.columns?.length).toBeGreaterThan(1);
+
+    spyOn(dynamic, 'extractCmsImageFiles').and.returnValue([{ name: 'x.png' } as any]);
+    const insertPageMedia = spyOn(dynamic, 'insertPageMediaFiles').and.returnValue(Promise.resolve());
+    const insertHomeMedia = spyOn(dynamic, 'insertHomeMediaFiles').and.returnValue(Promise.resolve());
+    component.pageBlocks = { 'page.about': [{ key: 'target', type: 'text', enabled: true }] as any[] } as any;
+    component.homeBlocks = [{ key: 'home-target', type: 'text', enabled: true }] as any;
+
+    component.onPageBlockDrop({ preventDefault: () => undefined } as any, 'page.about', 'target');
+    component.onHomeBlockDrop({ preventDefault: () => undefined } as any, 'home-target');
+
+    expect(insertPageMedia).toHaveBeenCalled();
+    expect(insertHomeMedia).toHaveBeenCalled();
+  });
 });
+
+
+
+
+
+
+
 
 

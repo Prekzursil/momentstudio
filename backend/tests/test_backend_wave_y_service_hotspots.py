@@ -401,10 +401,34 @@ def _resolve_method_callable(cls, instance, method_name: str):
     return None
 
 
+def _edge_case_kwargs(source: dict[str, object]) -> dict[str, object]:
+    edge = dict(source)
+    for key, value in list(edge.items()):
+        lowered = key.lower()
+        if isinstance(value, bool):
+            edge[key] = not value
+            continue
+        if isinstance(value, list):
+            edge[key] = []
+            continue
+        if isinstance(value, dict):
+            edge[key] = {}
+            continue
+        if isinstance(value, str):
+            if lowered in {"status", "slug", "provider", "source", "q", "search"}:
+                edge[key] = ""
+            elif lowered in {"lang", "language", "currency", "payment_method"}:
+                edge[key] = "ro"
+    return edge
+
+
 def _invoke_method_variants(callable_obj, *, alternate: bool) -> int:
-    _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=False))
-    _invoke(callable_obj, _build_kwargs(callable_obj, alternate=alternate, include_optional=True))
-    return 2
+    base = _build_kwargs(callable_obj, alternate=alternate, include_optional=False)
+    full = _build_kwargs(callable_obj, alternate=alternate, include_optional=True)
+    variants = [base, full, _edge_case_kwargs(base), _edge_case_kwargs(full)]
+    for kwargs in variants:
+        _invoke(callable_obj, kwargs)
+    return len(variants)
 
 
 def _install_fast_network_guards(monkeypatch: pytest.MonkeyPatch) -> None:
