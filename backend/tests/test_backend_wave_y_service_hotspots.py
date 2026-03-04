@@ -16,6 +16,7 @@ from starlette.requests import Request
 MODULES = [
     "app.services.media_dam",
     "app.services.order",
+    "app.services.auth",
     "app.services.email",
     "app.services.catalog",
     "app.services.content",
@@ -93,6 +94,7 @@ _BOOL_NAMES = {"enabled", "active", "force", "strict", "owner", "admin", "publis
 MINIMUM_BY_MODULE = {
     "app.services.media_dam": 220,
     "app.services.order": 240,
+    "app.services.auth": 90,
     "app.services.email": 80,
     "app.services.catalog": 280,
     "app.services.content": 210,
