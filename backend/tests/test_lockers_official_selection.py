@@ -355,3 +355,161 @@ async def test_query_mirror_and_list_lockers_cached_fallback(monkeypatch) -> Non
         force_refresh=True,
     )
     assert out == cached_rows
+
+
+def test_lockers_format_and_coord_edge_cases() -> None:
+    assert lockers_service._format_address({'address': 'Fallback Addr'}) == 'Fallback Addr'
+    assert lockers_service._format_address({}) is None
+
+    assert lockers_service._format_name({'official_name': 'Official Box'}, LockerProvider.fan_courier) == 'Official Box'
+    assert lockers_service._format_name({'brand': 'Brand Box'}, LockerProvider.sameday) == 'Brand Box'
+
+    assert lockers_service._sameday_coord(True) is None
+    assert lockers_service._sameday_coord(object()) is None
+    assert lockers_service._sameday_coord('x-not-a-float') is None
+
+
+@pytest.mark.anyio('asyncio')
+async def test_lockers_config_and_token_guard_paths(monkeypatch) -> None:
+    lockers_service._reset_cache_for_tests()
+
+    monkeypatch.setattr(lockers_service.settings, 'sameday_api_base_url', None)
+    with pytest.raises(lockers_service.LockersNotConfiguredError):
+        lockers_service._sameday_base_url()
+
+    monkeypatch.setattr(lockers_service.settings, 'sameday_api_username', None)
+    monkeypatch.setattr(lockers_service.settings, 'sameday_api_password', None)
+    with pytest.raises(lockers_service.LockersNotConfiguredError):
+        lockers_service._require_sameday_credentials()
+
+    monkeypatch.setattr(lockers_service.settings, 'sameday_api_base_url', 'https://example.invalid')
+    monkeypatch.setattr(lockers_service.settings, 'sameday_api_username', 'user')
+    monkeypatch.setattr(lockers_service.settings, 'sameday_api_password', 'pass')
+
+    class _Resp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return {'token': 'sameday-token', 'expire_at': '2099-01-01 00:00:00'}
+
+    class _Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, _path: str, data=None):
+            assert data == {'remember_me': '1'}
+            return _Resp()
+
+    monkeypatch.setattr(lockers_service.httpx, 'AsyncClient', lambda *a, **k: _Client())
+    token = await lockers_service._sameday_get_token()
+    assert token == 'sameday-token'
+
+
+@pytest.mark.anyio('asyncio')
+async def test_lockers_sameday_load_and_paging_terminal_branch(monkeypatch) -> None:
+    lockers_service._reset_cache_for_tests()
+    monkeypatch.setattr(lockers_service, '_sameday_get_token', lambda: (_ for _ in ()).throw(RuntimeError('nope')))
+    with pytest.raises(RuntimeError, match='nope'):
+        await lockers_service._load_sameday_lockers()
+
+    assert lockers_service._next_sameday_page({'pages': 1, 'currentPage': 1}, current_page=1) is None
+
+
+@pytest.mark.anyio('asyncio')
+async def test_lockers_fan_token_runtime_error_and_cache_hit(monkeypatch) -> None:
+    lockers_service._reset_cache_for_tests()
+
+    now = datetime.now(timezone.utc)
+    lockers_service._fan_auth = lockers_service._AuthToken(  # type: ignore[attr-defined]
+        token='fan-cached',
+        expires_at=now + timedelta(minutes=30),
+    )
+    cached = await lockers_service._fan_get_token()
+    assert cached == 'fan-cached'
+
+    lockers_service._fan_auth = None
+    monkeypatch.setattr(lockers_service.settings, 'fan_api_base_url', 'https://example.invalid')
+    monkeypatch.setattr(lockers_service.settings, 'fan_api_username', 'u')
+    monkeypatch.setattr(lockers_service.settings, 'fan_api_password', 'p')
+
+    class _Resp:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self):
+            return {'status': 'success', 'data': {'token': ''}}
+
+    class _Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def post(self, _path: str, params=None):
+            assert params == {'username': 'u', 'password': 'p'}
+            return _Resp()
+
+    monkeypatch.setattr(lockers_service.httpx, 'AsyncClient', lambda *a, **k: _Client())
+    with pytest.raises(RuntimeError, match='empty token'):
+        await lockers_service._fan_get_token()
+
+
+@pytest.mark.anyio('asyncio')
+async def test_lockers_cache_shortcuts_and_stale_fallback_paths(monkeypatch) -> None:
+    lockers_service._reset_cache_for_tests()
+
+    now = datetime.now(timezone.utc)
+    monkeypatch.setattr(lockers_service, '_locker_source', lambda _provider: 'official')
+
+    key = lockers_service._locker_cache_key(
+        LockerProvider.sameday,
+        'official',
+        lat=44.4,
+        lng=26.1,
+        radius_km=5.0,
+        limit=10,
+    )
+    cached_rows = [
+        lockers_service.LockerRead(
+            id='cached-1',
+            provider=LockerProvider.sameday,
+            name='Cached',
+            address='Addr',
+            lat=44.4,
+            lng=26.1,
+            distance_km=0.1,
+        )
+    ]
+    lockers_service._cache[key] = lockers_service._CacheEntry(expires_at=now + timedelta(minutes=10), items=cached_rows)
+
+    out = await lockers_service.list_lockers(
+        provider=LockerProvider.sameday,
+        lat=44.4,
+        lng=26.1,
+        radius_km=5.0,
+        limit=10,
+        force_refresh=False,
+    )
+    assert out == cached_rows
+
+    lockers_service._cache[key] = lockers_service._CacheEntry(expires_at=now - timedelta(minutes=5), items=cached_rows)
+    monkeypatch.setattr(lockers_service, '_locker_source', lambda _provider: 'official')
+
+    async def _raise_query(*_args, **_kwargs):
+        raise RuntimeError('official-source-down')
+
+    monkeypatch.setattr(lockers_service, '_query_source_lockers', _raise_query)
+    fallback = await lockers_service.list_lockers(
+        provider=LockerProvider.sameday,
+        lat=44.4,
+        lng=26.1,
+        radius_km=5.0,
+        limit=10,
+        force_refresh=True,
+    )
+    assert fallback == cached_rows
