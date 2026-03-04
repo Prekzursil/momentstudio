@@ -1326,3 +1326,161 @@ async def test_admin_dashboard_public_endpoint_reflection_superstep_a(monkeypatc
         invoked += 1
 
     assert invoked >= 40
+
+class _GdprSession:
+    def __init__(self, records: dict[object, object]) -> None:
+        self.records = dict(records)
+        self.added: list[object] = []
+        self.commits = 0
+
+    async def get(self, model: object, key: object) -> object | None:
+        await asyncio.sleep(0)
+        return self.records.get((model, key))
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        await asyncio.sleep(0)
+        self.commits += 1
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_gdpr_download_and_expiry_paths(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    user_id = uuid4()
+    job_id = uuid4()
+    export_file = tmp_path / 'export.json'
+    export_file.write_text('{"ok":true}', encoding='utf-8')
+
+    now = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    job = SimpleNamespace(
+        id=job_id,
+        user_id=user_id,
+        status=admin_dashboard.UserDataExportStatus.succeeded,
+        file_path='exports/export.json',
+        expires_at=now + timedelta(hours=2),
+        finished_at=now,
+        created_at=now,
+    )
+    user = SimpleNamespace(id=user_id)
+    session = _GdprSession({
+        (admin_dashboard.UserDataExportJob, job_id): job,
+        (admin_dashboard.User, user_id): user,
+    })
+
+    audit_calls: list[dict[str, object]] = []
+
+    async def _audit(_session, **kwargs):
+        await asyncio.sleep(0)
+        audit_calls.append(kwargs)
+
+    monkeypatch.setattr(admin_dashboard.step_up_service, 'require_step_up', lambda *_a, **_k: None)
+    monkeypatch.setattr(admin_dashboard.private_storage, 'resolve_private_path', lambda _p: export_file)
+    monkeypatch.setattr(admin_dashboard.audit_chain_service, 'add_admin_audit_log', _audit)
+
+    class _FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now if tz else now.replace(tzinfo=None)
+
+    monkeypatch.setattr(admin_dashboard, 'datetime', _FrozenDateTime)
+
+    request = _request_with_scope(headers=[(b'user-agent', b'Agent/2.0')], client=('198.51.100.77', 443))
+    current_user = SimpleNamespace(id=uuid4())
+
+    response = await admin_dashboard.admin_gdpr_download_export_job(job_id, request, session, current_user)
+    assert response.media_type == 'application/json'
+    assert 'moment-studio-export-' in str(response.headers.get('content-disposition', ''))
+    assert session.commits == 1
+    assert len(audit_calls) == 1
+
+    job.expires_at = now - timedelta(minutes=1)
+    with pytest.raises(HTTPException):
+        await admin_dashboard.admin_gdpr_download_export_job(job_id, request, session, current_user)
+
+
+@pytest.mark.anyio
+async def test_admin_dashboard_gdpr_deletion_request_execute_and_cancel_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = _request_with_scope(headers=[(b'user-agent', b'Agent/3.0')], client=('203.0.113.21', 443))
+    current_user = SimpleNamespace(id=uuid4(), role=admin_dashboard.UserRole.owner, hashed_password='hash')
+
+    pii_calls: list[object] = []
+    row_requested_at = datetime(2026, 3, 1, tzinfo=timezone.utc)
+
+    async def _page(_session, _stmt, *, limit: int, offset: int):
+        await asyncio.sleep(0)
+        row = SimpleNamespace(
+            id=uuid4(),
+            email='customer@example.com',
+            username='customer',
+            role=admin_dashboard.UserRole.customer,
+            deletion_requested_at=row_requested_at,
+            deletion_scheduled_for=row_requested_at + timedelta(days=3),
+        )
+        return 1, 1, [row]
+
+    monkeypatch.setattr(admin_dashboard.pii_service, 'require_pii_reveal', lambda *_a, **_k: pii_calls.append(True))
+    monkeypatch.setattr(admin_dashboard, '_gdpr_deletion_requests_stmt', lambda _q: object())
+    monkeypatch.setattr(admin_dashboard, '_gdpr_deletion_requests_page', _page)
+
+    listing = await admin_dashboard.admin_gdpr_deletion_requests(
+        request=request,
+        q='customer',
+        page=1,
+        limit=25,
+        include_pii=True,
+        session=SimpleNamespace(),
+        current_user=current_user,
+    )
+    assert listing.meta.total_items == 1
+    assert listing.items[0].user.email == 'customer@example.com'
+    assert pii_calls
+
+    target_user_id = uuid4()
+    deletion_user = SimpleNamespace(
+        id=target_user_id,
+        role=admin_dashboard.UserRole.customer,
+        email='customer@example.com',
+        deletion_requested_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        deletion_scheduled_for=datetime(2026, 3, 5, tzinfo=timezone.utc),
+    )
+    exec_session = _GdprSession({(admin_dashboard.User, target_user_id): deletion_user})
+    audit_calls: list[str] = []
+
+    async def _delete_account(_session, _user):
+        await asyncio.sleep(0)
+
+    async def _audit(_session, **kwargs):
+        await asyncio.sleep(0)
+        audit_calls.append(str(kwargs.get('action')))
+
+    monkeypatch.setattr(admin_dashboard.security, 'verify_password', lambda *_a, **_k: False)
+    with pytest.raises(HTTPException):
+        await admin_dashboard.admin_gdpr_execute_deletion(
+            target_user_id,
+            SimpleNamespace(password='credential-value'),
+            request,
+            exec_session,
+            current_user,
+        )
+
+    monkeypatch.setattr(admin_dashboard.security, 'verify_password', lambda *_a, **_k: True)
+    monkeypatch.setattr(admin_dashboard.self_service, 'execute_account_deletion', _delete_account)
+    monkeypatch.setattr(admin_dashboard.audit_chain_service, 'add_admin_audit_log', _audit)
+
+    await admin_dashboard.admin_gdpr_execute_deletion(
+        target_user_id,
+        SimpleNamespace(password='credential-value'),
+        request,
+        exec_session,
+        current_user,
+    )
+    assert exec_session.commits >= 1
+    assert 'gdpr.deletion.execute' in audit_calls
+
+    await admin_dashboard.admin_gdpr_cancel_deletion(target_user_id, request, exec_session, current_user)
+    assert deletion_user.deletion_requested_at is None
+    assert deletion_user.deletion_scheduled_for is None
+    assert 'gdpr.deletion.cancel' in audit_calls
+
+

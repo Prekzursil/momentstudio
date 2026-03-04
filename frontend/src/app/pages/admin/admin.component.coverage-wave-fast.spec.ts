@@ -704,3 +704,201 @@ describe('AdminComponent fast tax/category/fx/product branches', () => {
     expect(component.toast.error).toHaveBeenCalled();
   });
 });
+
+type BlogHarness = {
+  admin: jasmine.SpyObj<any>;
+  blog: jasmine.SpyObj<any>;
+  toast: jasmine.SpyObj<any>;
+  draft: { initFromServer: jasmine.Spy; markServerSaved: jasmine.Spy };
+};
+
+function attachBlogHarness(component: any): BlogHarness {
+  const admin = jasmine.createSpyObj('AdminService', ['createContent', 'updateContentBlock', 'deleteContent', 'getContent']);
+  admin.createContent.and.returnValue(of({ key: 'blog.hello', version: 1 }));
+  admin.updateContentBlock.and.returnValue(of({ key: 'blog.hello', version: 2, title: 'Saved', body_markdown: 'Body', status: 'draft' }));
+  admin.deleteContent.and.returnValue(immediateResult({}));
+  admin.getContent.and.returnValue(
+    of({ title: 'Loaded', body_markdown: 'Loaded body', status: 'draft', published_at: null, published_until: null, meta: {} })
+  );
+  const blog = jasmine.createSpyObj('BlogService', ['createPreviewToken']);
+  blog.createPreviewToken.and.returnValue(
+    of({ url: 'https://preview.example/blog/hello', token: 'preview-token', expires_at: '2026-03-10T12:00:00Z' })
+  );
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+  const draft = {
+    initFromServer: jasmine.createSpy('initFromServer'),
+    markServerSaved: jasmine.createSpy('markServerSaved'),
+  };
+
+  component.admin = admin;
+  component.blog = blog;
+  component.toast = toast;
+  component.t = (key: string) => key;
+  component.blogMeta = {};
+  component.blogForm = { title: '', body_markdown: '', status: 'draft', published_at: '', published_until: '' };
+  component.blogCreate = {
+    title: 'Hello world',
+    body_markdown: 'Body text',
+    status: 'draft',
+    baseLang: 'en',
+    includeTranslation: true,
+    translationTitle: 'Salut',
+    translationBody: 'Continut',
+    tags: 'news, featured',
+    summary: 'Summary',
+    series: 'Series',
+    cover_image_url: 'https://cdn.example/image.jpg',
+    reading_time_minutes: '4',
+    pinned: true,
+    pin_order: '2',
+    published_at: '2026-03-01T10:00',
+    published_until: '2026-03-05T12:00',
+  };
+
+  spyOn(component, 'rememberContentVersion').and.stub();
+  spyOn(component, 'reloadContentBlocks').and.stub();
+  spyOn(component, 'loadBlogEditor').and.stub();
+  spyOn(component, 'setBlogSeoSnapshot').and.stub();
+  spyOn(component, 'currentBlogDraftState').and.returnValue({} as any);
+  spyOn(component, 'ensureBlogDraft').and.returnValue(draft as any);
+  spyOn(component, 'withExpectedVersion').and.callFake((_key: string, payload: unknown) => payload);
+  return { admin, blog, toast, draft };
+}
+
+describe('AdminComponent fast blog editor branches', () => {
+  it('validates createBlogPost required fields before submit', async () => {
+    const component = createAdminHarness() as any;
+    attachBlogHarness(component);
+
+    spyOn(component, 'blogCreateSlug').and.returnValue('');
+    await component.createBlogPost();
+    expect(component.toast.error).toHaveBeenCalled();
+
+    component.blogCreate.title = '   ';
+    component.blogCreate.body_markdown = '   ';
+    component.blogCreateSlug.and.returnValue('hello-world');
+    await component.createBlogPost();
+    expect(component.toast.error).toHaveBeenCalled();
+  });
+
+  it('covers createBlogPost retry, translation update and success flow', async () => {
+    const component = createAdminHarness() as any;
+    const { admin, toast } = attachBlogHarness(component);
+
+    spyOn(component, 'blogCreateSlug').and.returnValue('hello-world');
+    spyOn(component, 'parseTags').and.returnValue(['news', 'featured']);
+    spyOn(component, 'nextBlogPinOrder').and.returnValue(8);
+
+    admin.createContent.and.returnValues(
+      throwError(() => ({ error: { detail: 'Content key exists' } })),
+      of({ key: 'blog.hello-world-2', version: 2 })
+    );
+
+    await component.createBlogPost();
+
+    expect(admin.createContent).toHaveBeenCalledTimes(2);
+    expect(admin.createContent.calls.argsFor(1)[0]).toBe('blog.hello-world-2');
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+    expect(component.loadBlogEditor).toHaveBeenCalledWith('blog.hello-world-2');
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('covers createBlogPost error branch after submit failure', async () => {
+    const component = createAdminHarness() as any;
+    const { admin, toast } = attachBlogHarness(component);
+
+    spyOn(component, 'blogCreateSlug').and.returnValue('hello-world');
+    admin.createContent.and.returnValue(throwError(() => ({ error: { detail: 'fatal' } })));
+
+    await component.createBlogPost();
+
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('covers deleteBlogPost confirm, success and error branches', () => {
+    const component = createAdminHarness() as any;
+    const { admin, toast } = attachBlogHarness(component);
+    component.selectedBlogKey = 'blog.hello';
+    spyOn(component, 'closeBlogEditor').and.stub();
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true);
+
+    component.deleteBlogPost({ key: 'blog.hello', title: 'Hello' } as any);
+    expect(admin.deleteContent).not.toHaveBeenCalled();
+
+    component.deleteBlogPost({ key: 'blog.hello', title: 'Hello' } as any);
+    expect(admin.deleteContent).toHaveBeenCalledWith('blog.hello');
+    expect(component.closeBlogEditor).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalled();
+
+    admin.deleteContent.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })));
+    component.deleteBlogPost({ key: 'blog.other', title: 'Other' } as any);
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('covers setBlogEditLang success and error branches', () => {
+    const component = createAdminHarness() as any;
+    const { admin, draft, toast } = attachBlogHarness(component);
+
+    component.selectedBlogKey = 'blog.hello';
+    component.blogBaseLang = 'en';
+    component.setBlogEditLang('ro');
+    expect(admin.getContent).toHaveBeenCalledWith('blog.hello', 'ro');
+    expect(draft.initFromServer).toHaveBeenCalled();
+
+    admin.getContent.and.returnValue(throwError(() => ({ error: { detail: 'load-failed' } })));
+    component.setBlogEditLang('en');
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('covers saveBlogPost base and translation update branches', () => {
+    const component = createAdminHarness() as any;
+    const { admin, draft, toast } = attachBlogHarness(component);
+
+    component.selectedBlogKey = 'blog.hello';
+    component.blogBaseLang = 'en';
+    component.blogEditLang = 'en';
+    component.blogForm = { title: 'Updated', body_markdown: 'Updated body', status: 'draft', published_at: '', published_until: '' };
+    component.blogMeta = {};
+    spyOn(component, 'buildBlogMeta').and.returnValues({ summary: { en: 'S1' } }, { summary: { ro: 'S2' } });
+    spyOn(component, 'blogA11yIssues').and.returnValue([]);
+    spyOn(component, 'handleContentConflict').and.returnValue(false);
+    spyOn(component, 'setBlogEditLang').and.stub();
+
+    component.saveBlogPost();
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+    expect(draft.markServerSaved).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalled();
+
+    admin.updateContentBlock.calls.reset();
+    admin.updateContentBlock.and.returnValues(
+      of({ key: 'blog.hello', version: 3, title: 'Updated', body_markdown: 'Updated body', status: 'draft' }),
+      throwError(() => ({ error: { detail: 'meta-failed' } }))
+    );
+    component.blogEditLang = 'ro';
+    component.saveBlogPost();
+    expect(admin.updateContentBlock).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('covers blog preview generation and copy branches', async () => {
+    const component = createAdminHarness() as any;
+    const { blog, toast } = attachBlogHarness(component);
+
+    component.selectedBlogKey = 'blog.hello';
+    spyOn(component, 'currentBlogSlug').and.returnValue('hello');
+    component.copyToClipboard = jasmine.createSpy('copyToClipboard').and.returnValues(Promise.resolve(true), Promise.resolve(false));
+
+    component.generateBlogPreviewLink();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(blog.createPreviewToken).toHaveBeenCalled();
+    expect(component.blogPreviewUrl).toContain('preview.example');
+
+    component.copyBlogPreviewLink();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(toast.info).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalled();
+  });
+});
