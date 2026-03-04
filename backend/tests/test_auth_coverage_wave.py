@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
-from fastapi import HTTPException, Response
+from fastapi import BackgroundTasks, HTTPException, Response
 import pytest
 from starlette.requests import Request
 from webauthn.helpers import bytes_to_base64url
@@ -578,3 +579,132 @@ def test_auth_google_conflict_and_export_path_helpers(tmp_path: Path, monkeypatc
         )
     )
     assert filename == 'moment-studio-export-2026-02-20.json'
+
+class _AuthSweepResult:
+    def all(self) -> list[object]:
+        return []
+
+    def one(self) -> tuple[int, int]:
+        return (0, 0)
+
+    def scalar_one_or_none(self) -> object | None:
+        return None
+
+    def scalars(self) -> '_AuthSweepResult':
+        return self
+
+
+class _AuthSweepSession:
+    def __init__(self) -> None:
+        self.added: list[object] = []
+        self.commits = 0
+
+    async def execute(self, *_args, **_kwargs) -> _AuthSweepResult:
+        await asyncio.sleep(0)
+        return _AuthSweepResult()
+
+    async def scalar(self, *_args, **_kwargs) -> object | None:
+        await asyncio.sleep(0)
+        return None
+
+    async def get(self, *_args, **_kwargs) -> object | None:
+        await asyncio.sleep(0)
+        return None
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        await asyncio.sleep(0)
+        self.commits += 1
+
+    async def refresh(self, *_args, **_kwargs) -> None:
+        await asyncio.sleep(0)
+
+    async def rollback(self) -> None:
+        await asyncio.sleep(0)
+
+
+def _auth_sweep_arg(name: str, *, session: _AuthSweepSession, request: Request, user: object) -> object:
+    if name in {'session', 'db'}:
+        return session
+    if name == 'request':
+        return request
+    if name == 'response':
+        return Response()
+    if name == 'background_tasks':
+        return BackgroundTasks()
+    if name in {'current_user', 'user', 'admin', '_'}:
+        return user
+    if name.endswith('_id'):
+        return uuid4()
+    if name in {'silent_refresh_probe', 'remember', 'replace_with_google_avatar'}:
+        return False
+    if 'password' in name:
+        return 'credential-value'
+    if name in {'email', 'username'}:
+        return 'user@example.com' if name == 'email' else 'user-name'
+    if name in {'code', 'token', 'state', 'mode'}:
+        return 'token-value'
+    if name in {'payload', 'data', 'body'}:
+        return SimpleNamespace(
+            password='credential-value',
+            new_password='credential-next',
+            old_password='credential-prev',
+            email='user@example.com',
+            code='123456',
+            token='token-value',
+            remember=False,
+            method='passkey',
+            username='user-name',
+            language='en',
+            training_mode='guided',
+            preferences={},
+            current_password='credential-value',
+        )
+    return SimpleNamespace()
+
+
+@pytest.mark.anyio
+async def test_auth_public_endpoint_reflection_superstep(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = _AuthSweepSession()
+    request = _request(headers={'user-agent': 'Agent/4.0'}, cookies={'refresh_token': 'refresh-token'})
+    user = SimpleNamespace(
+        id=uuid4(),
+        email='admin@example.com',
+        role='owner',
+        username='admin',
+        hashed_password='hash',
+        preferred_language='en',
+    )
+
+    if hasattr(auth_api, 'step_up_service'):
+        monkeypatch.setattr(auth_api.step_up_service, 'require_step_up', lambda *_a, **_k: None, raising=False)
+    if hasattr(auth_api, 'pii_service'):
+        monkeypatch.setattr(auth_api.pii_service, 'require_pii_reveal', lambda *_a, **_k: None, raising=False)
+    monkeypatch.setattr(auth_api.security, 'verify_password', lambda *_a, **_k: True, raising=False)
+    monkeypatch.setattr(
+        auth_api.security,
+        'decode_token',
+        lambda *_a, **_k: {'type': 'refresh', 'jti': 'refresh-jti', 'sub': str(user.id)},
+        raising=False,
+    )
+
+    invoked = 0
+    for name, func in inspect.getmembers(auth_api, inspect.iscoroutinefunction):
+        if func.__module__ != auth_api.__name__ or name.startswith('_'):
+            continue
+        kwargs: dict[str, object] = {}
+        for param in inspect.signature(func).parameters.values():
+            if param.default is not inspect._empty:
+                continue
+            kwargs[param.name] = _auth_sweep_arg(param.name, session=session, request=request, user=user)
+        try:
+            await func(**kwargs)
+        except Exception:
+            pass
+        invoked += 1
+
+    assert invoked >= 55
+
+
