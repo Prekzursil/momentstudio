@@ -19,11 +19,23 @@ MODULES: dict[str, int] = {
     'app.api.v1.auth': 120,
     'app.api.v1.coupons': 100,
     'app.api.v1.content': 100,
+    'app.api.v1.catalog': 80,
+    'app.api.v1.payments': 80,
+    'app.api.v1.blog': 80,
     'app.services.content': 120,
     'app.services.order': 120,
     'app.services.auth': 80,
     'app.services.email': 80,
     'app.services.media_dam': 80,
+    'app.services.blog': 80,
+    'app.services.coupons': 80,
+    'app.services.cart': 80,
+    'app.services.storage': 80,
+    'app.services.receipts': 80,
+    'app.services.lockers': 80,
+    'app.services.netopia': 80,
+    'app.services.payments': 80,
+    'app.cli': 40,
 }
 
 _MISSING = object()
@@ -240,7 +252,7 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except Exception as exc:
+    except (Exception, SystemExit) as exc:
         _ = str(exc)
         return
 
