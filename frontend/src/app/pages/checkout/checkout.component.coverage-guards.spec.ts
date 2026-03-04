@@ -447,6 +447,94 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
     expect(cmp.errorMessage).toBe('validation.phoneInvalid');
   });
 
+
+  it('covers openEditSavedAddress guard and happy-path branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.auth.isAuthenticated.and.returnValue(true);
+    cmp.selectedShippingAddressId = 'addr-1';
+    cmp.selectedBillingAddressId = 'addr-2';
+    cmp.savedAddresses = [
+      {
+        id: 'addr-1',
+        label: 'Home',
+        phone: '+40711111111',
+        line1: 'Main 1',
+        line2: null,
+        city: 'Bucharest',
+        region: 'B',
+        postal_code: '010101',
+        country: 'ro',
+        is_default_shipping: true,
+        is_default_billing: false,
+      },
+      {
+        id: 'addr-2',
+        label: 'Billing',
+        phone: null,
+        line1: 'Billing 2',
+        line2: 'Suite 2',
+        city: 'Cluj',
+        region: 'CJ',
+        postal_code: '400000',
+        country: 'RO',
+        is_default_shipping: false,
+        is_default_billing: true,
+      },
+    ] as any;
+
+    (CheckoutComponent.prototype as any).openEditSavedAddress.call(cmp, 'shipping');
+    expect(cmp.editSavedAddressOpen).toBeTrue();
+    expect(cmp.editSavedAddressId).toBe('addr-1');
+    expect(cmp.editSavedAddressModel.country).toBe('RO');
+
+    cmp.auth.isAuthenticated.and.returnValue(false);
+    cmp.editSavedAddressOpen = false;
+    (CheckoutComponent.prototype as any).openEditSavedAddress.call(cmp, 'billing');
+    expect(cmp.editSavedAddressOpen).toBeFalse();
+  });
+
+  it('covers applyLegacyPromo success, pending, and fallback-reload branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.cartApi = {
+      get: jasmine
+        .createSpy('get')
+        .and.returnValues(of({ quote: {} }), throwError(() => ({ error: { detail: 'legacy-fail' } })), of({ quote: {} })),
+      headers: jasmine.createSpy('headers').and.returnValue({}),
+    };
+    cmp.cartQuoteParams = jasmine.createSpy('cartQuoteParams').and.callFake((code: string | null) => ({ promo_code: code }));
+    cmp.hydrateCartAndQuote = jasmine.createSpy('hydrateCartAndQuote');
+    cmp.quotePromoSavings = jasmine.createSpy('quotePromoSavings').and.returnValues(12, 0);
+
+    (CheckoutComponent.prototype as any).applyLegacyPromo.call(cmp, 'SAVE10');
+    expect(cmp.promoStatus).toBe('success');
+    expect(cmp.promoMessage).toContain('checkout.promoApplied');
+
+    (CheckoutComponent.prototype as any).applyLegacyPromo.call(cmp, 'SAVE20');
+    expect(cmp.promoStatus).toBe('warn');
+    expect(cmp.promoMessage).toBe('legacy-fail');
+    expect(cmp.cartApi.get.calls.count()).toBe(3);
+  });
+
+  it('covers submitCheckout payload assembly for locker and billing branches', () => {
+    const cmp = createCheckoutHarness();
+    cmp.saveAddress = true;
+    cmp.saveDefaultShipping = true;
+    cmp.saveDefaultBilling = true;
+    cmp.billingSameAsShipping = false;
+    cmp.deliveryType = 'locker';
+    cmp.locker = { id: 'locker-1', name: 'Locker', address: 'Address', lat: 44.4, lng: 26.1 };
+    cmp.billing = { line1: 'Billing street', line2: 'Apt 2', city: 'Cluj', region: 'CJ', postal: '400000', country: 'RO' };
+    cmp.submitCheckoutRequest = jasmine.createSpy('submitCheckoutRequest');
+
+    (CheckoutComponent.prototype as any).submitCheckout.call(cmp);
+
+    const [url, payload] = cmp.submitCheckoutRequest.calls.mostRecent().args;
+    expect(url).toBe('/orders/checkout');
+    expect(payload.locker_id).toBe('locker-1');
+    expect(payload.default_shipping).toBeTrue();
+    expect(payload.billing_line1).toBe('Billing street');
+  });
+
   it('runs a deterministic prototype sweep across remaining checkout methods', () => {
     const cmp = createCheckoutHarness();
     cmp.quote = {

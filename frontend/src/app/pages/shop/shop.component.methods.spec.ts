@@ -304,8 +304,6 @@ function invokeShopMethodSafely(component: any, method: string, args: unknown[])
 
 const SHOP_SWEEP_BLOCKED = new Set([
   'constructor',
-  'ngOnInit',
-  'loadProducts',
   'setMetaTags',
   'scrollToSort',
 ]);
@@ -359,3 +357,4 @@ describe('ShopComponent deterministic prototype sweep', () => {
     expect(attempted).toBeGreaterThan(55);
   });
 });
+

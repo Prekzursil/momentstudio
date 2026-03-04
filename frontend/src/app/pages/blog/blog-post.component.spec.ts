@@ -61,11 +61,8 @@ const BLOG_SWEEP_BLOCKED = new Set([
   'ngOnInit',
   'ngOnDestroy',
   // Route and async loads are already exercised by dedicated tests.
-  'load',
   'loadAdminBlock',
   'loadNeighbors',
-  'loadRelatedPosts',
-  'loadMoreFromAuthor',
   'loadComments',
   'loadCommentSubscription',
   // Scroll/measurement helpers depend on stable real browser layout.
@@ -472,3 +469,4 @@ function configureBlogPostTestingModule(deps: BlogPostSpecDeps): void {
   translate.setTranslation('en', { blog: { post: { metaTitle: 'Blog post', metaDescription: 'Desc' } } }, true);
   translate.use('en');
 }
+
