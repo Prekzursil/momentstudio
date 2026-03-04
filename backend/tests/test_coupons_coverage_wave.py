@@ -1412,3 +1412,145 @@ async def test_coupon_api_admin_promotion_assign_revoke_and_segment_paths(monkey
             session=revoke_segment_session,
             admin_user=segment_admin,
         )
+
+@pytest.mark.anyio
+async def test_coupon_api_segment_preview_all_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
+    coupon_id = uuid.uuid4()
+    monkeypatch.setattr(coupons_api, '_segment_sample_emails', lambda *_args, **_kwargs: asyncio.sleep(0, result=['sample@site.test']))
+
+    assign_session = _SessionStub(
+        _Result(scalar=10),
+        _Result(scalar=3),
+        _Result(scalar=2),
+    )
+    assign_preview = await coupons_api._preview_segment_assign_all(
+        assign_session,
+        coupon_id=coupon_id,
+        filters=[],
+    )
+    assert assign_preview.total_candidates == 10
+    assert assign_preview.already_active == 3
+    assert assign_preview.restored == 2
+    assert assign_preview.created == 5
+    assert assign_preview.sample_emails == ['sample@site.test']
+
+    revoke_session = _SessionStub(
+        _Result(scalar=8),
+        _Result(scalar=3),
+        _Result(scalar=2),
+    )
+    revoke_preview = await coupons_api._preview_segment_revoke_all(
+        revoke_session,
+        coupon_id=coupon_id,
+        filters=[],
+    )
+    assert revoke_preview.total_candidates == 8
+    assert revoke_preview.revoked == 3
+    assert revoke_preview.already_revoked == 2
+    assert revoke_preview.not_assigned == 3
+
+
+@pytest.mark.anyio
+async def test_coupon_api_admin_update_and_analytics_missing_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_model_validate_to_stub(monkeypatch, coupons_api.CouponRead)
+
+    promo_id = uuid.uuid4()
+    coupon_id = uuid.uuid4()
+    promotion = SimpleNamespace(id=promo_id)
+    coupon = SimpleNamespace(
+        id=coupon_id,
+        promotion_id=promo_id,
+        is_active=True,
+        starts_at=None,
+        ends_at=None,
+        global_max_redemptions=None,
+        per_customer_max_redemptions=None,
+        promotion=promotion,
+    )
+
+    session_ok = _AdminSessionStub(execute_results=[_Result(scalars=[coupon])])
+    updated = await coupons_api.admin_update_coupon(
+        coupon_id=coupon_id,
+        payload=coupons_api.CouponUpdate(is_active=False, global_max_redemptions=5),
+        session=session_ok,
+        _=None,
+    )
+    assert updated.is_active is False
+    assert updated.global_max_redemptions == 5
+
+    with pytest.raises(HTTPException, match='Coupon not found'):
+        await coupons_api.admin_update_coupon(
+            coupon_id=uuid.uuid4(),
+            payload=coupons_api.CouponUpdate(is_active=False),
+            session=_AdminSessionStub(execute_results=[_Result(scalars=[])]),
+            _=None,
+        )
+
+    with pytest.raises(HTTPException, match='Promotion not found'):
+        await coupons_api.admin_coupon_analytics(
+            promotion_id=promo_id,
+            session=_AdminSessionStub(get_map={}),
+            _=None,
+        )
+
+    mismatch_coupon = SimpleNamespace(id=uuid.uuid4(), promotion_id=uuid.uuid4())
+    with pytest.raises(HTTPException, match='Coupon not found'):
+        await coupons_api.admin_coupon_analytics(
+            promotion_id=promo_id,
+            coupon_id=mismatch_coupon.id,
+            session=_AdminSessionStub(get_map={promo_id: promotion, mismatch_coupon.id: mismatch_coupon}),
+            _=None,
+        )
+
+
+@pytest.mark.anyio
+async def test_coupon_api_bulk_job_finish_and_notification_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, int]] = []
+
+    async def _send_assign(*, notify, context):
+        del context
+        calls.append(('assign', len(notify)))
+
+    async def _send_revoke(*, notify, context, revoke_reason):
+        del context, revoke_reason
+        calls.append(('revoke', len(notify)))
+
+    monkeypatch.setattr(coupons_api, '_send_bulk_assign_notifications', _send_assign)
+    monkeypatch.setattr(coupons_api, '_send_bulk_revoke_notifications', _send_revoke)
+
+    context = coupons_api._CouponEmailContext(
+        coupon_code='SAVEX',
+        promotion_name='Promo',
+        promotion_description='Desc',
+        ends_at=None,
+    )
+    await coupons_api._send_bulk_job_notifications(
+        job=SimpleNamespace(action=CouponBulkJobAction.assign),
+        notify=[('user@site.test', 'en')],
+        context=context,
+        revoke_reason=None,
+    )
+    await coupons_api._send_bulk_job_notifications(
+        job=SimpleNamespace(action=CouponBulkJobAction.revoke),
+        notify=[('user@site.test', 'en')],
+        context=context,
+        revoke_reason='cleanup',
+    )
+    await coupons_api._send_bulk_job_notifications(
+        job=SimpleNamespace(action=CouponBulkJobAction.assign),
+        notify=[],
+        context=context,
+        revoke_reason=None,
+    )
+    assert calls == [('assign', 1), ('revoke', 1)]
+
+    session = _AdminSessionStub()
+    job = SimpleNamespace(status=CouponBulkJobStatus.cancelled, finished_at=None)
+    done = await coupons_api._finish_bulk_job_if_cancelled(session, job=job)
+    assert done is True
+    assert job.finished_at is not None
+
+    session_not = _AdminSessionStub()
+    not_cancelled = SimpleNamespace(status=CouponBulkJobStatus.running, finished_at=None)
+    done_not = await coupons_api._finish_bulk_job_if_cancelled(session_not, job=not_cancelled)
+    assert done_not is False
