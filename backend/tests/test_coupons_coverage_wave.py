@@ -6,7 +6,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 import uuid
 
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 import pytest
 
 from app.api.v1 import coupons as coupons_api
@@ -949,3 +949,258 @@ def test_coupon_api_bulk_job_row_helpers() -> None:
     assert coupons_api._is_bulk_job_runnable(SimpleNamespace(status=CouponBulkJobStatus.pending)) is True
     assert coupons_api._is_bulk_job_runnable(SimpleNamespace(status=CouponBulkJobStatus.running)) is True
     assert coupons_api._is_bulk_job_runnable(SimpleNamespace(status=CouponBulkJobStatus.succeeded)) is False
+
+
+
+class _AdminSessionStub:
+    def __init__(
+        self,
+        *,
+        execute_results: list[_Result] | None = None,
+        get_map: dict[object, object] | None = None,
+        promotions: dict[uuid.UUID, object] | None = None,
+        bind: object | None = object(),
+    ) -> None:
+        self._execute_results = list(execute_results or [])
+        self._get_map = get_map or {}
+        self._promotions = promotions or {}
+        self.bind = bind
+        self.added: list[object] = []
+        self.commits = 0
+        self.refresh_calls: list[tuple[object, object | None]] = []
+
+    async def execute(self, _stmt: object) -> _Result:
+        await asyncio.sleep(0)
+        if self._execute_results:
+            return self._execute_results.pop(0)
+        return _Result(scalars=[])
+
+    async def get(self, model: object, key: object) -> object | None:
+        await asyncio.sleep(0)
+        return self._get_map.get((model, key), self._get_map.get(key))
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+    async def commit(self) -> None:
+        await asyncio.sleep(0)
+        self.commits += 1
+
+    async def refresh(self, value: object, attribute_names: object | None = None) -> None:
+        await asyncio.sleep(0)
+        self.refresh_calls.append((value, attribute_names))
+        names = set(attribute_names or []) if attribute_names else set()
+        if 'promotion' in names and hasattr(value, 'promotion_id'):
+            setattr(value, 'promotion', self._promotions.get(getattr(value, 'promotion_id')))
+        if 'scopes' in names and hasattr(value, 'scopes') and getattr(value, 'scopes', None) is None:
+            setattr(value, 'scopes', [])
+
+
+class _ReadStub(SimpleNamespace):
+    def model_copy(self, *, update: dict[str, object] | None = None) -> '_ReadStub':
+        payload = dict(self.__dict__)
+        if update:
+            payload.update(update)
+        return _ReadStub(**payload)
+
+
+def _patch_model_validate_to_stub(monkeypatch: pytest.MonkeyPatch, target: object) -> None:
+    def _model_validate(cls, obj: object, from_attributes: bool = True):
+        if isinstance(obj, dict):
+            payload = dict(obj)
+        else:
+            payload = {k: getattr(obj, k) for k in dir(obj) if not k.startswith('_') and not callable(getattr(obj, k))}
+        return _ReadStub(**payload)
+
+    monkeypatch.setattr(target, 'model_validate', classmethod(_model_validate))
+
+
+@pytest.mark.anyio
+async def test_coupon_api_admin_create_cancel_retry_and_bulk_assignment_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_model_validate_to_stub(monkeypatch, coupons_api.CouponRead)
+    _patch_model_validate_to_stub(monkeypatch, coupons_api.CouponBulkJobRead)
+
+    promo_id = uuid.uuid4()
+    now = datetime(2026, 3, 3, tzinfo=timezone.utc)
+    promotion = coupons_api.Promotion(
+        id=promo_id,
+        name='Spring Promo',
+        description='Desc',
+        discount_type=PromotionDiscountType.percent,
+        percentage_off=Decimal('10.00'),
+        amount_off=None,
+        max_discount_amount=None,
+        min_subtotal=None,
+        allow_on_sale_items=True,
+        first_order_only=False,
+        is_active=True,
+        starts_at=None,
+        ends_at=None,
+        is_automatic=False,
+        created_at=now,
+        updated_at=now,
+    )
+
+    create_session = _AdminSessionStub(
+        execute_results=[_Result(scalars=[])],
+        get_map={promo_id: promotion},
+        promotions={promo_id: promotion},
+    )
+    created = await coupons_api.admin_create_coupon(
+        payload=coupons_api.CouponCreate(promotion_id=promo_id, code=' save10 '),
+        session=create_session,
+        _=None,
+    )
+    assert created.code == 'SAVE10'
+    assert create_session.commits == 1
+
+    duplicate_session = _AdminSessionStub(
+        execute_results=[_Result(scalars=[SimpleNamespace(id=uuid.uuid4())])],
+        get_map={promo_id: promotion},
+    )
+    with pytest.raises(HTTPException, match='already exists'):
+        await coupons_api.admin_create_coupon(
+            payload=coupons_api.CouponCreate(promotion_id=promo_id, code='SAVE10'),
+            session=duplicate_session,
+            _=None,
+        )
+
+    done_job = SimpleNamespace(id=uuid.uuid4(), status=CouponBulkJobStatus.succeeded, finished_at=None, coupon_id=promo_id)
+    done_session = _AdminSessionStub(get_map={done_job.id: done_job})
+    done_result = await coupons_api.admin_cancel_bulk_job(done_job.id, done_session, _=None)
+    assert done_result.status == CouponBulkJobStatus.succeeded
+    assert done_session.commits == 0
+
+    pending_job = SimpleNamespace(id=uuid.uuid4(), status=CouponBulkJobStatus.pending, finished_at=None, coupon_id=promo_id)
+    pending_session = _AdminSessionStub(get_map={pending_job.id: pending_job})
+    pending_result = await coupons_api.admin_cancel_bulk_job(pending_job.id, pending_session, _=None)
+    assert pending_result.status == CouponBulkJobStatus.cancelled
+    assert pending_job.finished_at is not None
+    assert pending_session.commits == 1
+
+    running_job = SimpleNamespace(id=uuid.uuid4(), status=CouponBulkJobStatus.running, coupon_id=promo_id)
+    running_session = _AdminSessionStub(get_map={running_job.id: running_job})
+    with pytest.raises(HTTPException, match='in progress'):
+        await coupons_api.admin_retry_bulk_job(
+            running_job.id,
+            background_tasks=BackgroundTasks(),
+            session=running_session,
+            admin_user=SimpleNamespace(id=uuid.uuid4()),
+        )
+
+    failed_job = SimpleNamespace(
+        id=uuid.uuid4(),
+        status=CouponBulkJobStatus.failed,
+        coupon_id=promo_id,
+        action=CouponBulkJobAction.assign,
+        require_marketing_opt_in=False,
+        require_email_verified=False,
+        bucket_total=10,
+        bucket_index=0,
+        bucket_seed='seed',
+        send_email=True,
+        revoke_reason=None,
+    )
+    bad_bucket_session = _AdminSessionStub(get_map={failed_job.id: failed_job})
+    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_: (_ for _ in ()).throw(ValueError('bad bucket')))
+    with pytest.raises(HTTPException, match='bad bucket'):
+        await coupons_api.admin_retry_bulk_job(
+            failed_job.id,
+            background_tasks=BackgroundTasks(),
+            session=bad_bucket_session,
+            admin_user=SimpleNamespace(id=uuid.uuid4()),
+        )
+
+    engine_none_job = SimpleNamespace(
+        id=uuid.uuid4(),
+        status=CouponBulkJobStatus.failed,
+        coupon_id=promo_id,
+        action=CouponBulkJobAction.assign,
+        require_marketing_opt_in=False,
+        require_email_verified=False,
+        bucket_total=None,
+        bucket_index=None,
+        bucket_seed=None,
+        send_email=False,
+        revoke_reason=None,
+    )
+    engine_none_session = _AdminSessionStub(get_map={engine_none_job.id: engine_none_job}, bind=None)
+    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_: None)
+    monkeypatch.setattr(coupons_api, '_segment_user_filters', lambda *_: {'emails': []})
+    monkeypatch.setattr(coupons_api, '_preview_segment_assign', lambda *args, **kwargs: asyncio.sleep(0, result=SimpleNamespace(total_candidates=0)))
+    with pytest.raises(HTTPException, match='Database engine unavailable'):
+        await coupons_api.admin_retry_bulk_job(
+            engine_none_job.id,
+            background_tasks=BackgroundTasks(),
+            session=engine_none_session,
+            admin_user=SimpleNamespace(id=uuid.uuid4()),
+        )
+
+
+def test_coupon_api_bulk_assignment_and_notification_helpers() -> None:
+    coupon = SimpleNamespace(
+        id=uuid.uuid4(),
+        code='SAVE22',
+        ends_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
+        promotion=SimpleNamespace(name='Promo', description='Desc'),
+    )
+    active_user = SimpleNamespace(id=uuid.uuid4(), email='active@example.com', notify_marketing=True, preferred_language='en')
+    restored_user = SimpleNamespace(id=uuid.uuid4(), email='restored@example.com', notify_marketing=True, preferred_language='ro')
+    new_user = SimpleNamespace(id=uuid.uuid4(), email='new@example.com', notify_marketing=False, preferred_language='ro')
+
+    active_assignment = SimpleNamespace(revoked_at=None, revoked_reason='')
+    restored_assignment = SimpleNamespace(revoked_at=datetime(2026, 1, 1, tzinfo=timezone.utc), revoked_reason='old')
+
+    session = SimpleNamespace(added=[])
+    session.add = lambda value: session.added.append(value)
+
+    created, restored, already_active, notify_ids = coupons_api._apply_bulk_assignments(
+        session=session,
+        coupon=coupon,
+        emails=['active@example.com', 'restored@example.com', 'new@example.com', 'missing@example.com'],
+        users_by_email={
+            active_user.email: active_user,
+            restored_user.email: restored_user,
+            new_user.email: new_user,
+        },
+        assignments_by_user_id={
+            active_user.id: active_assignment,
+            restored_user.id: restored_assignment,
+        },
+    )
+    assert created == 1
+    assert restored == 1
+    assert already_active == 1
+    assert restored_assignment.revoked_at is None
+    assert new_user.id in notify_ids and restored_user.id in notify_ids
+
+    queued: list[tuple[object, ...]] = []
+    tasks = SimpleNamespace(add_task=lambda *args, **kwargs: queued.append((args, kwargs)))
+    coupons_api._enqueue_bulk_assign_notifications(
+        background_tasks=tasks,
+        coupon=coupon,
+        users_by_email={active_user.email: active_user, restored_user.email: restored_user, new_user.email: new_user},
+        notify_user_ids=notify_ids,
+    )
+    assert len(queued) == 1
+    assert queued[0][0][1] == 'restored@example.com'
+    assert queued[0][1]['coupon_code'] == 'SAVE22'
+
+
+@pytest.mark.anyio
+async def test_coupon_api_admin_list_coupon_assignments_maps_user_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_model_validate_to_stub(monkeypatch, coupons_api.CouponAssignmentRead)
+
+    coupon_id = uuid.uuid4()
+    coupon = SimpleNamespace(id=coupon_id)
+    assignments = [
+        SimpleNamespace(id=uuid.uuid4(), coupon_id=coupon_id, user=SimpleNamespace(email='first@example.com', username='first')),
+        SimpleNamespace(id=uuid.uuid4(), coupon_id=coupon_id, user=None),
+    ]
+    session = _AdminSessionStub(execute_results=[_Result(scalars=assignments)], get_map={coupon_id: coupon})
+
+    result = await coupons_api.admin_list_coupon_assignments(coupon_id, session=session, _=None)
+    assert len(result) == 2
+    assert result[0].user_email == 'first@example.com'
+    assert result[0].user_username == 'first'
+    assert result[1].user_email is None

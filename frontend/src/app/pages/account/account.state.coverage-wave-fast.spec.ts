@@ -666,3 +666,194 @@ describe('AccountState fast profile-save and completion branches', () => {
     expect(state.cooldownsLoading()).toBeFalse();
   });
 });
+
+
+describe('AccountState fast export/passkey branches', () => {
+  it('covers requestDataExport running path and start-error fallback', () => {
+    const state = createAccountHarness();
+    state.t = (key: string) => key;
+    state.auth = { isAuthenticated: () => true };
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.account = {
+      startExportJob: jasmine.createSpy('startExportJob').and.returnValue(of({ id: 'job-1', status: 'running' })),
+      downloadExportJob: jasmine.createSpy('downloadExportJob')
+    };
+    state.exportJobLoading = mockSignal(false);
+    state.exportJob = mockSignal<any>(null);
+    state.exportingData = false;
+    state.exportError = null;
+    state.startExportJobPolling = jasmine.createSpy('startExportJobPolling');
+    state.requestDataExport = (AccountState.prototype as any).requestDataExport;
+
+    state.requestDataExport();
+    expect(state.startExportJobPolling).toHaveBeenCalledWith('job-1');
+    expect(state.toast.success).toHaveBeenCalledWith('account.privacy.export.startedToast');
+    expect(state.exportJobLoading()).toBeFalse();
+
+    state.account.startExportJob.and.returnValue(throwError(() => ({ error: { detail: 'start-failed' } })));
+    state.requestDataExport();
+    expect(state.exportError).toBe('start-failed');
+    expect(state.toast.error).toHaveBeenCalledWith('start-failed');
+    expect(state.exportJobLoading()).toBeFalse();
+  });
+
+  it('covers downloadExportJob success and error branches', () => {
+    const state = createAccountHarness();
+    const anchor = { href: '', download: '', click: jasmine.createSpy('click') } as any;
+    const createUrl = (window.URL as any).createObjectURL ?? (() => 'blob:mock');
+    const revokeUrl = (window.URL as any).revokeObjectURL ?? (() => undefined);
+    if (!(window.URL as any).createObjectURL) {
+      (window.URL as any).createObjectURL = createUrl;
+    }
+    if (!(window.URL as any).revokeObjectURL) {
+      (window.URL as any).revokeObjectURL = revokeUrl;
+    }
+    const createSpy = spyOn(window.URL as any, 'createObjectURL').and.returnValue('blob:test');
+    const revokeSpy = spyOn(window.URL as any, 'revokeObjectURL').and.stub();
+    spyOn(document, 'createElement').and.returnValue(anchor);
+
+    state.t = (key: string) => key;
+    state.auth = { isAuthenticated: () => true };
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.account = {
+      startExportJob: jasmine.createSpy('startExportJob'),
+      downloadExportJob: jasmine.createSpy('downloadExportJob').and.returnValue(of(new Blob(['{"ok":true}'])))
+    };
+    state.exportingData = false;
+    state.exportError = null;
+    state.exportJob = mockSignal<any>({ id: 'job-succeeded', status: 'succeeded' });
+    state.downloadExportJob = (AccountState.prototype as any).downloadExportJob;
+
+    state.downloadExportJob();
+    expect(state.account.downloadExportJob).toHaveBeenCalledWith('job-succeeded');
+    expect(createSpy).toHaveBeenCalled();
+    expect(anchor.click).toHaveBeenCalled();
+    expect(revokeSpy).toHaveBeenCalledWith('blob:test');
+    expect(state.toast.success).toHaveBeenCalledWith('account.privacy.export.downloaded');
+    expect(state.exportingData).toBeFalse();
+
+    state.account.downloadExportJob.and.returnValue(throwError(() => ({ error: { detail: 'download-failed' } })));
+    state.downloadExportJob();
+    expect(state.exportError).toBe('download-failed');
+    expect(state.toast.error).toHaveBeenCalledWith('download-failed');
+    expect(state.exportingData).toBeTrue();
+  });
+
+  it('covers copyReceiptUrl timer branch and fallback toast branch', async () => {
+    const state = createAccountHarness();
+    state.t = (key: string) => key;
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.receiptCopiedId = mockSignal<string | null>(null);
+    state.receiptCopiedTimer = 321;
+
+    const clearSpy = spyOn(window, 'clearTimeout').and.stub();
+    const setSpy = spyOn(window, 'setTimeout').and.callFake(((fn: unknown) => {
+      if (typeof fn === 'function') fn();
+      return 654 as any;
+    }) as any);
+
+    state.copyToClipboard = jasmine.createSpy('copyToClipboard').and.resolveTo(true);
+    await (AccountState.prototype as any).copyReceiptUrl.call(state, 'order-1', 'https://share.example', 'account.orders.receiptReady');
+    expect(state.copyToClipboard).toHaveBeenCalledWith('https://share.example');
+    expect(clearSpy).toHaveBeenCalledWith(321);
+    expect(setSpy).toHaveBeenCalled();
+    expect(state.toast.success).toHaveBeenCalledWith('account.orders.receiptCopied');
+
+    state.toast.success.calls.reset();
+    state.copyToClipboard.and.resolveTo(false);
+    await (AccountState.prototype as any).copyReceiptUrl.call(state, 'order-2', 'https://share2.example', 'account.orders.receiptReady');
+    expect(state.toast.success).toHaveBeenCalledWith('account.orders.receiptReady');
+  });
+
+  it('covers registerPasskey success, empty credential, and cancellation branches', async () => {
+    const state = createAccountHarness();
+    state.t = (key: string) => key;
+    state.passkeysSupported = jasmine.createSpy('passkeysSupported').and.returnValue(true);
+    state.auth = {
+      isAuthenticated: () => true,
+      startPasskeyRegistration: jasmine
+        .createSpy('startPasskeyRegistration')
+        .and.returnValue(
+          of({
+            options: {
+              challenge: 'AQI',
+              user: { id: 'AQI', name: 'user@example.com', displayName: 'User' },
+              rp: { id: 'momentstudio.test', name: 'MomentStudio' },
+              pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+              timeout: 60000,
+              excludeCredentials: []
+            },
+            registration_token: 'reg-token'
+          })
+        ),
+      completePasskeyRegistration: jasmine.createSpy('completePasskeyRegistration').and.returnValue(of({}))
+    };
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+    state.passkeysError = mockSignal<string | null>(null);
+    state.passkeys = mockSignal<any[]>([]);
+    state.registeringPasskey = false;
+    state.passkeyRegisterPassword = 'password-1';
+    state.passkeyRegisterName = 'Laptop key';
+    state.loadPasskeys = jasmine.createSpy('loadPasskeys');
+    state.refreshSecurityEvents = jasmine.createSpy('refreshSecurityEvents');
+    state.registerPasskey = (AccountState.prototype as any).registerPasskey;
+
+    const fakeCredential = {
+      id: 'cred-1',
+      rawId: new Uint8Array([1, 2, 3]).buffer,
+      type: 'public-key',
+      response: {
+        clientDataJSON: new Uint8Array([1]).buffer,
+        attestationObject: new Uint8Array([2]).buffer,
+      },
+      getClientExtensionResults: () => ({})
+    } as any;
+
+    const credentialsCreate = jasmine.createSpy('credentials.create').and.resolveTo(fakeCredential);
+    spyOnProperty(navigator, 'credentials', 'get').and.returnValue({ create: credentialsCreate } as any);
+
+    state.registerPasskey();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state.auth.startPasskeyRegistration).toHaveBeenCalledWith('password-1');
+    expect(credentialsCreate).toHaveBeenCalled();
+    expect(state.auth.completePasskeyRegistration).toHaveBeenCalled();
+    expect(state.toast.success).toHaveBeenCalledWith('account.security.passkeys.added');
+    expect(state.loadPasskeys).toHaveBeenCalledWith(true);
+    expect(state.refreshSecurityEvents).toHaveBeenCalled();
+
+    state.toast.info.calls.reset();
+    credentialsCreate.and.resolveTo(null);
+    state.registerPasskey();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state.registeringPasskey).toBeFalse();
+
+    credentialsCreate.and.rejectWith({ name: 'NotAllowedError' });
+    state.registerPasskey();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state.toast.info.calls.count() + state.toast.error.calls.count()).toBeGreaterThan(0);
+    expect(state.registeringPasskey).toBeFalse();
+  });
+
+  it('covers accountHeaderLabel branch variants', () => {
+    const state = createAccountHarness();
+    state.profile = mockSignal<any>({ username: 'user1', name: 'Alice', name_tag: 42 });
+
+    const headerWithTag = (AccountState.prototype as any).accountHeaderLabel.call(state, null);
+    expect(headerWithTag).toBe('user1 (Alice#42)');
+
+    const headerWithNameOnly = (AccountState.prototype as any).accountHeaderLabel.call(
+      state,
+      { username: 'user2', name: 'Bob', name_tag: null } as any
+    );
+    expect(headerWithNameOnly).toBe('user2 (Bob)');
+
+    const headerUsernameOnly = (AccountState.prototype as any).accountHeaderLabel.call(
+      state,
+      { username: 'user3', name: '', name_tag: null } as any
+    );
+    expect(headerUsernameOnly).toBe('user3');
+  });
+});
