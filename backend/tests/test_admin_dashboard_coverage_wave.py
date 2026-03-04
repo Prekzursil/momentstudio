@@ -1686,3 +1686,140 @@ async def test_admin_dashboard_user_search_duplicate_segment_and_alias_paths(mon
     assert aliases['user']['email'].startswith('masked:')
     assert len(aliases['usernames']) == 1
     assert len(aliases['display_names']) == 1
+
+def test_admin_dashboard_channel_and_payment_helpers() -> None:
+    gross_rows = [('stripe', 2, 100.0), ('paypal', 1, 40.0), (None, 3, 70.0)]
+    refunds_map = {'stripe': 5.0}
+    missing_map = {'stripe': 2.0, 'paypal': 1.0}
+
+    rows_map = admin_dashboard._channel_rows_value_map([('stripe', 10), ('paypal', 4)])
+    assert rows_map == {'stripe': 10, 'paypal': 4}
+    assert admin_dashboard._channel_number_or_zero(None) == 0
+    assert admin_dashboard._channel_int_or_zero(None) == 0
+
+    channel_items = admin_dashboard._channel_items(gross_rows, refunds_map, missing_map, label_unknown='unknown')
+    assert channel_items[0]['orders'] >= channel_items[-1]['orders']
+    assert any(item['key'] == 'unknown' for item in channel_items)
+
+    assert admin_dashboard._payments_success_rate(0, 0) is None
+    assert admin_dashboard._payments_success_rate(8, 2) == 0.8
+
+    stripe_row = SimpleNamespace(
+        stripe_event_id='evt_stripe',
+        event_type='invoice.paid',
+        attempts=2,
+        last_attempt_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        last_error='timeout',
+    )
+    paypal_row = SimpleNamespace(
+        paypal_event_id='evt_paypal',
+        event_type='PAYMENT.CAPTURED',
+        attempts=1,
+        last_attempt_at=datetime(2026, 3, 2, tzinfo=timezone.utc),
+        last_error='none',
+    )
+    merged_errors = admin_dashboard._payments_recent_webhook_errors([stripe_row], [paypal_row])
+    assert merged_errors[0]['provider'] == 'paypal'
+
+
+def test_admin_dashboard_payment_provider_row_helpers() -> None:
+    success_map = {'stripe': 5, 'paypal': 2}
+    pending_map = {'stripe': 3, 'cod': 4}
+    webhook_counts = {'stripe': {'errors': 1, 'backlog': 2}}
+
+    methods = admin_dashboard._payments_sorted_methods(success_map, pending_map)
+    assert methods[0] == 'stripe'
+    assert 'cod' in methods
+
+    provider = admin_dashboard._payments_provider_row('stripe', success_map, pending_map, webhook_counts)
+    assert provider['provider'] == 'stripe'
+    assert provider['successful_orders'] == 5
+    assert provider['pending_payment_orders'] == 3
+    assert provider['webhook_errors'] == 1
+
+    providers = admin_dashboard._payments_provider_rows(success_map, pending_map, webhook_counts)
+    assert any(item['provider'] == 'paypal' for item in providers)
+
+
+def test_admin_dashboard_refund_reason_and_breakdown_helpers() -> None:
+    assert admin_dashboard._refund_delta_pct(10.0, 0.0) is None
+    assert admin_dashboard._refund_delta_pct(10.0, 5.0) == 100.0
+
+    providers = admin_dashboard._refund_provider_payload(
+        [('stripe', 4, 120.0), ('paypal', 1, 20.0)],
+        [('stripe', 2, 80.0)],
+    )
+    assert providers[0]['provider'] == 'stripe'
+    assert providers[0]['delta_pct']['count'] == 100.0
+
+    assert admin_dashboard._normalize_refund_reason_text('  Ștricat produs ') == 'stricat produs'
+    assert admin_dashboard._refund_reason_category('Wrong item received') == 'wrong_item'
+    assert admin_dashboard._refund_reason_category('') == 'other'
+
+    reasons = admin_dashboard._refund_reasons_payload({'damaged': 3, 'other': 1}, {'damaged': 1})
+    assert reasons[0]['current'] >= reasons[-1]['current']
+
+    payload = admin_dashboard._refund_breakdown_payload(
+        window_days=30,
+        window_start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        window_end=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        current_provider=[('stripe', 2, 44.0)],
+        previous_provider=[('stripe', 1, 22.0)],
+        missing_current_count=1,
+        missing_current_amount=10.0,
+        missing_prev_count=0,
+        missing_prev_amount=0.0,
+        current_reasons={'damaged': 1},
+        previous_reasons={'damaged': 0},
+    )
+    assert payload['window_days'] == 30
+    assert payload['missing_refunds']['current']['count'] == 1
+
+
+def test_admin_dashboard_shipping_stockout_and_channel_response_helpers() -> None:
+    ship_delta = admin_dashboard._shipping_delta_pct(12.0, 6.0)
+    assert ship_delta == 100.0
+    assert admin_dashboard._shipping_delta_pct(None, 6.0) is None
+    assert admin_dashboard._shipping_avg([2.0, 4.0, 6.0]) == 4.0
+
+    duration_rows = [
+        ('sameday', datetime(2026, 3, 1, tzinfo=timezone.utc), datetime(2026, 3, 1, 3, tzinfo=timezone.utc)),
+        (None, datetime(2026, 3, 1, tzinfo=timezone.utc), datetime(2026, 3, 1, 1, tzinfo=timezone.utc)),
+    ]
+    duration_map = admin_dashboard._shipping_duration_map(duration_rows, courier_idx=0, start_idx=1, end_idx=2)
+    assert 'sameday' in duration_map
+    assert 'unknown' in duration_map
+
+    rows = admin_dashboard._shipping_rows({'sameday': [1.0, 2.0]}, {'sameday': [1.0], 'fan': [3.0]})
+    assert any(item['courier'] == 'sameday' for item in rows)
+
+    stock_row = SimpleNamespace(
+        product_id=uuid4(),
+        product_slug='ring-1',
+        product_name='Ring',
+        reserved_in_carts=2,
+        reserved_in_orders=1,
+        available_quantity=0,
+        stock_quantity=3,
+    )
+    demand_map = {stock_row.product_id: (4, 80.0)}
+    product_map = {stock_row.product_id: {'base_price': 20.0, 'sale_price': None, 'currency': 'RON', 'allow_backorder': False}}
+    stock_item = admin_dashboard._stockout_item(stock_row, demand_map=demand_map, product_map=product_map)
+    assert stock_item['estimated_missed_revenue'] == 40.0
+
+    stock_items = admin_dashboard._stockout_items([stock_row], demand_map=demand_map, product_map=product_map)
+    assert len(stock_items) == 1
+
+    response = admin_dashboard._channel_attribution_response(
+        effective_range_days=7,
+        start=datetime(2026, 2, 1, tzinfo=timezone.utc),
+        end=datetime(2026, 2, 8, tzinfo=timezone.utc),
+        total_orders=10,
+        total_gross_sales=250.0,
+        tracked_orders=5,
+        tracked_gross_sales=125.0,
+        coverage_pct=0.5,
+        channels=[{'source': 'direct', 'orders': 5, 'gross_sales': 125.0}],
+    )
+    assert response['range_days'] == 7
+    assert response['tracked_orders'] == 5
