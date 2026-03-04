@@ -154,10 +154,10 @@ function installAccountSweepStubs(state: any): void {
   state.wishlist = { ensureLoaded: jasmine.createSpy('ensureLoaded'), clear: jasmine.createSpy('clear') };
   const dynamicService = (target: Record<string, any>) => new Proxy(target, {
     get(obj, prop, receiver) {
-      if (Object.prototype.toString.call(prop) !== '[object String]') return Reflect.get(obj, prop, receiver);
-      const key = String(prop);
-      const existing = Reflect.get(obj, key, receiver);
+      const existing = Reflect.get(obj, prop, receiver);
       if (existing !== undefined) return existing;
+      const key = String(prop);
+      if (key.startsWith('Symbol(')) return existing;
       const spy = jasmine.createSpy(key).and.returnValue(of({}));
       if (key.startsWith('list') || key.startsWith('get')) spy.and.returnValue(of([]));
       obj[key] = spy;
@@ -175,7 +175,7 @@ function prepareAccountSweepArgs(name: string, arity: number): unknown[] {
 }
 
 function isSweepCallable(value: unknown): value is (...values: unknown[]) => unknown {
-  return Object.prototype.toString.call(value) === '[object Function]';
+  return value instanceof Function;
 }
 
 function isAccountRiskyMethod(name: string): boolean {

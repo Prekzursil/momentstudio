@@ -63,10 +63,10 @@ function seedAdminSpyDefaults(admin: jasmine.SpyObj<any>): void {
 function withAdminFallback(admin: jasmine.SpyObj<any>): Record<string, any> {
   return new Proxy(admin as Record<string, any>, {
     get(target, prop, receiver) {
-      if (Object.prototype.toString.call(prop) !== '[object String]') return Reflect.get(target, prop, receiver);
-      const key = String(prop);
-      const existing = Reflect.get(target, key, receiver);
+      const existing = Reflect.get(target, prop, receiver);
       if (existing !== undefined) return existing;
+      const key = String(prop);
+      if (key.startsWith('Symbol(')) return existing;
       const dynamicSpy = jasmine.createSpy(key);
       const lower = key.toLowerCase();
       if (lower.startsWith('list') || lower.startsWith('get') || lower.endsWith('history')) {
@@ -81,7 +81,7 @@ function withAdminFallback(admin: jasmine.SpyObj<any>): Record<string, any> {
 }
 
 function isCallableMethod(value: unknown): value is (...args: unknown[]) => unknown {
-  return Object.prototype.toString.call(value) === '[object Function]';
+  return value instanceof Function;
 }
 
 function createAdminHarness(): {
