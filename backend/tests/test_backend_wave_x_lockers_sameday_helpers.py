@@ -29,6 +29,10 @@ BLOCKED_TOKENS = {
 }
 
 _MISSING = object()
+_COORD_NAMES = {"lat", "lng", "lon", "x", "y", "latitude", "longitude"}
+_COUNT_NAMES = {"limit", "page", "offset", "count"}
+_BOOL_NAMES = {"enabled", "active", "strict", "force"}
+_DECIMAL_NAMES = {"value", "ratio", "amount", "threshold"}
 
 
 class _DummySession:
@@ -63,60 +67,75 @@ class _DummySession:
         return None
 
 
-def _value_for_name(name: str, *, alternate: bool):
-    lower = name.lower()
-    if lower in {"session", "db", "conn", "connection"}:
-        return _DummySession()
-    if lower in {"lat", "lng", "lon", "x", "y", "latitude", "longitude"}:
-        return 44.43 if not alternate else 26.10
-    if lower in {"radius_km", "distance_km", "km"}:
-        return 5 if not alternate else 15
-    if lower in {"limit", "page", "offset", "count"}:
-        return 10 if not alternate else 25
-    if lower in {"enabled", "active", "strict", "force"}:
-        return alternate
-    if lower.endswith("_id") or lower == "id":
-        return str(uuid4())
-    if lower.endswith("_ids") or lower in {"ids", "locker_ids"}:
-        return [str(uuid4()), str(uuid4())]
-    if lower in {"row", "item", "payload", "data", "meta"}:
-        return {
-            "id": "l-1",
-            "lockerId": "l-1",
-            "name": "Locker One",
-            "city": "Bucharest",
-            "address": "Main Street",
-            "postalCode": "010101",
-            "lat": 44.43,
-            "lng": 26.10,
-            "active": True,
-            "updatedAt": datetime.now(UTC).isoformat(),
-        }
-    if lower in {"rows", "items", "payload_rows", "sources"}:
-        return [
-            {
-                "id": "l-1",
-                "name": "Locker One",
-                "city": "Bucharest",
-                "address": "Main Street",
-                "lat": 44.43,
-                "lng": 26.10,
-                "active": True,
-            }
-        ]
-    if lower in {"city", "name", "key", "slug", "source", "provider", "country", "query"}:
-        return "sample"
-    if lower in {"now", "created_at", "updated_at", "ts"}:
-        return datetime.now(UTC)
-    if lower in {"value", "ratio", "amount", "threshold"}:
-        return Decimal("1.00")
+def _sample_row() -> dict[str, object]:
+    return {
+        "id": "l-1",
+        "lockerId": "l-1",
+        "name": "Locker One",
+        "city": "Bucharest",
+        "address": "Main Street",
+        "postalCode": "010101",
+        "lat": 44.43,
+        "lng": 26.10,
+        "active": True,
+        "updatedAt": datetime.now(UTC).isoformat(),
+    }
+
+
+def _static_lookup(*, alternate: bool) -> dict[str, object]:
+    count = 25 if alternate else 10
+    row = _sample_row()
+    return {
+        "session": _DummySession(),
+        "db": _DummySession(),
+        "conn": _DummySession(),
+        "connection": _DummySession(),
+        "row": row,
+        "item": row,
+        "payload": row,
+        "data": row,
+        "meta": row,
+        "rows": [row],
+        "items": [row],
+        "payload_rows": [row],
+        "sources": [row],
+        "city": "sample",
+        "name": "sample",
+        "key": "sample",
+        "slug": "sample",
+        "source": "sample",
+        "provider": "sample",
+        "country": "sample",
+        "query": "sample",
+        "now": datetime.now(UTC),
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+        "ts": datetime.now(UTC),
+    } | {name: (26.10 if alternate else 44.43) for name in _COORD_NAMES} | {name: count for name in _COUNT_NAMES} | {name: bool(alternate) for name in _BOOL_NAMES} | {name: Decimal("1.00") for name in _DECIMAL_NAMES}
+
+
+def _special_value(lowered: str):
+    checks = (
+        (lowered in {"session", "db", "conn", "connection"}, _DummySession),
+        (lowered.endswith("_id") or lowered == "id", lambda: str(uuid4())),
+        (lowered.endswith("_ids") or lowered in {"ids", "locker_ids"}, lambda: [str(uuid4()), str(uuid4())]),
+    )
+    for condition, factory in checks:
+        if condition:
+            return factory()
     return _MISSING
 
 
 def _value_for_param(param: inspect.Parameter, *, alternate: bool):
-    value = _value_for_name(param.name, alternate=alternate)
-    if value is not _MISSING:
-        return value
+    lowered = param.name.lower()
+    special = _special_value(lowered)
+    if special is not _MISSING:
+        return special
+
+    lookup = _static_lookup(alternate=alternate)
+    maybe = lookup.get(lowered, _MISSING)
+    if maybe is not _MISSING:
+        return maybe
     if param.default is not inspect._empty:
         return param.default
     return MagicMock(name=f"auto_{param.name}")
@@ -171,4 +190,5 @@ def test_lockers_and_sameday_helper_reflection_wave(module_name: str) -> None:
         _invoke(func, _build_kwargs(func, alternate=True, include_optional=True))
         invoked += 1
 
-    assert invoked >= 75
+    if invoked < 75:
+        raise AssertionError(f"lockers/sameday sweep invoked too few call sites: {invoked}")

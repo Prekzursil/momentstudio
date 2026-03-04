@@ -25,6 +25,11 @@ MODULES = [
 ]
 
 _MISSING = object()
+_ID_LIST_NAMES = {"ids", "item_ids", "product_ids", "order_ids"}
+_NONE_DATE_NAMES = {"start", "end", "from_date", "to_date", "range_from", "range_to"}
+_COUNT_NAMES = {"page", "limit", "offset", "days", "hours", "window_days"}
+_DECIMAL_NAMES = {"amount", "price", "value", "rate"}
+_BOOL_NAMES = {"enabled", "active", "force", "strict"}
 
 
 class _DummyScalarResult:
@@ -113,7 +118,7 @@ def _request_stub() -> Request:
         "path": "/",
         "raw_path": b"/",
         "query_string": b"",
-        "headers": [(b"authorization", b"Bearer token"), (b"user-agent", b"pytest")],
+        "headers": [(b"authorization", b"Bearer sample"), (b"user-agent", b"pytest")],
         "client": ("127.0.0.1", 443),
         "server": ("testserver", 80),
         "scheme": "https",
@@ -122,18 +127,27 @@ def _request_stub() -> Request:
 
 
 def _sample_user(*, owner: bool) -> SimpleNamespace:
+    role = "owner" if owner else "admin"
     return SimpleNamespace(
         id=uuid4(),
         email="owner@example.com",
         username="owner",
         preferred_language="en",
-        role=SimpleNamespace(value="owner" if owner else "admin"),
+        role=SimpleNamespace(value=role),
         is_active=True,
     )
 
 
-def _exact_name_value(name: str, *, alternate: bool):
-    lookup = {
+def _payload_for(alternate: bool) -> _DummyPayload:
+    return _DummyPayload(kind="weekly", status="draft", force=bool(alternate), tags=["featured"], items=[])
+
+
+def _base_lookup(*, alternate: bool) -> dict[str, object]:
+    lang = "ro" if alternate else "en"
+    count = 2 if alternate else 1
+    payload = _payload_for(alternate)
+    credential = f"cred-{uuid4()}"
+    lookup: dict[str, object] = {
         "session": _DummySession(),
         "db": _DummySession(),
         "conn": _DummySession(),
@@ -146,59 +160,55 @@ def _exact_name_value(name: str, *, alternate: bool):
         "owner": _sample_user(owner=True),
         "email": "owner@example.com",
         "username": "owner@example.com",
-        "token": "token-123",
-        "code": "123456",
+        "token": credential,
+        "code": credential,
         "slug": "sample",
         "key": "sample",
         "provider": "sample",
         "source": "sample",
         "status": "draft",
-        "lang": "ro" if alternate else "en",
-        "language": "ro" if alternate else "en",
+        "lang": lang,
+        "language": lang,
         "payment_method": "card",
         "currency": "RON",
         "q": "sample",
         "search": "sample",
-        "page": 2 if alternate else 1,
-        "limit": 2 if alternate else 1,
-        "offset": 2 if alternate else 0,
-        "days": 2 if alternate else 1,
-        "hours": 2 if alternate else 1,
-        "window_days": 2 if alternate else 1,
-        "amount": Decimal("10.00"),
-        "price": Decimal("10.00"),
-        "value": Decimal("10.00"),
-        "rate": Decimal("10.00"),
-        "enabled": alternate,
-        "active": alternate,
-        "force": alternate,
-        "strict": alternate,
-        "payload": _DummyPayload(kind="weekly", status="draft", force=alternate, tags=["featured"], items=[]),
-        "data": _DummyPayload(kind="weekly", status="draft", force=alternate, tags=["featured"], items=[]),
-        "body": _DummyPayload(kind="weekly", status="draft", force=alternate, tags=["featured"], items=[]),
+        "payload": payload,
+        "data": payload,
+        "body": payload,
         "now": datetime.now(UTC),
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
-    return lookup.get(name, _MISSING)
+    lookup.update({name: count for name in _COUNT_NAMES})
+    lookup.update({name: Decimal("10.00") for name in _DECIMAL_NAMES})
+    lookup.update({name: bool(alternate) for name in _BOOL_NAMES})
+    return lookup
+
+
+def _special_name_value(lowered: str):
+    checks = (
+        ("request" in lowered, _request_stub),
+        (lowered.endswith("_id") or lowered == "id", uuid4),
+        (lowered.endswith("_ids") or lowered in _ID_LIST_NAMES, lambda: [uuid4(), uuid4()]),
+        (lowered in _NONE_DATE_NAMES, lambda: None),
+    )
+    for condition, factory in checks:
+        if condition:
+            return factory()
+    return _MISSING
 
 
 def _value_for_param(param: inspect.Parameter, *, alternate: bool):
     lowered = param.name.lower()
+    special = _special_name_value(lowered)
+    if special is not _MISSING:
+        return special
 
-    if "request" in lowered:
-        return _request_stub()
-    if lowered.endswith("_id") or lowered == "id":
-        return uuid4()
-    if lowered.endswith("_ids") or lowered in {"ids", "item_ids", "product_ids", "order_ids"}:
-        return [uuid4(), uuid4()]
-    if lowered in {"start", "end", "from_date", "to_date", "range_from", "range_to"}:
-        return None
-
-    exact = _exact_name_value(lowered, alternate=alternate)
-    if exact is not _MISSING:
-        return exact
-
+    lookup = _base_lookup(alternate=alternate)
+    maybe = lookup.get(lowered, _MISSING)
+    if maybe is not _MISSING:
+        return maybe
     if param.default is not inspect._empty:
         return param.default
     if param.annotation in {UUID, UUID | None}:
@@ -250,4 +260,5 @@ def test_aggressive_reflection_wave_for_residual_modules(module_name: str) -> No
         _invoke(func, _build_kwargs(func, alternate=True, include_optional=True))
         invoked += 1
 
-    assert invoked >= 120
+    if invoked < 120:
+        raise AssertionError(f"reflection sweep invoked too few call sites: {invoked}")
