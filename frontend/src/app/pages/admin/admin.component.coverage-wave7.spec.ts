@@ -65,7 +65,7 @@ function withAdminFallback(admin: jasmine.SpyObj<any>): Record<string, any> {
     get(target, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(target, prop, receiver);
       const existing = Reflect.get(target, prop, receiver);
-      if (typeof existing !== 'undefined') return existing;
+      if (existing !== undefined) return existing;
       const dynamicSpy = jasmine.createSpy(prop);
       const lower = prop.toLowerCase();
       if (lower.startsWith('list') || lower.startsWith('get') || lower.endsWith('history')) {
@@ -678,7 +678,7 @@ describe("AdminComponent coverage wave 7 permissive sweep", () => {
     let attempted = 0;
     for (const name of methods) {
       const args = ADMIN_SWEEP_ARGS_BY_NAME[name] ?? [];
-      await callAdminMethodSafely(component, name, args as unknown[]);
+      await callAdminMethodSafely(component, name, args);
       attempted += 1;
     }
 
@@ -792,3 +792,4 @@ describe('AdminComponent coverage wave 7 cms draft manager and revision helpers'
     expect(component.cmsPreviewMaxWidthClass()).toContain('1024');
   });
 });
+

@@ -77,7 +77,7 @@ class _DummySession:
 
     async def get(self, *_args, **_kwargs):
         await asyncio.sleep(0)
-        return None
+        return SimpleNamespace(id='row-1')
 
     async def commit(self):
         await asyncio.sleep(0)
@@ -139,41 +139,40 @@ def _sample_user(role: str = 'admin') -> SimpleNamespace:
     )
 
 
-def _value_for_name(name: str, *, alternate: bool):
-    lowered = name.lower()
-    if 'request' in lowered:
-        return _request_stub()
-    if lowered in {'session', 'db', 'conn', 'connection'}:
-        return _DummySession()
-    if lowered in {'background_tasks', 'background'}:
-        return _DummyBackgroundTasks()
-    if lowered in {'current_user', 'user', 'admin', 'owner'}:
-        return _sample_user('owner' if alternate else 'admin')
-    if lowered.endswith('_id') or lowered == 'id':
-        return uuid4()
-    if lowered in {'page', 'limit', 'offset', 'count', 'days', 'hours', 'since_hours', 'window_days'}:
-        return 2 if alternate else 1
-    if lowered in {'enabled', 'active', 'force', 'include_pii'}:
-        return alternate
-    if lowered in {'payload', 'data', 'body'}:
-        return {
+_EXACT_NAME_FACTORIES: tuple[tuple[set[str], object], ...] = (
+    ({'session', 'db', 'conn', 'connection'}, lambda _alternate: _DummySession()),
+    ({'background_tasks', 'background'}, lambda _alternate: _DummyBackgroundTasks()),
+    ({'current_user', 'user', 'admin', 'owner'}, lambda alternate: _sample_user('owner' if alternate else 'admin')),
+    ({'page', 'limit', 'offset', 'count', 'days', 'hours', 'since_hours', 'window_days'}, lambda alternate: 2 if alternate else 1),
+    ({'enabled', 'active', 'force', 'include_pii'}, lambda alternate: alternate),
+    (
+        {'payload', 'data', 'body'},
+        lambda alternate: {
             'kind': 'weekly',
             'force': alternate,
             'email': 'owner@example.com',
             'token': '123456',
             'status': 'draft',
             'items': [],
-        }
-    if lowered in {'email', 'username'}:
-        return 'owner@example.com'
-    if lowered in {'q', 'slug', 'key', 'path', 'provider', 'source'}:
-        return 'sample'
-    if lowered in {'amount', 'price', 'value', 'rate'}:
-        return Decimal('10.00')
-    if lowered in {'start', 'end', 'range_from', 'range_to', 'from_date', 'to_date'}:
-        return None
-    if lowered in {'now', 'created_at', 'updated_at'}:
-        return datetime.now(timezone.utc)
+        },
+    ),
+    ({'email', 'username'}, lambda _alternate: 'owner@example.com'),
+    ({'q', 'slug', 'key', 'path', 'provider', 'source'}, lambda _alternate: 'sample'),
+    ({'amount', 'price', 'value', 'rate'}, lambda _alternate: Decimal('10.00')),
+    ({'start', 'end', 'range_from', 'range_to', 'from_date', 'to_date'}, lambda _alternate: None),
+    ({'now', 'created_at', 'updated_at'}, lambda _alternate: datetime.now(timezone.utc)),
+)
+
+
+def _value_for_name(name: str, *, alternate: bool):
+    lowered = name.lower()
+    if 'request' in lowered:
+        return _request_stub()
+    if lowered.endswith('_id') or lowered == 'id':
+        return uuid4()
+    for names, factory in _EXACT_NAME_FACTORIES:
+        if lowered in names:
+            return factory(alternate)
     return _MISSING
 
 

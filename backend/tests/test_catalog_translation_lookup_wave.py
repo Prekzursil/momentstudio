@@ -210,11 +210,17 @@ def test_catalog_image_optimization_error_mapping(monkeypatch: pytest.MonkeyPatc
     stats = catalog_service.get_product_image_optimization_stats(image)
     assert stats['width'] == 100
 
-    monkeypatch.setattr(catalog_service, 'get_media_image_stats', lambda _url: (_ for _ in ()).throw(ValueError('bad image')))
+    def _raise_bad_image(_url):
+        raise ValueError('bad image')
+
+    monkeypatch.setattr(catalog_service, 'get_media_image_stats', _raise_bad_image)
     with pytest.raises(HTTPException, match='bad image'):
         catalog_service.get_product_image_optimization_stats(image)
 
-    monkeypatch.setattr(catalog_service, 'get_media_image_stats', lambda _url: (_ for _ in ()).throw(RuntimeError('boom')))
+    def _raise_stats_runtime(_url):
+        raise RuntimeError('boom')
+
+    monkeypatch.setattr(catalog_service, 'get_media_image_stats', _raise_stats_runtime)
     with pytest.raises(HTTPException, match='Unable to read image stats'):
         catalog_service.get_product_image_optimization_stats(image)
 
@@ -226,15 +232,25 @@ def test_catalog_thumbnail_reprocess_error_mapping(monkeypatch: pytest.MonkeyPat
     result = catalog_service.reprocess_product_image_thumbnails(image)
     assert result['generated'] == 3
 
-    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', lambda _url: (_ for _ in ()).throw(FileNotFoundError('missing')))
+    def _raise_missing_thumb(_url):
+        raise FileNotFoundError('missing')
+
+    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', _raise_missing_thumb)
     with pytest.raises(HTTPException, match='Image file not found'):
         catalog_service.reprocess_product_image_thumbnails(image)
 
-    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', lambda _url: (_ for _ in ()).throw(ValueError('invalid')))
+    def _raise_invalid_thumb(_url):
+        raise ValueError('invalid')
+
+    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', _raise_invalid_thumb)
     with pytest.raises(HTTPException, match='invalid'):
         catalog_service.reprocess_product_image_thumbnails(image)
 
-    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', lambda _url: (_ for _ in ()).throw(RuntimeError('bad')))
+    def _raise_thumb_runtime(_url):
+        raise RuntimeError('bad')
+
+    monkeypatch.setattr(catalog_service, 'regenerate_media_thumbnails', _raise_thumb_runtime)
     with pytest.raises(HTTPException, match='Unable to reprocess thumbnails'):
         catalog_service.reprocess_product_image_thumbnails(image)
+
 

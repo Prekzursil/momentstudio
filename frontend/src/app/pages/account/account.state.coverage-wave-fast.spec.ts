@@ -83,7 +83,10 @@ const ACCOUNT_SWEEP_BLOCKED = new Set<string>([
   'clearInterval',
 ]);
 
-const ACCOUNT_SWEEP_RISKY = /(poll|timer|interval|timeout|avatar|clipboard|revoke|confirm|passkey|twofactor|session|secondary|google|download|export|receipt|share|cancel|return|remove|delete|reorder|signout)/i;
+const ACCOUNT_SWEEP_RISKY_PATTERNS: RegExp[] = [
+  /(poll|timer|interval|timeout|avatar|clipboard|revoke|confirm|passkey|twofactor|session|secondary|google)/i,
+  /(download|export|receipt|share|cancel|return|remove|delete|reorder|signout)/i,
+];
 
 const ACCOUNT_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
   navigateToSection: ['overview'],
@@ -132,7 +135,7 @@ function installAccountSweepStubs(state: any): void {
     get(obj, prop, receiver) {
       if (typeof prop !== 'string') return Reflect.get(obj, prop, receiver);
       const existing = Reflect.get(obj, prop, receiver);
-      if (typeof existing !== 'undefined') return existing;
+      if (existing !== undefined) return existing;
       const spy = jasmine.createSpy(prop).and.returnValue(of({}));
       if (prop.startsWith('list') || prop.startsWith('get')) spy.and.returnValue(of([]));
       obj[prop] = spy;
@@ -146,7 +149,7 @@ function installAccountSweepStubs(state: any): void {
 function prepareAccountSweepArgs(name: string, arity: number): unknown[] {
   const base = [...(ACCOUNT_SWEEP_ARGS_BY_NAME[name] ?? [])];
   if (base.length >= arity) return base;
-  return [...base, ...Array(arity - base.length).fill(undefined)];
+  return [...base, ...new Array(arity - base.length).fill(undefined)];
 }
 
 async function invokeAccountSweepMethod(state: any, name: string): Promise<void> {
@@ -164,7 +167,7 @@ async function runAccountMethodSweep(state: any): Promise<number> {
   const methods = Object.getOwnPropertyNames(AccountState.prototype).filter(
     (name) =>
       !ACCOUNT_SWEEP_BLOCKED.has(name) &&
-      !ACCOUNT_SWEEP_RISKY.test(name) &&
+      !ACCOUNT_SWEEP_RISKY_PATTERNS.some((pattern) => pattern.test(name)) &&
       typeof state[name] === 'function',
   );
 
@@ -968,6 +971,7 @@ describe('AccountState fast export/passkey branches', () => {
     expect(attempted).toBeGreaterThan(80);
   });
 });
+
 
 
 

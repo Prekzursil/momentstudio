@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import importlib
 import inspect
 from datetime import datetime, timezone
@@ -88,22 +89,13 @@ def _sample_user() -> SimpleNamespace:
     )
 
 
-def _name_value(name: str, *, alternate: bool):
-    lowered = name.lower()
-
-    if lowered.endswith('_id') or lowered == 'id':
-        return uuid4()
-    if lowered.endswith('_ids') or lowered in {'ids', 'product_ids', 'order_ids'}:
-        return [uuid4(), uuid4()]
-
-    if lowered in {'product', 'existing_product', 'target_product'}:
-        return _sample_product()
-    if lowered in {'item', 'line_item'}:
-        return _sample_item()
-    if lowered in {'items', 'rows', 'records', 'products'}:
-        return [_sample_item(), _sample_item()]
-    if lowered in {'order', 'cart'}:
-        return SimpleNamespace(
+_EXACT_NAME_FACTORIES: tuple[tuple[set[str], Callable[[bool], object]], ...] = (
+    ({'product', 'existing_product', 'target_product'}, lambda _alternate: _sample_product()),
+    ({'item', 'line_item'}, lambda _alternate: _sample_item()),
+    ({'items', 'rows', 'records', 'products'}, lambda _alternate: [_sample_item(), _sample_item()]),
+    (
+        {'order', 'cart'},
+        lambda _alternate: SimpleNamespace(
             id=uuid4(),
             reference_code='REF-1',
             user_id=uuid4(),
@@ -118,14 +110,13 @@ def _name_value(name: str, *, alternate: bool):
             total_amount=Decimal('17.00'),
             status='pending_payment',
             created_at=datetime.now(timezone.utc),
-        )
-    if lowered in {'address', 'addr', 'shipping_address', 'billing_address'}:
-        return _sample_address()
-    if lowered in {'user', 'current_user', 'admin', 'owner'}:
-        return _sample_user()
-
-    if lowered in {'payload', 'data', 'body', 'meta', 'options', 'params'}:
-        return {
+        ),
+    ),
+    ({'address', 'addr', 'shipping_address', 'billing_address'}, lambda _alternate: _sample_address()),
+    ({'user', 'current_user', 'admin', 'owner'}, lambda _alternate: _sample_user()),
+    (
+        {'payload', 'data', 'body', 'meta', 'options', 'params'},
+        lambda alternate: {
             'kind': 'weekly',
             'force': alternate,
             'slug': 'sample',
@@ -137,23 +128,30 @@ def _name_value(name: str, *, alternate: bool):
             'city': 'Bucharest',
             'postal_code': '010101',
             'country': 'RO',
-        }
+        },
+    ),
+    ({'email', 'username'}, lambda _alternate: 'owner@example.com'),
+    ({'token', 'verification_token', 'code'}, lambda _alternate: '123456'),
+    ({'amount', 'price', 'value', 'rate', 'subtotal', 'total', 'discount'}, lambda _alternate: Decimal('10.00')),
+    ({'count', 'page', 'limit', 'offset', 'days', 'hours', 'window_days'}, lambda alternate: 2 if alternate else 1),
+    ({'enabled', 'active', 'force', 'strict'}, lambda alternate: alternate),
+    ({'created_at', 'updated_at', 'now', 'window_start', 'window_end'}, lambda _alternate: datetime.now(timezone.utc)),
+)
 
-    if lowered in {'email', 'username'}:
-        return 'owner@example.com'
-    if lowered in {'token', 'verification_token', 'code'}:
-        return '123456'
+
+def _name_value(name: str, *, alternate: bool):
+    lowered = name.lower()
+
+    if lowered.endswith('_id') or lowered == 'id':
+        return uuid4()
+    if lowered.endswith('_ids') or lowered in {'ids', 'product_ids', 'order_ids'}:
+        return [uuid4(), uuid4()]
     if lowered in {'slug', 'key', 'path', 'name', 'lang', 'language'}:
         return 'ro' if alternate and lowered in {'lang', 'language'} else 'sample'
 
-    if lowered in {'amount', 'price', 'value', 'rate', 'subtotal', 'total', 'discount'}:
-        return Decimal('10.00')
-    if lowered in {'count', 'page', 'limit', 'offset', 'days', 'hours', 'window_days'}:
-        return 2 if alternate else 1
-    if lowered in {'enabled', 'active', 'force', 'strict'}:
-        return alternate
-    if lowered in {'created_at', 'updated_at', 'now', 'window_start', 'window_end'}:
-        return datetime.now(timezone.utc)
+    for names, factory in _EXACT_NAME_FACTORIES:
+        if lowered in names:
+            return factory(alternate)
 
     return _MISSING
 
@@ -171,7 +169,7 @@ def _is_blocked(func_name: str, func: object) -> bool:
     return False
 
 
-def _build_kwargs(func: object, *, alternate: bool, include_optional: bool = False) -> dict[str, object]:
+def _build_kwargs(func: Callable[..., object], *, alternate: bool, include_optional: bool = False) -> dict[str, object]:
     sig = inspect.signature(func)
     kwargs: dict[str, object] = {}
     for param in sig.parameters.values():
@@ -189,7 +187,7 @@ def _build_kwargs(func: object, *, alternate: bool, include_optional: bool = Fal
     return kwargs
 
 
-def _invoke(func: object, kwargs: dict[str, object]) -> None:
+def _invoke(func: Callable[..., object], kwargs: dict[str, object]) -> None:
     try:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
