@@ -317,5 +317,74 @@ describe('AccountState coverage wave 5 residual branch closures', () => {
 });
 
 
+describe('AccountState coverage wave 5 security and google residual branches', () => {
+  it('covers aliases and cooldowns loader error branches', () => {
+    const { state, auth } = createHarness();
+    auth.getAliases = jasmine.createSpy('getAliases').and.returnValue(throwError(() => new Error('aliases-fail')));
+    auth.getCooldowns = jasmine.createSpy('getCooldowns').and.returnValue(throwError(() => new Error('cooldowns-fail')));
 
+    state.loadAliases(true);
+    state.loadCooldowns(true);
+
+    expect(state.aliasesError()).toBe('account.profile.aliases.loadError');
+    expect(state.cooldownsError()).toBe('account.cooldowns.loadError');
+  });
+
+  it('covers two-factor/passkeys success and unsupported branches', () => {
+    const { state, auth } = createHarness();
+    auth.getTwoFactorStatus = jasmine.createSpy('getTwoFactorStatus').and.returnValue(of({ enabled: true }));
+    auth.listPasskeys = jasmine.createSpy('listPasskeys').and.returnValue(of([{ id: 'pk-1' }]));
+
+    (state as any).loadTwoFactorStatus(true);
+    expect(state.twoFactorLoaded()).toBeTrue();
+
+    spyOn(state, 'passkeysSupported').and.returnValue(false);
+    (state as any).loadPasskeys(true);
+    expect(state.passkeys()).toEqual([]);
+
+    (state.passkeysSupported as jasmine.Spy).and.returnValue(true);
+    (state as any).loadPasskeys(true);
+    expect(state.passkeys().length).toBe(1);
+  });
+});
+
+describe('AccountState coverage wave 5 passkey and google residual branches', () => {
+  it('covers registerPasskey guard and start failure branches', () => {
+    const { state, auth } = createHarness();
+    auth.startPasskeyRegistration = jasmine
+      .createSpy('startPasskeyRegistration')
+      .and.returnValue(throwError(() => ({ error: { detail: 'register-start-fail' } })));
+
+    spyOn(state, 'passkeysSupported').and.returnValue(false);
+    state.registerPasskey();
+    expect((state as any).toast.error).toHaveBeenCalledWith('account.security.passkeys.notSupported');
+
+    (state.passkeysSupported as jasmine.Spy).and.returnValue(true);
+    state.passkeyRegisterPassword = '';
+    state.registerPasskey();
+    expect((state as any).toast.error).toHaveBeenCalledWith('auth.completeForm');
+
+    state.passkeyRegisterPassword = 'pw';
+    state.registerPasskey();
+    expect(state.passkeysError()).toBe('register-start-fail');
+    expect(state.registeringPasskey).toBeFalse();
+  });
+
+  it('covers export action labels and google link/unlink guard branches', () => {
+    const { state, auth } = createHarness();
+    state.exportJob.set({ id: 'exp-1', status: 'running' } as any);
+    expect(state.exportActionLabelKey()).toBe('account.privacy.export.actionGenerating');
+
+    auth.startGoogleLink = jasmine
+      .createSpy('startGoogleLink')
+      .and.returnValue(throwError(() => ({ error: { detail: 'google-link-fail' } })));
+    state.googlePassword = 'pw';
+    state.linkGoogle();
+    expect(state.googleError).toBe('google-link-fail');
+
+    state.googlePassword = '';
+    state.unlinkGoogle();
+    expect(state.googleError).toBe('account.security.google.passwordRequiredUnlink');
+  });
+});
 

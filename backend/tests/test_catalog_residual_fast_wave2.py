@@ -43,6 +43,9 @@ class _Session:
         await asyncio.sleep(0)
         self.flushed += 1
 
+    async def rollback(self):
+        await asyncio.sleep(0)
+
 
 class _Payload:
     def __init__(self, **data):
@@ -448,3 +451,109 @@ async def test_catalog_residual_wave2_import_and_notification_helper_branches(mo
     monkeypatch.setattr(catalog_service.email_service, 'send_back_in_stock', _send)
     sent = await catalog_service.notify_back_in_stock(['a@ok.test', 'b@fail.test', 'c@ok.test'], 'Product')
     assert sent == 2
+
+
+@pytest.mark.anyio
+async def test_catalog_residual_wave2_add_image_and_csv_rollback_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakeImage:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    session = _Session()
+    product = SimpleNamespace(id=uuid4(), slug='ring')
+    payload = _Payload(url='https://cdn.test/a.jpg', alt_text='alt', sort_order=1)
+    monkeypatch.setattr(catalog_service, 'ProductImage', _FakeImage)
+
+    created = await catalog_service.add_product_image(session, product, payload)
+    assert created.product is product
+    assert session.commits == 1
+    assert session.added
+
+    class _RollupResult:
+        def __init__(self, values):
+            self._values = list(values)
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return list(self._values)
+
+    class _RollbackSession(_Session):
+        def __init__(self):
+            super().__init__()
+            self.rollbacks = 0
+
+        async def execute(self, _stmt):
+            await asyncio.sleep(0)
+            return _RollupResult([])
+
+        async def rollback(self):
+            await asyncio.sleep(0)
+            self.rollbacks += 1
+
+    rollback_session = _RollbackSession()
+    duplicate_csv = "slug,name,parent_slug,sort_order\nsame,One,,\nsame,Two,,\n"
+    result = await catalog_service.import_categories_csv(rollback_session, duplicate_csv, dry_run=False)
+    assert result['errors']
+    assert rollback_session.rollbacks == 1
+
+
+@pytest.mark.anyio
+async def test_catalog_residual_wave2_import_products_invalid_row_and_parent_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(catalog_service, '_parse_import_product_row', lambda *_args, **_kwargs: (None, None))
+
+    finalized: list[tuple[bool, list[str]]] = []
+
+    async def _finalize(_session, *, dry_run: bool, errors: list[str]):
+        await asyncio.sleep(0)
+        finalized.append((dry_run, list(errors)))
+
+    monkeypatch.setattr(catalog_service, '_finalize_import_products_transaction', _finalize)
+    csv_payload = "slug,name,category_slug\nring,Ring,cat\n"
+    imported = await catalog_service.import_products_csv(_Session(), csv_payload, dry_run=True)
+    assert any('invalid row' in err for err in imported['errors'])
+    assert finalized and finalized[0][0] is True
+
+    class _ParentResult:
+        def __init__(self, values):
+            self._values = list(values)
+
+        def scalars(self):
+            return self
+
+        def all(self):
+            return list(self._values)
+
+    class _FoundParentSession(_Session):
+        async def execute(self, _stmt):
+            await asyncio.sleep(0)
+            return _ParentResult(['parent-a'])
+
+    rows = [{'idx': 2, 'slug': 'child', 'parent_slug': 'parent-a'}]
+    errors = await catalog_service._collect_missing_parent_errors(_FoundParentSession(), rows, {'child'})
+    assert errors == []
+
+
+def test_catalog_residual_wave2_category_parser_error_branches() -> None:
+    _, parent_error = catalog_service._parse_category_import_row_or_error(
+        10,
+        {'slug': 'self', 'name': 'Self', 'parent_slug': 'self'},
+        set(),
+    )
+    assert parent_error is not None and 'parent_slug' in parent_error
+
+    _, sort_error = catalog_service._parse_category_import_row_or_error(
+        11,
+        {'slug': 'valid-slug', 'name': 'Name', 'sort_order': 'abc'},
+        set(),
+    )
+    assert sort_error is not None and 'sort_order' in sort_error
+
+    _, translation_error = catalog_service._parse_category_import_row_or_error(
+        12,
+        {'slug': 'valid-slug-2', 'name': 'Name', 'description_en': 'Needs translation'},
+        set(),
+    )
+    assert translation_error is not None and 'description_en' in translation_error
+
