@@ -271,3 +271,108 @@ async def test_run_bulk_segment_job_non_runnable_and_failure_path(monkeypatch: p
 
     await coupons_api._run_bulk_segment_job(object(), job_id=uuid4())
     assert failed['called'] is True
+
+
+@pytest.mark.anyio
+async def test_admin_retry_bulk_job_branch_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _RetrySession(_Session):
+        def __init__(self, *, job, bind=object()):
+            super().__init__(coupon=None, promotion=None, bind=bind)
+            self._job = job
+            self.commits = 0
+            self.refreshes = 0
+
+        async def get(self, model, _id):
+            if model is coupons_api.CouponBulkJob:
+                return self._job
+            return await super().get(model, _id)
+
+        async def commit(self):
+            await asyncio.sleep(0)
+            self.commits += 1
+
+        async def refresh(self, obj, attribute_names=None):
+            await asyncio.sleep(0)
+            self.refreshes += 1
+            return obj
+
+    base_job = SimpleNamespace(
+        id=uuid4(),
+        coupon_id=uuid4(),
+        status=coupons_api.CouponBulkJobStatus.pending,
+        action=coupons_api.CouponBulkJobAction.assign,
+        require_marketing_opt_in=False,
+        require_email_verified=False,
+        bucket_total=None,
+        bucket_index=None,
+        bucket_seed=None,
+        send_email=False,
+        revoke_reason=None,
+    )
+
+    with pytest.raises(HTTPException) as in_progress:
+        await coupons_api.admin_retry_bulk_job(base_job.id, BackgroundTasks(), _RetrySession(job=base_job), SimpleNamespace(id=uuid4()))
+    assert in_progress.value.status_code == status.HTTP_400_BAD_REQUEST
+
+    base_job.status = coupons_api.CouponBulkJobStatus.failed
+    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_kwargs: (_ for _ in ()).throw(ValueError('bad-bucket')))
+    with pytest.raises(HTTPException) as bad_bucket:
+        await coupons_api.admin_retry_bulk_job(base_job.id, BackgroundTasks(), _RetrySession(job=base_job), SimpleNamespace(id=uuid4()))
+    assert bad_bucket.value.status_code == status.HTTP_400_BAD_REQUEST
+
+
+@pytest.mark.anyio
+async def test_admin_retry_bulk_job_success_assign_and_engine_guard(monkeypatch: pytest.MonkeyPatch) -> None:
+    job = SimpleNamespace(
+        id=uuid4(),
+        coupon_id=uuid4(),
+        status=coupons_api.CouponBulkJobStatus.failed,
+        action=coupons_api.CouponBulkJobAction.assign,
+        require_marketing_opt_in=True,
+        require_email_verified=True,
+        bucket_total=2,
+        bucket_index=1,
+        bucket_seed='seed',
+        send_email=True,
+        revoke_reason='cleanup',
+    )
+
+    class _RetrySession(_Session):
+        def __init__(self, *, bind):
+            super().__init__(coupon=None, promotion=None, bind=bind)
+            self.job = job
+
+        async def get(self, model, _id):
+            if model is coupons_api.CouponBulkJob:
+                return self.job
+            return await super().get(model, _id)
+
+        async def refresh(self, obj, attribute_names=None):
+            await asyncio.sleep(0)
+            obj.id = getattr(obj, 'id', None) or uuid4()
+            for field in ('processed', 'created', 'restored', 'already_active', 'revoked', 'already_revoked', 'not_assigned'):
+                setattr(obj, field, int(getattr(obj, field, 0) or 0))
+            obj.created_at = getattr(obj, 'created_at', None) or coupons_api.datetime.now(coupons_api.timezone.utc)
+            return obj
+
+    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **kwargs: SimpleNamespace(**kwargs))
+    monkeypatch.setattr(coupons_api, '_segment_user_filters', lambda _job: [])
+
+    async def _preview_assign(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return coupons_api.CouponBulkSegmentPreview(total_candidates=7, sample_emails=[], created=0, restored=0, already_active=0)
+
+    monkeypatch.setattr(coupons_api, '_preview_segment_assign', _preview_assign)
+
+    admin_user = SimpleNamespace(id=uuid4())
+    tasks = BackgroundTasks()
+    ok_session = _RetrySession(bind=object())
+    result = await coupons_api.admin_retry_bulk_job(job.id, tasks, ok_session, admin_user)
+    assert result.total_candidates == 7
+    assert len(tasks.tasks) == 1
+
+    none_engine_session = _RetrySession(bind=None)
+    with pytest.raises(HTTPException) as no_engine:
+        await coupons_api.admin_retry_bulk_job(job.id, BackgroundTasks(), none_engine_session, admin_user)
+    assert no_engine.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
