@@ -912,3 +912,200 @@ describe('AdminComponent coverage wave 7 blog action matrix', () => {
   });
 });
 
+
+describe('AdminComponent coverage wave 7 blog residual branch matrix', () => {
+  it('covers blog bulk preview branches across actions', () => {
+    const { component } = createAdminHarness();
+    primeBlogHarness(component as any, (component as any).admin as any);
+
+    component.blogBulkSelection = new Set<string>();
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewEmpty');
+
+    component.blogBulkSelection = new Set(['blog.wave']);
+    component.blogBulkAction = 'unpublish';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewUnpublish');
+
+    component.blogBulkAction = 'schedule';
+    component.blogBulkPublishAt = '2026-03-01T12:00';
+    component.blogBulkUnpublishAt = '2026-03-02T12:00';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewSchedule');
+
+    component.blogBulkAction = 'tags_add';
+    component.blogBulkTags = 'alpha, beta';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewTagsAdd');
+
+    component.blogBulkAction = 'tags_remove';
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewTagsRemove');
+
+    component.blogBulkAction = 'unknown' as any;
+    expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewEmpty');
+  });
+
+  it('covers saveBlogPost translation branch with meta follow-up failure', () => {
+    const { component, admin, toast } = createAdminHarness();
+    primeBlogHarness(component as any, admin as any);
+    spyOn(component as any, 'reloadContentBlocks').and.stub();
+    spyOn(component as any, 'setBlogEditLang').and.stub();
+
+    component.selectedBlogKey = 'blog.wave';
+    component.blogBaseLang = 'en';
+    component.blogEditLang = 'ro';
+    component.blogMeta = { summary: { en: 'base' } } as any;
+    component.blogForm = {
+      title: 'RO title',
+      body_markdown: 'RO body',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+      summary: 'Rezumat',
+      tags: 'x,y',
+      series: 'S1',
+      cover_image_url: '',
+      cover_fit: 'contain',
+      reading_time_minutes: '6',
+      pinned: true,
+      pin_order: '4'
+    } as any;
+
+    admin.updateContentBlock.and.callFake((_key: string, payload: any) => {
+      if (payload?.lang) {
+        return of({ version: 3, title: 'RO title', body_markdown: 'RO body', status: 'draft' } as any);
+      }
+      return throwError(() => ({ status: 500 }));
+    });
+
+    component.saveBlogPost();
+
+    expect(admin.updateContentBlock).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.errors.translationMetaSave');
+    expect((component as any).setBlogEditLang).toHaveBeenCalled();
+  });
+
+  it('covers moderation guard and error branches for hide/unhide/delete', () => {
+    const { component } = createAdminHarness();
+    const { blog } = primeBlogHarness(component as any, (component as any).admin as any);
+    spyOn(component as any, 'loadFlaggedComments').and.stub();
+
+    component.blogCommentModerationBusy.add('busy-1');
+    component.toggleHide({ id: 'busy-1', is_hidden: false } as any);
+    expect(blog.hideCommentAdmin).not.toHaveBeenCalled();
+
+    component.blogCommentModerationBusy.delete('busy-1');
+    spyOn(GLOBAL_CTX, 'prompt').and.returnValues(null as any, 'reason text');
+    component.toggleHide({ id: 'c-10', is_hidden: false } as any);
+    expect(blog.hideCommentAdmin).not.toHaveBeenCalledWith('c-10', jasmine.anything());
+
+    blog.hideCommentAdmin.and.returnValue(throwError(() => ({ error: { detail: 'hide failed' } })));
+    component.flaggedComments.set([{ id: 'c-11', is_hidden: false } as any]);
+    component.toggleHide({ id: 'c-11', is_hidden: false } as any);
+    expect(component.flaggedComments()[0].is_hidden).toBeFalse();
+
+    blog.unhideCommentAdmin.and.returnValue(of({} as any));
+    component.flaggedComments.set([{ id: 'c-12', is_hidden: true } as any]);
+    component.toggleHide({ id: 'c-12', is_hidden: true } as any);
+    expect(component.flaggedComments()[0].is_hidden).toBeFalse();
+
+    component.blogCommentModerationBusy.add('c-13');
+    spyOn(GLOBAL_CTX, 'confirm').and.returnValue(true);
+    component.adminDeleteComment({ id: 'c-13', is_hidden: false } as any);
+    expect(blog.deleteComment).not.toHaveBeenCalledWith('c-13');
+  });
+
+  it('covers upload image guard/error and rich-editor insertion branch', () => {
+    const { component, admin, toast } = createAdminHarness();
+    const { adminProxy } = primeBlogHarness(component as any, admin as any);
+
+    const input = document.createElement('input');
+    const richEditor = { insertMarkdown: jasmine.createSpy('insertMarkdown') } as any;
+
+    component.selectedBlogKey = null;
+    Object.defineProperty(input, 'files', { value: [new File(['x'], 'guard.png', { type: 'image/png' })], configurable: true });
+    component.uploadAndInsertBlogImage(richEditor, { target: input } as any);
+    expect(adminProxy.uploadContentImage).not.toHaveBeenCalledWith(null as any, jasmine.anything());
+
+    component.selectedBlogKey = 'blog.wave';
+    Object.defineProperty(input, 'files', { value: [new File(['x'], 'ins.png', { type: 'image/png' })], configurable: true });
+    adminProxy.uploadContentImage.and.returnValue(of({ images: [{ id: 'i-2', url: '/media/ins.png', sort_order: 2, focal_x: 25, focal_y: 75 }] } as any));
+    component.blogImageLayout = 'wide';
+    component.uploadAndInsertBlogImage(richEditor, { target: input } as any);
+    expect(richEditor.insertMarkdown).toHaveBeenCalled();
+
+    adminProxy.uploadContentImage.and.returnValue(throwError(() => ({ status: 500 })));
+    component.uploadAndInsertBlogImage(richEditor, { target: input } as any);
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.images.errors.upload');
+  });
+
+  it('covers drop-image no-files and mid-loop upload failure branch', async () => {
+    const { component, admin, toast } = createAdminHarness();
+    const { adminProxy } = primeBlogHarness(component as any, admin as any);
+    const textarea = document.createElement('textarea');
+
+    const noFileEvent = {
+      dataTransfer: { files: [] },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    } as any;
+    await component.onBlogImageDrop(textarea, noFileEvent);
+    expect(noFileEvent.preventDefault).not.toHaveBeenCalled();
+
+    component.selectedBlogKey = 'blog.wave';
+    let calls = 0;
+    adminProxy.uploadContentImage.and.callFake(() => {
+      calls += 1;
+      if (calls === 1) {
+        return of({ images: [{ id: 'ok-1', url: '/media/ok-1.png', sort_order: 1, focal_x: 50, focal_y: 50 }] } as any);
+      }
+      return throwError(() => ({ status: 500 }));
+    });
+
+    const dropEvent = {
+      dataTransfer: {
+        files: [
+          new File(['a'], 'ok-1.png', { type: 'image/png' }),
+          new File(['b'], 'fail-2.png', { type: 'image/png' })
+        ]
+      },
+      preventDefault: jasmine.createSpy('preventDefault'),
+      stopPropagation: jasmine.createSpy('stopPropagation')
+    } as any;
+
+    await component.onBlogImageDrop(textarea, dropEvent);
+    expect(dropEvent.preventDefault).toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.blog.images.errors.upload');
+  });
+
+  it('covers markdown heading extraction and blog meta normalization helpers', () => {
+    const { component } = createAdminHarness();
+    const cmp: any = component as any;
+
+    const headings = cmp.extractMarkdownHeadings('# One\n```\n## Hidden\n```\n## Two [Link](https://x)\n#### Ignored\n');
+    expect(headings.length).toBe(2);
+    expect(headings[0]).toEqual(jasmine.objectContaining({ level: 1, text: 'One' }));
+
+    component.blogBaseLang = 'en';
+    component.blogMeta = { summary: 'Legacy summary', tags: 'legacy', pin_order: 0 } as any;
+    component.blogForm = {
+      title: 'T',
+      body_markdown: 'B',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+      summary: 'Romanian summary',
+      tags: 'alpha, beta, Alpha',
+      series: 'Series',
+      cover_image_url: '/cover.png',
+      cover_fit: 'contain',
+      reading_time_minutes: '7.8',
+      pinned: true,
+      pin_order: '0'
+    } as any;
+
+    const meta = cmp.buildBlogMeta('ro');
+    expect(meta.summary).toEqual(jasmine.objectContaining({ en: 'Legacy summary', ro: 'Romanian summary' }));
+    expect(meta.tags).toEqual(['alpha', 'beta']);
+    expect(meta.cover_fit).toBe('contain');
+    expect(meta.reading_time_minutes).toBe(7);
+    expect(meta.pin_order).toBe(1);
+  });
+});
+
