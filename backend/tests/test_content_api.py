@@ -5,6 +5,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Dict
 from urllib.parse import urlparse
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -865,3 +866,95 @@ def test_legal_pages_require_bilingual_before_publish(test_app: Dict[str, object
     )
     assert clear_ro.status_code == 400, clear_ro.text
     assert "EN and RO" in str(clear_ro.json().get("detail"))
+
+
+
+def test_content_media_admin_error_branches_and_preview_signatures(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+    headers = auth_headers(admin_token)
+    asset_id = uuid4()
+
+    async def _missing_asset(_session, _asset_id):
+        raise ValueError('missing')
+
+    monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _missing_asset)
+
+    update_missing = client.patch(f"/api/v1/content/admin/media/assets/{asset_id}", json={"tags": []}, headers=headers)
+    assert update_missing.status_code == 404, update_missing.text
+
+    approve_missing = client.post(f"/api/v1/content/admin/media/assets/{asset_id}/approve", json={"note": "ok"}, headers=headers)
+    assert approve_missing.status_code == 404, approve_missing.text
+
+    reject_missing = client.post(f"/api/v1/content/admin/media/assets/{asset_id}/reject", json={"note": "no"}, headers=headers)
+    assert reject_missing.status_code == 404, reject_missing.text
+
+    purge_missing = client.post(f"/api/v1/content/admin/media/assets/{asset_id}/purge", headers=headers)
+    assert purge_missing.status_code == 404, purge_missing.text
+
+    edit_missing = client.post(f"/api/v1/content/admin/media/assets/{asset_id}/edit", json={"rotate_cw": 90}, headers=headers)
+    assert edit_missing.status_code == 404, edit_missing.text
+
+    preview_missing = client.get(
+        f"/api/v1/content/admin/media/assets/{asset_id}/preview",
+        params={"exp": 2_000_000_000, "sig": "x" * 16},
+        headers=headers,
+    )
+    assert preview_missing.status_code == 404, preview_missing.text
+
+    async def _asset(_session, _asset_id):
+        return type('Asset', (), {'id': asset_id})()
+
+    monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _asset)
+    monkeypatch.setattr('app.services.media_dam.verify_preview_signature', lambda *args, **kwargs: False)
+    preview_bad_sig = client.get(
+        f"/api/v1/content/admin/media/assets/{asset_id}/preview",
+        params={"exp": 2_000_000_000, "sig": "y" * 16},
+        headers=headers,
+    )
+    assert preview_bad_sig.status_code == 403, preview_bad_sig.text
+
+    monkeypatch.setattr('app.services.media_dam.verify_preview_signature', lambda *args, **kwargs: True)
+
+    def _raise_missing(*_args, **_kwargs):
+        raise FileNotFoundError('missing-file')
+
+    monkeypatch.setattr('app.services.media_dam.resolve_asset_preview_path', _raise_missing)
+    preview_missing_file = client.get(
+        f"/api/v1/content/admin/media/assets/{asset_id}/preview",
+        params={"exp": 2_000_000_000, "sig": "z" * 16},
+        headers=headers,
+    )
+    assert preview_missing_file.status_code == 404, preview_missing_file.text
+
+
+def test_content_retry_policy_value_error_branches(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(SessionLocal)
+    headers = auth_headers(admin_token)
+
+    async def _raise_value_error(*_args, **_kwargs):
+        raise ValueError('unsupported')
+
+    monkeypatch.setattr('app.services.media_dam.rollback_retry_policy', _raise_value_error)
+    monkeypatch.setattr('app.services.media_dam.mark_retry_policy_known_good', _raise_value_error)
+    monkeypatch.setattr('app.services.media_dam.reset_retry_policy', _raise_value_error)
+
+    rollback_resp = client.post(
+        '/api/v1/content/admin/media/retry-policies/ingest/rollback',
+        json={"preset_key": "factory_default", "note": "rollback"},
+        headers=headers,
+    )
+    assert rollback_resp.status_code == 400, rollback_resp.text
+
+    mark_known_good_resp = client.post(
+        '/api/v1/content/admin/media/retry-policies/ingest/mark-known-good',
+        params={"note": "known-good"},
+        headers=headers,
+    )
+    assert mark_known_good_resp.status_code == 400, mark_known_good_resp.text
+
+    reset_resp = client.post('/api/v1/content/admin/media/retry-policies/ingest/reset', headers=headers)
+    assert reset_resp.status_code == 400, reset_resp.text
