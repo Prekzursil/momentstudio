@@ -380,4 +380,136 @@ describe('AdminComponent coverage wave 10 targeted branch closures', () => {
     cmp.loadReportsSettings();
     expect(cmp.reportsSettingsForm.weekly_enabled).toBeFalse();
   });
+
+  it('covers checkout settings normalization, fallback create, and conflict save branches', () => {
+    const { component, admin } = createHarness();
+    const cmp: any = component;
+    cmp.handleContentConflict = jasmine.createSpy('handleContentConflict').and.returnValue(false);
+    cmp.checkoutSettingsForm = {
+      shipping_fee_ron: '-1',
+      free_shipping_threshold_ron: 'NaN',
+      phone_required_home: 0,
+      phone_required_locker: 1,
+      fee_enabled: true,
+      fee_type: 'nope',
+      fee_value: '-4',
+      vat_enabled: true,
+      vat_rate_percent: '500',
+      vat_apply_to_shipping: 0,
+      vat_apply_to_fee: 1,
+      receipt_share_days: '99999',
+      money_rounding: 'unknown',
+    };
+
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    admin.createContent.and.returnValue(of({ version: 11 }));
+    cmp.saveCheckoutSettings();
+
+    const payload = admin.createContent.calls.mostRecent().args[1];
+    expect(payload.meta.shipping_fee_ron).toBe(20);
+    expect(payload.meta.free_shipping_threshold_ron).toBe(300);
+    expect(payload.meta.fee_type).toBe('flat');
+    expect(payload.meta.fee_value).toBe(0);
+    expect(payload.meta.vat_rate_percent).toBe(10);
+    expect(payload.meta.receipt_share_days).toBe(365);
+    expect(payload.meta.money_rounding).toBe('half_up');
+    expect(cmp.checkoutSettingsMessage).toBe('adminUi.site.checkout.success.save');
+
+    cmp.handleContentConflict.and.returnValue(true);
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    cmp.saveCheckoutSettings();
+    expect(cmp.checkoutSettingsError).toBe('adminUi.site.checkout.errors.save');
+  });
+
+  it('covers reports settings sanitize/create fallback, conflict, and send-now branches', () => {
+    const { component, admin } = createHarness();
+    const cmp: any = component;
+    cmp.handleContentConflict = jasmine.createSpy('handleContentConflict').and.returnValue(false);
+    cmp.reportsSettingsMeta = {};
+    cmp.reportsSettingsForm = {
+      weekly_enabled: true,
+      weekly_weekday: 99,
+      weekly_hour_utc: -5,
+      monthly_enabled: true,
+      monthly_day: '99',
+      monthly_hour_utc: 77,
+      recipients: 'A@EXAMPLE.COM; bad; a@example.com; B@example.com',
+    };
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    admin.createContent.and.returnValue(of({ version: 2, meta: {} }));
+    cmp.saveReportsSettings();
+
+    const payload = admin.createContent.calls.mostRecent().args[1];
+    expect(payload.meta.reports_weekly_weekday).toBe(6);
+    expect(payload.meta.reports_weekly_hour_utc).toBe(0);
+    expect(payload.meta.reports_monthly_day).toBe(28);
+    expect(payload.meta.reports_monthly_hour_utc).toBe(23);
+    expect(payload.meta.reports_recipients).toEqual(['a@example.com', 'b@example.com']);
+
+    cmp.handleContentConflict.and.returnValue(true);
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    cmp.saveReportsSettings();
+    expect(cmp.reportsSettingsError).toBe('adminUi.reports.errors.save');
+
+    spyOn(cmp, 'loadReportsSettings').and.stub();
+    admin.sendScheduledReport.and.returnValue(of({ skipped: true }));
+    cmp.sendReportNow('weekly');
+    expect(cmp.reportsSettingsMessage).toBe('adminUi.reports.success.skipped');
+    expect(cmp.loadReportsSettings).toHaveBeenCalled();
+
+    cmp.reportsSending = true;
+    cmp.sendReportNow('monthly');
+    expect(admin.sendScheduledReport.calls.count()).toBe(1);
+    cmp.reportsSending = false;
+
+    admin.sendScheduledReport.and.returnValue(throwError(() => new Error('send-fail')));
+    cmp.sendReportNow('monthly');
+    expect(cmp.reportsSettingsError).toBe('adminUi.reports.errors.send');
+  });
+
+  it('covers legal-page save chains, page-load 404/general error, and custom-page create branches', () => {
+    const { component, admin, toast } = createHarness();
+    const cmp: any = component;
+
+    spyOn(cmp, 'saveLegalMetaIfNeeded').and.callFake((_key: any, onOk: () => void) => onOk());
+    spyOn(cmp, 'savePageMarkdownInternal').and.callFake(
+      (_key: string, _body: string, lang: string, onSuccess: () => void, onError: () => void) => {
+        if (lang === 'ro') onError();
+        else onSuccess();
+      },
+    );
+    cmp.legalPageForm = { en: 'EN', ro: 'RO' };
+    cmp.saveLegalPageBoth('legal.terms', cmp.legalPageForm);
+    expect(cmp.savePageMarkdownInternal.calls.count()).toBe(2);
+    expect(cmp.legalPageError).toBe('adminUi.site.pages.errors.save');
+
+    admin.getContent.and.returnValue(throwError(() => ({ status: 404 })));
+    cmp.loadPageBlocks('page.faq');
+    expect(cmp.pageBlocks['page.faq']).toEqual([]);
+
+    admin.getContent.and.returnValue(throwError(() => ({ status: 500 })));
+    cmp.loadPageBlocks('page.faq');
+    expect(cmp.pageBlocksError['page.faq']).toBe('adminUi.site.pages.builder.errors.load');
+
+    cmp.newCustomPageTitle = 'New Page';
+    cmp.newCustomPageTemplate = 'blank';
+    cmp.newCustomPageStatus = 'draft';
+    cmp.contentPages = [{ slug: 'new-page' }];
+    spyOn(cmp, 'isReservedPageSlug').and.returnValue(true);
+    cmp.createCustomPage();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.site.pages.errors.reservedTitle', 'adminUi.site.pages.errors.reservedCopy');
+
+    (cmp.isReservedPageSlug as jasmine.Spy).and.returnValue(false);
+    spyOn(cmp, 'loadContentPages').and.stub();
+    spyOn(cmp, 'loadPageBlocks').and.stub();
+    admin.createContent.and.returnValue(of({}));
+    cmp.createCustomPage();
+    expect(cmp.loadPageBlocks).toHaveBeenCalled();
+
+    admin.createContent.and.returnValue(throwError(() => ({ error: { detail: 'bad-create' } })));
+    cmp.newCustomPageTitle = 'Another Page';
+    cmp.createCustomPage();
+    expect(toast.error).toHaveBeenCalledWith('bad-create');
+  });
+
 });
