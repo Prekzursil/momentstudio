@@ -63,6 +63,65 @@ function buildCheckoutForm(valid: boolean): any {  return {
 }
 
 describe('CheckoutComponent fast preference and coupon guards', () => {
+  it('executes constructor defaults and saved-delivery preference branches', () => {
+    const cartStoreStub = {
+      items: () => [],
+      subtotal: () => 0,
+    };
+    const routerStub = { navigate: jasmine.createSpy('navigate').and.returnValue(Promise.resolve(true)) };
+    const routeStub = { snapshot: { queryParams: {} } };
+    const cartApiStub = {};
+    const apiStub = {};
+    const accountServiceStub = {};
+    const couponsServiceStub = {};
+    const translateStub = { currentLang: 'ro', instant: (key: string) => key };
+    const analyticsStub = { enabled: () => false, track: jasmine.createSpy('track') };
+    const authStub = { isAuthenticated: () => false };
+    const zoneStub = { run: (fn: () => void) => fn() };
+    const cdrStub = { markForCheck: jasmine.createSpy('markForCheck') };
+
+    const checkoutWithoutPrefs = new CheckoutComponent(
+      cartStoreStub as any,
+      routerStub as any,
+      routeStub as any,
+      cartApiStub as any,
+      apiStub as any,
+      accountServiceStub as any,
+      couponsServiceStub as any,
+      translateStub as any,
+      { tryLoadDeliveryPrefs: () => null, tryLoadPaymentMethod: () => null } as any,
+      analyticsStub as any,
+      authStub as any,
+      zoneStub as any,
+      cdrStub as any,
+    ) as any;
+
+    expect(checkoutWithoutPrefs.deliveryType).toBe('home');
+    expect(checkoutWithoutPrefs.locker).toBeNull();
+    expect(checkoutWithoutPrefs.shippingCountryInput).toBeTruthy();
+    expect(checkoutWithoutPrefs.billingCountryInput).toBeTruthy();
+    expect(checkoutWithoutPrefs.countries.length).toBeGreaterThan(0);
+
+    const checkoutWithPrefs = new CheckoutComponent(
+      cartStoreStub as any,
+      routerStub as any,
+      routeStub as any,
+      cartApiStub as any,
+      apiStub as any,
+      accountServiceStub as any,
+      couponsServiceStub as any,
+      translateStub as any,
+      { tryLoadDeliveryPrefs: () => ({ courier: 'fan_courier', deliveryType: 'locker' }), tryLoadPaymentMethod: () => null } as any,
+      analyticsStub as any,
+      authStub as any,
+      zoneStub as any,
+      cdrStub as any,
+    ) as any;
+
+    expect(checkoutWithPrefs.deliveryType).toBe('locker');
+    expect(checkoutWithPrefs.courier).toBe('fan_courier');
+    expect(checkoutWithPrefs.paymentMethod).toMatch(/^(cod|netopia|paypal|stripe)$/);
+  });
   it('reads and persists auto-apply preference safely', () => {
     const cmp = createCheckoutHarness();
     const getSpy = spyOn(localStorage, 'getItem').and.returnValue('true');

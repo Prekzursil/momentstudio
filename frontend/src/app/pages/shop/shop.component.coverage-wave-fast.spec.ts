@@ -1,4 +1,15 @@
 import { of, throwError } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
+import { TranslateModule } from '@ngx-translate/core';
+import { Meta, Title } from '@angular/platform-browser';
+import { CatalogService } from '../../core/catalog.service';
+import { AdminService } from '../../core/admin.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
+import { ToastService } from '../../core/toast.service';
+import { SeoHeadLinksService } from '../../core/seo-head-links.service';
+import { StructuredDataService } from '../../core/structured-data.service';
 
 import { ShopComponent } from './shop.component';
 
@@ -777,5 +788,58 @@ describe('ShopComponent coverage fast wave: constructor effect + reorder fallbac
     cmp.router.url = '/shop';
     cmp.initScrollRestoreFromSession();
     expect(cmp.clearShopReturnContext).toHaveBeenCalled();
+  });
+});
+
+describe('ShopComponent fast coverage wave: constructor and default field initialization', () => {
+  it('instantiates via TestBed and exercises constructor defaults without running ngOnInit', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ShopComponent, TranslateModule.forRoot(), RouterTestingModule.withRoutes([])],
+      providers: [
+        { provide: Title, useValue: jasmine.createSpyObj('Title', ['setTitle']) },
+        { provide: Meta, useValue: jasmine.createSpyObj('Meta', ['updateTag']) },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { data: { categories: [] } },
+            paramMap: of({ get: () => null }),
+            queryParams: of({}),
+          },
+        },
+        {
+          provide: CatalogService,
+          useValue: {
+            listProducts: jasmine.createSpy('listProducts').and.returnValue(of({ items: [], meta: null })),
+            listCategories: jasmine.createSpy('listCategories').and.returnValue(of([])),
+          },
+        },
+        {
+          provide: AdminService,
+          useValue: {
+            reorderCategories: jasmine.createSpy('reorderCategories').and.returnValue(of([])),
+            bulkUpdateProducts: jasmine.createSpy('bulkUpdateProducts').and.returnValue(of([])),
+          },
+        },
+        { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error', 'action']) },
+        {
+          provide: SeoHeadLinksService,
+          useValue: { setCanonical: () => undefined, setAlternates: () => undefined, setLocalizedCanonical: () => undefined },
+        },
+        { provide: StructuredDataService, useValue: { setRouteSchemas: () => undefined, clearRouteSchemas: () => undefined } },
+      ],
+    });
+
+    // Resolve token lookup from generated metadata where class references are direct imports.
+    const fixture = TestBed.createComponent(ShopComponent);
+    const component = fixture.componentInstance as any;
+
+    expect(component.filters.page).toBe(1);
+    expect(component.filters.limit).toBe(12);
+    expect(component.quickViewOpen).toBeFalse();
+    expect(component.loading()).toBeTrue();
+    expect(component.reorderSaving()).toBeFalse();
+    expect(component.bulkSelectMode()).toBeFalse();
   });
 });
