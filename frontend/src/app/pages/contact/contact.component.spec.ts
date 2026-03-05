@@ -2,13 +2,14 @@ import { TestBed } from '@angular/core/testing';
 import { Meta, Title } from '@angular/platform-browser';
 import { RouterTestingModule } from '@angular/router/testing';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { SeoHeadLinksService } from '../../core/seo-head-links.service';
 import { SiteSocialService } from '../../core/site-social.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { SupportService } from '../../core/support.service';
 import { ContactComponent } from './contact.component';
 
@@ -19,6 +20,7 @@ let contactSeoHeadLinks: jasmine.SpyObj<SeoHeadLinksService>;
 let contactAuth: jasmine.SpyObj<AuthService>;
 let contactSupport: jasmine.SpyObj<SupportService>;
 let contactSocial: jasmine.SpyObj<SiteSocialService>;
+let contactStorefrontAdmin: jasmine.SpyObj<StorefrontAdminModeService>;
 let contactTranslate: TranslateService;
 
 describe('ContactComponent SEO', () => {
@@ -84,6 +86,71 @@ describe('ContactComponent content + lifecycle', () => {
   });
 });
 
+
+describe('ContactComponent interaction branches', () => {
+  beforeEach(setupContactSpec);
+
+  it('covers helper methods plus admin edit action', () => {
+    const fixture = TestBed.createComponent(ContactComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+
+    expect(cmp.initialsForLabel('')).toBe('MS');
+    expect(cmp.initialsForLabel('Moment Studio')).toBe('MS');
+    expect(cmp.focalPosition(120, -5)).toBe('100% 0%');
+
+    contactStorefrontAdmin.enabled.and.returnValue(true);
+    expect(cmp.canEditPage()).toBeTrue();
+
+    const navigateSpy = spyOn((cmp as any).router, 'navigate').and.returnValue(Promise.resolve(true));
+    cmp.editPage();
+    expect(navigateSpy).toHaveBeenCalledWith(['/admin/content/pages'], { queryParams: { edit: 'contact' } });
+  });
+
+  it('covers load fallback branch when content request fails', () => {
+    contactApi.get.and.returnValue(throwError(() => new Error('content-fail')));
+
+    const fixture = TestBed.createComponent(ContactComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+
+    expect(cmp.hasError()).toBeTrue();
+    expect(cmp.loading()).toBeFalse();
+    expect(contactTitle.setTitle).toHaveBeenCalled();
+  });
+
+  it('covers submit captcha guard, success reset, and error reset branches', () => {
+    const fixture = TestBed.createComponent(ContactComponent);
+    fixture.detectChanges();
+    const cmp = fixture.componentInstance;
+
+    cmp.captchaEnabled = true;
+    cmp.captchaToken = null;
+    cmp.formTopic = 'contact';
+    cmp.formName = 'Ada';
+    cmp.formEmail = 'ada@example.com';
+    cmp.formMessage = 'Help';
+    cmp.submit();
+    expect(cmp.submitError()).toBeTruthy();
+
+    cmp.captchaEnabled = false;
+    cmp.formOrderRef = 'ORDER-1';
+    cmp.contactCaptcha = { reset: jasmine.createSpy('reset') } as any;
+
+    contactSupport.submitContact.and.returnValue(of({} as any));
+    cmp.submit();
+    expect(cmp.submitSuccess()).toBeTrue();
+    expect(cmp.formMessage).toBe('');
+    expect(cmp.formOrderRef).toBe('');
+    expect(cmp.contactCaptcha?.reset).toHaveBeenCalled();
+
+    contactSupport.submitContact.and.returnValue(throwError(() => ({ error: { detail: 'submit-failed' } })));
+    cmp.formMessage = 'Retry';
+    cmp.submit();
+    expect(cmp.submitError()).toBe('submit-failed');
+    expect(cmp.contactCaptcha?.reset).toHaveBeenCalled();
+  });
+});
 function setupContactSpec(): void {
   contactMeta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
   contactTitle = jasmine.createSpyObj<Title>('Title', ['setTitle']);
@@ -97,6 +164,8 @@ function setupContactSpec(): void {
   contactSupport = jasmine.createSpyObj<SupportService>('SupportService', ['submitContact']);
   contactSupport.submitContact.and.returnValue(of({} as any));
   contactSocial = jasmine.createSpyObj<SiteSocialService>('SiteSocialService', ['get']);
+  contactStorefrontAdmin = jasmine.createSpyObj<StorefrontAdminModeService>('StorefrontAdminModeService', ['enabled']);
+  contactStorefrontAdmin.enabled.and.returnValue(false);
   contactSocial.get.and.returnValue(
     of({
       contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
@@ -114,6 +183,7 @@ function setupContactSpec(): void {
       { provide: SeoHeadLinksService, useValue: contactSeoHeadLinks },
       { provide: MarkdownService, useValue: markdown },
       { provide: SiteSocialService, useValue: contactSocial },
+      { provide: StorefrontAdminModeService, useValue: contactStorefrontAdmin },
       { provide: AuthService, useValue: contactAuth },
       { provide: SupportService, useValue: contactSupport }
     ]
@@ -164,3 +234,5 @@ function contactPageBlocksCallFake(path: string, params?: Record<string, unknown
     }
   } as any);
 }
+
+
