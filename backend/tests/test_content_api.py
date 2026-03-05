@@ -3,16 +3,19 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Dict
 from urllib.parse import urlparse
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.main import app
+from app.api.v1 import content as content_api
 from app.db.base import Base
 from app.db.session import get_session
 from app.schemas.user import UserCreate
@@ -958,3 +961,236 @@ def test_content_retry_policy_value_error_branches(monkeypatch: pytest.MonkeyPat
 
     reset_resp = client.post('/api/v1/content/admin/media/retry-policies/ingest/reset', headers=headers)
     assert reset_resp.status_code == 400, reset_resp.text
+
+
+@pytest.mark.anyio
+async def test_content_api_direct_upload_auto_finalize_value_error_returns_asset(monkeypatch: pytest.MonkeyPatch) -> None:
+    session = SimpleNamespace()
+    admin = SimpleNamespace(id=uuid4(), role=UserRole.admin)
+    seed_asset = SimpleNamespace(id=uuid4(), status='pending')
+    upload_result = SimpleNamespace(asset=seed_asset, ingest_job_id=uuid4())
+
+    async def _create_asset(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return upload_result
+
+    async def _get_job(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return SimpleNamespace(id=uuid4())
+
+    async def _process_inline(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        raise ValueError('finalize-failed')
+
+    monkeypatch.setattr('app.services.media_dam.coerce_visibility', lambda value: value)
+    monkeypatch.setattr('app.services.media_dam.create_asset_from_upload', _create_asset)
+    monkeypatch.setattr('app.services.media_dam.get_job_or_404', _get_job)
+    monkeypatch.setattr('app.services.media_dam.process_job_inline', _process_inline)
+
+    upload = UploadFile(filename='asset.jpg', file=BytesIO(_jpeg_bytes()))
+    result = await content_api.admin_upload_media_asset(
+        file=upload,
+        visibility='private',
+        auto_finalize=True,
+        session=session,
+        admin=admin,
+    )
+    assert result is seed_asset
+
+
+@pytest.mark.anyio
+async def test_content_api_direct_media_update_reject_preview_edit_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Session:
+        def __init__(self):
+            self.commits = 0
+
+        async def commit(self):
+            await asyncio.sleep(0)
+            self.commits += 1
+
+    session = _Session()
+    admin = SimpleNamespace(id=uuid4(), role=UserRole.admin)
+    asset_id = uuid4()
+
+    calls = {'n': 0}
+
+    async def _get_asset(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        calls['n'] += 1
+        if calls['n'] == 1:
+            return SimpleNamespace(id=asset_id)
+        return SimpleNamespace(id=asset_id, marker='refreshed')
+
+    async def _apply_update(*_args, **_kwargs):
+        await asyncio.sleep(0)
+
+    monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _get_asset)
+    monkeypatch.setattr('app.services.media_dam.apply_asset_update', _apply_update)
+    monkeypatch.setattr('app.services.media_dam.asset_to_read', lambda asset: {'id': str(asset.id), 'marker': getattr(asset, 'marker', '')})
+
+    updated = await content_api.admin_update_media_asset(
+        asset_id=asset_id,
+        payload=SimpleNamespace(tags=[]),
+        session=session,
+        _=admin,
+    )
+    assert updated['marker'] == 'refreshed'
+    assert session.commits == 1
+
+    async def _missing_asset(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        raise ValueError('missing')
+
+    monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _missing_asset)
+
+    with pytest.raises(HTTPException) as reject_err:
+        await content_api.admin_reject_media_asset(
+            asset_id=asset_id,
+            payload=SimpleNamespace(note='nope'),
+            session=session,
+            admin=admin,
+        )
+    assert reject_err.value.status_code == 404
+
+    async def _existing_asset(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return SimpleNamespace(id=asset_id)
+
+    monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _existing_asset)
+    monkeypatch.setattr('app.services.media_dam.verify_preview_signature', lambda *_args, **_kwargs: True)
+    monkeypatch.setattr('app.services.media_dam.resolve_asset_preview_path', lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError('bad-variant')))
+
+    with pytest.raises(HTTPException) as variant_err:
+        await content_api.admin_media_asset_preview(asset_id=asset_id, exp=2_000_000_000, sig='x' * 16, variant_profile='bad', session=session)
+    assert variant_err.value.status_code == 404
+
+    monkeypatch.setattr('app.services.media_dam.resolve_asset_preview_path', lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError('missing')))
+
+    with pytest.raises(HTTPException) as missing_file_err:
+        await content_api.admin_media_asset_preview(asset_id=asset_id, exp=2_000_000_000, sig='y' * 16, variant_profile=None, session=session)
+    assert missing_file_err.value.status_code == 404
+
+    monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _missing_asset)
+    with pytest.raises(HTTPException) as edit_missing:
+        await content_api.admin_media_asset_edit(
+            asset_id=asset_id,
+            payload=SimpleNamespace(model_dump=lambda **_kwargs: {'rotate_cw': 90}),
+            session=session,
+            admin=admin,
+        )
+    assert edit_missing.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_content_api_direct_pages_redirects_and_preview_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _Scalars:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _Result:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def scalars(self):
+            return _Scalars(self._rows)
+
+    class _Session:
+        def __init__(self):
+            self.added = []
+            self.refreshed = 0
+            self.commits = 0
+            self.scalar_values = []
+
+        async def execute(self, _stmt):
+            await asyncio.sleep(0)
+            rows = [
+                SimpleNamespace(
+                    key='page.about',
+                    title='About',
+                    status='published',
+                    meta={'hidden': True},
+                    updated_at=datetime.now(timezone.utc),
+                    published_at=None,
+                    published_until=None,
+                    needs_translation_en=False,
+                    needs_translation_ro=True,
+                ),
+                SimpleNamespace(
+                    key='page',
+                    title='Page',
+                    status='draft',
+                    meta='not-dict',
+                    updated_at=datetime.now(timezone.utc),
+                    published_at=None,
+                    published_until=None,
+                    needs_translation_en=False,
+                    needs_translation_ro=False,
+                ),
+            ]
+            return _Result(rows)
+
+        async def scalar(self, _stmt):
+            await asyncio.sleep(0)
+            if self.scalar_values:
+                return self.scalar_values.pop(0)
+            return None
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def commit(self):
+            await asyncio.sleep(0)
+            self.commits += 1
+
+        async def refresh(self, _obj):
+            await asyncio.sleep(0)
+            self.refreshed += 1
+
+    session = _Session()
+    admin = SimpleNamespace(id=uuid4(), role=UserRole.admin)
+
+    items = await content_api.admin_list_pages(session=session, _=admin)
+    assert items[0].slug == 'about'
+    assert items[0].hidden is True
+    assert items[1].slug == 'page'
+    assert items[1].hidden is False
+
+    monkeypatch.setattr(content_api, '_parse_redirect_upsert_payload_or_400', lambda _payload: ('page.old', 'page.new'))
+
+    async def _noop_target(*_args, **_kwargs):
+        await asyncio.sleep(0)
+
+    async def _redirect_map(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return {}
+
+    monkeypatch.setattr(content_api, '_assert_redirect_target_exists', _noop_target)
+    monkeypatch.setattr(content_api, '_load_redirect_map', _redirect_map)
+    monkeypatch.setattr(content_api, '_serialize_redirect', lambda redirect, **_kwargs: {'from': redirect.from_key, 'to': redirect.to_key})
+
+    existing = SimpleNamespace(from_key='page.old', to_key='page.prev')
+    session.scalar_values = [existing]
+    updated = await content_api.admin_upsert_redirect(payload=SimpleNamespace(), session=session, _=admin)
+    assert updated['to'] == 'page.new'
+
+    session.scalar_values = [None]
+    created = await content_api.admin_upsert_redirect(payload=SimpleNamespace(), session=session, _=admin)
+    assert created['from'] == 'page.old'
+    assert session.commits >= 2
+
+    async def _missing_block(*_args, **_kwargs):
+        await asyncio.sleep(0)
+        return None
+
+    monkeypatch.setattr(content_api.content_service, 'get_block_by_key', _missing_block)
+    with pytest.raises(HTTPException) as preview_missing:
+        await content_api.admin_preview_content(
+            key='page.about',
+            token=settings.content_preview_token,
+            session=session,
+            lang='en',
+        )
+    assert preview_missing.value.status_code == 404
