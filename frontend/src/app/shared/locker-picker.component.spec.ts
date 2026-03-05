@@ -73,6 +73,11 @@ describe('LockerPickerComponent', () => {
   defineAbortErrorSuppressionSpec();
   defineDestroyCleanupSpec();
   defineMirrorSnapshotRefreshGuardSpec();
+  defineUtilityMethodsSpec();
+  defineApplySelectAndDistanceSpec();
+  defineInitMapGuardSpec();
+  defineRedrawMarkersSpec();
+  defineSamedayApplyFirstSpec();
 });
 
 function defineCitySuggestionSpec(): void {
@@ -310,3 +315,105 @@ function defineMirrorSnapshotRefreshGuardSpec(): void {
 }
 
 
+
+
+function defineUtilityMethodsSpec(): void {
+  it('covers track and clear helpers with abort cleanup', () => {
+    const controller = new AbortController();
+    const abortSpy = spyOn(controller, 'abort').and.callThrough();
+    (lockerPickerComponent as any).searchAbort = controller as any;
+    lockerPickerComponent.searchResults = [{ display_name: 'old', lat: 1, lng: 2 } as any];
+    lockerPickerComponent.searchQuery = 'abc';
+    lockerPickerComponent.selectedLocation = { display_name: 'loc', lat: 44, lng: 26 } as any;
+
+    expect(lockerPickerComponent.trackLocker(0, { id: 'locker-1' } as any)).toBe('locker-1');
+    expect(lockerPickerComponent.trackLocation(0, { display_name: 'B', lat: 44.5, lng: 26.1 })).toContain('B');
+
+    lockerPickerComponent.clearSearchQuery();
+    lockerPickerComponent.clearSelectedLocation();
+    expect(abortSpy).toHaveBeenCalled();
+    expect(lockerPickerComponent.searchQuery).toBe('');
+    expect(lockerPickerComponent.searchResults).toEqual([]);
+    expect(lockerPickerComponent.selectedLocation).toBeNull();
+  });
+}
+
+function defineApplySelectAndDistanceSpec(): void {
+  it('covers applyLocation, selectLocker pan branch, and haversine helper', () => {
+    const setView = jasmine.createSpy('setView');
+    const panTo = jasmine.createSpy('panTo');
+    (lockerPickerComponent as any).map = { setView, panTo, remove: jasmine.createSpy('remove') };
+    const searchAreaSpy = spyOn(lockerPickerComponent, 'searchThisArea').and.stub();
+
+    const location = { display_name: 'Bucuresti', lat: 44.43, lng: 26.1 } as any;
+    lockerPickerComponent.applyLocation(location);
+    expect(lockerPickerComponent.selectedLocation).toEqual(location);
+    expect(setView).toHaveBeenCalledWith([44.43, 26.1], 13);
+    expect(searchAreaSpy).toHaveBeenCalled();
+
+    const locker = { id: 'l-1', lat: 44.5, lng: 26.2 } as any;
+    lockerPickerComponent.selectLocker(locker);
+    expect(panTo).toHaveBeenCalledWith([44.5, 26.2]);
+
+    const km = (lockerPickerComponent as any).haversineKm(44.43, 26.1, 44.5, 26.2);
+    expect(km).toBeGreaterThan(0);
+  });
+}
+
+function defineInitMapGuardSpec(): void {
+  it('covers initMap guard returns for initialized and missing host', async () => {
+    (lockerPickerComponent as any).initialized = true;
+    await (lockerPickerComponent as any).initMap();
+
+    (lockerPickerComponent as any).initialized = false;
+    (lockerPickerComponent as any).mapHost = undefined;
+    await (lockerPickerComponent as any).initMap();
+    expect((lockerPickerComponent as any).initialized).toBeFalse();
+  });
+}
+
+function defineRedrawMarkersSpec(): void {
+  it('covers redrawMarkers marker creation and click handler wiring', () => {
+    const added: any[] = [];
+    const markerFactory = (coords: [number, number], opts: any) => {
+      const marker = {
+        on: jasmine.createSpy('on').and.callFake(() => marker),
+        addTo: jasmine.createSpy('addTo').and.callFake(() => {
+          added.push({ coords, opts });
+          return marker;
+        }),
+      };
+      return marker;
+    };
+
+    (lockerPickerComponent as any).leaflet = { circleMarker: markerFactory } as any;
+    (lockerPickerComponent as any).map = { remove: jasmine.createSpy('remove') } as any;
+    (lockerPickerComponent as any).markers = { clearLayers: jasmine.createSpy('clearLayers') } as any;
+    lockerPickerComponent.lockers = [{ id: 'l-1', lat: 44.4, lng: 26.1 } as any];
+
+    const selectSpy = spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
+    (lockerPickerComponent as any).redrawMarkers();
+
+    expect((lockerPickerComponent as any).markers.clearLayers).toHaveBeenCalled();
+    expect(added.length).toBe(1);
+  });
+}
+
+function defineSamedayApplyFirstSpec(): void {
+  it('covers sameday fetch apply-first happy path', async () => {
+    lockerPickerComponent.provider = 'sameday';
+    const applySpy = spyOn(lockerPickerComponent, 'applyLocation').and.callThrough();
+    lockerPickerShipping.listLockerCities.and.returnValue(
+      of({
+        items: [{ display_name: 'Iasi', lat: 47.15, lng: 27.58, locker_count: 5 }],
+        snapshot: { stale: false },
+      } as any)
+    );
+
+    await (lockerPickerComponent as any).fetchLocations('Iasi', { applyFirst: true });
+
+    expect(lockerPickerComponent.searchLoading).toBeFalse();
+    expect(applySpy).toHaveBeenCalled();
+    expect(lockerPickerComponent.selectedLocation?.display_name).toBe('Iasi');
+  });
+}
