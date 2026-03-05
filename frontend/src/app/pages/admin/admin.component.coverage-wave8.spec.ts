@@ -417,4 +417,130 @@ describe('AdminComponent coverage wave 8 branch matrix', () => {
     expect(admin.updateContentBlock.calls.count()).toBeGreaterThan(1);
   });
 
+
+  it('covers preview-link fallback and error branches', () => {
+    const { component } = createHarness();
+    const adminAny = (component as any).admin;
+    const toast = (component as any).toast as jasmine.SpyObj<any>;
+    spyOn(component as any, 'copyToClipboard').and.returnValue(Promise.resolve(false));
+    spyOn(component as any, 'pagePreviewShareUrl').and.returnValue(null);
+    spyOn(component as any, 'homePreviewShareUrl').and.returnValue(null);
+
+    adminAny.createPagePreviewToken = jasmine
+      .createSpy('createPagePreviewToken')
+      .and.returnValue(of({ token: 'page-token', expires_at: '2026-03-05T00:00:00Z', url: '::::invalid-url::::' }));
+    component.generatePagePreviewLink('page.about');
+    expect(toast.success).toHaveBeenCalledWith('adminUi.content.previewLinks.success.ready');
+
+    adminAny.createHomePreviewToken = jasmine
+      .createSpy('createHomePreviewToken')
+      .and.returnValue(of({ token: 'home-token', expires_at: '2026-03-05T00:00:00Z', url: '::::invalid-url::::' }));
+    component.generateHomePreviewLink();
+    expect(toast.success).toHaveBeenCalledWith('adminUi.content.previewLinks.success.ready');
+
+    adminAny.createPagePreviewToken.and.returnValue(throwError(() => new Error('preview-fail')));
+    component.generatePagePreviewLink('page.about');
+    expect(toast.error).toHaveBeenCalledWith('adminUi.content.previewLinks.errors.generate');
+
+    adminAny.createHomePreviewToken.and.returnValue(throwError(() => new Error('home-preview-fail')));
+    component.generateHomePreviewLink();
+    expect(toast.error).toHaveBeenCalledWith('adminUi.content.previewLinks.errors.generate');
+  });
+
+  it('covers markdown heading extraction guards and embed insertion paths', () => {
+    const { component } = createHarness();
+    const richEditor = { insertMarkdown: jasmine.createSpy('insertMarkdown') } as any;
+    const area = document.createElement('textarea');
+    area.value = `# First\n#### Skip\n## [Link](https://x.y)\n### ![img](https://img.y/z.jpg)\n`;
+
+    const headings = (component as any).extractMarkdownHeadings(area.value);
+    expect(headings.length).toBeGreaterThan(0);
+    expect(headings.every((item: { level: number }) => item.level <= 3)).toBeTrue();
+
+    const promptSpy = spyOn(globalThis, 'prompt').and.returnValues('sample-slug', 'sample-slug', 'Descriptive alt');
+    spyOn(component as any, 'insertAtCursor').and.callFake(() => undefined);
+    component.insertBlogEmbed(area, 'product');
+    expect((component as any).insertAtCursor).toHaveBeenCalledWith(area, '{{product:sample-slug}}');
+    component.insertBlogEmbed(richEditor, 'collection');
+    expect(richEditor.insertMarkdown).toHaveBeenCalledWith('{{collection:sample-slug}}');
+
+    const sparseMarkdown = `![image](https://cdn/a.jpg)\n![two](https://cdn/b.jpg)\n`;
+    component.blogForm = { body_markdown: sparseMarkdown } as any;
+    spyOn(component as any, 'setBlogMarkdownImageAlt').and.stub();
+    component.promptFixBlogImageAlt(1);
+    expect(promptSpy.calls.count()).toBeGreaterThan(1);
+    expect((component as any).setBlogMarkdownImageAlt).toHaveBeenCalledWith(1, 'Descriptive alt');
+  });
+
+  it('covers blog image upload/drop error handling and sorted image updates', async () => {
+    const { component, admin } = createHarness();
+    component.selectedBlogKey = 'blog.coverage';
+    component.blogForm = { body_markdown: '' } as any;
+
+    const imageA = new File(['a'], 'a.jpg', { type: 'image/jpeg' });
+    const imageB = new File(['b'], 'b.jpg', { type: 'image/jpeg' });
+    const input = document.createElement('input');
+    Object.defineProperty(input, 'files', { value: [imageA], configurable: true });
+
+    admin.uploadContentImage.and.returnValue(
+      of({
+        images: [
+          { id: '2', url: 'https://cdn.test/2.jpg', sort_order: 2 },
+          { id: '1', url: 'https://cdn.test/1.jpg', sort_order: 1 }
+        ]
+      } as any)
+    );
+    component.uploadAndInsertBlogImage(document.createElement('textarea'), { target: input } as any);
+    expect(component.blogImages.map((img) => img.id)).toEqual(['1', '2']);
+
+    admin.uploadContentImage.and.returnValue(throwError(() => new Error('upload-fail')));
+    component.uploadAndInsertBlogImage(document.createElement('textarea'), { target: input } as any);
+    expect((component as any).toast.error).toHaveBeenCalledWith('adminUi.blog.images.errors.upload');
+
+    admin.uploadContentImage.and.returnValue(
+      of({
+        images: [
+          { id: '10', url: 'https://cdn.test/10.jpg', sort_order: 10 },
+          { id: '5', url: 'https://cdn.test/5.jpg', sort_order: 5 }
+        ]
+      } as any)
+    );
+    await component.onBlogImageDrop(document.createElement('textarea'), dragEventWithFiles([imageA, imageB]));
+    expect(component.blogImages.map((img) => img.id)).toEqual(['5', '10']);
+  });
+
+  it('covers report/settings parsing and create fallbacks', () => {
+    const { component, admin } = createHarness();
+
+    admin.getContent.and.returnValue(
+      of({
+        meta: {
+          reports_weekly_enabled: 'off',
+          reports_monthly_enabled: 'yes',
+          reports_recipients: 'one@example.com; two@example.com\nthree@example.com'
+        }
+      } as any)
+    );
+    component.loadReportsSettings();
+    expect(component.reportsSettingsForm.weekly_enabled).toBeFalse();
+    expect(component.reportsSettingsForm.monthly_enabled).toBeTrue();
+    expect(component.reportsSettingsForm.recipients).toContain('one@example.com');
+
+    admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    admin.createContent.and.returnValue(of({ version: 33, meta: {} } as any));
+    component.saveCheckoutSettings();
+    expect(admin.createContent).toHaveBeenCalledWith(
+      'site.checkout',
+      jasmine.objectContaining({ title: 'Checkout settings' })
+    );
+
+    component.reportsSettingsForm.recipients = 'valid@example.com, invalid, valid@example.com';
+    component.saveReportsSettings();
+    expect(admin.createContent).toHaveBeenCalledWith(
+      'site.reports',
+      jasmine.objectContaining({ title: 'Reports settings' })
+    );
+  });
+
+
 });
