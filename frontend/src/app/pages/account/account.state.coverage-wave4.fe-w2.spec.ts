@@ -886,3 +886,99 @@ describe("AccountState coverage wave 4 FE-W2 permissive sweep", () => {
     expect(attemptedB).toBeGreaterThan(30);
   });
 });
+
+
+describe('AccountState coverage wave 4 FE-W2 helper and address matrix', () => {
+  it('covers tracking/payment/delivery helper branches', () => {
+    const state = createState();
+    state.translate = {
+      instant: jasmine.createSpy('instant').and.callFake((key: string) =>
+        key === 'adminUi.orders.paymentStripe' ? 'Card Stripe' : key,
+      ),
+    };
+    state.t = (key: string) => `translated:${key}`;
+
+    expect(state.trackingUrl('')).toBe('');
+    expect(state.trackingUrl(' TRACK 123 ')).toContain('TRACK%20123');
+    expect(state.trackingStatusLabel({ tracking_number: '', status: 'shipped' } as any)).toBeNull();
+    expect(state.trackingStatusLabel({ tracking_number: 'abc', status: 'shipped' } as any)).toContain('inTransit');
+    expect(state.trackingStatusLabel({ tracking_number: 'abc', status: 'delivered' } as any)).toContain('delivered');
+    expect(state.paymentMethodLabel({ payment_method: 'stripe' } as any)).toBe('Card Stripe');
+    expect(state.paymentMethodLabel({ payment_method: 'paypal' } as any)).toBe('PAYPAL');
+    expect(state.deliveryLabel({ courier: 'sameday', delivery_type: 'home' } as any)).toContain('Sameday');
+    expect(state.deliveryLabel({ courier: 'fan_courier', delivery_type: 'locker' } as any)).toContain('Fan Courier');
+    expect(state.deliveryLabel({ courier: '', delivery_type: '' } as any)).toBe('—');
+    expect(state.lockerLabel({ delivery_type: 'home' } as any)).toBeNull();
+    expect(state.lockerLabel({ delivery_type: 'locker', locker_name: 'L1', locker_address: 'Main' } as any)).toContain('L1');
+  });
+
+  it('covers refund and cancel/return eligibility helper branches', () => {
+    const state = createState();
+    state.cancelRequestedOrderIds = new Set<string>(['cancel-1']);
+    state.returnRequestedOrderIds = new Set<string>(['return-1']);
+
+    expect(state.manualRefundRequired({ status: 'paid', payment_method: 'stripe', events: [] } as any)).toBeFalse();
+    expect(state.manualRefundRequired({ status: 'cancelled', payment_method: 'cash', events: [{ event: 'payment_captured' }] } as any)).toBeFalse();
+    expect(state.manualRefundRequired({ status: 'cancelled', payment_method: 'stripe', events: [{ event: 'payment_captured' }] } as any)).toBeTrue();
+    expect(state.manualRefundRequired({ status: 'cancelled', payment_method: 'paypal', events: [{ event: 'payment_captured' }, { event: 'payment_refunded' }] } as any)).toBeFalse();
+
+    expect(state.hasCancelRequested({ id: 'cancel-1', events: [] } as any)).toBeTrue();
+    expect(state.hasCancelRequested({ id: 'cancel-2', events: [{ event: 'cancel_requested' }] } as any)).toBeTrue();
+    expect(state.canRequestCancel({ id: 'x', status: 'paid', events: [] } as any)).toBeTrue();
+    expect(state.canRequestCancel({ id: 'x', status: 'cancelled', events: [] } as any)).toBeFalse();
+    expect(state.canRequestReturn({ id: 'return-1', status: 'delivered' } as any)).toBeFalse();
+    expect(state.canRequestReturn({ id: 'return-2', status: 'delivered' } as any)).toBeTrue();
+  });
+
+  it('covers receipt and address helper branches', () => {
+    const state = createState();
+    state.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
+    state.account.downloadReceipt = jasmine.createSpy('downloadReceipt').and.returnValue(of(new Blob(['pdf'])));
+
+    const createUrl = spyOn(window.URL, 'createObjectURL').and.returnValue('blob:test');
+    const revokeUrl = spyOn(window.URL, 'revokeObjectURL').and.stub();
+    const nativeCreate = document.createElement.bind(document);
+    const anchor = nativeCreate('a') as HTMLAnchorElement;
+    const clickSpy = spyOn(anchor, 'click').and.stub();
+    spyOn(document, 'createElement').and.callFake((tagName: string): any =>
+      tagName.toLowerCase() === 'a' ? anchor : nativeCreate(tagName),
+    );
+
+    state.downloadReceipt({ id: 'order-1', reference_code: 'REF-1' } as any);
+    expect(createUrl).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeUrl).toHaveBeenCalledWith('blob:test');
+
+    state.shareReceipt = jasmine.createSpy('shareReceipt');
+    state.copyReceiptUrl = jasmine.createSpy('copyReceiptUrl').and.returnValue(Promise.resolve());
+    state.receiptShares = makeSignal<Record<string, any>>({});
+    const order = { id: 'order-4' } as any;
+    state.copyReceiptLink(order);
+    expect(state.toast.error).toHaveBeenCalled();
+
+    state.receiptShares.set({ 'order-4': { receipt_url: 'https://example/old', expires_at: new Date(Date.now() + 10_000).toISOString() } });
+    state.copyReceiptLink(order);
+    expect(state.shareReceipt).toHaveBeenCalledWith(order);
+
+    state.account.createAddress = jasmine.createSpy('createAddress').and.returnValue(of({ id: 'a-1', label: 'home' }));
+    state.account.updateAddress = jasmine.createSpy('updateAddress').and.returnValue(of({ id: 'a-1', label: 'billing' }));
+    state.account.deleteAddress = jasmine.createSpy('deleteAddress').and.returnValue(of({}));
+    state.addresses = makeSignal<any[]>([{ id: 'a-1', label: 'home', is_default_shipping: true, is_default_billing: false }]);
+    state.addressesLoaded = makeSignal(false);
+    spyOn(globalThis, 'confirm').and.returnValues(false, true, true);
+
+    state.editingAddressId = null;
+    state.saveAddress({ line1: 'X', city: 'Y', country: 'RO', label: 'home' } as any);
+    state.editingAddressId = 'a-1';
+    state.saveAddress({ line1: 'U', city: 'V', country: 'RO', label: 'billing' } as any);
+    state.removeAddress('a-1');
+    state.removeAddress('a-1');
+    state.setDefaultShipping({ id: 'a-1' } as any);
+    state.setDefaultBilling({ id: 'a-1' } as any);
+
+    expect(state.account.createAddress).toHaveBeenCalled();
+    expect(state.account.updateAddress).toHaveBeenCalled();
+    expect(state.account.deleteAddress).toHaveBeenCalledWith('a-1');
+    expect(state.toast.success).toHaveBeenCalled();
+  });
+});
