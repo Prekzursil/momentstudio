@@ -60,18 +60,11 @@ const BLOG_SWEEP_BLOCKED = new Set([
   'constructor',
   'ngOnInit',
   'ngOnDestroy',
-  // Route and async loads are already exercised by dedicated tests.
-  'loadAdminBlock',
-  'loadNeighbors',
-  'loadComments',
-  'loadCommentSubscription',
   // Scroll/measurement helpers depend on stable real browser layout.
   'measureReadingProgressSoon',
   'measureReadingProgress',
   'updateReadingProgress',
   'updateActiveHeading',
-  'setMetaTags',
-  'setErrorMetaTags',
 ]);
 
 const BLOG_SWEEP_ARGS_BY_NAME: Record<string, unknown[]> = {
@@ -619,4 +612,5 @@ function configureBlogPostTestingModule(deps: BlogPostSpecDeps): void {
   translate.setTranslation('en', { blog: { post: { metaTitle: 'Blog post', metaDescription: 'Desc' } } }, true);
   translate.use('en');
 }
+
 
