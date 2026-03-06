@@ -252,61 +252,73 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.legalIndexLoading.set(false);
     this.legalIndexSub?.unsubscribe();
     this.legalIndexSub = undefined;
-    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    const lang: 'en' | 'ro' = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = this.previewToken
       ? this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}/preview`, { token: this.previewToken, lang })
       : this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang });
     req.subscribe({
-      next: (block) => {
-        const canonicalSlug = this.slugFromKey(block.key);
-        this.block.set(block);
-        const bodyMarkdown = canonicalSlug === 'terms' ? this.stripLegalIndexTable(block.body_markdown) : block.body_markdown;
-        this.bodyHtml.set(this.markdown.render(bodyMarkdown));
-        this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
-        this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, block.title || slug));
-        this.loading.set(false);
-        this.hasError.set(false);
-        this.loadLegalIndexDocs(canonicalSlug, lang);
-        if (canonicalSlug && canonicalSlug !== slug) {
-          this.suppressNextLoad = true;
-          void this.router.navigate(['/pages', canonicalSlug], { replaceUrl: true, queryParamsHandling: 'preserve' });
-        }
-        const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : bodyMarkdown;
-        this.crumbs.set([
-          { label: 'nav.home', url: '/' },
-          { label: block.title || slug }
-        ]);
-        this.setMetaTags(block.title || slug, metaBody, canonicalSlug || slug);
-      },
-      error: (err) => {
-        if (err?.status === 401) {
-          this.block.set(null);
-          this.bodyHtml.set('');
-          this.pageBlocks.set([]);
-        this.loading.set(false);
-        this.hasError.set(false);
-        this.requiresLogin.set(true);
-        this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
-          this.crumbs.set([
-            { label: 'nav.home', url: '/' },
-            { label: slug }
-          ]);
-          return;
-        }
-        this.block.set(null);
-        this.bodyHtml.set('');
-        this.pageBlocks.set([]);
-        this.loading.set(false);
-        this.hasError.set(true);
-        this.requiresLogin.set(false);
-        this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
-        this.crumbs.set([
-          { label: 'nav.home', url: '/' },
-          { label: slug }
-        ]);
-        this.setMetaTags(slug, this.translate.instant('about.metaDescription'), slug);
-      }
+      next: (block) => this.handlePageLoadSuccess(block, slug, lang),
+      error: (err) => this.handlePageLoadError(err, slug, lang)
     });
+  }
+
+  private handlePageLoadSuccess(block: ContentBlock, slug: string, lang: 'en' | 'ro'): void {
+    const canonicalSlug = this.slugFromKey(block.key);
+    this.block.set(block);
+    const bodyMarkdown = canonicalSlug === 'terms' ? this.stripLegalIndexTable(block.body_markdown) : block.body_markdown;
+    this.bodyHtml.set(this.markdown.render(bodyMarkdown));
+    this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
+    this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, block.title || slug));
+    this.loading.set(false);
+    this.hasError.set(false);
+    this.loadLegalIndexDocs(canonicalSlug, lang);
+    if (canonicalSlug && canonicalSlug !== slug) {
+      this.suppressNextLoad = true;
+      void this.router.navigate(['/pages', canonicalSlug], { replaceUrl: true, queryParamsHandling: 'preserve' });
+    }
+    const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : bodyMarkdown;
+    this.crumbs.set([
+      { label: 'nav.home', url: '/' },
+      { label: block.title || slug }
+    ]);
+    this.setMetaTags(block.title || slug, metaBody, canonicalSlug || slug);
+  }
+
+  private setRestrictedPageState(slug: string, lang: 'en' | 'ro'): void {
+    this.block.set(null);
+    this.bodyHtml.set('');
+    this.pageBlocks.set([]);
+    this.loading.set(false);
+    this.hasError.set(false);
+    this.requiresLogin.set(true);
+    this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
+    this.crumbs.set([
+      { label: 'nav.home', url: '/' },
+      { label: slug }
+    ]);
+  }
+
+  private setPageErrorState(slug: string, lang: 'en' | 'ro'): void {
+    this.block.set(null);
+    this.bodyHtml.set('');
+    this.pageBlocks.set([]);
+    this.loading.set(false);
+    this.hasError.set(true);
+    this.requiresLogin.set(false);
+    this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
+    this.crumbs.set([
+      { label: 'nav.home', url: '/' },
+      { label: slug }
+    ]);
+    this.setMetaTags(slug, this.translate.instant('about.metaDescription'), slug);
+  }
+
+  private handlePageLoadError(err: any, slug: string, lang: 'en' | 'ro'): void {
+    if (err?.status === 401) {
+      this.setRestrictedPageState(slug, lang);
+      return;
+    }
+    this.setPageErrorState(slug, lang);
   }
 
   formatLegalIndexDate(value: string): string {
@@ -348,7 +360,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     return out.join('\n').trim();
   }
 
-  private loadLegalIndexDocs(slug: string, lang: string): void {
+  private loadLegalIndexDocs(slug: string, lang: 'en' | 'ro'): void {
     if (slug !== 'terms') return;
     const docs = [
       { slug: 'terms-and-conditions', fallbackKey: 'nav.terms' },
@@ -425,4 +437,3 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     return !this.legalIndexDocs().length;
   }
 }
-

@@ -26,6 +26,81 @@ ALLOWED_TRANSITIONS: dict[ReturnRequestStatus, set[ReturnRequestStatus]] = {
 }
 
 
+def _aggregate_requested_quantities(payload: ReturnRequestCreate) -> dict[UUID, int]:
+    requested_quantities: dict[UUID, int] = {}
+    for item_payload in payload.items:
+        quantity = int(item_payload.quantity)
+        if quantity <= 0:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
+        requested_quantities[item_payload.order_item_id] = requested_quantities.get(item_payload.order_item_id, 0) + quantity
+    return requested_quantities
+
+
+def _build_return_items(order: Order, payload: ReturnRequestCreate) -> list[ReturnRequestItem]:
+    order_items_by_id = {item.id: item for item in order.items}
+    items: list[ReturnRequestItem] = []
+    for order_item_id, quantity in _aggregate_requested_quantities(payload).items():
+        order_item = order_items_by_id.get(order_item_id)
+        if not order_item:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
+        if quantity > int(order_item.quantity):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
+        items.append(ReturnRequestItem(order_item_id=order_item.id, quantity=quantity))
+    return items
+
+
+def _normalized_optional_text(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
+def _new_return_request(
+    *,
+    order: Order,
+    user_id: UUID | None,
+    actor_id: UUID,
+    payload: ReturnRequestCreate,
+    items: list[ReturnRequestItem],
+) -> ReturnRequest:
+    now = datetime.now(timezone.utc)
+    return ReturnRequest(
+        order_id=order.id,
+        user_id=user_id,
+        status=ReturnRequestStatus.requested,
+        reason=payload.reason.strip(),
+        customer_message=_normalized_optional_text(payload.customer_message),
+        created_by=actor_id,
+        updated_by=actor_id,
+        created_at=now,
+        updated_at=now,
+        items=items,
+    )
+
+
+def _coerce_transition_status(raw_status: object) -> ReturnRequestStatus | None:
+    if raw_status is None:
+        return None
+    return ReturnRequestStatus(raw_status)
+
+
+def _apply_status_transition(record: ReturnRequest, *, data: dict[str, object], previous_status: ReturnRequestStatus) -> None:
+    next_status = _coerce_transition_status(data.get("status"))
+    if next_status is None:
+        return
+    if next_status == previous_status:
+        data.pop("status", None)
+        return
+    allowed = ALLOWED_TRANSITIONS.get(previous_status, set())
+    if next_status not in allowed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+    record.status = next_status
+    if next_status == ReturnRequestStatus.closed:
+        record.closed_at = datetime.now(timezone.utc)
+    data.pop("status", None)
+
+
 async def list_return_requests(
     session: AsyncSession,
     *,
@@ -91,37 +166,12 @@ async def create_return_request(
     order = await order_service.get_order_by_id_admin(session, payload.order_id)
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
-
-    order_items_by_id = {item.id: item for item in order.items}
-    items: list[ReturnRequestItem] = []
-    requested_quantities: dict[UUID, int] = {}
-    for item_payload in payload.items:
-        if item_payload.quantity <= 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
-        requested_quantities[item_payload.order_item_id] = requested_quantities.get(item_payload.order_item_id, 0) + int(
-            item_payload.quantity
-        )
-
-    for order_item_id, quantity in requested_quantities.items():
-        order_item = order_items_by_id.get(order_item_id)
-        if not order_item:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
-        if quantity <= 0 or quantity > int(order_item.quantity):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
-        items.append(ReturnRequestItem(order_item_id=order_item.id, quantity=quantity))
-
-    now = datetime.now(timezone.utc)
-    record = ReturnRequest(
-        order_id=order.id,
+    record = _new_return_request(
+        order=order,
         user_id=order.user_id,
-        status=ReturnRequestStatus.requested,
-        reason=payload.reason.strip(),
-        customer_message=(payload.customer_message.strip() if payload.customer_message else None),
-        created_by=actor.id,
-        updated_by=actor.id,
-        created_at=now,
-        updated_at=now,
-        items=items,
+        actor_id=actor.id,
+        payload=payload,
+        items=_build_return_items(order, payload),
     )
     session.add(record)
     await session.flush()
@@ -164,37 +214,12 @@ async def create_return_request_for_user(
     )
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Return request already exists")
-
-    order_items_by_id = {item.id: item for item in order.items}
-    items: list[ReturnRequestItem] = []
-    requested_quantities: dict[UUID, int] = {}
-    for item_payload in payload.items:
-        if item_payload.quantity <= 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
-        requested_quantities[item_payload.order_item_id] = requested_quantities.get(item_payload.order_item_id, 0) + int(
-            item_payload.quantity
-        )
-
-    for order_item_id, quantity in requested_quantities.items():
-        order_item = order_items_by_id.get(order_item_id)
-        if not order_item:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
-        if quantity <= 0 or quantity > int(order_item.quantity):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
-        items.append(ReturnRequestItem(order_item_id=order_item.id, quantity=quantity))
-
-    now = datetime.now(timezone.utc)
-    record = ReturnRequest(
-        order_id=order.id,
+    record = _new_return_request(
+        order=order,
         user_id=user.id,
-        status=ReturnRequestStatus.requested,
-        reason=payload.reason.strip(),
-        customer_message=(payload.customer_message.strip() if payload.customer_message else None),
-        created_by=user.id,
-        updated_by=user.id,
-        created_at=now,
-        updated_at=now,
-        items=items,
+        actor_id=user.id,
+        payload=payload,
+        items=_build_return_items(order, payload),
     )
     session.add(record)
     await session.commit()
@@ -209,24 +234,11 @@ async def update_return_request(
     actor: User,
 ) -> ReturnRequest:
     data = payload.model_dump(exclude_unset=True)
-
     previous_status = ReturnRequestStatus(record.status)
-
-    if "status" in data and data["status"] is not None:
-        next_status = ReturnRequestStatus(data["status"])
-        if next_status == previous_status:
-            data.pop("status")
-        else:
-            allowed = ALLOWED_TRANSITIONS.get(previous_status, set())
-            if next_status not in allowed:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
-            record.status = next_status
-            if next_status == ReturnRequestStatus.closed:
-                record.closed_at = datetime.now(timezone.utc)
-            data.pop("status")
+    _apply_status_transition(record, data=data, previous_status=previous_status)
 
     if "admin_note" in data:
-        record.admin_note = data["admin_note"].strip() if data["admin_note"] else None
+        record.admin_note = _normalized_optional_text(data["admin_note"] if isinstance(data["admin_note"], str) else None)
 
     record.updated_by = actor.id
     record.updated_at = datetime.now(timezone.utc)

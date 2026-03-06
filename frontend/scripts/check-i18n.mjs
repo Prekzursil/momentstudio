@@ -9,9 +9,10 @@ function isPathWithinRoot(rootPath, candidatePath) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function assertPathWithinRoot(rootPath, candidatePath, label) {
-  const candidate = path.resolve(candidatePath);
-  if (!isPathWithinRoot(rootPath, candidate)) {
+function resolvePathUnderBase(rootPath, candidatePath, label) {
+  const base = path.resolve(rootPath);
+  const candidate = path.resolve(base, candidatePath);
+  if (!isPathWithinRoot(base, candidate)) {
     throw new Error(`[i18n] Refusing ${label} outside allowed root: ${candidate}`);
   }
   return candidate;
@@ -30,23 +31,24 @@ function flattenKeys(value, prefix = '', out = new Set()) {
   return out;
 }
 
-function listFiles(rootDir, dir, exts, out = []) {
-  const scanDir = assertPathWithinRoot(rootDir, dir, 'scan directory');
+function listFiles(rootDir, relativeDir, exts, out = []) {
+  const scanDir = resolvePathUnderBase(rootDir, relativeDir, 'scan directory');
   for (const entry of fs.readdirSync(scanDir, { withFileTypes: true })) {
-    const fullPath = assertPathWithinRoot(rootDir, path.join(scanDir, entry.name), `entry "${entry.name}"`);
+    const nextRelativePath = path.join(relativeDir, entry.name);
+    resolvePathUnderBase(rootDir, nextRelativePath, `entry "${entry.name}"`);
     if (entry.isDirectory()) {
-      listFiles(rootDir, fullPath, exts, out);
+      listFiles(rootDir, nextRelativePath, exts, out);
       continue;
     }
     if (entry.isFile() && exts.includes(path.extname(entry.name))) {
-      out.push(fullPath);
+      out.push(nextRelativePath);
     }
   }
   return out;
 }
 
 function readJson(rootDir, filePath) {
-  const safeFilePath = assertPathWithinRoot(rootDir, filePath, 'JSON file');
+  const safeFilePath = resolvePathUnderBase(rootDir, filePath, 'JSON file');
   return JSON.parse(fs.readFileSync(safeFilePath, 'utf8'));
 }
 
@@ -76,8 +78,12 @@ function collectKeyMatches(contents, regex) {
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(scriptsDir, '..');
-const i18nDir = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'src', 'assets', 'i18n'), 'i18n directory');
-const appDir = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'src', 'app'), 'app directory');
+const i18nDir = resolvePathUnderBase(
+  frontendRoot,
+  path.join('src', 'assets', 'i18n'),
+  'i18n directory',
+);
+const appDir = resolvePathUnderBase(frontendRoot, path.join('src', 'app'), 'app directory');
 
 const i18nFiles = fs.existsSync(i18nDir)
   ? fs
@@ -95,7 +101,7 @@ const baseLangFile = i18nFiles.includes('en.json') ? 'en.json' : i18nFiles[0];
 const translations = new Map();
 
 for (const name of i18nFiles) {
-  const filePath = assertPathWithinRoot(i18nDir, path.join(i18nDir, name), `i18n file "${name}"`);
+  const filePath = resolvePathUnderBase(i18nDir, name, `i18n file "${name}"`);
   const json = readJson(i18nDir, filePath);
   translations.set(name, flattenKeys(json));
 }
@@ -128,11 +134,11 @@ for (const [name, keys] of translations.entries()) {
   }
 }
 
-const codeFiles = fs.existsSync(appDir) ? listFiles(appDir, appDir, ['.ts', '.html']) : [];
+const codeFiles = fs.existsSync(appDir) ? listFiles(appDir, '.', ['.ts', '.html']) : [];
 const codeKeys = [];
 
 for (const filePath of codeFiles) {
-  const safeFilePath = assertPathWithinRoot(appDir, filePath, 'code file');
+  const safeFilePath = resolvePathUnderBase(appDir, filePath, 'code file');
   const contents = fs.readFileSync(safeFilePath, 'utf8');
 
   codeKeys.push(...collectKeyMatches(contents, /\bthis\.t\(\s*(['"])(.*?)\1\s*\)/g));
@@ -145,7 +151,7 @@ const missingFromBase = uniqSorted(codeKeys.filter((key) => !baseKeys.has(key)))
 if (missingFromBase.length > 0) {
   hasErrors = true;
   console.error(
-    `[i18n] Found ${missingFromBase.length} translation keys referenced in code but missing from ${baseLangFile}:`
+    `[i18n] Found ${missingFromBase.length} translation keys referenced in code but missing from ${baseLangFile}:`,
   );
   for (const key of missingFromBase.slice(0, 50)) console.error(`  - ${key}`);
   if (missingFromBase.length > 50) console.error(`  …and ${missingFromBase.length - 50} more`);
@@ -153,12 +159,14 @@ if (missingFromBase.length > 0) {
 
 const unusedInBase = uniqSorted(Array.from(baseKeys).filter((key) => !new Set(codeKeys).has(key)));
 if (unusedInBase.length > 0) {
-  console.warn(`[i18n] Note: ${unusedInBase.length} keys in ${baseLangFile} were not detected in static code usage.`);
+  console.warn(
+    `[i18n] Note: ${unusedInBase.length} keys in ${baseLangFile} were not detected in static code usage.`,
+  );
   console.warn('[i18n] This is informational only (dynamic keys/templates may not be detected).');
 }
 
 if (hasErrors) process.exit(1);
 
 console.log(
-  `[i18n] OK (${baseLangFile}: ${baseKeys.size} keys; scanned ${codeFiles.length} files, found ${uniqSorted(codeKeys).length} static keys)`
+  `[i18n] OK (${baseLangFile}: ${baseKeys.size} keys; scanned ${codeFiles.length} files, found ${uniqSorted(codeKeys).length} static keys)`,
 );

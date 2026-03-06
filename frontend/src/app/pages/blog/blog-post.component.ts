@@ -21,7 +21,16 @@ import { CatalogService, Category, FeaturedCollection, Product } from '../../cor
 import { MarkdownService } from '../../core/markdown.service';
 import { NewsletterService } from '../../core/newsletter.service';
 import { ToastService } from '../../core/toast.service';
-import { BlogComment, BlogCommentSort, BlogPost, BlogPostListItem, BlogService, PaginationMeta } from '../../core/blog.service';
+import {
+  BlogComment,
+  BlogCommentSort,
+  BlogCommentThread,
+  BlogCommentThreadListResponse,
+  BlogPost,
+  BlogPostListItem,
+  BlogService,
+  PaginationMeta
+} from '../../core/blog.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -59,754 +68,7 @@ hljs.registerLanguage('typescript', typescript);
     CaptchaTurnstileComponent,
     SkeletonComponent
   ],
-  template: `
-    <div
-      *ngIf="post()"
-      class="fixed left-0 right-0 top-0 z-[110] h-1 bg-transparent no-print"
-      role="progressbar"
-      [attr.aria-label]="'blog.post.progressLabel' | translate"
-      [attr.aria-valuemin]="0"
-      [attr.aria-valuemax]="100"
-      [attr.aria-valuenow]="progressPercent()"
-    >
-      <div
-        class="h-full bg-indigo-600 dark:bg-indigo-300 transition-[width] duration-100"
-        [style.width.%]="progressPercent()"
-      ></div>
-    </div>
-
-    <app-container classes="py-10 grid gap-6 max-w-4xl">
-      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-
-      <div *ngIf="canEditBlog()" class="flex flex-col items-end gap-2 no-print">
-        <div class="flex items-center gap-2">
-          <app-button size="sm" variant="ghost" [label]="'blog.admin.edit' | translate" (action)="editBlogPost()"></app-button>
-          <app-button
-            size="sm"
-            variant="ghost"
-            [label]="quickEditOpen() ? ('blog.admin.quickEditClose' | translate) : ('blog.admin.quickEdit' | translate)"
-            (action)="toggleQuickEdit()"
-          ></app-button>
-        </div>
-
-        <div
-          *ngIf="quickEditOpen()"
-          class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-soft dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="grid gap-1">
-              <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.admin.quickEdit' | translate }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="adminBlock() as blk">
-                {{ 'adminUi.blog.fields.status' | translate }}: {{ ('adminUi.status.' + blk.status) | translate }}
-              </p>
-              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="adminBlockLoading()">
-                {{ 'adminUi.common.loading' | translate }}
-              </p>
-              <p class="text-xs text-rose-600 dark:text-rose-300" *ngIf="adminBlockError()">
-                {{ 'blog.admin.loadErrorCopy' | translate }}
-              </p>
-            </div>
-
-            <div class="flex items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.common.cancel' | translate"
-                (action)="resetQuickEdit()"
-                [disabled]="quickEditSaving() || adminBlockLoading() || !adminBlock()"
-              ></app-button>
-              <app-button
-                size="sm"
-                [label]="quickEditSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
-                (action)="saveQuickEdit()"
-                [disabled]="quickEditSaving() || adminBlockLoading() || !adminBlock()"
-              ></app-button>
-            </div>
-          </div>
-
-          <div class="mt-4 grid gap-3" *ngIf="adminBlock() as blk">
-            <div class="grid gap-3 md:grid-cols-3">
-              <label class="grid gap-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.status' | translate }}</span>
-                <select
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="quickEditStatus"
-                >
-                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-                  <option value="review">{{ 'adminUi.status.review' | translate }}</option>
-                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-                </select>
-              </label>
-
-              <label class="grid gap-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
-                  'adminUi.blog.fields.publishAtOptional' | translate
-                }}</span>
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="quickEditPublishAt"
-                />
-              </label>
-
-              <label class="grid gap-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
-                  'adminUi.blog.fields.unpublishAtOptional' | translate
-                }}</span>
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="quickEditUnpublishAt"
-                />
-              </label>
-            </div>
-
-            <div class="grid gap-3 md:grid-cols-3">
-              <label class="grid gap-1 md:col-span-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.title' | translate }}</span>
-                <input
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="quickEditTitle"
-                />
-              </label>
-
-              <label class="grid gap-1 md:col-span-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
-                  'adminUi.blog.editing.summaryOptional' | translate : { lang: activeLang() }
-                }}</span>
-                <textarea
-                  rows="2"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="quickEditSummary"
-                ></textarea>
-              </label>
-
-              <label class="grid gap-1 md:col-span-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.tags' | translate }}</span>
-                <input
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
-                  [(ngModel)]="quickEditTags"
-                />
-              </label>
-            </div>
-
-            <p class="text-xs text-rose-600 dark:text-rose-300" *ngIf="quickEditError()">{{ quickEditError() }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div
-        *ngIf="isPreview()"
-        class="rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
-      >
-        {{ 'blog.preview.banner' | translate }}
-      </div>
-
-      <div class="grid gap-2">
-        <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
-          <span *ngIf="loadingPost(); else postTitleTpl">{{ 'blog.post.loadingTitle' | translate }}</span>
-          <ng-template #postTitleTpl>{{ post()?.title }}</ng-template>
-        </h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post()?.published_at">
-          {{ post()!.published_at | date: 'mediumDate' }}
-          <ng-container *ngIf="post()?.reading_time_minutes"> · {{ 'blog.minutesRead' | translate : { minutes: post()!.reading_time_minutes } }}</ng-container>
-          <ng-container *ngIf="post()?.author_name"> · {{ 'blog.byAuthor' | translate : { author: post()!.author_name } }}</ng-container>
-        </p>
-        <a
-          *ngIf="post()?.series"
-          [routerLink]="['/blog/series', post()!.series]"
-          class="justify-self-start text-xs font-semibold rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
-        >
-          {{ 'blog.seriesPill' | translate : { series: post()!.series } }}
-        </a>
-        <p class="text-sm text-slate-600 dark:text-slate-300" *ngIf="post()?.summary">{{ post()!.summary }}</p>
-        <div class="flex flex-wrap gap-1" *ngIf="post()?.tags?.length">
-          <a
-            *ngFor="let tag of post()!.tags"
-            [routerLink]="['/blog/tag', tag]"
-            class="text-xs rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
-          >
-            #{{ tag }}
-          </a>
-        </div>
-      </div>
-
-      <div *ngIf="loadingPost()" class="grid gap-4">
-        <app-skeleton height="240px"></app-skeleton>
-        <app-skeleton [rows]="6"></app-skeleton>
-      </div>
-
-      <div
-        *ngIf="!loadingPost() && hasPostError()"
-        class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-2 dark:border-amber-900/40 dark:bg-amber-950/30"
-      >
-        <p class="text-lg font-semibold text-amber-900 dark:text-amber-100">{{ 'blog.post.errorTitle' | translate }}</p>
-        <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'blog.post.errorCopy' | translate }}</p>
-        <div class="flex justify-center">
-          <app-button [label]="'blog.retry' | translate" size="sm" (action)="load()"></app-button>
-        </div>
-      </div>
-
-      <div *ngIf="!loadingPost() && !hasPostError() && post()">
-        <div class="grid gap-6 lg:grid-cols-[1fr_260px] lg:items-start">
-          <app-card>
-            <div #articleContent class="grid gap-6" (click)="handleArticleClick($event)">
-              <img
-                *ngIf="post()!.cover_image_url"
-                [src]="post()!.cover_image_url"
-                [alt]="post()!.title"
-                class="w-full aspect-[16/9] rounded-2xl border border-slate-200 dark:border-slate-800"
-                [ngClass]="coverImageClass(post()!.cover_fit)"
-                [style.object-position]="focalPosition(post()!.cover_focal_x, post()!.cover_focal_y)"
-                loading="lazy"
-              />
-              <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
-              <p
-                *ngIf="!hasMeaningfulArticleText()"
-                class="mx-auto w-full max-w-prose text-base text-slate-700 leading-relaxed dark:text-slate-200"
-              >
-                {{ fallbackIntro() }}
-              </p>
-              <div class="mx-auto w-full max-w-prose no-print">
-                <a
-                  routerLink="/blog"
-                  class="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                >
-                  ← {{ 'blog.post.backToBlog' | translate }}
-                </a>
-              </div>
-            </div>
-          </app-card>
-
-          <aside *ngIf="toc().length > 1" class="hidden lg:block lg:sticky lg:top-24 no-print">
-            <app-card>
-              <nav class="grid gap-3" [attr.aria-label]="'blog.post.tocTitle' | translate">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.tocTitle' | translate }}</p>
-                <div class="grid gap-1">
-                  <a
-                    *ngFor="let item of toc()"
-                    class="text-sm rounded-md px-2 py-1 transition-colors"
-                    [ngClass]="
-                      (item.id === activeHeadingId() ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-slate-50 dark:hover:bg-slate-950/40') +
-                      (item.level === 3 ? ' pl-5' : '')
-                    "
-                    [attr.href]="'#' + item.id"
-                    (click)="scrollToHeading($event, item.id)"
-                  >
-                    {{ item.title }}
-                  </a>
-                </div>
-              </nav>
-            </app-card>
-          </aside>
-        </div>
-      </div>
-
-      <section *ngIf="post()" class="grid gap-2 no-print">
-        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.shareTitle' | translate }}</p>
-        <div class="flex flex-wrap gap-2">
-          <app-button size="sm" variant="ghost" [label]="'blog.post.shareCopy' | translate" (action)="copyShareLink()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'blog.post.shareWhatsApp' | translate" (action)="shareWhatsApp()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'blog.post.shareFacebook' | translate" (action)="shareFacebook()"></app-button>
-        </div>
-      </section>
-
-      <section *ngIf="neighbors().previous || neighbors().next" class="grid gap-3 no-print">
-        <div class="grid gap-3 sm:grid-cols-2">
-          <a
-            *ngIf="neighbors().previous as prev"
-            [routerLink]="['/blog', prev.slug]"
-            class="group block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
-          >
-            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-              ← {{ 'blog.post.previousPost' | translate }}
-            </p>
-            <p class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
-              {{ prev.title }}
-            </p>
-          </a>
-          <a
-            *ngIf="neighbors().next as next"
-            [routerLink]="['/blog', next.slug]"
-            class="group block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
-          >
-            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 text-right">
-              {{ 'blog.post.nextPost' | translate }} →
-            </p>
-            <p class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300 text-right">
-              {{ next.title }}
-            </p>
-          </a>
-        </div>
-      </section>
-
-      <section *ngIf="relatedPosts().length" class="grid gap-3 no-print">
-        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.relatedTitle' | translate }}</h2>
-        <div class="grid gap-4 sm:grid-cols-2">
-          <a *ngFor="let related of relatedPosts()" [routerLink]="['/blog', related.slug]" class="group block">
-            <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
-              <app-card class="h-full">
-                <div class="grid gap-3">
-                  <div
-                    *ngIf="related.cover_image_url"
-                    class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
-                  >
-                    <img
-                      [src]="related.cover_image_url"
-                      [alt]="related.title"
-                      class="w-full aspect-[16/9]"
-                      [ngClass]="coverImageClass(related.cover_fit)"
-                      [style.object-position]="focalPosition(related.cover_focal_x, related.cover_focal_y)"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-                  <div class="grid gap-1">
-                    <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="related.published_at">
-                      {{ related.published_at | date: 'mediumDate' }}
-                      <ng-container *ngIf="related.reading_time_minutes">
-                        · {{ 'blog.minutesRead' | translate : { minutes: related.reading_time_minutes } }}
-                      </ng-container>
-                    </p>
-                    <h3 class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
-                      {{ related.title }}
-                    </h3>
-                    <p class="text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
-                      {{ related.excerpt }}
-                    </p>
-                  </div>
-                </div>
-              </app-card>
-            </div>
-          </a>
-        </div>
-      </section>
-
-      <section *ngIf="authorDisplayName()" class="grid gap-3">
-        <app-card>
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <ng-container *ngIf="post()?.author?.avatar_url; else authorAvatarFallback">
-              <img
-                [src]="post()!.author!.avatar_url"
-                [alt]="authorDisplayName()"
-                class="h-16 w-16 rounded-full border border-slate-200 object-cover dark:border-slate-800"
-                loading="lazy"
-                decoding="async"
-              />
-            </ng-container>
-            <ng-template #authorAvatarFallback>
-              <div
-                class="h-16 w-16 rounded-full border border-slate-200 bg-slate-50 grid place-items-center text-lg font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-200"
-              >
-                {{ authorInitials() }}
-              </div>
-            </ng-template>
-
-            <div class="grid gap-1 flex-1">
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                {{ 'blog.post.author.title' | translate }}
-              </p>
-              <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                {{ authorDisplayName() }}
-              </p>
-              <p *ngIf="authorBio()" class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">
-                {{ authorBio() }}
-              </p>
-              <div *ngIf="authorLinks().length" class="flex flex-wrap gap-3 pt-1 text-sm">
-                <a
-                  *ngFor="let link of authorLinks()"
-                  [href]="link.url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-indigo-600 underline underline-offset-4 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                >
-                  {{ link.label }}
-                </a>
-              </div>
-            </div>
-          </div>
-        </app-card>
-
-        <div *ngIf="loadingMoreFromAuthor()" class="grid gap-2 sm:grid-cols-2">
-          <app-skeleton height="86px"></app-skeleton>
-          <app-skeleton height="86px"></app-skeleton>
-        </div>
-
-        <div *ngIf="!loadingMoreFromAuthor() && moreFromAuthor().length" class="grid gap-2">
-          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            {{ 'blog.post.author.moreFrom' | translate : { author: authorDisplayName() } }}
-          </p>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <a
-              *ngFor="let item of moreFromAuthor()"
-              [routerLink]="['/blog', item.slug]"
-              class="block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
-            >
-              <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="item.published_at">
-                {{ item.published_at | date: 'mediumDate' }}
-                <ng-container *ngIf="item.reading_time_minutes">
-                  · {{ 'blog.minutesRead' | translate : { minutes: item.reading_time_minutes } }}
-                </ng-container>
-              </p>
-              <p class="pt-1 text-base font-semibold text-slate-900 hover:text-indigo-600 dark:text-slate-50 dark:hover:text-indigo-300">
-                {{ item.title }}
-              </p>
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section class="no-print">
-        <app-card>
-          <form class="grid gap-3" (submit)="submitNewsletter($event)">
-            <div class="grid gap-1">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.newsletter.title' | translate }}</p>
-              <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.newsletter.copy' | translate }}</p>
-            </div>
-
-            <div *ngIf="newsletterSubscribed()" class="text-sm text-emerald-700 dark:text-emerald-300">
-              {{
-                (newsletterAlreadySubscribed() ? 'blog.newsletter.alreadyCopy' : 'blog.newsletter.successCopy')
-                  | translate
-              }}
-            </div>
-
-            <div class="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'blog.newsletter.emailLabel' | translate }}
-                <input
-                  type="email"
-                  name="newsletterEmail"
-                  required
-                  autocomplete="email"
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                  [placeholder]="'blog.newsletter.emailPlaceholder' | translate"
-                  [(ngModel)]="newsletterEmail"
-                />
-              </label>
-              <app-button
-                size="sm"
-                type="submit"
-                [label]="'blog.newsletter.subscribe' | translate"
-                [disabled]="newsletterLoading() || !newsletterEmail.trim() || (captchaEnabled && !newsletterCaptchaToken)"
-              ></app-button>
-            </div>
-
-            <app-captcha-turnstile
-              #newsletterCaptcha
-              *ngIf="captchaEnabled"
-              [siteKey]="captchaSiteKey"
-              (tokenChange)="newsletterCaptchaToken = $event"
-            ></app-captcha-turnstile>
-          </form>
-        </app-card>
-      </section>
-
-      <section class="grid gap-3 no-print">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-            {{ 'blog.comments.title' | translate : { count: commentsTotal() } }}
-          </h2>
-	          <div class="flex flex-wrap items-center justify-end gap-2">
-              <label *ngIf="auth.isAuthenticated()" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  [checked]="commentSubscribed()"
-                  [disabled]="commentSubscriptionLoading() || !canSubscribeToComments()"
-                  (change)="toggleCommentSubscription($event)"
-                />
-                <span>{{ 'blog.comments.follow' | translate }}</span>
-              </label>
-	            <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-	              <span class="font-medium">{{ 'blog.comments.sortLabel' | translate }}</span>
-	              <select
-                class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [disabled]="loadingComments()"
-                [ngModel]="commentSort()"
-                (ngModelChange)="setCommentSort($event)"
-                name="commentSort"
-              >
-                <option value="newest">{{ 'blog.comments.sortNewest' | translate }}</option>
-                <option value="oldest">{{ 'blog.comments.sortOldest' | translate }}</option>
-                <option value="top">{{ 'blog.comments.sortTop' | translate }}</option>
-              </select>
-            </label>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'blog.comments.refresh' | translate"
-              [disabled]="loadingComments()"
-              (action)="loadComments()"
-            ></app-button>
-          </div>
-        </div>
-
-        <div
-          *ngIf="commentsMeta() as meta"
-          class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <span>{{ 'blog.comments.pageMeta' | translate : { page: meta.page, totalPages: meta.total_pages } }}</span>
-          <div class="flex items-center justify-center gap-2">
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'blog.comments.prev' | translate"
-              [disabled]="loadingComments() || meta.page <= 1"
-              (action)="goToCommentsPage(meta.page - 1)"
-            ></app-button>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'blog.comments.next' | translate"
-              [disabled]="loadingComments() || meta.page >= meta.total_pages"
-              (action)="goToCommentsPage(meta.page + 1)"
-            ></app-button>
-          </div>
-        </div>
-
-        <div *ngIf="loadingComments()" class="grid gap-3">
-          <app-skeleton *ngFor="let i of commentSkeletons" height="88px"></app-skeleton>
-        </div>
-
-        <div
-          *ngIf="!loadingComments() && hasCommentsError()"
-          class="border border-amber-200 bg-amber-50 rounded-2xl p-4 text-center grid gap-1 dark:border-amber-900/40 dark:bg-amber-950/30"
-        >
-          <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'blog.comments.errorTitle' | translate }}</p>
-          <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'blog.comments.errorCopy' | translate }}</p>
-        </div>
-
-        <div
-          *ngIf="!loadingComments() && !hasCommentsError() && commentsTotal() === 0"
-          class="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300"
-        >
-          {{ 'blog.comments.empty' | translate }}
-        </div>
-
-        <div
-          *ngIf="!loadingComments() && !hasCommentsError() && commentsTotal() > 0 && comments().length === 0"
-          class="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300 grid gap-2"
-        >
-          <p>{{ 'blog.comments.emptyPage' | translate }}</p>
-          <app-button size="sm" variant="ghost" [label]="'blog.comments.goToFirstPage' | translate" (action)="goToCommentsPage(1)"></app-button>
-        </div>
-
-        <div *ngIf="!loadingComments() && !hasCommentsError() && comments().length" class="grid gap-3">
-          <ng-container *ngFor="let comment of rootComments()">
-            <app-card>
-              <div class="grid gap-2">
-                <div class="flex items-start justify-between gap-2">
-                  <div>
-                    <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {{ authorLabel(comment.author) }}
-                    </p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                      {{ comment.created_at | date: 'short' }}
-                    </p>
-                  </div>
-                  <div class="flex items-center gap-2 text-xs">
-                    <button
-                      *ngIf="canReply(comment)"
-                      type="button"
-                      class="text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                      (click)="startReply(comment)"
-                    >
-                      {{ 'blog.comments.reply' | translate }}
-                    </button>
-                    <button
-                      *ngIf="canFlag(comment)"
-                      type="button"
-                      class="text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100"
-                      (click)="flagComment(comment)"
-                    >
-                      {{ 'blog.comments.report' | translate }}
-                    </button>
-                    <button
-                      *ngIf="canDelete(comment)"
-                      type="button"
-                      class="text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
-                      (click)="deleteComment(comment)"
-                    >
-                      {{ 'blog.comments.delete' | translate }}
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  class="text-sm leading-relaxed whitespace-pre-line"
-                  [ngClass]="comment.is_deleted || comment.is_hidden ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
-                >
-                  {{
-                    comment.is_deleted
-                      ? ('blog.comments.deleted' | translate)
-                      : comment.is_hidden
-                        ? ('blog.comments.hidden' | translate)
-                        : comment.body
-                  }}
-                </div>
-
-                <div *ngIf="replies(comment.id).length" class="grid gap-2 border-l border-slate-200 pl-4 dark:border-slate-700">
-                  <div *ngFor="let reply of replies(comment.id)" class="grid gap-1">
-                    <div class="flex items-start justify-between gap-2">
-                      <div>
-                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                          {{ authorLabel(reply.author) }}
-                        </p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">
-                          {{ reply.created_at | date: 'short' }}
-                        </p>
-                      </div>
-                      <div class="flex items-center gap-2 text-xs">
-                        <button
-                          *ngIf="canFlag(reply)"
-                          type="button"
-                          class="text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100"
-                          (click)="flagComment(reply)"
-                        >
-                          {{ 'blog.comments.report' | translate }}
-                        </button>
-                        <button
-                          *ngIf="canDelete(reply)"
-                          type="button"
-                          class="text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
-                          (click)="deleteComment(reply)"
-                        >
-                          {{ 'blog.comments.delete' | translate }}
-                        </button>
-                      </div>
-                    </div>
-                    <div
-                      class="text-sm leading-relaxed whitespace-pre-line"
-                      [ngClass]="reply.is_deleted || reply.is_hidden ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
-                    >
-                      {{
-                        reply.is_deleted
-                          ? ('blog.comments.deleted' | translate)
-                          : reply.is_hidden
-                            ? ('blog.comments.hidden' | translate)
-                            : reply.body
-                      }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </app-card>
-          </ng-container>
-        </div>
-
-        <app-card>
-          <div *ngIf="!auth.isAuthenticated()" class="text-sm text-slate-700 dark:text-slate-200">
-            {{ 'blog.comments.signInPrompt' | translate }}
-            <a routerLink="/login" class="text-indigo-600 dark:text-indigo-300 hover:underline">{{ 'nav.signIn' | translate }}</a
-            >.
-          </div>
-
-          <form *ngIf="auth.isAuthenticated()" class="grid gap-3" (submit)="submitComment($event)">
-            <div *ngIf="replyTo()" class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
-              <span>
-                {{ 'blog.comments.replyingTo' | translate : { name: authorLabel(replyTo()!.author) } }}
-              </span>
-              <button type="button" class="text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" (click)="cancelReply()">
-                {{ 'blog.comments.cancelReply' | translate }}
-              </button>
-            </div>
-
-            <label class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-              {{ 'blog.comments.yourComment' | translate }}
-              <textarea
-                rows="4"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [(ngModel)]="commentBody"
-                name="commentBody"
-                [placeholder]="'blog.comments.placeholder' | translate"
-              ></textarea>
-            </label>
-
-            <div class="flex items-center gap-2">
-              <app-button
-                size="sm"
-                [label]="'blog.comments.submit' | translate"
-                [disabled]="submitting() || !commentBody.trim() || (captchaEnabled && !commentCaptchaToken)"
-                (action)="submitComment()"
-              ></app-button>
-              <span *ngIf="submitting()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'blog.comments.submitting' | translate }}</span>
-            </div>
-
-	            <app-captcha-turnstile
-                #commentCaptcha
-	              *ngIf="captchaEnabled"
-	              [siteKey]="captchaSiteKey"
-	              (tokenChange)="commentCaptchaToken = $event"
-	            ></app-captcha-turnstile>
-          </form>
-        </app-card>
-      </section>
-    </app-container>
-
-    <div
-      *ngIf="lightboxOpen()"
-      class="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm p-4 grid place-items-center"
-      (click)="closeLightbox()"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div class="relative w-full max-w-5xl" (click)="$event.stopPropagation()">
-        <button
-          type="button"
-          class="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white text-slate-900 shadow-soft hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"
-          (click)="closeLightbox()"
-          [attr.aria-label]="'blog.post.lightbox.close' | translate"
-        >
-          ✕
-        </button>
-
-        <img
-          *ngIf="lightboxImage() as img"
-          [src]="img.src"
-          [alt]="img.alt || ''"
-          class="w-full max-h-[78vh] object-contain rounded-2xl bg-black"
-        />
-
-        <div class="pt-3 grid gap-2 text-center">
-          <p *ngIf="lightboxImage()?.alt" class="text-sm text-white/80">{{ lightboxImage()!.alt }}</p>
-          <p *ngIf="galleryImages().length > 1" class="text-xs text-white/60">
-            {{ (lightboxIndex() ?? 0) + 1 }} / {{ galleryImages().length }}
-          </p>
-        </div>
-
-        <div *ngIf="galleryImages().length > 1" class="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-2">
-          <button
-            type="button"
-            class="h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/55"
-            (click)="prevLightbox($event)"
-            [attr.aria-label]="'blog.post.lightbox.previous' | translate"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            class="h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/55"
-            (click)="nextLightbox($event)"
-            [attr.aria-label]="'blog.post.lightbox.next' | translate"
-          >
-            ›
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <button
-      *ngIf="showBackToTop()"
-      type="button"
-      class="fixed bottom-6 right-6 z-50 h-11 w-11 rounded-full bg-slate-900 text-white shadow-soft hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white no-print"
-      (click)="scrollToTop()"
-      [attr.aria-label]="'blog.post.backToTop' | translate"
-    >
-      ↑
-    </button>
-  `
-})
+    templateUrl: './blog-post.component.html',})
 export class BlogPostComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
@@ -845,13 +107,13 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   commentSubscribed = signal<boolean>(false);
   commentSubscriptionLoading = signal<boolean>(false);
   private readonly commentThreadsLimit = 10;
-  commentSkeletons = Array.from({ length: 3 });
+  readonly commentSkeletons = Array.from({ length: 3 });
 
   commentBody = '';
   submitting = signal<boolean>(false);
   replyTo = signal<BlogComment | null>(null);
-  captchaSiteKey = appConfig.captchaSiteKey;
-  captchaEnabled = Boolean(this.captchaSiteKey);
+  readonly captchaSiteKey = appConfig.captchaSiteKey;
+  readonly captchaEnabled = Boolean(this.captchaSiteKey);
   commentCaptchaToken: string | null = null;
   newsletterEmail = '';
   newsletterLoading = signal<boolean>(false);
@@ -890,25 +152,31 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   });
   authorBio = computed(() => {
     const post = this.post();
-    const meta = (post?.meta as any) || {};
-    const author = meta?.author;
-    const bio = author?.bio;
+    const meta = this.toObjectRecord(post?.meta);
+    const author = this.toObjectRecord(meta['author']);
+    const bio = author['bio'];
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     if (typeof bio === 'string') return bio.trim();
-    if (bio && typeof bio === 'object' && typeof bio[lang] === 'string') return String(bio[lang]).trim();
+    if (bio && typeof bio === 'object' && !Array.isArray(bio)) {
+      const localized = this.toObjectRecord(bio)[lang];
+      if (typeof localized === 'string') return localized.trim();
+    }
     return '';
   });
   authorLinks = computed(() => {
     const post = this.post();
-    const meta = (post?.meta as any) || {};
-    const author = meta?.author;
-    const links = author?.links;
-    if (!Array.isArray(links)) return [] as Array<{ label: string; url: string }>;
+    const meta = this.toObjectRecord(post?.meta);
+    const author = this.toObjectRecord(meta['author']);
+    const links = author['links'];
+    if (!Array.isArray(links)) return [];
     return links
-      .map((row: any) => ({
-        label: typeof row?.label === 'string' ? row.label.trim() : '',
-        url: typeof row?.url === 'string' ? row.url.trim() : ''
-      }))
+      .map((row) => {
+        const rec = this.toObjectRecord(row);
+        return {
+          label: typeof rec['label'] === 'string' ? rec['label'].trim() : '',
+          url: typeof rec['url'] === 'string' ? rec['url'].trim() : ''
+        };
+      })
       .filter((row) => row.label && row.url);
   });
 
@@ -961,7 +229,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private readonly toast: ToastService,
     private readonly markdown: MarkdownService,
     private readonly catalog: CatalogService,
-    public auth: AuthService,
+    public readonly auth: AuthService,
     private readonly seoCopyFallback: SeoCopyFallbackService
   ) {}
 
@@ -1305,7 +573,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       this.quickEditUnpublishAt = this.toDateTimeLocal(block.published_until);
     }
 
-    const meta = (block?.meta || post?.meta || {}) as Record<string, unknown>;
+    const meta = this.toObjectRecord(block?.meta ?? post?.meta);
     const tags = (post?.tags?.length ? post.tags : this.normalizeTags(meta['tags'])) || [];
     this.quickEditTitle = String(post?.title ?? block?.title ?? '').trim();
     this.quickEditSummary = String(post?.summary ?? this.getMetaSummary(meta, lang) ?? '').trim();
@@ -1379,10 +647,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!raw) return '';
     if (typeof raw === 'string') return raw.trim();
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      const value = (raw as any)[lang];
+      const value = this.toObjectRecord(raw)[lang];
       if (typeof value === 'string') return value.trim();
     }
     return '';
+  }
+
+  private toObjectRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+    return value as Record<string, unknown>;
   }
 
   private loadNeighbors(lang: string): void {
@@ -1490,9 +765,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   handleArticleClick(event: MouseEvent): void {
-    const target = event.target as HTMLElement | null;
-    const link = target?.closest('a[data-router-link]') as HTMLAnchorElement | null;
-    if (link) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const link = target.closest('a[data-router-link]');
+    if (link instanceof HTMLAnchorElement) {
       const to = link.getAttribute('data-router-link') || '';
       if (to && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
         event.preventDefault();
@@ -1501,14 +777,14 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         return;
       }
     }
-    const codeButton = target?.closest('button[data-code-action]') as HTMLButtonElement | null;
-    if (codeButton) {
+    const codeButton = target.closest('button[data-code-action]');
+    if (codeButton instanceof HTMLButtonElement) {
       const action = codeButton.getAttribute('data-code-action');
-      const wrapper = codeButton.closest('.blog-codeblock') as HTMLElement | null;
-      if (!action || !wrapper) return;
+      const wrapper = codeButton.closest('.blog-codeblock');
+      if (!action || !(wrapper instanceof HTMLElement)) return;
       if (action === 'copy') {
-        const code = wrapper.querySelector('pre code') as HTMLElement | null;
-        const value = (code?.textContent || '').trimEnd();
+        const code = wrapper.querySelector('pre code');
+        const value = ((code instanceof HTMLElement ? code.textContent : '') || '').trimEnd();
         if (value) this.copyCode(value);
       } else if (action === 'wrap') {
         const wrap = wrapper.classList.toggle('blog-codeblock--wrap');
@@ -1520,8 +796,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       event.stopPropagation();
       return;
     }
-    const img = target?.closest('img') as HTMLImageElement | null;
-    if (!img) return;
+    const img = target.closest('img');
+    if (!(img instanceof HTMLImageElement)) return;
     const images = this.galleryImages();
     if (!images.length) return;
     const src = img.currentSrc || img.src;
@@ -1678,16 +954,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.hasCommentsError.set(false);
     this.blog.listCommentThreads(this.slug, { page, limit: this.commentThreadsLimit, sort }).subscribe({
       next: (resp) => {
-        const flattened: BlogComment[] = [];
-        for (const thread of resp.items || []) {
-          if (thread?.root) flattened.push(thread.root);
-          if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
-        }
-        this.comments.set(flattened);
-        this.commentsMeta.set(resp.meta ?? null);
-        this.commentsTotal.set(Number(resp.total_comments ?? 0));
-        this.loadingComments.set(false);
-        this.hasCommentsError.set(false);
+        this.applyCommentThreadResponse(resp);
       },
       error: () => {
         this.comments.set([]);
@@ -1697,6 +964,23 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.hasCommentsError.set(true);
       }
     });
+  }
+
+  private applyCommentThreadResponse(resp: BlogCommentThreadListResponse): void {
+    this.comments.set(this.flattenCommentThreads(resp.items));
+    this.commentsMeta.set(resp.meta ?? null);
+    this.commentsTotal.set(Number(resp.total_comments ?? 0));
+    this.loadingComments.set(false);
+    this.hasCommentsError.set(false);
+  }
+
+  private flattenCommentThreads(threads: BlogCommentThread[] | null | undefined): BlogComment[] {
+    const flattened: BlogComment[] = [];
+    for (const thread of threads || []) {
+      if (thread?.root) flattened.push(thread.root);
+      if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
+    }
+    return flattened;
   }
 
   loadCommentSubscription(): void {
@@ -1724,7 +1008,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   toggleCommentSubscription(event: Event): void {
-    const target = event?.target as HTMLInputElement | null;
+    const target = event.target instanceof HTMLInputElement ? event.target : null;
     const desired = Boolean(target?.checked);
     if (!this.slug) return;
     if (!this.auth.isAuthenticated()) return;
@@ -1758,7 +1042,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (next !== 'newest' && next !== 'oldest' && next !== 'top') return;
     if (next === this.commentSort()) return;
     this.commentPage.set(1);
-    this.loadComments({ page: 1, sort: next as BlogCommentSort });
+    this.loadComments({ page: 1, sort: next });
   }
 
   goToCommentsPage(page: number): void {
@@ -1842,31 +1126,50 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.submitting.set(false);
         this.commentCaptchaToken = null;
         this.commentCaptcha?.reset();
-        const statusCode = typeof (err)?.status === 'number' ? (err).status : 0;
-        const detail = (err)?.error?.detail;
-        if (statusCode === 429) {
-          this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
-          return;
-        }
-        if (statusCode === 400 && typeof detail === 'string') {
-          if (detail.toLowerCase().includes('link')) {
-            this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
-            return;
-          }
-          if (detail.toLowerCase().includes('captcha')) {
-            const copy =
-              detail.toLowerCase().includes('required')
-                ? this.translate.instant('auth.captchaRequired')
-                : this.translate.instant('auth.captchaFailedTryAgain');
-            this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
-            return;
-          }
-          this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
-          return;
-        }
-        this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
+        this.toastCommentCreateError(err);
       }
     });
+  }
+
+  private toastCommentCreateError(err: unknown): void {
+    const statusCode = this.commentErrorStatus(err);
+    if (statusCode === 429) {
+      this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
+      return;
+    }
+    if (statusCode === 400) {
+      const handled = this.toastBadRequestCommentCreateError(err);
+      if (handled) return;
+    }
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
+  }
+
+  private commentErrorStatus(err: unknown): number {
+    const status = (err as { status?: unknown })?.status;
+    return typeof status === 'number' ? status : 0;
+  }
+
+  private toastBadRequestCommentCreateError(err: unknown): boolean {
+    const detail = (err as { error?: { detail?: unknown } })?.error?.detail;
+    if (typeof detail !== 'string') return false;
+    const lowerDetail = detail.toLowerCase();
+    if (lowerDetail.includes('link')) {
+      this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
+      return true;
+    }
+    if (lowerDetail.includes('captcha')) {
+      this.toastCaptchaCommentCreateError(lowerDetail);
+      return true;
+    }
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
+    return true;
+  }
+
+  private toastCaptchaCommentCreateError(detail: string): void {
+    const copy = detail.includes('required')
+      ? this.translate.instant('auth.captchaRequired')
+      : this.translate.instant('auth.captchaFailedTryAgain');
+    this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
   }
 
   submitNewsletter(event?: Event): void {
@@ -2048,8 +1351,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const end = rect.bottom + scrollTop - w.innerHeight;
     this.scrollStartY = start;
     this.scrollEndY = Math.max(start + 1, end);
-    this.tocHeadingEls = Array.from(el.querySelectorAll('h2[id], h3[id]')) as HTMLElement[];
-    const imgs = Array.from(el.querySelectorAll('img')) as HTMLImageElement[];
+    this.tocHeadingEls = Array.from(el.querySelectorAll<HTMLElement>('h2[id], h3[id]'));
+    const imgs = Array.from(el.querySelectorAll<HTMLImageElement>('img'));
     const gallery: Array<{ src: string; alt: string }> = [];
     const seen = new Set<string>();
     for (const img of imgs) {
@@ -2122,7 +1425,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
     const parser = new w.DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    const headings = Array.from(doc.body.querySelectorAll('h2, h3')) as HTMLElement[];
+    const headings = Array.from(doc.body.querySelectorAll<HTMLElement>('h2, h3'));
 
     const toc: Array<{ id: string; title: string; level: 2 | 3 }> = [];
     const embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }> = [];
@@ -2130,7 +1433,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const linkLabel = this.translate.instant('blog.post.sectionLinkLabel');
 
     for (const heading of headings) {
-      const level = heading.tagName.toLowerCase() === 'h3' ? 3 : 2;
+      const level: 2 | 3 = heading.tagName.toLowerCase() === 'h3' ? 3 : 2;
       const title = (heading.textContent || '').replace(/\s+/g, ' ').trim();
       if (!title) continue;
       const baseId = this.slugifyHeading(title) || 'section';
@@ -2150,10 +1453,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       anchor.textContent = '#';
       heading.appendChild(anchor);
 
-      toc.push({ id, title, level: level as 2 | 3 });
+      toc.push({ id, title, level });
     }
 
-    const images = Array.from(doc.body.querySelectorAll('img')) as HTMLImageElement[];
+    const images = Array.from(doc.body.querySelectorAll<HTMLImageElement>('img'));
     for (const img of images) {
       const title = (img.getAttribute('title') || '').trim().toLowerCase();
       if (!title) continue;
@@ -2210,10 +1513,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     }
 
     const embedRe = /^\{\{\s*(product|category|collection)\s*:\s*([a-z0-9_-]+)\s*\}\}$/i;
-    const embedParas = Array.from(doc.body.querySelectorAll('p')) as HTMLElement[];
+    const embedParas = Array.from(doc.body.querySelectorAll<HTMLElement>('p'));
     for (const para of embedParas) {
       const text = (para.textContent || '').trim();
-      const match = text.match(embedRe);
+      const match = embedRe.exec(text);
       if (!match) continue;
       const rawType = (match[1] || '').toLowerCase();
       const type = rawType === 'product' || rawType === 'category' || rawType === 'collection' ? rawType : null;
@@ -2272,12 +1575,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       return svg;
     };
 
-    const callouts = Array.from(doc.body.querySelectorAll('blockquote')) as HTMLElement[];
+    const callouts = Array.from(doc.body.querySelectorAll<HTMLElement>('blockquote'));
     for (const blockquote of callouts) {
-      const firstPara = blockquote.querySelector('p') as HTMLElement | null;
+      const firstPara = blockquote.querySelector<HTMLElement>('p');
       if (!firstPara) continue;
       const text = (firstPara.textContent || '').trimStart();
-      const match = text.match(/^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i);
+      const match = /^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i.exec(text);
       if (!match) continue;
       const marker = match[1].toLowerCase();
       const kind = marker === 'tip' ? 'tip' : marker === 'warning' || marker === 'caution' ? 'warning' : 'note';
@@ -2315,12 +1618,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const codeUnwrapLabel = this.translate.instant('blog.post.code.unwrap');
     const codeFallbackLabel = this.translate.instant('blog.post.code.languageFallback');
 
-    const codeBlocks = Array.from(doc.body.querySelectorAll('pre > code')) as HTMLElement[];
+    const codeBlocks = Array.from(doc.body.querySelectorAll<HTMLElement>('pre > code'));
     for (const codeEl of codeBlocks) {
-      const pre = codeEl.parentElement as HTMLElement | null;
-      if (!pre) continue;
+      const pre = codeEl.parentElement;
+      if (!(pre instanceof HTMLElement)) continue;
       const raw = codeEl.textContent || '';
-      const langMatch = codeEl.className.match(/language-([a-z0-9_-]+)/i);
+      const langMatch = /language-([a-z0-9_-]+)/i.exec(codeEl.className);
       const rawLang = (langMatch?.[1] || '').trim().toLowerCase();
       const lang =
         rawLang === 'js'
@@ -2385,7 +1688,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private hydrateEmbeds(
     embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }>,
     revision: number,
-    lang: string
+    lang: 'en' | 'ro'
   ): void {
     const html = this.bodyHtml();
     if (!html || !embeds.length) return;
@@ -2409,7 +1712,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
     const req = forkJoin({
       products: Object.keys(productCalls).length ? forkJoin(productCalls) : of({}),
-      categories: categorySlugs.length ? this.catalog.listCategories(lang as any).pipe(catchError(() => of([]))) : of([]),
+      categories: categorySlugs.length ? this.catalog.listCategories(lang).pipe(catchError(() => of([]))) : of([]),
       collections: collectionSlugs.length ? this.catalog.listFeaturedCollections().pipe(catchError(() => of([]))) : of([])
     });
 
@@ -2432,7 +1735,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const w = this.document?.defaultView;
     if (!w?.DOMParser) return html;
     const doc = new w.DOMParser().parseFromString(html, 'text/html');
-    const embeds = Array.from(doc.body.querySelectorAll('.blog-embed[data-embed-type][data-embed-slug]')) as HTMLElement[];
+    const embeds = Array.from(doc.body.querySelectorAll<HTMLElement>('.blog-embed[data-embed-type][data-embed-slug]'));
     if (!embeds.length) return html;
 
     const categoryBySlug = new Map<string, Category>();

@@ -1027,36 +1027,7 @@ export class AdminOpsComponent implements OnInit {
       webhooksBacklog: this.ops.getWebhookBacklogStats({ since_hours: sinceHours }).pipe(catchError(() => of(null))),
       emailsFailed: this.ops.getEmailFailureStats({ since_hours: sinceHours }).pipe(catchError(() => of(null)))
     }).subscribe({
-      next: (res) => {
-        this.backendReady.set(Boolean(res.ready));
-
-        if (res.webhooksFailed) {
-          const count = Number((res.webhooksFailed)?.failed ?? 0);
-          this.webhookFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
-        }
-        if (res.webhooksBacklog) {
-          const totalCount = Number((res.webhooksBacklog)?.pending ?? 0);
-          const recentCount = Number((res.webhooksBacklog)?.pending_recent ?? 0);
-          this.webhookBacklogTotal.set(Number.isFinite(totalCount) ? Math.max(0, Math.floor(totalCount)) : 0);
-          this.webhookBacklogRecent24h.set(Number.isFinite(recentCount) ? Math.max(0, Math.floor(recentCount)) : 0);
-        }
-        if (res.emailsFailed) {
-          const count = Number((res.emailsFailed)?.failed ?? 0);
-          this.emailFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
-        }
-
-        const failedCalls = [
-          res.ready == null,
-          res.webhooksFailed == null,
-          res.webhooksBacklog == null,
-          res.emailsFailed == null
-        ].some(Boolean);
-        if (failedCalls) {
-          this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
-        }
-        this.healthCheckedAt.set(new Date());
-        this.healthLoading.set(false);
-      },
+      next: (res) => this.handleHealthDashboardResponse(res),
       error: () => {
         this.backendReady.set(false);
         this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
@@ -1064,6 +1035,31 @@ export class AdminOpsComponent implements OnInit {
         this.healthLoading.set(false);
       }
     });
+  }
+
+  private normalizedCount(value: unknown): number {
+    const parsed = Number(value ?? 0);
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+  }
+
+  private handleHealthDashboardResponse(res: {
+    ready: unknown;
+    webhooksFailed: { failed?: unknown } | null;
+    webhooksBacklog: { pending?: unknown; pending_recent?: unknown } | null;
+    emailsFailed: { failed?: unknown } | null;
+  }): void {
+    this.backendReady.set(Boolean(res.ready));
+    if (res.webhooksFailed) this.webhookFailures24h.set(this.normalizedCount(res.webhooksFailed.failed));
+    if (res.webhooksBacklog) {
+      this.webhookBacklogTotal.set(this.normalizedCount(res.webhooksBacklog.pending));
+      this.webhookBacklogRecent24h.set(this.normalizedCount(res.webhooksBacklog.pending_recent));
+    }
+    if (res.emailsFailed) this.emailFailures24h.set(this.normalizedCount(res.emailsFailed.failed));
+    if ([res.ready, res.webhooksFailed, res.webhooksBacklog, res.emailsFailed].some((item) => item == null)) {
+      this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
+    }
+    this.healthCheckedAt.set(new Date());
+    this.healthLoading.set(false);
   }
 
   loadDiagnostics(): void {
@@ -1489,4 +1485,3 @@ export class AdminOpsComponent implements OnInit {
     return d.toISOString();
   }
 }
-

@@ -3,6 +3,7 @@
 Bilingual (RO/EN) e-commerce storefront + admin suite for showcasing and selling handmade products.
 
 This repository is a monorepo:
+
 - `backend/` — FastAPI (Python) API under `/api/v1`
 - `frontend/` — Angular app (storefront + admin UI)
 - `infra/` — Docker Compose + backup helpers
@@ -77,7 +78,6 @@ docker compose -f infra/docker-compose.yml exec -T backend python -m app.seeds -
 docker compose -f infra/docker-compose.yml exec -T backend python -m app.cli bootstrap-owner \
   --email owner@example.com --password Password123 --username owner --display-name Owner
 ```
-
 
 Seed profiles:
 
@@ -229,8 +229,8 @@ make coverage-codacy
 
 ## Codecov (GitHub App + uploads)
 
-- Install the Codecov GitHub App for this repository via https://github.com/settings/installations/110555522 (select the Prekzursil org and the `AdrianaArt` repo).
-- Ensure the repo is present in the Prekzursil Codecov org at https://app.codecov.io/gh/Prekzursil; if it is missing, add the repository from the dashboard and grab the repo upload token.
+- Install the Codecov GitHub App for this repository via <https://github.com/settings/installations/110555522> (select the Prekzursil org and the `AdrianaArt` repo).
+- Ensure the repo is present in the Prekzursil Codecov org at <https://app.codecov.io/gh/Prekzursil>; if it is missing, add the repository from the dashboard and grab the repo upload token.
 - Add a GitHub Actions secret `CODECOV_TOKEN` (org- or repo-level). The token is required by `.github/workflows/codecov-analytics.yml` for coverage, test-results, and bundle analysis uploads; policy is in `codecov.yml`.
 
 ## Sameday mirror first sync (ops runbook)
@@ -325,18 +325,22 @@ Before tagging a release, run through this hygiene checklist to ensure productio
 ### Pre-Release Verification
 
 1. **Run full verification suite:**
+
    ```bash
    make verify
    ```
+
    This executes both `make lint` and `make test` across backend and frontend.
 
 2. **Check environment profile status:**
+
    ```bash
    make env-status
    make env-doctor
    ```
 
 3. **Validate Docker stack health:**
+
    ```bash
    make docker-up
    make compose-smoke
@@ -353,11 +357,13 @@ Before tagging a release, run through this hygiene checklist to ensure productio
    - Check Clarity config if enabled (`FRONTEND_CLARITY_PROJECT_ID`)
 
 6. **Database migration check:**
+
    ```bash
    cd backend && alembic check
    ```
 
 7. **Test payment provider integration (if changed):**
+
    ```bash
    PAYMENTS_PROVIDER=providers PYTHONPATH=backend pytest backend/tests/test_checkout_flow.py
    ```
@@ -458,7 +464,7 @@ Quick usage:
 
 Roadmap board:
 
-- `AdrianaArt Roadmap` — https://github.com/users/Prekzursil/projects/2
+- `AdrianaArt Roadmap` — <https://github.com/users/Prekzursil/projects/2>
 - Structure: `Status` + `Roadmap Lane` (`Now`, `Next`, `Later`) with draft-first roadmap items.
 
 See `docs/REPOSITORY_POLICY.md` for required CI checks and merge expectations.

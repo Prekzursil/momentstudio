@@ -1,10 +1,12 @@
 import { inject } from '@angular/core';
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpErrorResponse, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { from, of, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 import { appConfig } from './app-config';
 import { HttpErrorBusService } from './http-error-bus.service';
+
+const REFRESH_EXCLUDED_PATHS = ['/auth/refresh', '/auth/login', '/auth/register', '/auth/logout'];
 
 function getApiBaseUrl(): string {
   return appConfig.apiBaseUrl.replace(/\/$/, '');
@@ -56,6 +58,150 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
   return of('');
 }
 
+const hasSession = (auth: AuthService): boolean => Boolean(auth.getRefreshToken() || auth.getAccessToken() || auth.user());
+
+const isRefreshExcludedRequest = (url: string, apiBase: string): boolean => {
+  if (url.startsWith(`${apiBase}/auth/google/`)) {
+    return true;
+  }
+  return REFRESH_EXCLUDED_PATHS.some((path) => url === `${apiBase}${path}`);
+};
+
+const canAttemptRefresh = (err: unknown, req: HttpRequest<unknown>, apiBase: string, isApiRequest: boolean, hasAuthHeader: boolean, auth: AuthService): boolean => {
+  if (!(err instanceof HttpErrorResponse)) {
+    return false;
+  }
+  if (err.status !== 401 || !isApiRequest || hasAuthHeader) {
+    return false;
+  }
+  if (isRefreshExcludedRequest(req.url, apiBase)) {
+    return false;
+  }
+  return hasSession(auth);
+};
+
+const retryAfterRefresh = (req: HttpRequest<unknown>, next: HttpHandlerFn, auth: AuthService, err: HttpErrorResponse) => {
+  return auth.refresh({ silent: true }).pipe(
+    switchMap((tokens) => {
+      if (!tokens) {
+        auth.expireSession();
+        return throwError(() => err);
+      }
+
+      const nextToken = auth.getAccessToken();
+      const retryReq = req.clone({
+        withCredentials: true,
+        setHeaders: nextToken ? { Authorization: `Bearer ${nextToken}` } : {}
+      });
+      return next(retryReq);
+    }),
+    catchError(() => throwError(() => err))
+  );
+};
+
+const canAttemptStepUpRetry = (err: unknown, req: HttpRequest<unknown>, apiBase: string, isApiRequest: boolean, silent: boolean, auth: AuthService): boolean => {
+  if (!(err instanceof HttpErrorResponse)) {
+    return false;
+  }
+  if (err.status !== 403 || !isApiRequest || silent) {
+    return false;
+  }
+  if (req.url === `${apiBase}/auth/step-up`) {
+    return false;
+  }
+  if (req.headers.has('X-Step-Up-Retry')) {
+    return false;
+  }
+  return hasSession(auth);
+};
+
+const buildAuthHeaders = (req: HttpRequest<unknown>, auth: AuthService, hasAuthHeader: boolean): Record<string, string> => {
+  const token = auth.getAccessToken();
+  const stepUpToken = auth.getStepUpToken();
+  const hasStepUpHeader = req.headers.has('X-Admin-Step-Up');
+  const setHeaders: Record<string, string> = {};
+
+  if (token && !hasAuthHeader) {
+    setHeaders['Authorization'] = `Bearer ${token}`;
+  }
+  if (stepUpToken && !hasStepUpHeader) {
+    setHeaders['X-Admin-Step-Up'] = stepUpToken;
+  }
+  return setHeaders;
+};
+
+const retryWithStepUp = (req: HttpRequest<unknown>, next: HttpHandlerFn, auth: AuthService, hasAuthHeader: boolean, err: HttpErrorResponse) => {
+  const syncErrorCode = extractErrorCode(err);
+  const code$ = syncErrorCode ? of(syncErrorCode) : extractErrorCodeFromBinary(err);
+
+  return code$.pipe(
+    switchMap((errorCode) => {
+      if (String(errorCode || '').toLowerCase() !== 'step_up_required') {
+        return throwError(() => err);
+      }
+
+      auth.clearStepUpToken();
+      return auth.ensureStepUp({ silent: true }).pipe(
+        switchMap((nextStepUp) => {
+          if (!nextStepUp) {
+            return throwError(() => err);
+          }
+
+          const nextToken = auth.getAccessToken();
+          const retryHeaders: Record<string, string> = {
+            'X-Admin-Step-Up': nextStepUp,
+            'X-Step-Up-Retry': '1'
+          };
+          if (nextToken && !hasAuthHeader) {
+            retryHeaders['Authorization'] = `Bearer ${nextToken}`;
+          }
+          const retryReq = req.clone({
+            withCredentials: true,
+            setHeaders: retryHeaders
+          });
+          return next(retryReq);
+        }),
+        catchError(() => throwError(() => err))
+      );
+    })
+  );
+};
+
+const emitGlobalHttpError = (err: unknown, silent: boolean, errors: HttpErrorBusService, req: HttpRequest<unknown>): void => {
+  if (silent || !(err instanceof HttpErrorResponse)) {
+    return;
+  }
+
+  const status = err.status ?? 0;
+  if (status === 0 || (status >= 500 && status < 600)) {
+    errors.emit({ status, method: req.method, url: req.url });
+  }
+};
+
+type InterceptorErrorContext = {
+  req: HttpRequest<unknown>;
+  next: HttpHandlerFn;
+  auth: AuthService;
+  errors: HttpErrorBusService;
+  apiBase: string;
+  isApiRequest: boolean;
+  hasAuthHeader: boolean;
+  silent: boolean;
+};
+
+const handleInterceptorError = (err: unknown, context: InterceptorErrorContext) => {
+  const { req, next, auth, errors, apiBase, isApiRequest, hasAuthHeader, silent } = context;
+  if (canAttemptRefresh(err, req, apiBase, isApiRequest, hasAuthHeader, auth)) {
+    return retryAfterRefresh(req, next, auth, err as HttpErrorResponse);
+  }
+  if (canAttemptStepUpRetry(err, req, apiBase, isApiRequest, silent, auth)) {
+    return retryWithStepUp(req, next, auth, hasAuthHeader, err as HttpErrorResponse);
+  }
+
+  emitGlobalHttpError(err, silent, errors, req);
+  return throwError(() => err);
+};
+
 export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const apiBase = getApiBaseUrl();
   const absoluteApiBase =
@@ -76,17 +222,8 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
 
   const auth = inject(AuthService);
   const errors = inject(HttpErrorBusService);
-  const token = auth.getAccessToken();
-  const stepUpToken = auth.getStepUpToken();
   const hasAuthHeader = req.headers.has('Authorization');
-  const hasStepUpHeader = req.headers.has('X-Admin-Step-Up');
-  const setHeaders: Record<string, string> = {};
-  if (token && !hasAuthHeader) {
-    setHeaders['Authorization'] = `Bearer ${token}`;
-  }
-  if (stepUpToken && !hasStepUpHeader) {
-    setHeaders['X-Admin-Step-Up'] = stepUpToken;
-  }
+  const setHeaders = buildAuthHeaders(req, auth, hasAuthHeader);
   const authReq = req.clone({
     withCredentials: true,
     // Allow callers to explicitly set Authorization (e.g. Google completion token)
@@ -95,90 +232,17 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   });
 
   return next(authReq).pipe(
-    catchError((err) => {
-      const isRefresh = req.url === `${apiBase}/auth/refresh`;
-      const isLogin = req.url === `${apiBase}/auth/login`;
-      const isRegister = req.url === `${apiBase}/auth/register`;
-      const isLogout = req.url === `${apiBase}/auth/logout`;
-      const isGoogleFlow = req.url.startsWith(`${apiBase}/auth/google/`);
-      const isStepUp = req.url === `${apiBase}/auth/step-up`;
-
-      if (
-        err instanceof HttpErrorResponse &&
-        err.status === 401 &&
-        isApiRequest &&
-        !hasAuthHeader &&
-        !isRefresh &&
-        !isLogin &&
-        !isRegister &&
-        !isLogout &&
-        !isGoogleFlow &&
-        (auth.getRefreshToken() || auth.getAccessToken() || auth.user())
-      ) {
-        return auth.refresh({ silent: true }).pipe(
-          switchMap((tokens) => {
-            if (!tokens) {
-              auth.expireSession();
-              return throwError(() => err);
-            }
-            const nextToken = auth.getAccessToken();
-            const retryReq = req.clone({
-              withCredentials: true,
-              setHeaders: nextToken ? { Authorization: `Bearer ${nextToken}` } : {}
-              });
-            return next(retryReq);
-          }),
-          catchError(() => throwError(() => err))
-        );
-      }
-
-      const canAttemptStepUpRetry =
-        err instanceof HttpErrorResponse && err.status === 403 && isApiRequest && !isStepUp && !silent && !req.headers.has('X-Step-Up-Retry');
-
-      if (canAttemptStepUpRetry && (auth.getRefreshToken() || auth.getAccessToken() || auth.user())) {
-        const syncErrorCode = extractErrorCode(err);
-        const code$ = syncErrorCode ? of(syncErrorCode) : extractErrorCodeFromBinary(err);
-        return code$.pipe(
-          switchMap((errorCode) => {
-            if (String(errorCode || '').toLowerCase() !== 'step_up_required') {
-              return throwError(() => err);
-            }
-
-            auth.clearStepUpToken();
-            return auth.ensureStepUp({ silent: true }).pipe(
-              switchMap((nextStepUp) => {
-                if (!nextStepUp) {
-                  return throwError(() => err);
-                }
-                const nextToken = auth.getAccessToken();
-                const retryHeaders: Record<string, string> = { 'X-Admin-Step-Up': nextStepUp, 'X-Step-Up-Retry': '1' };
-                if (nextToken && !hasAuthHeader) {
-                  retryHeaders['Authorization'] = `Bearer ${nextToken}`;
-                }
-                const retryReq = req.clone({
-                  withCredentials: true,
-                  setHeaders: retryHeaders
-                });
-                return next(retryReq);
-              }),
-              catchError(() => throwError(() => err))
-            );
-          })
-        );
-      }
-
-      // Global, low-noise error surface:
-      // - only network failures (status 0) and 5xx
-      // - honor X-Silent to avoid spamming background calls
-      if (!silent && err instanceof HttpErrorResponse) {
-        const status = err.status ?? 0;
-        if (status === 0 || (status >= 500 && status < 600)) {
-          errors.emit({ status, method: req.method, url: req.url });
-        }
-      }
-
-      return throwError(() => err);
-    })
+    catchError((err) =>
+      handleInterceptorError(err, {
+        req,
+        next,
+        auth,
+        errors,
+        apiBase,
+        isApiRequest,
+        hasAuthHeader,
+        silent
+      })
+    )
   );
 };
-

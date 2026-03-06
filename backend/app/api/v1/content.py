@@ -102,19 +102,24 @@ def _is_hidden(block: ContentBlock) -> bool:
     return bool(meta.get("hidden")) if isinstance(meta, dict) else False
 
 
+def _normalize_image_tag(raw: str) -> str | None:
+    value = str(raw or "").strip().lower()
+    if not value:
+        return None
+    value = value.replace(" ", "-")
+    value = "".join(ch for ch in value if ch.isalnum() or ch in ("-", "_"))
+    value = value.strip("-_")
+    if not value or len(value) > 64:
+        return None
+    return value
+
+
 def _normalize_image_tags(tags: list[str]) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
     for raw in tags or []:
-        value = str(raw or "").strip().lower()
-        if not value:
-            continue
-        value = value.replace(" ", "-")
-        value = "".join(ch for ch in value if ch.isalnum() or ch in ("-", "_"))
-        value = value.strip("-_")
-        if not value or len(value) > 64:
-            continue
-        if value in seen:
+        value = _normalize_image_tag(raw)
+        if not value or value in seen:
             continue
         seen.add(value)
         normalized.append(value)
@@ -161,6 +166,533 @@ def _redirect_chain_error(from_key: str, redirects: dict[str, str], *, max_hops:
             return None
         current = nxt
     return "too_deep"
+
+
+def _build_pagination_meta(total_items: int, page: int, limit: int) -> dict[str, int]:
+    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    return {"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit}
+
+
+def _normalize_scheduling_window_start(window_start: datetime | None, now: datetime) -> datetime:
+    start = window_start or now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return start.astimezone(timezone.utc)
+
+
+def _build_scheduling_filters(now: datetime, window_end: datetime) -> tuple[list, object]:
+    key_filter = or_(
+        ContentBlock.key.like("page.%"),
+        ContentBlock.key.like("blog.%"),
+        ContentBlock.key.like("site.%"),
+    )
+    publish_filter = and_(
+        ContentBlock.published_at.is_not(None),
+        ContentBlock.published_at >= now,
+        ContentBlock.published_at < window_end,
+    )
+    unpublish_filter = and_(
+        ContentBlock.published_until.is_not(None),
+        ContentBlock.published_until >= now,
+        ContentBlock.published_until < window_end,
+    )
+    filters = [
+        key_filter,
+        ContentBlock.status == ContentStatus.published,
+        or_(publish_filter, unpublish_filter),
+    ]
+    publish_event = case((publish_filter, ContentBlock.published_at), else_=None)
+    unpublish_event = case((unpublish_filter, ContentBlock.published_until), else_=None)
+    next_event = case(
+        (publish_event.is_(None), unpublish_event),
+        (unpublish_event.is_(None), publish_event),
+        (publish_event <= unpublish_event, publish_event),
+        else_=unpublish_event,
+    )
+    return filters, next_event
+
+
+def _to_scheduling_item(block: ContentBlock) -> ContentSchedulingItem:
+    return ContentSchedulingItem(
+        key=block.key,
+        title=block.title,
+        status=block.status,
+        lang=block.lang,
+        published_at=block.published_at,
+        published_until=block.published_until,
+        updated_at=block.updated_at,
+    )
+
+
+def _build_redirect_search_filters(q: str | None) -> list:
+    if not q:
+        return []
+    needle = f"%{q.strip()}%"
+    return [or_(ContentRedirect.from_key.ilike(needle), ContentRedirect.to_key.ilike(needle))]
+
+
+def _serialize_redirect(
+    row: ContentRedirect,
+    *,
+    target_exists: bool,
+    chain_error: str | None,
+) -> ContentRedirectRead:
+    return ContentRedirectRead(
+        id=row.id,
+        from_key=row.from_key,
+        to_key=row.to_key,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        target_exists=target_exists,
+        chain_error=chain_error,
+    )
+
+
+def _parse_redirect_upsert_payload_or_400(payload: ContentRedirectUpsertRequest) -> tuple[str, str]:
+    from_key = _redirect_display_value_to_key((payload.from_key or "").strip())
+    to_key = _redirect_display_value_to_key((payload.to_key or "").strip())
+    if not from_key or not to_key or from_key == to_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid redirect")
+    return from_key, to_key
+
+
+def _raise_for_redirect_chain_error(chain_error: str | None) -> None:
+    if chain_error == "loop":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect loop detected")
+    if chain_error == "too_deep":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect chain too deep")
+
+
+def _is_blank_redirect_import_row(row: list[str]) -> bool:
+    return not row or all(not str(cell or "").strip() for cell in row)
+
+
+def _is_comment_redirect_import_row(row: list[str]) -> bool:
+    return bool(row) and str(row[0] or "").lstrip().startswith("#")
+
+
+def _is_header_redirect_import_row(line: int, row: list[str]) -> bool:
+    if line != 1 or len(row) < 2:
+        return False
+    first = str(row[0] or "").strip().lower()
+    second = str(row[1] or "").strip().lower()
+    return first in {"from", "from_key"} and second in {"to", "to_key"}
+
+
+def _should_skip_redirect_import_row(line: int, row: list[str]) -> bool:
+    return (
+        _is_blank_redirect_import_row(row)
+        or _is_comment_redirect_import_row(row)
+        or _is_header_redirect_import_row(line, row)
+    )
+
+
+def _csv_row_value(row: list[str], index: int) -> str | None:
+    if index >= len(row):
+        return None
+    value = row[index]
+    if value is None:
+        return None
+    return str(value)
+
+
+def _stripped_csv_row_value(row: list[str], index: int) -> str:
+    value = _csv_row_value(row, index)
+    if value is None:
+        return ""
+    return value.strip()
+
+
+def _none_if_empty(value: str) -> str | None:
+    if value:
+        return value
+    return None
+
+
+def _extract_redirect_import_pair(line: int, row: list[str]) -> tuple[str, str] | ContentRedirectImportError:
+    if len(row) < 2:
+        return ContentRedirectImportError(
+            line=line,
+            from_value=_csv_row_value(row, 0),
+            error="Missing columns",
+        )
+    from_value = _stripped_csv_row_value(row, 0)
+    to_value = _stripped_csv_row_value(row, 1)
+    if not from_value:
+        return ContentRedirectImportError(
+            line=line,
+            from_value=None,
+            to_value=_none_if_empty(to_value),
+            error="Missing from/to",
+        )
+    if not to_value:
+        return ContentRedirectImportError(
+            line=line,
+            from_value=_none_if_empty(from_value),
+            to_value=None,
+            error="Missing from/to",
+        )
+    return from_value, to_value
+
+
+def _validate_redirect_import_pair(
+    line: int,
+    from_value: str,
+    to_value: str,
+) -> tuple[str, str] | ContentRedirectImportError:
+    from_key = _redirect_display_value_to_key(from_value)
+    to_key = _redirect_display_value_to_key(to_value)
+    if not from_key or not to_key:
+        return ContentRedirectImportError(
+            line=line,
+            from_value=from_value,
+            to_value=to_value,
+            error="Invalid redirect value",
+        )
+    if len(from_key) > 120 or len(to_key) > 120:
+        return ContentRedirectImportError(
+            line=line,
+            from_value=from_value,
+            to_value=to_value,
+            error="Key too long",
+        )
+    if from_key == to_key:
+        return ContentRedirectImportError(
+            line=line,
+            from_value=from_value,
+            to_value=to_value,
+            error="from and to must differ",
+        )
+    return from_key, to_key
+
+
+def _parse_redirect_import_values(
+    line: int,
+    row: list[str],
+) -> tuple[str, str] | ContentRedirectImportError | None:
+    if _should_skip_redirect_import_row(line, row):
+        return None
+    pair_or_error = _extract_redirect_import_pair(line, row)
+    if isinstance(pair_or_error, ContentRedirectImportError):
+        return pair_or_error
+    from_value, to_value = pair_or_error
+    return _validate_redirect_import_pair(line, from_value, to_value)
+
+
+def _collect_redirect_import_rows(text: str) -> tuple[list[tuple[int, str, str]], list[ContentRedirectImportError]]:
+    rows: list[tuple[int, str, str]] = []
+    errors: list[ContentRedirectImportError] = []
+    for line, row in enumerate(csv.reader(StringIO(text)), start=1):
+        parsed = _parse_redirect_import_values(line, row)
+        if parsed is None:
+            continue
+        if isinstance(parsed, ContentRedirectImportError):
+            errors.append(parsed)
+            continue
+        from_key, to_key = parsed
+        rows.append((line, from_key, to_key))
+    return rows, errors
+
+
+def _build_redirect_map(
+    existing_rows: list[tuple[str, str]],
+    imported_rows: list[tuple[int, str, str]],
+) -> dict[str, str]:
+    redirect_map = {from_key: to_key for from_key, to_key in existing_rows if from_key and to_key}
+    for _, from_key, to_key in imported_rows:
+        redirect_map[from_key] = to_key
+    return redirect_map
+
+
+def _raise_for_redirect_import_chain_errors(redirect_map: dict[str, str]) -> None:
+    loop_keys: set[str] = set()
+    too_deep_keys: set[str] = set()
+    for from_key in redirect_map.keys():
+        chain_error = _redirect_chain_error(from_key, redirect_map)
+        if chain_error == "loop":
+            loop_keys.add(from_key)
+        elif chain_error == "too_deep":
+            too_deep_keys.add(from_key)
+    if not loop_keys and not too_deep_keys:
+        return
+
+    details: list[str] = []
+    if loop_keys:
+        sample = ", ".join(sorted(loop_keys)[:5])
+        details.append(f"Redirect loop detected (e.g. {sample})")
+    if too_deep_keys:
+        sample = ", ".join(sorted(too_deep_keys)[:5])
+        details.append(f"Redirect chain too deep (e.g. {sample})")
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="; ".join(details))
+
+
+def _dedupe_redirect_import_rows(rows: list[tuple[int, str, str]]) -> dict[str, str]:
+    unique_rows: dict[str, str] = {}
+    for _, from_key, to_key in rows:
+        unique_rows[from_key] = to_key
+    return unique_rows
+
+
+async def _load_redirect_map(session: AsyncSession) -> dict[str, str]:
+    rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
+    return {from_key: to_key for from_key, to_key in rows if from_key and to_key}
+
+
+async def _load_redirect_target_keys(session: AsyncSession, redirects: list[ContentRedirect]) -> set[str]:
+    to_keys = {row.to_key for row in redirects}
+    if not to_keys:
+        return set()
+    result = await session.execute(select(ContentBlock.key).where(ContentBlock.key.in_(to_keys)))
+    return set(result.scalars().all())
+
+
+async def _assert_redirect_target_exists(session: AsyncSession, to_key: str) -> None:
+    if await session.scalar(select(ContentBlock.key).where(ContentBlock.key == to_key)):
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect target not found")
+
+
+async def _apply_redirect_import_changes(session: AsyncSession, rows: dict[str, str]) -> tuple[int, int, int]:
+    created = 0
+    updated = 0
+    skipped = 0
+    existing = (await session.execute(select(ContentRedirect).where(ContentRedirect.from_key.in_(list(rows.keys()))))).scalars().all()
+    existing_by_key = {record.from_key: record for record in existing}
+
+    for from_key, to_key in rows.items():
+        current = existing_by_key.get(from_key)
+        if not current:
+            session.add(ContentRedirect(from_key=from_key, to_key=to_key))
+            created += 1
+            continue
+        if current.to_key == to_key:
+            skipped += 1
+            continue
+        current.to_key = to_key
+        session.add(current)
+        updated += 1
+    return created, updated, skipped
+
+
+def _validate_content_image_date_range(created_from: datetime | None, created_to: datetime | None) -> None:
+    if created_from and created_to and created_from > created_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+
+
+def _build_content_image_filters(
+    *,
+    key: str | None,
+    q: str | None,
+    tag: str | None,
+    created_from: datetime | None,
+    created_to: datetime | None,
+) -> tuple[list, str]:
+    _validate_content_image_date_range(created_from, created_to)
+    filters = []
+    if key:
+        filters.append(ContentBlock.key == key)
+    if q:
+        needle = f"%{q.strip()}%"
+        filters.append(
+            or_(
+                ContentBlock.key.ilike(needle),
+                ContentImage.url.ilike(needle),
+                ContentImage.alt_text.ilike(needle),
+            )
+        )
+    tag_value = (tag or "").strip().lower()
+    if tag_value:
+        filters.append(ContentImageTag.tag == tag_value)
+    if created_from:
+        filters.append(ContentImage.created_at >= created_from)
+    if created_to:
+        filters.append(ContentImage.created_at <= created_to)
+    return filters, tag_value
+
+
+def _build_content_image_count_query(tag_value: str):
+    if not tag_value:
+        return select(func.count()).select_from(ContentImage).join(ContentBlock)
+    return select(func.count(func.distinct(ContentImage.id))).select_from(ContentImage).join(ContentBlock).join(
+        ContentImageTag
+    )
+
+
+def _content_image_order_clauses(sort: str) -> list:
+    order_map = {
+        "newest": [ContentImage.created_at.desc(), ContentImage.id.desc()],
+        "oldest": [ContentImage.created_at.asc(), ContentImage.id.asc()],
+        "key_asc": [ContentBlock.key.asc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
+        "key_desc": [ContentBlock.key.desc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
+    }
+    return order_map.get(sort, order_map["newest"])
+
+
+def _build_content_image_query(
+    *,
+    filters: list,
+    tag_value: str,
+    order_clauses: list,
+    offset: int,
+    limit: int,
+):
+    query = (
+        select(ContentImage, ContentBlock.key)
+        .join(ContentBlock)
+        .where(*filters)
+        .order_by(*order_clauses)
+        .offset(offset)
+        .limit(limit)
+    )
+    if tag_value:
+        return query.join(ContentImageTag)
+    return query
+
+
+async def _load_content_image_tag_map(session: AsyncSession, image_ids: list[UUID]) -> dict[UUID, list[str]]:
+    if not image_ids:
+        return {}
+    result = await session.execute(
+        select(ContentImageTag.content_image_id, ContentImageTag.tag).where(ContentImageTag.content_image_id.in_(image_ids))
+    )
+    tag_map: dict[UUID, list[str]] = {}
+    for image_id, value in result.all():
+        tag_map.setdefault(image_id, []).append(value)
+    for image_id, values in tag_map.items():
+        tag_map[image_id] = sorted(set(values))
+    return tag_map
+
+
+def _serialize_content_image_asset(
+    image: ContentImage,
+    *,
+    content_key: str,
+    tags: list[str],
+) -> ContentImageAssetRead:
+    return ContentImageAssetRead(
+        id=image.id,
+        root_image_id=getattr(image, "root_image_id", None),
+        source_image_id=getattr(image, "source_image_id", None),
+        url=image.url,
+        alt_text=image.alt_text,
+        sort_order=image.sort_order,
+        focal_x=getattr(image, "focal_x", 50),
+        focal_y=getattr(image, "focal_y", 50),
+        created_at=image.created_at,
+        content_key=content_key,
+        tags=tags,
+    )
+
+
+def _parse_optional_datetime_range(
+    created_from: str | None,
+    created_to: str | None,
+) -> tuple[datetime | None, datetime | None]:
+    parsed_from = None
+    parsed_to = None
+    try:
+        if created_from:
+            parsed_from = datetime.fromisoformat(created_from)
+        if created_to:
+            parsed_to = datetime.fromisoformat(created_to)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters") from exc
+    if parsed_from and parsed_to and parsed_from > parsed_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+    return parsed_from, parsed_to
+
+
+def _validate_public_page_access(block: ContentBlock, user: User | None) -> None:
+    block_key = getattr(block, "key", "")
+    if not block_key.startswith("page."):
+        return
+    if _is_hidden(block):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+    if _requires_auth(block) and not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+
+async def _serialize_content_block(block: ContentBlock) -> ContentBlockRead:
+    if getattr(block, "key", "") != "site.social":
+        return block
+    hydrated_meta = await social_thumbnails.hydrate_site_social_meta(block.meta if isinstance(block.meta, dict) else None)
+    out = ContentBlockRead.model_validate(block)
+    out.meta = hydrated_meta
+    return out
+
+
+async def _list_media_assets_or_400(
+    session: AsyncSession,
+    *,
+    q: str,
+    tag: str,
+    asset_type: str,
+    status_filter: str,
+    visibility: str,
+    include_trashed: bool,
+    created_from: datetime | None,
+    created_to: datetime | None,
+    page: int,
+    limit: int,
+    sort: str,
+) -> tuple[list, dict]:
+    try:
+        return await media_dam.list_assets(
+            session,
+            media_dam.MediaListFilters(
+                q=q,
+                tag=tag,
+                asset_type=asset_type,
+                status=status_filter,
+                visibility=visibility,
+                include_trashed=include_trashed,
+                created_from=created_from,
+                created_to=created_to,
+                page=page,
+                limit=limit,
+                sort=sort,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+async def _list_media_jobs_or_400(
+    session: AsyncSession,
+    *,
+    page: int,
+    limit: int,
+    status_filter: str,
+    job_type: str,
+    asset_id: UUID | None,
+    triage_state: str,
+    assigned_to_user_id: UUID | None,
+    tag: str,
+    sla_breached: bool,
+    dead_letter_only: bool,
+    created_from: datetime | None,
+    created_to: datetime | None,
+) -> tuple[list, dict]:
+    try:
+        return await media_dam.list_jobs(
+            session,
+            media_dam.MediaJobListFilters(
+                page=page,
+                limit=limit,
+                status=status_filter,
+                job_type=job_type,
+                asset_id=asset_id,
+                triage_state=triage_state,
+                assigned_to_user_id=assigned_to_user_id,
+                tag=tag,
+                sla_breached=sla_breached,
+                dead_letter_only=dead_letter_only,
+                created_from=created_from,
+                created_to=created_to,
+            ),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/pages/{slug}", response_model=ContentBlockRead)
@@ -241,16 +773,8 @@ async def get_content(
     block = await content_service.get_published_by_key_following_redirects(session, key, lang=lang)
     if not block:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
-    if getattr(block, "key", "").startswith("page.") and _is_hidden(block):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
-    if getattr(block, "key", "").startswith("page.") and _requires_auth(block) and not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    if getattr(block, "key", "") == "site.social":
-        hydrated_meta = await social_thumbnails.hydrate_site_social_meta(block.meta if isinstance(block.meta, dict) else None)
-        out = ContentBlockRead.model_validate(block)
-        out.meta = hydrated_meta
-        return out
-    return block
+    _validate_public_page_access(block, user)
+    return await _serialize_content_block(block)
 
 
 @router.get("/home/preview", response_model=HomePreviewResponse)
@@ -323,49 +847,13 @@ async def admin_list_scheduling(
     _: User = Depends(require_admin_section("content")),
 ) -> ContentSchedulingListResponse:
     now = datetime.now(timezone.utc)
-    start = window_start
-    if start is None:
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    if start.tzinfo is None:
-        start = start.replace(tzinfo=timezone.utc)
-    start = start.astimezone(timezone.utc)
+    start = _normalize_scheduling_window_start(window_start, now)
     window_end = start + timedelta(days=window_days)
-
-    key_filter = or_(
-        ContentBlock.key.like("page.%"),
-        ContentBlock.key.like("blog.%"),
-        ContentBlock.key.like("site.%"),
-    )
-
-    publish_filter = and_(
-        ContentBlock.published_at.is_not(None),
-        ContentBlock.published_at >= now,
-        ContentBlock.published_at < window_end,
-    )
-    unpublish_filter = and_(
-        ContentBlock.published_until.is_not(None),
-        ContentBlock.published_until >= now,
-        ContentBlock.published_until < window_end,
-    )
-
-    filters = [
-        key_filter,
-        ContentBlock.status == ContentStatus.published,
-        or_(publish_filter, unpublish_filter),
-    ]
-
-    publish_event = case((publish_filter, ContentBlock.published_at), else_=None)
-    unpublish_event = case((unpublish_filter, ContentBlock.published_until), else_=None)
-    next_event = case(
-        (publish_event.is_(None), unpublish_event),
-        (unpublish_event.is_(None), publish_event),
-        (publish_event <= unpublish_event, publish_event),
-        else_=unpublish_event,
-    )
+    filters, next_event = _build_scheduling_filters(now, window_end)
 
     total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
     total_items = int(total or 0)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    meta = _build_pagination_meta(total_items, page, limit)
     offset = (page - 1) * limit
 
     result = await session.execute(
@@ -377,23 +865,8 @@ async def admin_list_scheduling(
     )
     blocks = list(result.scalars().all())
 
-    items = [
-        ContentSchedulingItem(
-            key=b.key,
-            title=b.title,
-            status=b.status,
-            lang=b.lang,
-            published_at=b.published_at,
-            published_until=b.published_until,
-            updated_at=b.updated_at,
-        )
-        for b in blocks
-    ]
-
-    return ContentSchedulingListResponse(
-        items=items,
-        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
-    )
+    items = [_to_scheduling_item(block) for block in blocks]
+    return ContentSchedulingListResponse(items=items, meta=meta)
 
 
 @router.get("/admin/redirects", response_model=ContentRedirectListResponse)
@@ -404,14 +877,10 @@ async def admin_list_redirects(
     limit: int = Query(default=25, ge=1, le=100),
     _: User = Depends(require_admin_section("content")),
 ) -> ContentRedirectListResponse:
-    filters = []
-    if q:
-        needle = f"%{q.strip()}%"
-        filters.append(or_(ContentRedirect.from_key.ilike(needle), ContentRedirect.to_key.ilike(needle)))
-
+    filters = _build_redirect_search_filters(q)
     total = await session.scalar(select(func.count()).select_from(ContentRedirect).where(*filters))
     total_items = int(total or 0)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    meta = _build_pagination_meta(total_items, page, limit)
     offset = (page - 1) * limit
 
     result = await session.execute(
@@ -422,36 +891,17 @@ async def admin_list_redirects(
         .limit(limit)
     )
     redirects = list(result.scalars().all())
-
-    to_keys = {r.to_key for r in redirects}
-    existing_targets: set[str] = set()
-    if to_keys:
-        existing_targets = set(
-            (await session.execute(select(ContentBlock.key).where(ContentBlock.key.in_(to_keys)))).scalars().all()
+    existing_targets = await _load_redirect_target_keys(session, redirects)
+    redirect_map = await _load_redirect_map(session)
+    items = [
+        _serialize_redirect(
+            redirect,
+            target_exists=redirect.to_key in existing_targets,
+            chain_error=_redirect_chain_error(redirect.from_key, redirect_map),
         )
-
-    redirect_map_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
-    redirect_map = {from_key: to_key for from_key, to_key in redirect_map_rows if from_key and to_key}
-
-    items: list[ContentRedirectRead] = []
-    for r in redirects:
-        chain_error = _redirect_chain_error(r.from_key, redirect_map)
-        items.append(
-            ContentRedirectRead(
-                id=r.id,
-                from_key=r.from_key,
-                to_key=r.to_key,
-                created_at=r.created_at,
-                updated_at=r.updated_at,
-                target_exists=r.to_key in existing_targets,
-                chain_error=chain_error,
-            )
-        )
-
-    return ContentRedirectListResponse(
-        items=items,
-        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
-    )
+        for redirect in redirects
+    ]
+    return ContentRedirectListResponse(items=items, meta=meta)
 
 
 @router.post("/admin/redirects", response_model=ContentRedirectRead)
@@ -460,25 +910,11 @@ async def admin_upsert_redirect(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("content")),
 ) -> ContentRedirectRead:
-    from_key_raw = (payload.from_key or "").strip()
-    to_key_raw = (payload.to_key or "").strip()
-    from_key = _redirect_display_value_to_key(from_key_raw)
-    to_key = _redirect_display_value_to_key(to_key_raw)
-    if not from_key or not to_key or from_key == to_key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid redirect")
-
-    target = await session.scalar(select(ContentBlock.key).where(ContentBlock.key == to_key))
-    if not target:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect target not found")
-
-    redirect_map_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
-    redirect_map = {fk: tk for fk, tk in redirect_map_rows if fk and tk}
+    from_key, to_key = _parse_redirect_upsert_payload_or_400(payload)
+    await _assert_redirect_target_exists(session, to_key)
+    redirect_map = await _load_redirect_map(session)
     redirect_map[from_key] = to_key
-    chain_error = _redirect_chain_error(from_key, redirect_map)
-    if chain_error == "loop":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect loop detected")
-    if chain_error == "too_deep":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Redirect chain too deep")
+    _raise_for_redirect_chain_error(_redirect_chain_error(from_key, redirect_map))
 
     existing = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == from_key))
     if existing:
@@ -486,29 +922,13 @@ async def admin_upsert_redirect(
         session.add(existing)
         await session.commit()
         await session.refresh(existing)
-        return ContentRedirectRead(
-            id=existing.id,
-            from_key=existing.from_key,
-            to_key=existing.to_key,
-            created_at=existing.created_at,
-            updated_at=existing.updated_at,
-            target_exists=True,
-            chain_error=None,
-        )
+        return _serialize_redirect(existing, target_exists=True, chain_error=None)
 
     redirect = ContentRedirect(from_key=from_key, to_key=to_key)
     session.add(redirect)
     await session.commit()
     await session.refresh(redirect)
-    return ContentRedirectRead(
-        id=redirect.id,
-        from_key=redirect.from_key,
-        to_key=redirect.to_key,
-        created_at=redirect.created_at,
-        updated_at=redirect.updated_at,
-        target_exists=True,
-        chain_error=None,
-    )
+    return _serialize_redirect(redirect, target_exists=True, chain_error=None)
 
 
 @router.get("/admin/redirects/export")
@@ -558,96 +978,16 @@ async def admin_import_redirects(
 ) -> ContentRedirectImportResult:
     raw = await file.read()
     text = raw.decode("utf-8-sig", errors="replace")
-
-    rows: list[tuple[int, str, str]] = []
-    errors: list[ContentRedirectImportError] = []
-
-    reader = csv.reader(StringIO(text))
-    line = 0
-    for row in reader:
-        line += 1
-        if not row or all(not str(cell or "").strip() for cell in row):
-            continue
-        if row and str(row[0] or "").lstrip().startswith("#"):
-            continue
-        if line == 1 and len(row) >= 2:
-            first = str(row[0] or "").strip().lower()
-            second = str(row[1] or "").strip().lower()
-            if first in {"from", "from_key"} and second in {"to", "to_key"}:
-                continue
-        if len(row) < 2:
-            errors.append(ContentRedirectImportError(line=line, from_value=row[0] if row else None, error="Missing columns"))
-            continue
-        from_value = str(row[0] or "").strip()
-        to_value = str(row[1] or "").strip()
-        if not from_value or not to_value:
-            errors.append(ContentRedirectImportError(line=line, from_value=from_value or None, to_value=to_value or None, error="Missing from/to"))
-            continue
-        from_key = _redirect_display_value_to_key(from_value)
-        to_key = _redirect_display_value_to_key(to_value)
-        if not from_key or not to_key:
-            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="Invalid redirect value"))
-            continue
-        if len(from_key) > 120 or len(to_key) > 120:
-            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="Key too long"))
-            continue
-        if from_key == to_key:
-            errors.append(ContentRedirectImportError(line=line, from_value=from_value, to_value=to_value, error="from and to must differ"))
-            continue
-        rows.append((line, from_key, to_key))
-
+    rows, errors = _collect_redirect_import_rows(text)
     if not rows:
         return ContentRedirectImportResult(created=0, updated=0, skipped=0, errors=errors)
 
     existing_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
-    redirect_map = {from_key: to_key for from_key, to_key in existing_rows if from_key and to_key}
-    for _, from_key, to_key in rows:
-        redirect_map[from_key] = to_key
+    redirect_map = _build_redirect_map(existing_rows, rows)
+    _raise_for_redirect_import_chain_errors(redirect_map)
 
-    loop_keys: set[str] = set()
-    too_deep_keys: set[str] = set()
-    for from_key in redirect_map.keys():
-        err = _redirect_chain_error(from_key, redirect_map)
-        if err == "loop":
-            loop_keys.add(from_key)
-        elif err == "too_deep":
-            too_deep_keys.add(from_key)
-    if loop_keys or too_deep_keys:
-        details: list[str] = []
-        if loop_keys:
-            sample = ", ".join(sorted(loop_keys)[:5])
-            details.append(f"Redirect loop detected (e.g. {sample})")
-        if too_deep_keys:
-            sample = ", ".join(sorted(too_deep_keys)[:5])
-            details.append(f"Redirect chain too deep (e.g. {sample})")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="; ".join(details))
-
-    created = 0
-    updated = 0
-    skipped = 0
-
-    unique_rows: dict[str, tuple[int, str]] = {}
-    for line_no, from_key, to_key in rows:
-        unique_rows[from_key] = (line_no, to_key)
-
-    existing = (
-        await session.execute(select(ContentRedirect).where(ContentRedirect.from_key.in_(list(unique_rows.keys()))))
-    ).scalars().all()
-    existing_by_key = {r.from_key: r for r in existing}
-
-    for from_key, (_, to_key) in unique_rows.items():
-        row = existing_by_key.get(from_key)
-        if row:
-            if row.to_key == to_key:
-                skipped += 1
-                continue
-            row.to_key = to_key
-            session.add(row)
-            updated += 1
-            continue
-        session.add(ContentRedirect(from_key=from_key, to_key=to_key))
-        created += 1
-
+    unique_rows = _dedupe_redirect_import_rows(rows)
+    created, updated, skipped = await _apply_redirect_import_changes(session, unique_rows)
     await session.commit()
     return ContentRedirectImportResult(created=created, updated=updated, skipped=skipped, errors=errors)
 
@@ -775,89 +1115,35 @@ async def admin_list_content_images(
     limit: int = Query(default=24, ge=1, le=100),
     _: User = Depends(require_admin_section("content")),
 ) -> ContentImageAssetListResponse:
-    filters = []
-    if key:
-        filters.append(ContentBlock.key == key)
-    if q:
-        needle = f"%{q.strip()}%"
-        filters.append(
-            or_(
-                ContentBlock.key.ilike(needle),
-                ContentImage.url.ilike(needle),
-                ContentImage.alt_text.ilike(needle),
-            )
-        )
-    tag_value = (tag or "").strip().lower()
-    if tag_value:
-        filters.append(ContentImageTag.tag == tag_value)
-    if created_from:
-        filters.append(ContentImage.created_at >= created_from)
-    if created_to:
-        filters.append(ContentImage.created_at <= created_to)
-    if created_from and created_to and created_from > created_to:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
-
-    count_query = select(func.count()).select_from(ContentImage).join(ContentBlock)
-    if tag_value:
-        count_query = select(func.count(func.distinct(ContentImage.id))).select_from(ContentImage).join(ContentBlock).join(
-            ContentImageTag
-        )
-    total = await session.scalar(count_query.where(*filters))
+    filters, tag_value = _build_content_image_filters(
+        key=key,
+        q=q,
+        tag=tag,
+        created_from=created_from,
+        created_to=created_to,
+    )
+    total = await session.scalar(_build_content_image_count_query(tag_value).where(*filters))
     total_items = int(total or 0)
-    total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
+    meta = _build_pagination_meta(total_items, page, limit)
     offset = (page - 1) * limit
 
-    order_map = {
-        "newest": [ContentImage.created_at.desc(), ContentImage.id.desc()],
-        "oldest": [ContentImage.created_at.asc(), ContentImage.id.asc()],
-        "key_asc": [ContentBlock.key.asc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
-        "key_desc": [ContentBlock.key.desc(), ContentImage.created_at.desc(), ContentImage.id.desc()],
-    }
-    order_clauses = order_map.get(sort, order_map["newest"])
-
-    query = (
-        select(ContentImage, ContentBlock.key)
-        .join(ContentBlock)
-        .where(*filters)
-        .order_by(*order_clauses)
-        .offset(offset)
-        .limit(limit)
+    order_clauses = _content_image_order_clauses(sort)
+    query = _build_content_image_query(
+        filters=filters,
+        tag_value=tag_value,
+        order_clauses=order_clauses,
+        offset=offset,
+        limit=limit,
     )
-    if tag_value:
-        query = query.join(ContentImageTag)
     result = await session.execute(query)
     rows = result.all()
     image_ids = [img.id for img, _ in rows]
-    tag_map: dict[UUID, list[str]] = {}
-    if image_ids:
-        tag_rows = await session.execute(
-            select(ContentImageTag.content_image_id, ContentImageTag.tag).where(ContentImageTag.content_image_id.in_(image_ids))
-        )
-        for image_id, tag_value_row in tag_rows.all():
-            tag_map.setdefault(image_id, []).append(tag_value_row)
-        for image_id in list(tag_map.keys()):
-            tag_map[image_id] = sorted(set(tag_map[image_id]))
-    items: list[ContentImageAssetRead] = []
-    for img, block_key in rows:
-        items.append(
-            ContentImageAssetRead(
-                id=img.id,
-                root_image_id=getattr(img, "root_image_id", None),
-                source_image_id=getattr(img, "source_image_id", None),
-                url=img.url,
-                alt_text=img.alt_text,
-                sort_order=img.sort_order,
-                focal_x=getattr(img, "focal_x", 50),
-                focal_y=getattr(img, "focal_y", 50),
-                created_at=img.created_at,
-                content_key=block_key,
-                tags=tag_map.get(img.id, []),
-            )
-        )
-    return ContentImageAssetListResponse(
-        items=items,
-        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
-    )
+    tag_map = await _load_content_image_tag_map(session, image_ids)
+    items = [
+        _serialize_content_image_asset(image, content_key=block_key, tags=tag_map.get(image.id, []))
+        for image, block_key in rows
+    ]
+    return ContentImageAssetListResponse(items=items, meta=meta)
 
 
 @router.patch("/admin/assets/images/{image_id}", response_model=ContentImageAssetRead)
@@ -1083,37 +1369,21 @@ async def admin_list_media_assets(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("content")),
 ) -> MediaAssetListResponse:
-    parsed_from = None
-    parsed_to = None
-    try:
-        if created_from:
-            parsed_from = datetime.fromisoformat(created_from)
-        if created_to:
-            parsed_to = datetime.fromisoformat(created_to)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters")
-    if parsed_from and parsed_to and parsed_from > parsed_to:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
-
-    try:
-        rows, meta = await media_dam.list_assets(
-            session,
-            media_dam.MediaListFilters(
-                q=q,
-                tag=tag,
-                asset_type=asset_type,
-                status=status_filter,
-                visibility=visibility,
-                include_trashed=include_trashed,
-                created_from=parsed_from,
-                created_to=parsed_to,
-                page=page,
-                limit=limit,
-                sort=sort,
-            ),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    parsed_from, parsed_to = _parse_optional_datetime_range(created_from, created_to)
+    rows, meta = await _list_media_assets_or_400(
+        session,
+        q=q,
+        tag=tag,
+        asset_type=asset_type,
+        status_filter=status_filter,
+        visibility=visibility,
+        include_trashed=include_trashed,
+        created_from=parsed_from,
+        created_to=parsed_to,
+        page=page,
+        limit=limit,
+        sort=sort,
+    )
     return MediaAssetListResponse(items=[media_dam.asset_to_read(row) for row in rows], meta=meta)
 
 
@@ -1414,38 +1684,22 @@ async def admin_list_media_jobs(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("content")),
 ) -> MediaJobListResponse:
-    parsed_from = None
-    parsed_to = None
-    try:
-        if created_from:
-            parsed_from = datetime.fromisoformat(created_from)
-        if created_to:
-            parsed_to = datetime.fromisoformat(created_to)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date filters")
-    if parsed_from and parsed_to and parsed_from > parsed_to:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
-
-    try:
-        rows, meta = await media_dam.list_jobs(
-            session,
-            media_dam.MediaJobListFilters(
-                page=page,
-                limit=limit,
-                status=status_filter,
-                job_type=job_type,
-                asset_id=asset_id,
-                triage_state=triage_state,
-                assigned_to_user_id=assigned_to_user_id,
-                tag=tag,
-                sla_breached=sla_breached,
-                dead_letter_only=dead_letter_only,
-                created_from=parsed_from,
-                created_to=parsed_to,
-            ),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    parsed_from, parsed_to = _parse_optional_datetime_range(created_from, created_to)
+    rows, meta = await _list_media_jobs_or_400(
+        session,
+        page=page,
+        limit=limit,
+        status_filter=status_filter,
+        job_type=job_type,
+        asset_id=asset_id,
+        triage_state=triage_state,
+        assigned_to_user_id=assigned_to_user_id,
+        tag=tag,
+        sla_breached=sla_breached,
+        dead_letter_only=dead_letter_only,
+        created_from=parsed_from,
+        created_to=parsed_to,
+    )
     return MediaJobListResponse(items=[media_dam.job_to_read(row) for row in rows], meta=meta)
 
 

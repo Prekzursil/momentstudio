@@ -91,6 +91,43 @@ def _read_identifier(source: str, idx: int) -> tuple[str, int]:
     return source[start:idx], idx
 
 
+def _is_expression_delimiter(
+    ch: str,
+    *,
+    paren_depth: int,
+    bracket_depth: int,
+    brace_depth: int,
+) -> bool:
+    return (
+        ch in {",", "]", "}"}
+        and paren_depth == 0
+        and bracket_depth == 0
+        and brace_depth == 0
+    )
+
+
+def _adjust_expression_depth(
+    ch: str,
+    *,
+    paren_depth: int,
+    bracket_depth: int,
+    brace_depth: int,
+) -> tuple[int, int, int]:
+    if ch == "(":
+        return paren_depth + 1, bracket_depth, brace_depth
+    if ch == ")":
+        return max(paren_depth - 1, 0), bracket_depth, brace_depth
+    if ch == "[":
+        return paren_depth, bracket_depth + 1, brace_depth
+    if ch == "]":
+        return paren_depth, max(bracket_depth - 1, 0), brace_depth
+    if ch == "{":
+        return paren_depth, bracket_depth, brace_depth + 1
+    if ch == "}":
+        return paren_depth, bracket_depth, max(brace_depth - 1, 0)
+    return paren_depth, bracket_depth, brace_depth
+
+
 def _consume_expression_value(source: str, idx: int) -> tuple[str, int]:
     start = idx
     paren_depth = 0
@@ -104,27 +141,19 @@ def _consume_expression_value(source: str, idx: int) -> tuple[str, int]:
         if ch in ("'", '"'):
             _, idx = _read_quoted_string(source, idx)
             continue
-        if ch == "(":
-            paren_depth += 1
-        elif ch == ")":
-            if paren_depth > 0:
-                paren_depth -= 1
-        elif ch == "[":
-            bracket_depth += 1
-        elif ch == "]":
-            if bracket_depth > 0:
-                bracket_depth -= 1
-            elif paren_depth == 0 and brace_depth == 0:
-                break
-        elif ch == "{":
-            brace_depth += 1
-        elif ch == "}":
-            if brace_depth > 0:
-                brace_depth -= 1
-            elif paren_depth == 0 and bracket_depth == 0:
-                break
-        elif ch == "," and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
+        if _is_expression_delimiter(
+            ch,
+            paren_depth=paren_depth,
+            bracket_depth=bracket_depth,
+            brace_depth=brace_depth,
+        ):
             break
+        paren_depth, bracket_depth, brace_depth = _adjust_expression_depth(
+            ch,
+            paren_depth=paren_depth,
+            bracket_depth=bracket_depth,
+            brace_depth=brace_depth,
+        )
         idx += 1
     return source[start:idx].strip(), idx
 
@@ -145,6 +174,24 @@ def _parse_value(source: str, idx: int) -> tuple[Any, int]:
     return ParsedExpression(raw), next_idx
 
 
+def _read_object_key(source: str, idx: int) -> tuple[str, int]:
+    if source[idx] in ("'", '"'):
+        return _read_quoted_string(source, idx)
+    return _read_identifier(source, idx)
+
+
+def _consume_optional_object_delimiter(source: str, idx: int) -> int:
+    idx = _skip_whitespace_and_comments(source, idx)
+    if idx < len(source) and source[idx] == ",":
+        return idx + 1
+    return idx
+
+
+def _consume_unsupported_shorthand_property(source: str, idx: int) -> int:
+    _, idx = _consume_expression_value(source, idx)
+    return _consume_optional_object_delimiter(source, idx)
+
+
 def _parse_object(source: str, idx: int) -> tuple[ParsedObject, int]:
     if source[idx] != "{":
         raise ValueError(f"Expected object start at offset {idx}")
@@ -158,24 +205,16 @@ def _parse_object(source: str, idx: int) -> tuple[ParsedObject, int]:
             break
         if source[idx] == "}":
             return ParsedObject(values=values, start=start, end=idx), idx + 1
-        if source[idx] in ("'", '"'):
-            key, idx = _read_quoted_string(source, idx)
-        else:
-            key, idx = _read_identifier(source, idx)
+        key, idx = _read_object_key(source, idx)
         idx = _skip_whitespace_and_comments(source, idx)
         if idx >= len(source) or source[idx] != ":":
             # Unsupported shorthand property; consume until delimiter.
-            _, idx = _consume_expression_value(source, idx)
-            idx = _skip_whitespace_and_comments(source, idx)
-            if idx < len(source) and source[idx] == ",":
-                idx += 1
+            idx = _consume_unsupported_shorthand_property(source, idx)
             continue
         idx += 1
         value, idx = _parse_value(source, idx)
         values[key] = value
-        idx = _skip_whitespace_and_comments(source, idx)
-        if idx < len(source) and source[idx] == ",":
-            idx += 1
+        idx = _consume_optional_object_delimiter(source, idx)
     raise ValueError(f"Unterminated object starting at offset {start}")
 
 
@@ -228,20 +267,22 @@ def _surface_for_path(path: str) -> str:
     return "storefront"
 
 
-def _extract_robots_hint(route: dict[str, Any]) -> str | None:
-    robots = route.get("robots")
-    if isinstance(robots, str) and robots.strip():
-        return robots
-    if isinstance(robots, ParsedExpression) and robots.value.strip():
-        return robots.value
-    data = route.get("data")
-    if isinstance(data, dict):
-        data_robots = data.get("robots")
-        if isinstance(data_robots, str) and data_robots.strip():
-            return data_robots
-        if isinstance(data_robots, ParsedExpression) and data_robots.value.strip():
-            return data_robots.value
+def _coerce_robots_hint(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value
+    if isinstance(value, ParsedExpression) and value.value.strip():
+        return value.value
     return None
+
+
+def _extract_robots_hint(route: dict[str, Any]) -> str | None:
+    robots_hint = _coerce_robots_hint(route.get("robots"))
+    if robots_hint is not None:
+        return robots_hint
+    data = route.get("data")
+    if not isinstance(data, dict):
+        return None
+    return _coerce_robots_hint(data.get("robots"))
 
 
 def _collect_rows(

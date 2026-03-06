@@ -33,7 +33,7 @@ from app.models.catalog import (
 )  # noqa: F401
 from app.models.cart import Cart, CartItem  # noqa: F401
 from app.models.promo import PromoCode  # noqa: F401
-from app.models.coupons_v2 import (  # noqa: F401
+from app.models.coupons import (  # noqa: F401
     Promotion,
     Coupon,
     CouponAssignment,

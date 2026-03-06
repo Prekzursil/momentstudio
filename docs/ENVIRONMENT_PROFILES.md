@@ -78,6 +78,7 @@ Backups created on every switch:
 
 This is designed for daily coding with low risk and fewer setup blockers.
 Shipping note:
+
 - dev defaults keep Overpass fallback on and Sameday mirror off so locker search is usable even when courier credentials or mirror snapshot are not configured.
 
 ## Start Script Guard
@@ -177,6 +178,7 @@ make env-dev
 ```
 
 If you intentionally need mirror behavior in local dev:
+
 1. set `SAMEDAY_MIRROR_ENABLED=1`,
 2. seed a successful mirror snapshot from Admin Ops (`Run sync now`),
 3. optionally keep `LOCKERS_USE_OVERPASS_FALLBACK=1` as resilience.

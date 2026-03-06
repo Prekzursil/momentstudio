@@ -36,9 +36,7 @@
     "@ngx-translate/http-loader": "^17.0.0",
     "@nuintun/qrcode": "^5.0.3",
     "@sentry/browser": "^10.39.0",
-    "@toast-ui/editor": "^3.2.2",
     "diff": "^8.0.2",
-    "dompurify": "^3.3.1",
     "express": "^5.1.0",
     "highlight.js": "^11.11.1",
     "leaflet": "^1.9.4",
@@ -48,11 +46,11 @@
     "zone.js": "~0.16.1"
   },
   "devDependencies": {
-    "@codecov/bundle-analyzer": "^1.9.1",
     "@angular-devkit/build-angular": "^21.2.0",
     "@angular/cli": "^21.2.0",
     "@angular/compiler-cli": "^21.2.0",
     "@applitools/eyes-playwright": "^1.44.3",
+    "@codecov/bundle-analyzer": "^1.9.1",
     "@eslint/js": "^9.39.3",
     "@percy/cli": "^1.31.0",
     "@percy/playwright": "^1.0.8",
@@ -83,9 +81,6 @@
     "typescript-eslint": "^8.56.0"
   },
   "overrides": {
-    "@toast-ui/editor": {
-      "dompurify": "3.3.1"
-    },
     "fastify": "5.7.2",
     "hono": "4.12.2",
     "lodash": "4.17.23",

@@ -5,28 +5,14 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import bootstrap from './main.server';
 
-// The Express app is exported so that it can be reused by tests/other runtimes.
-export function app(): express.Express {
-  const server = express();
-  const distFolder = join(process.cwd(), 'dist/app/browser');
-  const indexHtml = existsSync(join(distFolder, 'index.original.html'))
-    ? join(distFolder, 'index.original.html')
-    : join(distFolder, 'index.html');
+function resolveIndexHtml(distFolder: string): string {
+  const original = join(distFolder, 'index.original.html');
+  return existsSync(original) ? original : join(distFolder, 'index.html');
+}
 
-  const commonEngine = new CommonEngine();
-
-  server.set('view engine', 'html');
-  server.set('views', distFolder);
-
-  server.use(express.static(distFolder, {
-    maxAge: '1y',
-    index: false,
-  }));
-
-  // All regular routes use the Angular engine
-  server.use((req, res, next) => {
+function renderAngularApp(commonEngine: CommonEngine, indexHtml: string, distFolder: string): express.RequestHandler {
+  return (req, res, next) => {
     const { protocol, originalUrl, baseUrl, headers } = req;
-
     commonEngine
       .render({
         bootstrap,
@@ -37,7 +23,25 @@ export function app(): express.Express {
       })
       .then((html) => res.send(html))
       .catch((err) => next(err));
-  });
+  };
+}
+
+// The Express app is exported so that it can be reused by tests/other runtimes.
+export function app(): express.Express {
+  const server = express();
+  const distFolder = join(process.cwd(), 'dist/app/browser');
+  const indexHtml = resolveIndexHtml(distFolder);
+  const commonEngine = new CommonEngine();
+
+  server.set('view engine', 'html');
+  server.set('views', distFolder);
+
+  server.use(express.static(distFolder, {
+    maxAge: '1y',
+    index: false,
+  }));
+
+  server.use(renderAngularApp(commonEngine, indexHtml, distFolder));
 
   return server;
 }

@@ -8,24 +8,21 @@ on:
   workflow_dispatch:
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
   codecov-analytics:
     runs-on: ubuntu-latest
     env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      CODECOV_SLUG: Prekzursil/momentstudio
+      CODECOV_BRANCH: ${{ github.head_ref || github.ref_name }}
+      CODECOV_PR: ${{ github.event.pull_request.number || '' }}
+      CODECOV_BUILD: ${{ github.run_id }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
-
-      - name: Validate Codecov token
-        run: |
-          if [ -z "${CODECOV_TOKEN}" ]; then
-            echo "::error::Missing CODECOV_TOKEN secret. Configure it in GitHub Actions secrets."
-            exit 1
-          fi
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -90,6 +87,19 @@ jobs:
           echo "test_exit_code=$test_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Enforce absolute backend/frontend/project coverage >= 100
+        id: absolute_coverage
+        continue-on-error: true
+        run: |
+          set +e
+          python3 scripts/quality/assert_coverage_thresholds.py \
+            --backend backend/coverage.xml \
+            --frontend frontend/coverage/lcov.info \
+            --threshold 100
+          coverage_exit=$?
+          echo "coverage_exit_code=$coverage_exit" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Build frontend browser bundle
         id: frontend_build
         continue-on-error: true
@@ -108,8 +118,12 @@ jobs:
         continue-on-error: true
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: backend/coverage.xml,frontend/coverage/**/lcov.info
+          use_oidc: true
+          slug: ${{ env.CODECOV_SLUG }}
+          override_branch: ${{ env.CODECOV_BRANCH }}
+          override_commit: ${{ github.sha }}
+          override_pr: ${{ env.CODECOV_PR }}
+          files: backend/coverage.xml,frontend/coverage/lcov.info,frontend/coverage/**/lcov.info
           flags: backend,frontend
           fail_ci_if_error: false
           verbose: true
@@ -120,7 +134,11 @@ jobs:
         continue-on-error: true
         uses: codecov/test-results-action@0fa95f0e1eeaafde2c782583b36b28ad0d8c77d3 # v1.2.1
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: true
+          slug: ${{ env.CODECOV_SLUG }}
+          override_branch: ${{ env.CODECOV_BRANCH }}
+          override_commit: ${{ github.sha }}
+          override_pr: ${{ env.CODECOV_PR }}
           files: backend/test-results/pytest.junit.xml,frontend/test-results/karma.junit.xml
           disable_search: true
           fail_ci_if_error: false
@@ -136,10 +154,19 @@ jobs:
             echo "bundle_exit_code=1" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/browser \
-            --bundle-name=adrianaart-frontend-browser \
-            --upload-token="${CODECOV_TOKEN}"
-          bundle_exit=$?
+          python -c "import json, os, pathlib; pathlib.Path('/tmp/codecov-bundle-browser.json').write_text(json.dumps({'gitService': 'github', 'oidc': {'useGitHubOIDC': True, 'gitHubOIDCTokenAudience': 'https://codecov.io'}, 'uploadOverrides': {'slug': os.environ['CODECOV_SLUG'], 'sha': os.environ['GITHUB_SHA'], 'pr': os.environ['CODECOV_PR'], 'branch': os.environ['CODECOV_BRANCH'], 'build': os.environ['CODECOV_BUILD']}}, indent=2), encoding='utf-8')"
+          bundle_exit=1
+          for attempt in 1 2 3 4; do
+            npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/browser \
+              --bundle-name=adrianaart-frontend-browser \
+              --config-file=/tmp/codecov-bundle-browser.json
+            bundle_exit=$?
+            if [ "$bundle_exit" -eq 0 ]; then
+              break
+            fi
+            echo "::warning::Browser bundle upload attempt ${attempt} failed (exit=${bundle_exit}); retrying."
+            sleep $((attempt * 5))
+          done
           echo "bundle_exit_code=$bundle_exit" >> "$GITHUB_OUTPUT"
           exit 0
 
@@ -154,10 +181,19 @@ jobs:
           ssr_build_exit=$?
           cd ..
           if [ "$ssr_build_exit" -eq 0 ] && [ -d frontend/dist/app/server ]; then
-            npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/server \
-              --bundle-name=adrianaart-frontend-server \
-              --upload-token="${CODECOV_TOKEN}"
-            ssr_bundle_exit=$?
+            python -c "import json, os, pathlib; pathlib.Path('/tmp/codecov-bundle-ssr.json').write_text(json.dumps({'gitService': 'github', 'oidc': {'useGitHubOIDC': True, 'gitHubOIDCTokenAudience': 'https://codecov.io'}, 'uploadOverrides': {'slug': os.environ['CODECOV_SLUG'], 'sha': os.environ['GITHUB_SHA'], 'pr': os.environ['CODECOV_PR'], 'branch': os.environ['CODECOV_BRANCH'], 'build': os.environ['CODECOV_BUILD']}}, indent=2), encoding='utf-8')"
+            ssr_bundle_exit=1
+            for attempt in 1 2 3 4; do
+              npx --yes --package @codecov/bundle-analyzer bundle-analyzer ./frontend/dist/app/server \
+                --bundle-name=adrianaart-frontend-server \
+                --config-file=/tmp/codecov-bundle-ssr.json
+              ssr_bundle_exit=$?
+              if [ "$ssr_bundle_exit" -eq 0 ]; then
+                break
+              fi
+              echo "::warning::SSR bundle upload attempt ${attempt} failed (exit=${ssr_bundle_exit}); retrying."
+              sleep $((attempt * 5))
+            done
           else
             ssr_bundle_exit=$ssr_build_exit
           fi
@@ -167,45 +203,86 @@ jobs:
       - name: Enforce test/build and bundle results
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+
+          normalize_int() {
+            local raw="$1"
+            raw="$(printf '%s' "$raw" | tr -d '\r\n[:space:]')"
+            if [[ -z "$raw" ]]; then
+              echo "1"
+              return
+            fi
+            if [[ ! "$raw" =~ ^-?[0-9]+$ ]]; then
+              echo "1"
+              return
+            fi
+            echo "$raw"
+          }
+
+          normalize_outcome() {
+            local raw="$1"
+            raw="$(printf '%s' "$raw" | tr -d '\r\n[:space:]')"
+            if [[ -z "$raw" ]]; then
+              echo "failure"
+              return
+            fi
+            echo "$raw"
+          }
+
+          backend_test_exit="$(normalize_int "${{ steps.backend_tests.outputs.test_exit_code }}")"
+          backend_coverage_exit="$(normalize_int "${{ steps.backend_tests.outputs.coverage_exit_code }}")"
+          frontend_test_exit="$(normalize_int "${{ steps.frontend_tests.outputs.test_exit_code }}")"
+          absolute_coverage_exit="$(normalize_int "${{ steps.absolute_coverage.outputs.coverage_exit_code }}")"
+          frontend_build_exit="$(normalize_int "${{ steps.frontend_build.outputs.build_exit_code }}")"
+          browser_bundle_exit="$(normalize_int "${{ steps.browser_bundle.outputs.bundle_exit_code }}")"
+          ssr_bundle_exit="$(normalize_int "${{ steps.ssr_bundle.outputs.bundle_exit_code }}")"
+          upload_coverage_outcome="$(normalize_outcome "${{ steps.upload_coverage.outcome }}")"
+          upload_test_results_outcome="$(normalize_outcome "${{ steps.upload_test_results.outcome }}")"
+
           fail=0
 
-          if [ "${{ steps.backend_tests.outputs.test_exit_code }}" != "0" ]; then
-            echo "::error::Backend tests failed (exit ${{ steps.backend_tests.outputs.test_exit_code }})."
+          if [ "$backend_test_exit" -ne 0 ]; then
+            echo "::error::Backend tests failed (exit $backend_test_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.backend_tests.outputs.coverage_exit_code }}" != "0" ]; then
-            echo "::error::Backend coverage export failed (exit ${{ steps.backend_tests.outputs.coverage_exit_code }})."
+          if [ "$backend_coverage_exit" -ne 0 ]; then
+            echo "::error::Backend coverage export failed (exit $backend_coverage_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.frontend_tests.outputs.test_exit_code }}" != "0" ]; then
-            echo "::error::Frontend tests failed (exit ${{ steps.frontend_tests.outputs.test_exit_code }})."
+          if [ "$frontend_test_exit" -ne 0 ]; then
+            echo "::error::Frontend tests failed (exit $frontend_test_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.frontend_build.outputs.build_exit_code }}" != "0" ]; then
-            echo "::error::Frontend browser build failed (exit ${{ steps.frontend_build.outputs.build_exit_code }})."
+          if [ "$absolute_coverage_exit" -ne 0 ]; then
+            echo "::error::Absolute coverage threshold check failed (exit $absolute_coverage_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.browser_bundle.outputs.bundle_exit_code }}" != "0" ]; then
-            echo "::error::Browser bundle upload failed (exit ${{ steps.browser_bundle.outputs.bundle_exit_code }})."
+          if [ "$frontend_build_exit" -ne 0 ]; then
+            echo "::error::Frontend browser build failed (exit $frontend_build_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.ssr_bundle.outputs.bundle_exit_code }}" != "0" ]; then
-            echo "::error::SSR bundle upload failed (exit ${{ steps.ssr_bundle.outputs.bundle_exit_code }})."
+          if [ "$browser_bundle_exit" -ne 0 ]; then
+            echo "::error::Browser bundle upload failed (exit $browser_bundle_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.upload_coverage.outcome }}" != "success" ]; then
-            echo "::error::Codecov coverage upload step did not succeed (outcome=${{ steps.upload_coverage.outcome }})."
+          if [ "$ssr_bundle_exit" -ne 0 ]; then
+            echo "::error::SSR bundle upload failed (exit $ssr_bundle_exit)."
             fail=1
           fi
 
-          if [ "${{ steps.upload_test_results.outcome }}" != "success" ]; then
-            echo "::error::Codecov test-results upload step did not succeed (outcome=${{ steps.upload_test_results.outcome }})."
+          if [ "$upload_coverage_outcome" != "success" ]; then
+            echo "::error::Codecov coverage upload step did not succeed (outcome=$upload_coverage_outcome)."
+            fail=1
+          fi
+
+          if [ "$upload_test_results_outcome" != "success" ]; then
+            echo "::error::Codecov test-results upload step did not succeed (outcome=$upload_test_results_outcome)."
             fail=1
           fi
 

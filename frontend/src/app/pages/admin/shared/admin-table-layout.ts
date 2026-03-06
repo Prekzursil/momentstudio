@@ -30,10 +30,68 @@ export function adminTableLayoutStorageKey(tableId: string, userId: string | nul
 export function defaultAdminTableLayout(columns: AdminTableColumn[]): AdminTableLayoutV1 {
   return {
     version: 1,
-    order: columns.map((c) => c.id),
+    order: columnIds(columns),
     hidden: [],
     density: 'comfortable',
   };
+}
+
+function columnIds(columns: AdminTableColumn[]): string[] {
+  const ids: string[] = [];
+  for (const column of columns) {
+    ids.push(column.id);
+  }
+  return ids;
+}
+
+function requiredColumnIds(columns: AdminTableColumn[]): Set<string> {
+  const required = new Set<string>();
+  for (const column of columns) {
+    if (column.required) required.add(column.id);
+  }
+  return required;
+}
+
+const normalizeOrderEntry = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
+
+const isAllowedOrderId = (id: string, allowed: Set<string>): boolean => id.length > 0 && allowed.has(id);
+
+const collectAllowedOrderIds = (rawOrder: unknown[], allowed: Set<string>): string[] => {
+  const normalized = rawOrder.map((value) => normalizeOrderEntry(value));
+  const allowedIds = normalized.filter((id) => isAllowedOrderId(id, allowed));
+  return Array.from(new Set(allowedIds));
+};
+
+const appendMissingOrderIds = (order: string[], ids: string[]): string[] => {
+  const seen = new Set(order);
+  for (const id of ids) {
+    if (!seen.has(id)) order.push(id);
+  }
+  return order;
+};
+
+const sanitizeOrder = (rawOrder: unknown[], ids: string[], allowed: Set<string>): string[] =>
+  appendMissingOrderIds(collectAllowedOrderIds(rawOrder, allowed), ids);
+
+const sanitizeHidden = (rawHidden: unknown[], allowed: Set<string>, required: Set<string>): string[] => {
+  const hiddenSet = new Set<string>();
+  for (const value of rawHidden) {
+    if (typeof value !== 'string') continue;
+    const id = value.trim();
+    if (!allowed.has(id) || required.has(id)) continue;
+    hiddenSet.add(id);
+  }
+  return Array.from(hiddenSet);
+};
+
+const asLayoutObject = (input: unknown): Record<string, unknown> | null => {
+  if (!input || typeof input !== 'object') return null;
+  const obj = input as Record<string, unknown>;
+  return obj['version'] === 1 ? obj : null;
+};
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 export function sanitizeAdminTableLayout(
@@ -41,41 +99,17 @@ export function sanitizeAdminTableLayout(
   columns: AdminTableColumn[],
   fallbackLayout?: AdminTableLayoutV1
 ): AdminTableLayoutV1 {
-  const ids = columns.map((c) => c.id);
+  const ids = columnIds(columns);
   const allowed = new Set(ids);
-  const required = new Set(columns.filter((c) => c.required).map((c) => c.id));
+  const required = requiredColumnIds(columns);
   const fallback = fallbackLayout ?? defaultAdminTableLayout(columns);
 
-  if (!input || typeof input !== 'object') return fallback;
-  const obj = input as Record<string, unknown>;
-  const version = obj['version'];
-  if (version !== 1) return fallback;
+  const obj = asLayoutObject(input);
+  if (!obj) return fallback;
 
-  const rawOrder = Array.isArray(obj['order']) ? (obj['order'] as unknown[]) : [];
-  const seen = new Set<string>();
-  const order: string[] = [];
-  for (const value of rawOrder) {
-    if (typeof value !== 'string') continue;
-    const id = value.trim();
-    if (!allowed.has(id)) continue;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    order.push(id);
-  }
-  for (const id of ids) {
-    if (!seen.has(id)) order.push(id);
-  }
+  const order = sanitizeOrder(asArray(obj['order']), ids, allowed);
 
-  const rawHidden = Array.isArray(obj['hidden']) ? (obj['hidden'] as unknown[]) : [];
-  const hiddenSet = new Set<string>();
-  for (const value of rawHidden) {
-    if (typeof value !== 'string') continue;
-    const id = value.trim();
-    if (!allowed.has(id)) continue;
-    if (required.has(id)) continue;
-    hiddenSet.add(id);
-  }
-  const hidden = Array.from(hiddenSet);
+  const hidden = sanitizeHidden(asArray(obj['hidden']), allowed, required);
 
   const density = obj['density'] === 'compact' ? 'compact' : 'comfortable';
 

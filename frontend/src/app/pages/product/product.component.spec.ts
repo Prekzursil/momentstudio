@@ -13,12 +13,16 @@ import { CatalogService } from '../../core/catalog.service';
 import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { WishlistService } from '../../core/wishlist.service';
 import { AuthService } from '../../core/auth.service';
+import { AdminService } from '../../core/admin.service';
+import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 
 describe('ProductComponent', () => {
   let toast: jasmine.SpyObj<ToastService>;
   let cart: jasmine.SpyObj<CartStore>;
   let catalog: jasmine.SpyObj<CatalogService>;
   let auth: jasmine.SpyObj<AuthService>;
+  let admin: jasmine.SpyObj<AdminService>;
+  let storefrontAdminMode: { enabled: jasmine.Spy };
   let routeParam$: ReplaySubject<any>;
 
   beforeEach(() => {
@@ -26,10 +30,14 @@ describe('ProductComponent', () => {
     cart = jasmine.createSpyObj<CartStore>('CartStore', ['addFromProduct']);
     catalog = jasmine.createSpyObj<CatalogService>('CatalogService', [
       'requestBackInStock',
+      'cancelBackInStock',
+      'getBackInStockStatus',
       'getProduct',
       'getUpsellProducts',
       'getRelatedProducts',
     ]);
+    admin = jasmine.createSpyObj<AdminService>('AdminService', ['duplicateProduct']);
+    storefrontAdminMode = { enabled: jasmine.createSpy('enabled').and.returnValue(false) };
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated', 'isAdmin', 'isImpersonating']);
     auth.isAdmin.and.returnValue(false);
     auth.isImpersonating.and.returnValue(false);
@@ -37,6 +45,9 @@ describe('ProductComponent', () => {
     routeParam$.next(convertToParamMap({ slug: 'prod' }));
     catalog.getUpsellProducts.and.returnValue(of([] as any));
     catalog.getRelatedProducts.and.returnValue(of([] as any));
+    catalog.getBackInStockStatus.and.returnValue(of({ request: null } as any));
+    catalog.cancelBackInStock.and.returnValue(of({} as any));
+    admin.duplicateProduct.and.returnValue(of({ slug: 'copy-prod' } as any));
 
     TestBed.configureTestingModule({
       imports: [RouterTestingModule.withRoutes([]), ProductComponent, TranslateModule.forRoot()],
@@ -45,6 +56,8 @@ describe('ProductComponent', () => {
         { provide: CartStore, useValue: cart },
         { provide: CatalogService, useValue: catalog },
         { provide: AuthService, useValue: auth },
+        { provide: AdminService, useValue: admin },
+        { provide: StorefrontAdminModeService, useValue: storefrontAdminMode },
         { provide: RecentlyViewedService, useValue: { add: () => [] } },
         { provide: WishlistService, useValue: { ensureLoaded: () => {}, isWishlisted: () => false } },
         {
@@ -195,5 +208,71 @@ describe('ProductComponent', () => {
 
     productA$.next(productA);
     expect(cmp.product?.slug).toBe('b');
+  });
+
+  it('covers storefront edit guards, image manager, and duplicate branches', () => {
+    const cmp = TestBed.createComponent(ProductComponent).componentInstance;
+    cmp.product = { id: 'p1', slug: 'prod', name: 'Prod', base_price: 20, currency: 'RON', stock_quantity: 1, images: [] } as any;
+
+    storefrontAdminMode.enabled.and.returnValue(false);
+    expect(cmp.showStorefrontEdit()).toBeFalse();
+
+    storefrontAdminMode.enabled.and.returnValue(true);
+    auth.isAdmin.and.returnValue(true);
+    auth.isImpersonating.and.returnValue(false);
+    expect(cmp.showStorefrontEdit()).toBeTrue();
+
+    cmp.openImageManager();
+    expect(cmp.imageManagerOpen).toBeTrue();
+
+    cmp.duplicateFromStorefront();
+    expect(admin.duplicateProduct).toHaveBeenCalledWith('prod', { source: 'storefront' });
+
+    admin.duplicateProduct.and.returnValue(of({ slug: '' } as any));
+    cmp.duplicateFromStorefront();
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('covers back-in-stock auth, success, and cancel branches', () => {
+    const cmp = TestBed.createComponent(ProductComponent).componentInstance;
+    cmp.product = { id: 'p1', slug: 'prod', name: 'Prod', base_price: 20, currency: 'RON', stock_quantity: 0, allow_backorder: false, images: [] } as any;
+
+    auth.isAuthenticated.and.returnValue(false);
+    cmp.requestBackInStock();
+    expect(toast.info).toHaveBeenCalled();
+
+    auth.isAuthenticated.and.returnValue(true);
+    catalog.requestBackInStock.and.returnValue(of({ id: 'req-1' } as any));
+    cmp.requestBackInStock();
+    expect(cmp.backInStockRequest?.id).toBe('req-1');
+
+    cmp.cancelBackInStock();
+    expect(catalog.cancelBackInStock).toHaveBeenCalledWith('prod');
+    expect(cmp.backInStockRequest).toBeNull();
+  });
+
+  it('covers wishlist toggle branches', () => {
+    const wishlist = TestBed.inject(WishlistService) as any;
+    wishlist.isWishlisted = jasmine.createSpy('isWishlisted').and.returnValue(false);
+    wishlist.add = jasmine.createSpy('add').and.returnValue(of({ id: 'p1' }));
+    wishlist.addLocal = jasmine.createSpy('addLocal');
+    wishlist.remove = jasmine.createSpy('remove').and.returnValue(of({}));
+    wishlist.removeLocal = jasmine.createSpy('removeLocal');
+
+    const cmp = TestBed.createComponent(ProductComponent).componentInstance;
+    cmp.product = { id: 'p1', slug: 'prod', name: 'Prod', base_price: 20, currency: 'RON', stock_quantity: 1, images: [] } as any;
+
+    auth.isAuthenticated.and.returnValue(false);
+    cmp.toggleWishlist();
+    expect(toast.info).toHaveBeenCalled();
+
+    auth.isAuthenticated.and.returnValue(true);
+    wishlist.isWishlisted.and.returnValue(false);
+    cmp.toggleWishlist();
+    expect(wishlist.add).toHaveBeenCalledWith('p1');
+
+    wishlist.isWishlisted.and.returnValue(true);
+    cmp.toggleWishlist();
+    expect(wishlist.remove).toHaveBeenCalledWith('p1');
   });
 });

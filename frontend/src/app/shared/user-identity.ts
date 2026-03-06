@@ -6,38 +6,38 @@ export type IdentityLike = {
   id?: string | null;
 };
 
+const trimValue = (value: string | null | undefined): string => (value || '').trim();
+
+const buildDisplayName = (name: string, username: string, tag: number | null | undefined): string => {
+  if (!name || !username) return '';
+  return typeof tag === 'number' ? `${name}#${tag} (${username})` : `${name} (${username})`;
+};
+
+const pickPrimarySource = (identity: IdentityLike): string =>
+  [trimValue(identity.name), trimValue(identity.username), trimValue(identity.email)].find(Boolean) || '';
+
+const initialsFromSource = (source: string): string =>
+  source
+    .split(/[\s._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase())
+    .slice(0, 2)
+    .join('');
+
 export function formatIdentity(identity: IdentityLike | null | undefined, fallback = ''): string {
   if (!identity) return fallback;
-  const name = (identity.name ?? '').trim();
-  const username = (identity.username ?? '').trim();
-  const tag = identity.name_tag;
+  const name = trimValue(identity.name);
+  const username = trimValue(identity.username);
+  const formatted = buildDisplayName(name, username, identity.name_tag);
+  if (formatted) return formatted;
 
-  if (name && username && typeof tag === 'number') {
-    return `${name}#${tag} (${username})`;
-  }
-  if (name && username) {
-    return `${name} (${username})`;
-  }
-
-  const email = (identity.email ?? '').trim();
-  const id = (identity.id ?? '').trim();
-  return name || username || email || id || fallback;
+  return [name, username, trimValue(identity.email), trimValue(identity.id), fallback].find(Boolean) || '';
 }
 
 export function initialsFromIdentity(identity: IdentityLike | null | undefined, fallback = '?'): string {
   if (!identity) return fallback;
-  const name = (identity.name ?? '').trim();
-  const username = (identity.username ?? '').trim();
-  const email = (identity.email ?? '').trim();
-  const src = name || username || email;
-  if (!src) return fallback;
+  const source = pickPrimarySource(identity);
+  if (!source) return fallback;
 
-  const letters = src
-    .split(/[\s._-]+/)
-    .filter(Boolean)
-    .map((p) => p[0]?.toUpperCase())
-    .filter(Boolean);
-  return (letters.slice(0, 2).join('') || src.slice(0, 1).toUpperCase());
+  return initialsFromSource(source) || source.charAt(0).toUpperCase();
 }
-
-

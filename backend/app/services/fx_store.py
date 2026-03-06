@@ -35,55 +35,54 @@ async def _get_row(session: AsyncSession, *, is_override: bool) -> FxRate | None
     return result.scalar_one_or_none()
 
 
-async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRatesRead) -> FxRate:
-    bind = session.get_bind()
-    dialect = getattr(getattr(bind, "dialect", None), "name", "")
-    insert_fn = pg_insert if dialect == "postgresql" else (sqlite_insert if dialect == "sqlite" else None)
+def _apply_fx_row_data(row: FxRate, data: FxRatesRead) -> None:
+    row.base = data.base
+    row.eur_per_ron = data.eur_per_ron
+    row.usd_per_ron = data.usd_per_ron
+    row.as_of = data.as_of
+    row.source = data.source
+    row.fetched_at = data.fetched_at
 
-    if insert_fn is not None:
-        stmt = insert_fn(FxRate).values(
-            base=data.base,
-            eur_per_ron=data.eur_per_ron,
-            usd_per_ron=data.usd_per_ron,
-            as_of=data.as_of,
-            source=data.source,
-            fetched_at=data.fetched_at,
-            is_override=is_override,
-        )
-        stmt = stmt.on_conflict_do_update(
-            index_elements=[FxRate.is_override],
-            set_={
-                "base": data.base,
-                "eur_per_ron": data.eur_per_ron,
-                "usd_per_ron": data.usd_per_ron,
-                "as_of": data.as_of,
-                "source": data.source,
-                "fetched_at": data.fetched_at,
-                "updated_at": func.now(),
-            },
-        )
-        await session.execute(stmt)
-        await session.commit()
 
-        row = await _get_row(session, is_override=is_override)
-        if not row:
-            raise RuntimeError("fx_rate_upsert_failed")
-        await session.refresh(row)
-        return row
+async def _upsert_row_via_conflict_stmt(session: AsyncSession, *, is_override: bool, data: FxRatesRead, insert_fn):
+    stmt = insert_fn(FxRate).values(
+        base=data.base,
+        eur_per_ron=data.eur_per_ron,
+        usd_per_ron=data.usd_per_ron,
+        as_of=data.as_of,
+        source=data.source,
+        fetched_at=data.fetched_at,
+        is_override=is_override,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[FxRate.is_override],
+        set_={
+            "base": data.base,
+            "eur_per_ron": data.eur_per_ron,
+            "usd_per_ron": data.usd_per_ron,
+            "as_of": data.as_of,
+            "source": data.source,
+            "fetched_at": data.fetched_at,
+            "updated_at": func.now(),
+        },
+    )
+    await session.execute(stmt)
+    await session.commit()
+    row = await _get_row(session, is_override=is_override)
+    if not row:
+        raise RuntimeError("fx_rate_upsert_failed")
+    await session.refresh(row)
+    return row
 
+
+async def _upsert_row_fallback(session: AsyncSession, *, is_override: bool, data: FxRatesRead) -> FxRate:
     existing = await _get_row(session, is_override=is_override)
     if existing:
-        existing.base = data.base
-        existing.eur_per_ron = data.eur_per_ron
-        existing.usd_per_ron = data.usd_per_ron
-        existing.as_of = data.as_of
-        existing.source = data.source
-        existing.fetched_at = data.fetched_at
+        _apply_fx_row_data(existing, data)
         session.add(existing)
         await session.commit()
         await session.refresh(existing)
         return existing
-
     row = FxRate(
         base=data.base,
         eur_per_ron=data.eur_per_ron,
@@ -94,23 +93,37 @@ async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRates
         is_override=is_override,
     )
     session.add(row)
+    return row
+
+
+async def _upsert_row_after_integrity_error(session: AsyncSession, *, is_override: bool, data: FxRatesRead) -> FxRate:
+    await session.rollback()
+    existing = await _get_row(session, is_override=is_override)
+    if not existing:
+        raise
+    _apply_fx_row_data(existing, data)
+    session.add(existing)
+    await session.commit()
+    await session.refresh(existing)
+    return existing
+
+
+async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRatesRead) -> FxRate:
+    bind = session.get_bind()
+    dialect = getattr(getattr(bind, "dialect", None), "name", "")
+    insert_fn = pg_insert if dialect == "postgresql" else (sqlite_insert if dialect == "sqlite" else None)
+    if insert_fn is not None:
+        return await _upsert_row_via_conflict_stmt(
+            session,
+            is_override=is_override,
+            data=data,
+            insert_fn=insert_fn,
+        )
+    row = await _upsert_row_fallback(session, is_override=is_override, data=data)
     try:
         await session.commit()
     except IntegrityError:
-        await session.rollback()
-        existing = await _get_row(session, is_override=is_override)
-        if not existing:
-            raise
-        existing.base = data.base
-        existing.eur_per_ron = data.eur_per_ron
-        existing.usd_per_ron = data.usd_per_ron
-        existing.as_of = data.as_of
-        existing.source = data.source
-        existing.fetched_at = data.fetched_at
-        session.add(existing)
-        await session.commit()
-        await session.refresh(existing)
-        return existing
+        return await _upsert_row_after_integrity_error(session, is_override=is_override, data=data)
     await session.refresh(row)
     return row
 

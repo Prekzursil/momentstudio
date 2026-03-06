@@ -75,7 +75,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Upgrade npm
-        run: npm i -g npm@11.7.0
+        run: |
+          set +e
+          npm i -g npm@11.7.0
+          npm_upgrade_exit=$?
+          if [ "$npm_upgrade_exit" -ne 0 ]; then
+            echo "::warning::npm upgrade failed (exit $npm_upgrade_exit); continuing with runner npm $(npm -v)."
+          fi
+          exit 0
 
       - name: Install frontend dependencies
         run: |

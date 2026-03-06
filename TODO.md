@@ -122,8 +122,8 @@ showing what is already implemented.
   - Evidence: `scripts/audit/normalize_findings_fingerprint.py`, `scripts/audit/upsert_audit_issues.py`, `scripts/audit/collect_audit_evidence.py`
 - [x] Copilot governance: add repo-level + path-scoped Copilot instructions and AI governance apply helper.
   - Evidence: `.github/copilot-instructions.md`, `.github/instructions/storefront.instructions.md`, `.github/instructions/account.instructions.md`, `.github/instructions/admin.instructions.md`, `.github/instructions/backend-api.instructions.md`, `scripts/repo/apply_ai_governance.sh`
-- [x] AI audit phase 2: auto-sync severe audit issues to roadmap project lane `Now` when project-write token is configured.
-  - Evidence: `.github/workflows/audit-weekly-agent.yml`, `scripts/audit/upsert_audit_issues.py`, `scripts/audit/sync_severe_issues_to_project.py`, `docs/AI_AUDIT_PHASES.md`
+- [x] AI audit phase 2: keep severe findings in deterministic issue upsert flow and retire roadmap project auto-sync token dependency.
+  - Evidence: `.github/workflows/audit-weekly-agent.yml`, `scripts/audit/upsert_audit_issues.py`, `docs/AI_AUDIT_PHASES.md`
 - [x] AI audit phase 3: bi-directional roadmap sync (auto-update lane/status based on issue lifecycle + closure policy).
 - [x] Repo policy phase 2: evaluate enabling required review approvals once contributor cadence grows.
   - Evidence: `docs/REPOSITORY_POLICY.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.md`, `docs/reports/repo-policy-phase2-baseline-2026-02.json`

@@ -1,6 +1,7 @@
-import logging
 import json
+import logging
 from datetime import datetime, timezone
+from typing import Any
 from urllib.parse import quote_plus
 from uuid import UUID
 
@@ -26,7 +27,7 @@ from app.services import auth as auth_service
 from app.services import email as email_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services import notifications as notification_service
-from app.services import coupons_v2 as coupons_service
+from app.services import coupons as coupons_service
 from app.services import promo_usage
 from app.api.v1 import cart as cart_api
 from app.schemas.payment_capabilities import PaymentsCapabilitiesResponse, PaymentMethodCapability
@@ -62,57 +63,67 @@ def _account_orders_url(order: Order) -> str:
     return f"/account/orders?q={quote_plus(token)}"
 
 
+def _payment_method_capability(
+    *,
+    configured: bool,
+    enabled: bool,
+    reason: str,
+) -> PaymentMethodCapability:
+    return PaymentMethodCapability(
+        supported=True,
+        configured=configured,
+        enabled=enabled,
+        reason_code=None if enabled else "missing_credentials",
+        reason=None if enabled else reason,
+    )
+
+
+def _netopia_capability() -> PaymentMethodCapability:
+    netopia_configured, config_reason = netopia_service.netopia_configuration_status()
+    if not settings.netopia_enabled:
+        return PaymentMethodCapability(
+            supported=True,
+            configured=netopia_configured,
+            enabled=False,
+            reason_code="disabled_in_env",
+            reason="Netopia is disabled",
+        )
+    if not netopia_configured:
+        return PaymentMethodCapability(
+            supported=True,
+            configured=False,
+            enabled=False,
+            reason_code="missing_credentials",
+            reason=config_reason or "Netopia is not configured",
+        )
+    return PaymentMethodCapability(
+        supported=True,
+        configured=True,
+        enabled=True,
+        reason_code=None,
+        reason=None,
+    )
+
+
 @router.get("/capabilities", response_model=PaymentsCapabilitiesResponse)
 async def payment_capabilities() -> PaymentsCapabilitiesResponse:
     mock_mode = is_mock_payments()
-
     stripe_configured = payments.is_stripe_configured()
-    stripe_enabled = bool(mock_mode or stripe_configured)
-    stripe_reason = None if stripe_enabled else "Stripe is not configured"
-    stripe_reason_code = None if stripe_enabled else "missing_credentials"
-
     paypal_configured = paypal_service.is_paypal_configured()
-    paypal_enabled = bool(mock_mode or paypal_configured)
-    paypal_reason = None if paypal_enabled else "PayPal is not configured"
-    paypal_reason_code = None if paypal_enabled else "missing_credentials"
-
-    netopia_configured, netopia_config_reason = netopia_service.netopia_configuration_status()
-    netopia_supported = True
-    netopia_enabled = False
-    if not settings.netopia_enabled:
-        netopia_reason = "Netopia is disabled"
-        netopia_reason_code = "disabled_in_env"
-    elif not netopia_configured:
-        netopia_reason = netopia_config_reason or "Netopia is not configured"
-        netopia_reason_code = "missing_credentials"
-    else:
-        netopia_enabled = True
-        netopia_reason = None
-        netopia_reason_code = None
 
     return PaymentsCapabilitiesResponse(
         payments_provider=str(getattr(settings, "payments_provider", "") or "real"),
-        stripe=PaymentMethodCapability(
-            supported=True,
+        stripe=_payment_method_capability(
             configured=stripe_configured,
-            enabled=stripe_enabled,
-            reason_code=stripe_reason_code,
-            reason=stripe_reason,
+            enabled=bool(mock_mode or stripe_configured),
+            reason="Stripe is not configured",
         ),
-        paypal=PaymentMethodCapability(
-            supported=True,
+        paypal=_payment_method_capability(
             configured=paypal_configured,
-            enabled=paypal_enabled,
-            reason_code=paypal_reason_code,
-            reason=paypal_reason,
+            enabled=bool(mock_mode or paypal_configured),
+            reason="PayPal is not configured",
         ),
-        netopia=PaymentMethodCapability(
-            supported=netopia_supported,
-            configured=netopia_configured,
-            enabled=netopia_enabled,
-            reason_code=netopia_reason_code,
-            reason=netopia_reason,
-        ),
+        netopia=_netopia_capability(),
         cod=PaymentMethodCapability(supported=True, configured=True, enabled=True, reason=None),
     )
 
@@ -175,37 +186,70 @@ async def stripe_webhook(
         raise
 
 
-@router.post("/paypal/webhook", status_code=status.HTTP_200_OK)
-async def paypal_webhook(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-) -> dict:
+def _webhook_already_processed(record: object) -> bool:
+    return bool(getattr(record, "processed_at", None)) and not (getattr(record, "last_error", None) or "").strip()
+
+
+async def _set_paypal_webhook_result(
+    session: AsyncSession,
+    *,
+    record_id: Any,
+    processed: bool,
+    error: str | None = None,
+) -> None:
+    updated = await session.get(PayPalWebhookEvent, record_id)
+    if not updated:
+        return
+    updated.processed_at = datetime.now(timezone.utc) if processed else None
+    updated.last_error = None if processed else error
+    session.add(updated)
+    await session.commit()
+
+
+async def _parse_paypal_webhook_event(request: Request) -> dict[str, Any]:
     try:
         event = await request.json()
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
     if not isinstance(event, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
+    return event
 
+
+async def _verify_paypal_webhook_signature(request: Request, event: dict[str, Any]) -> None:
     verified = await paypal_service.verify_webhook_signature(headers=dict(request.headers), event=event)
     if not verified:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
 
+
+def _paypal_event_identity(event: dict[str, Any]) -> tuple[str, str | None]:
     event_id = str(event.get("id") or "").strip()
     if not event_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal event id")
-
-    now = datetime.now(timezone.utc)
     event_type = str(event.get("event_type") or "").strip() or None
-    resource = event.get("resource") if isinstance(event.get("resource"), dict) else {}
-    payload_summary = {
+    return event_id, event_type
+
+
+def _paypal_payload_summary(event: dict[str, Any], event_id: str, event_type: str | None) -> dict[str, Any]:
+    resource_raw = event.get("resource")
+    resource = resource_raw if isinstance(resource_raw, dict) else {}
+    resource_id = resource.get("id")
+    return {
         "id": event_id,
         "event_type": event_type,
         "create_time": event.get("create_time"),
-        "resource": {"id": resource.get("id")} if isinstance(resource, dict) and resource.get("id") else None,
+        "resource": {"id": resource_id} if resource_id else None,
     }
 
+
+async def _upsert_paypal_webhook_event(
+    session: AsyncSession,
+    *,
+    event_id: str,
+    event_type: str | None,
+    payload_summary: dict[str, Any],
+    now: datetime,
+) -> PayPalWebhookEvent:
     record = PayPalWebhookEvent(
         paypal_event_id=event_id,
         event_type=event_type,
@@ -217,6 +261,7 @@ async def paypal_webhook(
     try:
         await session.commit()
         await session.refresh(record)
+        return record
     except IntegrityError:
         await session.rollback()
         existing = (
@@ -233,34 +278,364 @@ async def paypal_webhook(
         session.add(existing)
         await session.commit()
         await session.refresh(existing)
-        record = existing
+        return existing
 
-    already_processed = bool(getattr(record, "processed_at", None)) and not (getattr(record, "last_error", None) or "").strip()
-    if already_processed:
+
+@router.post("/paypal/webhook", status_code=status.HTTP_200_OK)
+async def paypal_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    event = await _parse_paypal_webhook_event(request)
+    await _verify_paypal_webhook_signature(request, event)
+    event_id, event_type = _paypal_event_identity(event)
+    payload_summary = _paypal_payload_summary(event, event_id, event_type)
+    record = await _upsert_paypal_webhook_event(
+        session,
+        event_id=event_id,
+        event_type=event_type,
+        payload_summary=payload_summary,
+        now=datetime.now(timezone.utc),
+    )
+
+    if _webhook_already_processed(record):
         return {"received": True, "type": event.get("event_type")}
 
     try:
         await webhook_handlers.process_paypal_event(session, background_tasks, event)
-
-        updated = await session.get(PayPalWebhookEvent, record.id)
-        if updated:
-            updated.processed_at = datetime.now(timezone.utc)
-            updated.last_error = None
-            session.add(updated)
-            await session.commit()
-        return {"received": True, "type": event.get("event_type")}
     except Exception as exc:
         await session.rollback()
-        updated = await session.get(PayPalWebhookEvent, record.id)
-        if updated:
-            updated.processed_at = None
-            if isinstance(exc, HTTPException):
-                updated.last_error = str(exc.detail)
-            else:
-                updated.last_error = str(exc)
-            session.add(updated)
-            await session.commit()
+        error = str(exc.detail) if isinstance(exc, HTTPException) else str(exc)
+        await _set_paypal_webhook_result(session, record_id=record.id, processed=False, error=error)
         raise
+    await _set_paypal_webhook_result(session, record_id=record.id, processed=True)
+    return {"received": True, "type": event.get("event_type")}
+
+
+def _netopia_ack(error_type: int, error_code: str | int | None, message: str) -> dict[str, int | str]:
+    return {
+        "errorType": int(error_type),
+        "errorCode": "" if error_code is None else str(error_code),
+        "errorMessage": message,
+    }
+
+
+def _netopia_log_context(request: Request, payload: bytes) -> dict[str, Any]:
+    return {
+        "provider": "netopia",
+        "path": request.url.path,
+        "client_ip": request.client.host if request.client else None,
+        "payload_bytes": len(payload),
+    }
+
+
+def _netopia_warn_and_ack(
+    log_context: dict[str, Any],
+    *,
+    error_type: int,
+    error_code: str,
+    message: str,
+    reason: str,
+    exc_info: bool = False,
+) -> dict[str, int | str]:
+    logger.warning(
+        "Netopia webhook acknowledged with error: %s (%s)",
+        reason,
+        message,
+        extra={
+            **log_context,
+            "error_type": int(error_type),
+            "error_code": error_code,
+        },
+        exc_info=exc_info,
+    )
+    return _netopia_ack(error_type, error_code, message)
+
+
+def _verify_netopia_signature(
+    *,
+    verification_token: str,
+    payload: bytes,
+    log_context: dict[str, Any],
+) -> dict[str, int | str] | None:
+    try:
+        netopia_service.verify_ipn(verification_token=verification_token, payload=payload)
+    except HTTPException as exc:
+        detail = str(exc.detail) if getattr(exc, "detail", None) else "Invalid Netopia signature"
+        return _netopia_warn_and_ack(
+            log_context,
+            error_type=2,
+            error_code="INVALID_IPN",
+            message=detail,
+            reason="IPN verification failed",
+        )
+    except Exception:
+        return _netopia_warn_and_ack(
+            log_context,
+            error_type=2,
+            error_code="INVALID_IPN",
+            message="Invalid Netopia signature",
+            reason="IPN verification crashed",
+            exc_info=True,
+        )
+    return None
+
+
+def _parse_netopia_payload(
+    payload: bytes,
+    log_context: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, int | str] | None]:
+    try:
+        event = json.loads(payload)
+    except Exception:
+        return None, _netopia_warn_and_ack(
+            log_context,
+            error_type=2,
+            error_code="INVALID_PAYLOAD",
+            message="Invalid payload",
+            reason="payload is not valid JSON",
+        )
+    if not isinstance(event, dict):
+        return None, _netopia_warn_and_ack(
+            log_context,
+            error_type=2,
+            error_code="INVALID_PAYLOAD",
+            message="Invalid payload",
+            reason="payload root is not an object",
+        )
+    return event, None
+
+
+def _try_uuid(value: str) -> UUID | None:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return None
+    try:
+        return UUID(cleaned)
+    except Exception:
+        return None
+
+
+def _parse_optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _event_dict(event: dict[str, Any], key: str) -> dict[str, Any]:
+    value = event.get(key)
+    if isinstance(value, dict):
+        return value
+    return {}
+
+
+def _clean_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _clean_optional_text(value: Any) -> str | None:
+    cleaned = _clean_text(value)
+    return cleaned or None
+
+
+def _order_candidate(value: str) -> str:
+    return value.split("_", 1)[0].strip()
+
+
+def _extract_netopia_fields(event: dict[str, Any]) -> tuple[str, str, UUID | None, str | None, str | None, int | None]:
+    order_info = _event_dict(event, "order")
+    payment_info = _event_dict(event, "payment")
+
+    order_id_raw = _clean_text(order_info.get("orderID"))
+    candidate = _order_candidate(order_id_raw) if order_id_raw else ""
+    order_uuid = _try_uuid(order_id_raw) or _try_uuid(candidate)
+    ntp_id = _clean_optional_text(payment_info.get("ntpID"))
+    payment_message = _clean_optional_text(payment_info.get("message"))
+    payment_status = _parse_optional_int(payment_info.get("status"))
+    return order_id_raw, candidate, order_uuid, ntp_id, payment_message, payment_status
+
+
+async def _load_netopia_order(session: AsyncSession, *, order_uuid: UUID | None, candidate: str) -> Order | None:
+    query = (
+        select(Order)
+        .options(
+            selectinload(Order.user),
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.events),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
+        )
+    )
+    if order_uuid:
+        query = query.where(Order.id == order_uuid)
+    else:
+        query = query.where(Order.reference_code == candidate)
+    return (await session.execute(query)).scalars().first()
+
+
+def _netopia_order_error(order: Order | None) -> dict[str, int | str] | None:
+    if not order:
+        return _netopia_ack(2, "ORDER_NOT_FOUND", "Order not found")
+    if (order.payment_method or "").strip().lower() != "netopia":
+        return _netopia_ack(2, "ORDER_NOT_NETOPIA", "Order is not a Netopia order")
+    return None
+
+
+def _append_payment_message(base_message: str, payment_message: str | None) -> str:
+    if not payment_message:
+        return base_message
+    return f"{base_message}. {payment_message}"
+
+
+def _netopia_payment_note(ntp_id: str | None, payment_message: str | None) -> str:
+    note = f"Netopia {ntp_id}".strip() if ntp_id else "Netopia"
+    if payment_message:
+        note = f"{note} — {payment_message}"
+    return note
+
+
+async def _notify_netopia_payment_received(session: AsyncSession, order: Order) -> None:
+    if not (order.user and order.user.id):
+        return
+    await notification_service.create_notification(
+        session,
+        user_id=order.user.id,
+        type="order",
+        title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
+        body=f"Reference {order.reference_code}" if order.reference_code else None,
+        url=_account_orders_url(order),
+    )
+
+
+def _netopia_customer_to(order: Order) -> str | None:
+    if order.user and order.user.email:
+        return order.user.email
+    return getattr(order, "customer_email", None)
+
+
+def _netopia_customer_language(order: Order) -> str | None:
+    if order.user:
+        return order.user.preferred_language
+    return None
+
+
+def _netopia_admin_to(owner: Any) -> str | None:
+    if owner and owner.email:
+        return owner.email
+    return settings.admin_alert_email
+
+
+async def _queue_netopia_order_emails(session: AsyncSession, background_tasks: BackgroundTasks, order: Order) -> None:
+    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+    customer_to = _netopia_customer_to(order)
+    customer_lang = _netopia_customer_language(order)
+    if customer_to:
+        background_tasks.add_task(
+            email_service.send_order_confirmation,
+            customer_to,
+            order,
+            order.items,
+            customer_lang,
+            receipt_share_days=checkout_settings.receipt_share_days,
+        )
+
+    owner = await auth_service.get_owner_user(session)
+    admin_to = _netopia_admin_to(owner)
+    if admin_to:
+        background_tasks.add_task(
+            email_service.send_new_order_notification,
+            admin_to,
+            order,
+            customer_to,
+            owner.preferred_language if owner else None,
+        )
+
+
+async def _process_netopia_paid_order(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    order: Order,
+    *,
+    ntp_id: str | None,
+    payment_message: str | None,
+) -> None:
+    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    allowed_statuses = {
+        OrderStatus.pending_payment,
+        OrderStatus.pending_acceptance,
+        OrderStatus.paid,
+    }
+    if already_captured or order.status not in allowed_statuses:
+        return
+
+    note = _netopia_payment_note(ntp_id, payment_message)
+    if order.status == OrderStatus.pending_payment:
+        order.status = OrderStatus.pending_acceptance
+        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+
+    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
+    await promo_usage.record_promo_usage(session, order=order, note=note)
+    session.add(order)
+    await session.commit()
+    await session.refresh(order)
+    await coupons_service.redeem_coupon_for_order(session, order=order, note=note)
+
+    await _notify_netopia_payment_received(session, order)
+    await _queue_netopia_order_emails(session, background_tasks, order)
+
+
+def _netopia_status_ack_fields(payment_status: int | None, payment_message: str | None) -> tuple[int, str | int, str]:
+    if payment_status is None:
+        return 1, "UNKNOWN", "Unknown payment status"
+    status_messages = {
+        4: "payment was cancelled; do not deliver goods",
+        12: "Payment is DECLINED",
+        13: "Payment in reviewing",
+        15: "3D AUTH required",
+    }
+    return 1, payment_status, _append_payment_message(status_messages.get(payment_status, "Unknown"), payment_message)
+
+
+def _prepare_netopia_event(
+    *,
+    verification_token: str | None,
+    payload: bytes,
+    log_context: dict[str, Any],
+) -> tuple[dict[str, Any] | None, dict[str, int | str] | None]:
+    if not verification_token:
+        return None, _netopia_warn_and_ack(
+            log_context,
+            error_type=2,
+            error_code="MISSING_VERIFICATION_TOKEN",
+            message="Missing Netopia verification token",
+            reason="missing verification header",
+        )
+    signature_error = _verify_netopia_signature(
+        verification_token=verification_token,
+        payload=payload,
+        log_context=log_context,
+    )
+    if signature_error:
+        return None, signature_error
+    return _parse_netopia_payload(payload, log_context)
+
+
+async def _resolve_netopia_order_context(
+    session: AsyncSession,
+    event: dict[str, Any],
+) -> tuple[Order | None, str | None, str | None, int | None, dict[str, int | str] | None]:
+    order_id_raw, candidate, order_uuid, ntp_id, payment_message, payment_status = _extract_netopia_fields(event)
+    if not order_id_raw:
+        return None, ntp_id, payment_message, payment_status, _netopia_ack(2, "MISSING_ORDER_ID", "Missing order id")
+    order = await _load_netopia_order(session, order_uuid=order_uuid, candidate=candidate)
+    order_error = _netopia_order_error(order)
+    if order_error:
+        return None, ntp_id, payment_message, payment_status, order_error
+    return order, ntp_id, payment_message, payment_status, None
 
 
 @router.post("/netopia/webhook", status_code=status.HTTP_200_OK)
@@ -271,207 +646,43 @@ async def netopia_webhook(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     payload = await request.body()
+    log_context = _netopia_log_context(request, payload)
 
-    def _ack(error_type: int, error_code: str | int | None, message: str) -> dict:
-        return {
-            "errorType": int(error_type),
-            "errorCode": "" if error_code is None else str(error_code),
-            "errorMessage": message,
-        }
+    event, precheck_error = _prepare_netopia_event(
+        verification_token=verification_token,
+        payload=payload,
+        log_context=log_context,
+    )
+    if precheck_error:
+        return precheck_error
+    assert event is not None
 
-    client_ip = request.client.host if request.client else None
-    log_context = {
-        "provider": "netopia",
-        "path": request.url.path,
-        "client_ip": client_ip,
-        "payload_bytes": len(payload),
-    }
-
-    def _warn_and_ack(error_type: int, error_code: str, message: str, reason: str, *, exc_info: bool = False) -> dict:
-        logger.warning(
-            "Netopia webhook acknowledged with error: %s (%s)",
-            reason,
-            message,
-            extra={
-                **log_context,
-                "error_type": int(error_type),
-                "error_code": error_code,
-            },
-            exc_info=exc_info,
-        )
-        return _ack(error_type, error_code, message)
-
-    if not verification_token:
-        return _warn_and_ack(
-            2,
-            "MISSING_VERIFICATION_TOKEN",
-            "Missing Netopia verification token",
-            "missing verification header",
-        )
+    order, ntp_id, payment_message, payment_status, order_error = await _resolve_netopia_order_context(session, event)
+    if order_error:
+        return order_error
+    assert order is not None
 
     try:
-        netopia_service.verify_ipn(verification_token=verification_token, payload=payload)
-    except HTTPException as exc:
-        detail = str(exc.detail) if getattr(exc, "detail", None) else "Invalid Netopia signature"
-        return _warn_and_ack(2, "INVALID_IPN", detail, "IPN verification failed")
-    except Exception:
-        return _warn_and_ack(2, "INVALID_IPN", "Invalid Netopia signature", "IPN verification crashed", exc_info=True)
-
-    try:
-        event = json.loads(payload)
-    except Exception:
-        return _warn_and_ack(2, "INVALID_PAYLOAD", "Invalid payload", "payload is not valid JSON")
-    if not isinstance(event, dict):
-        return _warn_and_ack(2, "INVALID_PAYLOAD", "Invalid payload", "payload root is not an object")
-
-    try:
-        order_info = event.get("order") if isinstance(event.get("order"), dict) else {}
-        payment_info = event.get("payment") if isinstance(event.get("payment"), dict) else {}
-        order_id_raw = str(order_info.get("orderID") or "").strip()
-        ntp_id = str(payment_info.get("ntpID") or "").strip() or None
-        payment_message = str(payment_info.get("message") or "").strip() or None
-        payment_status_raw = payment_info.get("status")
-        try:
-            payment_status = int(payment_status_raw) if payment_status_raw is not None else None
-        except Exception:
-            payment_status = None
-
-        if not order_id_raw:
-            return _ack(2, "MISSING_ORDER_ID", "Missing order id")
-
-        def _try_uuid(value: str) -> UUID | None:
-            cleaned = (value or "").strip()
-            if not cleaned:
-                return None
-            try:
-                return UUID(cleaned)
-            except Exception:
-                return None
-
-        candidate = order_id_raw.split("_", 1)[0].strip() if order_id_raw else ""
-        order_uuid = _try_uuid(order_id_raw) or _try_uuid(candidate)
-
-        query = (
-            select(Order)
-            .options(
-                selectinload(Order.user),
-                selectinload(Order.items).selectinload(OrderItem.product),
-                selectinload(Order.events),
-                selectinload(Order.shipping_address),
-                selectinload(Order.billing_address),
+        if payment_status in {3, 5}:
+            await _process_netopia_paid_order(
+                session,
+                background_tasks,
+                order,
+                ntp_id=ntp_id,
+                payment_message=payment_message,
             )
-        )
-        if order_uuid:
-            query = query.where(Order.id == order_uuid)
-        else:
-            query = query.where(Order.reference_code == candidate)
+            paid_message = _append_payment_message("payment was paid; deliver goods", payment_message)
+            return _netopia_ack(0, None, paid_message)
 
-        order = (await session.execute(query)).scalars().first()
-        if not order:
-            return _ack(2, "ORDER_NOT_FOUND", "Order not found")
-
-        if (order.payment_method or "").strip().lower() != "netopia":
-            return _ack(2, "ORDER_NOT_NETOPIA", "Order is not a Netopia order")
-
-        # Status codes based on Netopia IPN docs / official examples.
-        paid_statuses = {3, 5}  # STATUS_PAID / STATUS_CONFIRMED
-        if payment_status in paid_statuses:
-            already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
-            if not already_captured and order.status in {
-                OrderStatus.pending_payment,
-                OrderStatus.pending_acceptance,
-                OrderStatus.paid,
-            }:
-                note = f"Netopia {ntp_id}".strip() if ntp_id else "Netopia"
-                if payment_message:
-                    note = f"{note} — {payment_message}"
-
-                if order.status == OrderStatus.pending_payment:
-                    order.status = OrderStatus.pending_acceptance
-                    session.add(
-                        OrderEvent(
-                            order_id=order.id,
-                            event="status_change",
-                            note="pending_payment -> pending_acceptance",
-                        )
-                    )
-                session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
-                await promo_usage.record_promo_usage(session, order=order, note=note)
-                session.add(order)
-                await session.commit()
-                await session.refresh(order)
-                await coupons_service.redeem_coupon_for_order(session, order=order, note=note)
-
-                if order.user and order.user.id:
-                    await notification_service.create_notification(
-                        session,
-                        user_id=order.user.id,
-                        type="order",
-                        title="Payment received"
-                        if (order.user.preferred_language or "en") != "ro"
-                        else "Plată confirmată",
-                        body=f"Reference {order.reference_code}" if order.reference_code else None,
-                        url=_account_orders_url(order),
-                    )
-
-                checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-                customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
-                    order, "customer_email", None
-                )
-                customer_lang = order.user.preferred_language if order.user else None
-                if customer_to:
-                    background_tasks.add_task(
-                        email_service.send_order_confirmation,
-                        customer_to,
-                        order,
-                        order.items,
-                        customer_lang,
-                        receipt_share_days=checkout_settings.receipt_share_days,
-                    )
-                owner = await auth_service.get_owner_user(session)
-                admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-                if admin_to:
-                    background_tasks.add_task(
-                        email_service.send_new_order_notification,
-                        admin_to,
-                        order,
-                        customer_to,
-                        owner.preferred_language if owner else None,
-                    )
-
-            msg = "payment was paid; deliver goods"
-            if payment_message:
-                msg = f"{msg}. {payment_message}"
-            return _ack(0, None, msg)
-
-        if payment_status is None:
-            return _ack(1, "UNKNOWN", "Unknown payment status")
-
-        if payment_status == 4:
-            msg = "payment was cancelled; do not deliver goods"
-            if payment_message:
-                msg = f"{msg}. {payment_message}"
-            return _ack(1, payment_status, msg)
-        if payment_status == 12:
-            msg = "Payment is DECLINED"
-            if payment_message:
-                msg = f"{msg}. {payment_message}"
-            return _ack(1, payment_status, msg)
-        if payment_status == 13:
-            msg = "Payment in reviewing"
-            if payment_message:
-                msg = f"{msg}. {payment_message}"
-            return _ack(1, payment_status, msg)
-        if payment_status == 15:
-            msg = "3D AUTH required"
-            if payment_message:
-                msg = f"{msg}. {payment_message}"
-            return _ack(1, payment_status, msg)
-
-        msg = "Unknown"
-        if payment_message:
-            msg = f"{msg}. {payment_message}"
-        return _ack(1, payment_status, msg)
+        error_type, error_code, message = _netopia_status_ack_fields(payment_status, payment_message)
+        return _netopia_ack(error_type, error_code, message)
     except Exception:
         await session.rollback()
-        return _warn_and_ack(2, "INTERNAL_ERROR", "Internal processing error", "unhandled processing error", exc_info=True)
+        return _netopia_warn_and_ack(
+            log_context,
+            error_type=2,
+            error_code="INTERNAL_ERROR",
+            message="Internal processing error",
+            reason="unhandled processing error",
+            exc_info=True,
+        )

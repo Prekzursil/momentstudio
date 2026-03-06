@@ -83,6 +83,21 @@ async def admin_create_banner(
     return MaintenanceBannerRead.model_validate(created)
 
 
+def _banner_snapshot(record: MaintenanceBanner, fields: list[str]) -> dict[str, object]:
+    return {
+        key: (value.isoformat() if isinstance(value, datetime) else value)
+        for key, value in ((field, getattr(record, field)) for field in fields)
+    }
+
+
+def _validate_banner_window(starts_at: datetime | None, ends_at: datetime | None) -> None:
+    if not ends_at or not starts_at:
+        return
+    if ends_at > starts_at:
+        return
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End time must be after start time")
+
+
 @router.patch("/admin/banners/{banner_id}", response_model=MaintenanceBannerRead)
 async def admin_update_banner(
     banner_id: UUID,
@@ -96,12 +111,9 @@ async def admin_update_banner(
     data = payload.model_dump(exclude_unset=True)
     next_starts = data.get("starts_at", getattr(banner, "starts_at", None))
     next_ends = data.get("ends_at", getattr(banner, "ends_at", None))
-    if next_ends and next_starts and next_ends <= next_starts:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End time must be after start time")
-    before = {
-        key: (value.isoformat() if isinstance(value, datetime) else value)
-        for key, value in ((field, getattr(banner, field)) for field in data)
-    }
+    _validate_banner_window(next_starts, next_ends)
+    changed_fields = sorted(list(data.keys()))
+    before = _banner_snapshot(banner, changed_fields)
     for key, value in data.items():
         setattr(banner, key, value)
     updated = await ops_service.update_maintenance_banner(session, banner)
@@ -112,12 +124,9 @@ async def admin_update_banner(
         subject_user_id=None,
         data={
             "banner_id": str(updated.id),
-            "changed_fields": sorted(list(data.keys())),
+            "changed_fields": changed_fields,
             "before": before,
-            "after": {
-                key: (value.isoformat() if isinstance(value, datetime) else value)
-                for key, value in ((field, getattr(updated, field)) for field in data)
-            },
+            "after": _banner_snapshot(updated, changed_fields),
         },
     )
     await session.commit()

@@ -144,93 +144,144 @@ def _load_md(profile_files: dict[str, Path], rel_path: str, *, allowed_markdown_
     return f"{text}\n"
 
 
-def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct], list[SeedContentBlock]]:
-    profile_dir = _resolve_profile_dir(profile)
-    profile_files = _build_profile_file_map(profile_dir)
-    allowed_markdown_paths = {
+def _build_allowed_markdown_paths(profile_dir: Path) -> set[str]:
+    return {
         path.relative_to(profile_dir).as_posix()
         for path in profile_dir.rglob("*.md")
         if path.is_file() and PROFILE_CONTENT_PATH_PATTERN.fullmatch(path.relative_to(profile_dir).as_posix())
     }
 
-    catalog = json.loads(
-        _resolve_profile_file(profile_files, "catalog.json", allowed_paths=SEED_JSON_ALLOWLIST).read_text(
-            encoding="utf-8"
+
+def _load_profile_json(profile_files: dict[str, Path], rel_path: str) -> dict[str, Any]:
+    content = _resolve_profile_file(profile_files, rel_path, allowed_paths=SEED_JSON_ALLOWLIST).read_text(encoding="utf-8")
+    return json.loads(content)
+
+
+def _parse_seed_variant(variant: dict[str, Any]) -> SeedVariant:
+    return {
+        "name": str(variant["name"]),
+        "additional_price_delta": Decimal(str(variant["additional_price_delta"])),
+        "stock_quantity": int(variant["stock_quantity"]),
+    }
+
+
+def _parse_seed_product(prod: dict[str, Any]) -> SeedProduct:
+    return {
+        "slug": str(prod["slug"]),
+        "name": str(prod["name"]),
+        "category_slug": str(prod["category_slug"]),
+        "short_description": str(prod["short_description"]),
+        "long_description": str(prod["long_description"]),
+        "base_price": Decimal(str(prod["base_price"])),
+        "currency": str(prod["currency"]),
+        "stock_quantity": int(prod["stock_quantity"]),
+        "is_featured": bool(prod["is_featured"]),
+        "images": list(prod.get("images", [])),
+        "variants": [_parse_seed_variant(variant) for variant in prod.get("variants", [])],
+    }
+
+
+def _resolve_markdown_body(
+    payload: dict[str, Any],
+    *,
+    profile_files: dict[str, Path],
+    allowed_markdown_paths: set[str],
+) -> Any:
+    body_markdown = payload.get("body_markdown")
+    if body_markdown is None and payload.get("body_markdown_file"):
+        body_markdown = _load_md(
+            profile_files,
+            payload["body_markdown_file"],
+            allowed_markdown_paths=allowed_markdown_paths,
         )
-    )
-    content = json.loads(
-        _resolve_profile_file(profile_files, "content_blocks.json", allowed_paths=SEED_JSON_ALLOWLIST).read_text(
-            encoding="utf-8"
-        )
-    )
+    return body_markdown or ""
 
-    categories = list(catalog.get("categories", []))
-    products: list[SeedProduct] = []
-    for prod in catalog.get("products", []):
-        parsed_product: SeedProduct = {
-            "slug": str(prod["slug"]),
-            "name": str(prod["name"]),
-            "category_slug": str(prod["category_slug"]),
-            "short_description": str(prod["short_description"]),
-            "long_description": str(prod["long_description"]),
-            "base_price": Decimal(str(prod["base_price"])),
-            "currency": str(prod["currency"]),
-            "stock_quantity": int(prod["stock_quantity"]),
-            "is_featured": bool(prod["is_featured"]),
-            "images": list(prod.get("images", [])),
-            "variants": [
-                {
-                    "name": str(variant["name"]),
-                    "additional_price_delta": Decimal(str(variant["additional_price_delta"])),
-                    "stock_quantity": int(variant["stock_quantity"]),
-                }
-                for variant in prod.get("variants", [])
-            ],
-        }
-        products.append(parsed_product)
 
-    blocks: list[SeedContentBlock] = []
-    for block in content.get("content_blocks", []):
-        body_markdown = block.get("body_markdown")
-        if body_markdown is None and block.get("body_markdown_file"):
-            body_markdown = _load_md(profile_files, block["body_markdown_file"], allowed_markdown_paths=allowed_markdown_paths)
+def _parse_seed_translation(
+    translation: dict[str, Any],
+    *,
+    profile_files: dict[str, Path],
+    allowed_markdown_paths: set[str],
+) -> SeedTranslation:
+    return {
+        "lang": translation["lang"],
+        "title": translation["title"],
+        "body_markdown": _resolve_markdown_body(
+            translation,
+            profile_files=profile_files,
+            allowed_markdown_paths=allowed_markdown_paths,
+        ),
+    }
 
-        translations: list[SeedTranslation] = []
-        for translation in block.get("translations", []):
-            translation_body = translation.get("body_markdown")
-            if translation_body is None and translation.get("body_markdown_file"):
-                translation_body = _load_md(
-                    profile_files,
-                    translation["body_markdown_file"],
-                    allowed_markdown_paths=allowed_markdown_paths,
-                )
-            translations.append(
-                {
-                    "lang": translation["lang"],
-                    "title": translation["title"],
-                    "body_markdown": translation_body or "",
-                }
+
+def _parse_seed_block(
+    block: dict[str, Any],
+    *,
+    profile_files: dict[str, Path],
+    allowed_markdown_paths: set[str],
+) -> SeedContentBlock:
+    return {
+        "key": block["key"],
+        "title": block["title"],
+        "body_markdown": _resolve_markdown_body(
+            block,
+            profile_files=profile_files,
+            allowed_markdown_paths=allowed_markdown_paths,
+        ),
+        "status": block.get("status", "draft"),
+        "meta": block.get("meta"),
+        "lang": block.get("lang"),
+        "translations": [
+            _parse_seed_translation(
+                translation,
+                profile_files=profile_files,
+                allowed_markdown_paths=allowed_markdown_paths,
             )
+            for translation in block.get("translations", [])
+        ],
+    }
 
-        blocks.append(
-            {
-                "key": block["key"],
-                "title": block["title"],
-                "body_markdown": body_markdown or "",
-                "status": block.get("status", "draft"),
-                "meta": block.get("meta"),
-                "lang": block.get("lang"),
-                "translations": translations,
-            }
+
+def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct], list[SeedContentBlock]]:
+    profile_dir = _resolve_profile_dir(profile)
+    profile_files = _build_profile_file_map(profile_dir)
+    allowed_markdown_paths = _build_allowed_markdown_paths(profile_dir)
+    catalog = _load_profile_json(profile_files, "catalog.json")
+    content = _load_profile_json(profile_files, "content_blocks.json")
+    categories = list(catalog.get("categories", []))
+    products = [_parse_seed_product(prod) for prod in catalog.get("products", [])]
+    blocks = [
+        _parse_seed_block(
+            block,
+            profile_files=profile_files,
+            allowed_markdown_paths=allowed_markdown_paths,
         )
-
+        for block in content.get("content_blocks", [])
+    ]
     return categories, products, blocks
 
 
-async def seed(session: AsyncSession, *, profile: str = "default") -> None:
-    categories, products, blocks = _load_profile(profile)
+def _build_product(prod: SeedProduct, *, category_id: Any) -> Product:
+    product = Product(
+        category_id=category_id,
+        slug=prod["slug"],
+        name=prod["name"],
+        short_description=prod["short_description"],
+        long_description=prod["long_description"],
+        base_price=prod["base_price"],
+        currency=prod["currency"],
+        is_active=True,
+        status=ProductStatus.published,
+        publish_at=datetime.now(timezone.utc),
+        is_featured=prod["is_featured"],
+        stock_quantity=prod["stock_quantity"],
+    )
+    product.images = [ProductImage(**img) for img in prod["images"]]
+    product.variants = [ProductVariant(**variant) for variant in prod["variants"]]
+    return product
 
-    # Categories
+
+async def _seed_categories(session: AsyncSession, categories: list[dict[str, Any]]) -> None:
     for cat in categories:
         existing = await session.execute(select(Category).where(Category.slug == cat["slug"]))
         if existing.scalar_one_or_none():
@@ -238,69 +289,61 @@ async def seed(session: AsyncSession, *, profile: str = "default") -> None:
         session.add(Category(**cat))
     await session.commit()
 
-    # Products
+
+async def _seed_products(session: AsyncSession, products: list[SeedProduct]) -> None:
     for prod in products:
         result = await session.execute(select(Product).where(Product.slug == prod["slug"]))
         if result.scalar_one_or_none():
             continue
-
         cat_result = await session.execute(select(Category).where(Category.slug == prod["category_slug"]))
         category = cat_result.scalar_one()
-
-        product = Product(
-            category_id=category.id,
-            slug=prod["slug"],
-            name=prod["name"],
-            short_description=prod["short_description"],
-            long_description=prod["long_description"],
-            base_price=prod["base_price"],
-            currency=prod["currency"],
-            is_active=True,
-            status=ProductStatus.published,
-            publish_at=datetime.now(timezone.utc),
-            is_featured=prod["is_featured"],
-            stock_quantity=prod["stock_quantity"],
-        )
-        product.images = [ProductImage(**img) for img in prod["images"]]
-        product.variants = [ProductVariant(**variant) for variant in prod["variants"]]
-        session.add(product)
-
+        session.add(_build_product(prod, category_id=category.id))
     await session.commit()
 
-    # Content blocks
+
+def _build_content_block(block: SeedContentBlock) -> ContentBlock:
+    status = ContentStatus(block["status"])
+    published_at = datetime.now(timezone.utc) if status == ContentStatus.published else None
+    content_block = ContentBlock(
+        key=block["key"],
+        title=block["title"],
+        body_markdown=block["body_markdown"],
+        status=status,
+        version=1,
+        meta=block["meta"],
+        lang=block["lang"],
+        published_at=published_at,
+    )
+    content_block.translations = [ContentBlockTranslation(**translation) for translation in block["translations"]]
+    content_block.versions = [
+        ContentBlockVersion(
+            version=1,
+            title=block["title"],
+            body_markdown=block["body_markdown"],
+            status=status,
+            meta=block["meta"],
+            lang=block["lang"],
+            published_at=published_at,
+            translations=list(block["translations"]),
+        )
+    ]
+    return content_block
+
+
+async def _seed_content_blocks(session: AsyncSession, blocks: list[SeedContentBlock]) -> None:
     for block in blocks:
         existing = await session.execute(select(ContentBlock).where(ContentBlock.key == block["key"]))
         if existing.scalar_one_or_none():
             continue
-
-        status = ContentStatus(block["status"])
-        published_at = datetime.now(timezone.utc) if status == ContentStatus.published else None
-        content_block = ContentBlock(
-            key=block["key"],
-            title=block["title"],
-            body_markdown=block["body_markdown"],
-            status=status,
-            version=1,
-            meta=block["meta"],
-            lang=block["lang"],
-            published_at=published_at,
-        )
-        content_block.translations = [ContentBlockTranslation(**translation) for translation in block["translations"]]
-        content_block.versions = [
-            ContentBlockVersion(
-                version=1,
-                title=block["title"],
-                body_markdown=block["body_markdown"],
-                status=status,
-                meta=block["meta"],
-                lang=block["lang"],
-                published_at=published_at,
-                translations=list(block["translations"]),
-            )
-        ]
-        session.add(content_block)
-
+        session.add(_build_content_block(block))
     await session.commit()
+
+
+async def seed(session: AsyncSession, *, profile: str = "default") -> None:
+    categories, products, blocks = _load_profile(profile)
+    await _seed_categories(session, categories)
+    await _seed_products(session, products)
+    await _seed_content_blocks(session, blocks)
 
 
 async def main(profile: str) -> None:

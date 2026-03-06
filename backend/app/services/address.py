@@ -16,6 +16,16 @@ POSTAL_PATTERNS = {
 }
 
 
+def _postal_pattern_for_country(country: str) -> str:
+    return POSTAL_PATTERNS.get(country, r"^[A-Za-z0-9 -]{3,12}$")
+
+
+def _postal_error_message(country: str) -> str:
+    if country in POSTAL_PATTERNS:
+        return "Invalid postal code for country"
+    return "Invalid postal code format"
+
+
 def _validate_address_fields(country: str, postal_code: str) -> tuple[str, str]:
     if not country or len(country) != 2 or not country.isalpha():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Country must be a 2-letter code")
@@ -23,13 +33,12 @@ def _validate_address_fields(country: str, postal_code: str) -> tuple[str, str]:
     if not postal_code or not postal_code.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Postal code is required")
     postal_code = postal_code.strip()
-    pattern = POSTAL_PATTERNS.get(normalized_country)
-    if pattern:
-        if not re.match(pattern, postal_code):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid postal code for country")
-    else:
-        if not re.match(r"^[A-Za-z0-9 -]{3,12}$", postal_code):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid postal code format")
+    pattern = _postal_pattern_for_country(normalized_country)
+    if not re.match(pattern, postal_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=_postal_error_message(normalized_country),
+        )
     return normalized_country, postal_code
 
 

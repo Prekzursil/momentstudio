@@ -79,6 +79,24 @@ def _cache_bucket() -> dict[str, object]:
     return _token_cache.setdefault(_paypal_env(), {"access_token": None, "expires_at": None})
 
 
+def _cached_access_token(now: datetime) -> str | None:
+    bucket = _cache_bucket()
+    cached_token = bucket.get("access_token")
+    cached_expires_at = bucket.get("expires_at")
+    if isinstance(cached_token, str) and isinstance(cached_expires_at, datetime):
+        # Refresh a bit early to avoid edge-of-expiry failures.
+        if cached_expires_at - now > timedelta(seconds=30):
+            return cached_token
+    return None
+
+
+def _cache_access_token(*, access_token: str, expires_in: Any, now: datetime) -> None:
+    expiry_seconds = int(expires_in) if isinstance(expires_in, (int, float)) else 300
+    bucket = _cache_bucket()
+    bucket["access_token"] = access_token
+    bucket["expires_at"] = now + timedelta(seconds=expiry_seconds)
+
+
 def is_paypal_configured() -> bool:
     return bool(_effective_client_id() and _effective_client_secret())
 
@@ -87,22 +105,7 @@ def _base_url() -> str:
     return "https://api-m.paypal.com" if _paypal_env() == "live" else "https://api-m.sandbox.paypal.com"
 
 
-async def _get_access_token() -> str:
-    if not is_paypal_configured():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal not configured")
-
-    now = datetime.now(timezone.utc)
-    bucket = _cache_bucket()
-    cached_token = bucket.get("access_token")
-    cached_expires_at = bucket.get("expires_at")
-    if isinstance(cached_token, str) and isinstance(cached_expires_at, datetime):
-        # Refresh a bit early to avoid edge-of-expiry failures.
-        if cached_expires_at - now > timedelta(seconds=30):
-            return cached_token
-
-    client_id = _effective_client_id()
-    client_secret = _effective_client_secret()
-
+async def _fetch_access_token(*, client_id: str, client_secret: str) -> dict[str, Any]:
     try:
         async with httpx.AsyncClient(base_url=_base_url(), timeout=10) as client:
             resp = await client.post(
@@ -112,18 +115,28 @@ async def _get_access_token() -> str:
                 headers={"Accept": "application/json", "Accept-Language": "en_US"},
             )
             resp.raise_for_status()
-            data = resp.json()
+            return resp.json()
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal token request failed") from exc
+
+
+async def _get_access_token() -> str:
+    if not is_paypal_configured():
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal not configured")
+
+    now = datetime.now(timezone.utc)
+    cached_token = _cached_access_token(now)
+    if cached_token:
+        return cached_token
+
+    data = await _fetch_access_token(client_id=_effective_client_id(), client_secret=_effective_client_secret())
 
     access_token = data.get("access_token")
     expires_in = data.get("expires_in")
     if not isinstance(access_token, str) or not access_token:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal token missing")
 
-    expiry = now + timedelta(seconds=int(expires_in) if isinstance(expires_in, (int, float)) else 300)
-    bucket["access_token"] = access_token
-    bucket["expires_at"] = expiry
+    _cache_access_token(access_token=access_token, expires_in=expires_in, now=now)
     return access_token
 
 
@@ -171,6 +184,293 @@ def _format_amount(value: Decimal) -> str:
     return str(Decimal(value).quantize(Decimal("0.01")))
 
 
+def _parse_positive_int(value: Any) -> int | None:
+    try:
+        parsed = int(str(value))
+    except Exception:
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _parse_decimal(value: Any) -> Decimal | None:
+    try:
+        return Decimal(str(value))
+    except Exception:
+        return None
+
+
+def _convert_order_item(*, raw_item: dict[str, Any], currency: str, fx_per_ron: Decimal) -> tuple[dict[str, Any] | None, Decimal]:
+    quantity = _parse_positive_int(raw_item.get("quantity"))
+    if quantity is None:
+        return None, Decimal("0.00")
+
+    raw_unit_amount = raw_item.get("unit_amount")
+    if not isinstance(raw_unit_amount, dict):
+        return None, Decimal("0.00")
+
+    unit_ron = _parse_decimal(raw_unit_amount.get("value"))
+    if unit_ron is None:
+        return None, Decimal("0.00")
+
+    unit_converted = _convert_ron(unit_ron, fx_per_ron)
+    unit_amount = dict(raw_unit_amount)
+    unit_amount["currency_code"] = currency
+    unit_amount["value"] = _format_amount(unit_converted)
+
+    item = dict(raw_item)
+    item["quantity"] = str(quantity)
+    item["unit_amount"] = unit_amount
+    return item, unit_converted * quantity
+
+
+def _convert_items(*, items: list[dict[str, Any]] | None, currency: str, fx_per_ron: Decimal) -> tuple[list[dict[str, Any]] | None, Decimal | None]:
+    if not items:
+        return None, None
+
+    converted_items: list[dict[str, Any]] = []
+    item_total_converted = Decimal("0.00")
+    for raw_item in items:
+        if not isinstance(raw_item, dict):
+            continue
+        item, item_total = _convert_order_item(raw_item=raw_item, currency=currency, fx_per_ron=fx_per_ron)
+        if item is None:
+            continue
+        converted_items.append(item)
+        item_total_converted += item_total
+
+    if not converted_items:
+        return None, None
+    return converted_items, item_total_converted
+
+
+def _convert_optional_amount(value_ron: Decimal | None, fx_per_ron: Decimal) -> Decimal | None:
+    return _convert_ron(Decimal(value_ron), fx_per_ron) if value_ron is not None else None
+
+
+def _discount_requested(discount_ron: Decimal | None) -> bool:
+    return discount_ron is not None and Decimal(discount_ron) > 0
+
+
+def _convert_discount(discount_ron: Decimal | None, fx_per_ron: Decimal) -> Decimal | None:
+    if discount_ron is None:
+        return None
+    discount_value = Decimal(discount_ron)
+    if discount_value <= 0:
+        return None
+    return _convert_ron(discount_value, fx_per_ron)
+
+
+def _resolve_item_total(
+    *,
+    item_total_converted: Decimal | None,
+    item_total_ron: Decimal | None,
+    fx_per_ron: Decimal,
+) -> Decimal | None:
+    if item_total_converted is not None or item_total_ron is None:
+        return item_total_converted
+    return _convert_ron(Decimal(item_total_ron), fx_per_ron)
+
+
+def _compute_total_converted(
+    *,
+    item_total_converted: Decimal | None,
+    shipping_converted: Decimal | None,
+    fee_converted: Decimal | None,
+    tax_converted: Decimal | None,
+    discount_converted: Decimal | None,
+) -> Decimal:
+    total_converted = Decimal("0.00")
+    for value in (item_total_converted, shipping_converted, fee_converted, tax_converted):
+        if value is not None:
+            total_converted += value
+    if discount_converted is not None:
+        total_converted -= discount_converted
+    if total_converted <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order total")
+    return total_converted
+
+
+def _amount_value(currency: str, value: Decimal) -> dict[str, str]:
+    return {"currency_code": currency, "value": _format_amount(value)}
+
+
+def _set_breakdown_amount(
+    *,
+    breakdown: dict[str, Any],
+    key: str,
+    currency: str,
+    value: Decimal | None,
+    allow_zero: bool = False,
+) -> None:
+    if value is None:
+        return
+    if not allow_zero and Decimal(value) <= 0:
+        return
+    breakdown[key] = _amount_value(currency, value)
+
+
+def _build_breakdown(
+    *,
+    currency: str,
+    item_total_converted: Decimal | None,
+    shipping_converted: Decimal | None,
+    fee_converted: Decimal | None,
+    tax_converted: Decimal | None,
+    discount_converted: Decimal | None,
+) -> dict[str, Any]:
+    breakdown: dict[str, Any] = {}
+    _set_breakdown_amount(
+        breakdown=breakdown,
+        key="item_total",
+        currency=currency,
+        value=item_total_converted,
+        allow_zero=True,
+    )
+    _set_breakdown_amount(breakdown=breakdown, key="shipping", currency=currency, value=shipping_converted)
+    _set_breakdown_amount(breakdown=breakdown, key="handling", currency=currency, value=fee_converted)
+    _set_breakdown_amount(breakdown=breakdown, key="tax_total", currency=currency, value=tax_converted)
+    _set_breakdown_amount(breakdown=breakdown, key="discount", currency=currency, value=discount_converted)
+    return breakdown
+
+
+def _build_order_amount(
+    *,
+    currency: str,
+    total_converted: Decimal,
+    item_total_converted: Decimal | None,
+    shipping_converted: Decimal | None,
+    fee_converted: Decimal | None,
+    tax_converted: Decimal | None,
+    discount_converted: Decimal | None,
+    item_total_ron: Decimal | None,
+    shipping_ron: Decimal | None,
+    tax_ron: Decimal | None,
+    fee_ron: Decimal | None,
+    discount_ron: Decimal | None,
+) -> dict[str, Any]:
+    amount: dict[str, Any] = _amount_value(currency, total_converted)
+    should_include_breakdown = (
+        item_total_ron is not None
+        or shipping_ron is not None
+        or tax_ron is not None
+        or fee_ron is not None
+        or _discount_requested(discount_ron)
+    )
+    if should_include_breakdown:
+        breakdown = _build_breakdown(
+            currency=currency,
+            item_total_converted=item_total_converted,
+            shipping_converted=shipping_converted,
+            fee_converted=fee_converted,
+            tax_converted=tax_converted,
+            discount_converted=discount_converted,
+        )
+        if breakdown:
+            amount["breakdown"] = breakdown
+    return amount
+
+
+def _prepare_order_amount(
+    *,
+    currency: str,
+    fx_per_ron: Decimal,
+    item_total_ron: Decimal | None,
+    shipping_ron: Decimal | None,
+    tax_ron: Decimal | None,
+    fee_ron: Decimal | None,
+    discount_ron: Decimal | None,
+    items: list[dict[str, Any]] | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]] | None]:
+    converted_items, item_total_converted = _convert_items(items=items, currency=currency, fx_per_ron=fx_per_ron)
+    shipping_converted = _convert_optional_amount(shipping_ron, fx_per_ron)
+    fee_converted = _convert_optional_amount(fee_ron, fx_per_ron)
+    tax_converted = _convert_optional_amount(tax_ron, fx_per_ron)
+    discount_converted = _convert_discount(discount_ron, fx_per_ron)
+    item_total_converted = _resolve_item_total(
+        item_total_converted=item_total_converted,
+        item_total_ron=item_total_ron,
+        fx_per_ron=fx_per_ron,
+    )
+    total_converted = _compute_total_converted(
+        item_total_converted=item_total_converted,
+        shipping_converted=shipping_converted,
+        fee_converted=fee_converted,
+        tax_converted=tax_converted,
+        discount_converted=discount_converted,
+    )
+    amount = _build_order_amount(
+        currency=currency,
+        total_converted=total_converted,
+        item_total_converted=item_total_converted,
+        shipping_converted=shipping_converted,
+        fee_converted=fee_converted,
+        tax_converted=tax_converted,
+        discount_converted=discount_converted,
+        item_total_ron=item_total_ron,
+        shipping_ron=shipping_ron,
+        tax_ron=tax_ron,
+        fee_ron=fee_ron,
+        discount_ron=discount_ron,
+    )
+    return amount, converted_items
+
+
+def _build_order_payload(
+    *,
+    amount: dict[str, Any],
+    reference: str,
+    return_url: str,
+    cancel_url: str,
+    converted_items: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    purchase_unit: dict[str, Any] = {
+        "amount": amount,
+        "custom_id": reference,
+        "description": f"momentstudio order {reference}",
+    }
+    if converted_items:
+        purchase_unit["items"] = converted_items
+
+    return {
+        "intent": "CAPTURE",
+        "purchase_units": [purchase_unit],
+        "application_context": {
+            "brand_name": "momentstudio",
+            "landing_page": "NO_PREFERENCE",
+            "user_action": "PAY_NOW",
+            "return_url": return_url,
+            "cancel_url": cancel_url,
+        },
+    }
+
+
+async def _create_order_response(*, token: str, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
+            resp = await client.post(
+                "/v2/checkout/orders",
+                json=payload,
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal order creation failed") from exc
+    return data
+
+
+def _extract_approval_url(links: Any) -> str | None:
+    if not isinstance(links, list):
+        return None
+    for link in links:
+        if not isinstance(link, dict):
+            continue
+        href = link.get("href")
+        if link.get("rel") == "approve" and isinstance(href, str):
+            return href
+    return None
+
+
 async def create_order_itemized(
     *,
     total_ron: Decimal,
@@ -187,143 +487,31 @@ async def create_order_itemized(
     fx_eur_per_ron: float | None = None,
     fx_usd_per_ron: float | None = None,
 ) -> tuple[str, str]:
-    """Create a PayPal order and return (paypal_order_id, approval_url).
-
-    When item totals are provided, the order includes an itemized breakdown so the buyer can see
-    products, shipping, taxes, fees and discounts on PayPal checkout.
-    """
+    """Create a PayPal order and return (paypal_order_id, approval_url)."""
     token = await _get_access_token()
     currency = _paypal_currency(currency_code)
     fx_per_ron = await _fx_per_ron(currency, fx_eur_per_ron=fx_eur_per_ron, fx_usd_per_ron=fx_usd_per_ron)
-
-    # PayPal expects a string amount with 2 decimal places.
-    converted_items: list[dict[str, Any]] | None = None
-    item_total_converted: Decimal | None = None
-    if items:
-        converted_items = []
-        item_total_converted = Decimal("0.00")
-        for raw_item in items:
-            if not isinstance(raw_item, dict):
-                continue
-            qty_raw = raw_item.get("quantity")
-            try:
-                qty_int = int(str(qty_raw))
-            except Exception:
-                continue
-            if qty_int <= 0:
-                continue
-            raw_unit_amount = raw_item.get("unit_amount")
-            if not isinstance(raw_unit_amount, dict):
-                continue
-            raw_value = raw_unit_amount.get("value")
-            try:
-                unit_ron = Decimal(str(raw_value))
-            except Exception:
-                continue
-            unit_converted = _convert_ron(unit_ron, fx_per_ron)
-            item_total_converted += unit_converted * qty_int
-            unit_amount = dict(raw_unit_amount)
-            unit_amount["currency_code"] = currency
-            unit_amount["value"] = _format_amount(unit_converted)
-            item = dict(raw_item)
-            item["quantity"] = str(qty_int)
-            item["unit_amount"] = unit_amount
-            converted_items.append(item)
-        if not converted_items:
-            converted_items = None
-            item_total_converted = None
-
-    shipping_converted = _convert_ron(Decimal(shipping_ron), fx_per_ron) if shipping_ron is not None else None
-    fee_converted = _convert_ron(Decimal(fee_ron), fx_per_ron) if fee_ron is not None else None
-    tax_converted = _convert_ron(Decimal(tax_ron), fx_per_ron) if tax_ron is not None else None
-    discount_converted = (
-        _convert_ron(Decimal(discount_ron), fx_per_ron)
-        if discount_ron is not None and Decimal(discount_ron) > 0
-        else None
+    amount, converted_items = _prepare_order_amount(
+        currency=currency,
+        fx_per_ron=fx_per_ron,
+        item_total_ron=item_total_ron,
+        shipping_ron=shipping_ron,
+        tax_ron=tax_ron,
+        fee_ron=fee_ron,
+        discount_ron=discount_ron,
+        items=items,
     )
-    item_total_ron_dec = Decimal(item_total_ron) if item_total_ron is not None else None
-    if item_total_converted is None and item_total_ron_dec is not None:
-        item_total_converted = _convert_ron(item_total_ron_dec, fx_per_ron)
-
-    # Compute a PayPal-compatible total in the settlement currency.
-    total_converted = Decimal("0.00")
-    if item_total_converted is not None:
-        total_converted += item_total_converted
-    if shipping_converted is not None:
-        total_converted += shipping_converted
-    if fee_converted is not None:
-        total_converted += fee_converted
-    if tax_converted is not None:
-        total_converted += tax_converted
-    if discount_converted is not None:
-        total_converted -= discount_converted
-    if total_converted <= 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid PayPal order total")
-
-    amount: dict[str, Any] = {"currency_code": currency, "value": _format_amount(total_converted)}
-    if (
-        item_total_ron is not None
-        or shipping_ron is not None
-        or tax_ron is not None
-        or fee_ron is not None
-        or (discount_ron is not None and Decimal(discount_ron) > 0)
-    ):
-        breakdown: dict[str, Any] = {}
-        if item_total_converted is not None:
-            breakdown["item_total"] = {"currency_code": currency, "value": _format_amount(item_total_converted)}
-        if shipping_converted is not None and Decimal(shipping_converted) > 0:
-            breakdown["shipping"] = {"currency_code": currency, "value": _format_amount(shipping_converted)}
-        if fee_converted is not None and Decimal(fee_converted) > 0:
-            breakdown["handling"] = {"currency_code": currency, "value": _format_amount(fee_converted)}
-        if tax_converted is not None and Decimal(tax_converted) > 0:
-            breakdown["tax_total"] = {"currency_code": currency, "value": _format_amount(tax_converted)}
-        if discount_converted is not None and Decimal(discount_converted) > 0:
-            breakdown["discount"] = {"currency_code": currency, "value": _format_amount(discount_converted)}
-        if breakdown:
-            amount["breakdown"] = breakdown
-
-    payload: dict[str, Any] = {
-        "intent": "CAPTURE",
-        "purchase_units": [
-            {
-                "amount": amount,
-                "custom_id": reference,
-                "description": f"momentstudio order {reference}",
-            }
-        ],
-        "application_context": {
-            "brand_name": "momentstudio",
-            "landing_page": "NO_PREFERENCE",
-            "user_action": "PAY_NOW",
-            "return_url": return_url,
-            "cancel_url": cancel_url,
-        },
-    }
-    if converted_items:
-        payload["purchase_units"][0]["items"] = converted_items
-
-    try:
-        async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
-            resp = await client.post(
-                "/v2/checkout/orders",
-                json=payload,
-                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal order creation failed") from exc
+    payload = _build_order_payload(
+        amount=amount,
+        reference=reference,
+        return_url=return_url,
+        cancel_url=cancel_url,
+        converted_items=converted_items,
+    )
+    data = await _create_order_response(token=token, payload=payload)
 
     paypal_order_id = data.get("id")
-    links = data.get("links")
-    approval_url = None
-    if isinstance(links, list):
-        for link in links:
-            if not isinstance(link, dict):
-                continue
-            if link.get("rel") == "approve" and isinstance(link.get("href"), str):
-                approval_url = link["href"]
-                break
+    approval_url = _extract_approval_url(data.get("links"))
 
     if not isinstance(paypal_order_id, str) or not paypal_order_id or not approval_url:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal approval link missing")
@@ -355,6 +543,31 @@ def _capture_path(paypal_order_id: str) -> str:
     return f"/v2/checkout/orders/{order_id}/capture"
 
 
+def _first_dict_item(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, list):
+        return None
+    if not value:
+        return None
+    item = value[0]
+    if not isinstance(item, dict):
+        return None
+    return item
+
+
+def _extract_capture_id(data: dict[str, Any]) -> str:
+    purchase_unit = _first_dict_item(data.get("purchase_units"))
+    if purchase_unit is None:
+        return ""
+    payments = purchase_unit.get("payments")
+    if not isinstance(payments, dict):
+        return ""
+    capture = _first_dict_item(payments.get("captures"))
+    if capture is None:
+        return ""
+    capture_id = capture.get("id")
+    return capture_id if isinstance(capture_id, str) else ""
+
+
 def _refund_path(paypal_capture_id: str) -> str:
     capture_id = quote(_sanitize_paypal_id(paypal_capture_id), safe="")
     return f"/v2/payments/captures/{capture_id}/refund"
@@ -375,16 +588,7 @@ async def capture_order(*, paypal_order_id: str) -> str:
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="PayPal capture failed") from exc
 
-    # Best-effort extraction of the capture id.
-    purchase_units = data.get("purchase_units")
-    if isinstance(purchase_units, list) and purchase_units:
-        payments = purchase_units[0].get("payments") if isinstance(purchase_units[0], dict) else None
-        captures = payments.get("captures") if isinstance(payments, dict) else None
-        if isinstance(captures, list) and captures:
-            cap = captures[0]
-            if isinstance(cap, dict) and isinstance(cap.get("id"), str):
-                return cap["id"]
-    return ""
+    return _extract_capture_id(data)
 
 
 async def refund_capture(
@@ -432,29 +636,32 @@ def _get_header(headers: dict[str, str], name: str) -> str | None:
     return None
 
 
+def _required_header(headers: dict[str, str], name: str) -> str:
+    value = _get_header(headers, name)
+    if value is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal signature headers")
+    return value
+
+
+def _webhook_verification_payload(*, headers: dict[str, str], event: dict[str, Any], webhook_id: str) -> dict[str, Any]:
+    return {
+        "auth_algo": _required_header(headers, "paypal-auth-algo"),
+        "cert_url": _required_header(headers, "paypal-cert-url"),
+        "transmission_id": _required_header(headers, "paypal-transmission-id"),
+        "transmission_sig": _required_header(headers, "paypal-transmission-sig"),
+        "transmission_time": _required_header(headers, "paypal-transmission-time"),
+        "webhook_id": webhook_id,
+        "webhook_event": event,
+    }
+
+
 async def verify_webhook_signature(*, headers: dict[str, str], event: dict[str, Any]) -> bool:
     webhook_id = _effective_webhook_id()
     if not webhook_id:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="PayPal webhook id not configured")
 
-    auth_algo = _get_header(headers, "paypal-auth-algo")
-    cert_url = _get_header(headers, "paypal-cert-url")
-    transmission_id = _get_header(headers, "paypal-transmission-id")
-    transmission_sig = _get_header(headers, "paypal-transmission-sig")
-    transmission_time = _get_header(headers, "paypal-transmission-time")
-    if not (auth_algo and cert_url and transmission_id and transmission_sig and transmission_time):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal signature headers")
-
+    payload = _webhook_verification_payload(headers=headers, event=event, webhook_id=webhook_id)
     token = await _get_access_token()
-    payload = {
-        "auth_algo": auth_algo,
-        "cert_url": cert_url,
-        "transmission_id": transmission_id,
-        "transmission_sig": transmission_sig,
-        "transmission_time": transmission_time,
-        "webhook_id": webhook_id,
-        "webhook_event": event,
-    }
     try:
         async with httpx.AsyncClient(base_url=_base_url(), timeout=15) as client:
             resp = await client.post(

@@ -120,6 +120,11 @@ type CheckoutSuccessSummary = {
   `
 })
 export class SuccessComponent {
+  private static readonly COURIER_LABELS: Record<string, string> = {
+    fan_courier: 'Fan Courier',
+    sameday: 'Sameday'
+  };
+
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'checkout.successTitle' }
@@ -171,11 +176,9 @@ export class SuccessComponent {
     const s = this.summary;
     if (!s) return null;
     const courierRaw = (s.courier ?? '').trim().toLowerCase();
-    return courierRaw === 'fan_courier'
-      ? 'Fan Courier'
-      : courierRaw === 'sameday'
-        ? 'Sameday'
-        : (s.courier ?? '').trim() || null;
+    const knownLabel = SuccessComponent.COURIER_LABELS[courierRaw];
+    if (knownLabel) return knownLabel;
+    return (s.courier ?? '').trim() || null;
   }
 
   deliveryTypeKey(): string | null {
@@ -196,4 +199,3 @@ export class SuccessComponent {
     return detail || null;
   }
 }
-

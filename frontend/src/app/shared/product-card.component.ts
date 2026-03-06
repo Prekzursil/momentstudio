@@ -270,19 +270,23 @@ export class ProductCardComponent implements OnChanges {
     const badges = Array.isArray(this.product?.badges) ? this.product.badges : [];
     if (!badges.length) return null;
     const now = Date.now();
-    const isActive = (badge: any): boolean => {
-      const startMs = badge?.start_at ? new Date(badge.start_at).getTime() : null;
-      const endMs = badge?.end_at ? new Date(badge.end_at).getTime() : null;
-      if (typeof startMs === 'number' && Number.isFinite(startMs) && now < startMs) return false;
-      if (typeof endMs === 'number' && Number.isFinite(endMs) && now >= endMs) return false;
-      return true;
-    };
-    const active = badges.filter(isActive).map((b: any) => String(b?.badge || '').trim()).filter(Boolean);
+    const active = badges
+      .filter((badge: any) => this.isBadgeActive(badge, now))
+      .map((badge: any) => String(badge?.badge || '').trim())
+      .filter(Boolean);
     const priority = ['limited', 'new', 'handmade'];
     for (const key of priority) {
       if (active.includes(key)) return key;
     }
     return active[0] ?? null;
+  }
+
+  private isBadgeActive(badge: any, now: number): boolean {
+    const startMs = badge?.start_at ? new Date(badge.start_at).getTime() : null;
+    const endMs = badge?.end_at ? new Date(badge.end_at).getTime() : null;
+    if (typeof startMs === 'number' && Number.isFinite(startMs) && now < startMs) return false;
+    if (typeof endMs === 'number' && Number.isFinite(endMs) && now >= endMs) return false;
+    return true;
   }
 
   toggleWishlist(event: MouseEvent): void {
@@ -594,4 +598,3 @@ export class ProductCardComponent implements OnChanges {
     }
   }
 }
-

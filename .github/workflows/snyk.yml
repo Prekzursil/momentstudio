@@ -1,0 +1,83 @@
+name: Snyk Security
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snyk:
+    name: snyk
+    runs-on: ubuntu-latest
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      SNYK_ORG: ${{ vars.SNYK_ORG || '' }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Snyk token
+        run: |
+          set -euo pipefail
+          if [ -z "${SNYK_TOKEN:-}" ]; then
+            echo "::error::Missing SNYK_TOKEN secret."
+            exit 1
+          fi
+
+      - name: Prepare deterministic Python environment for Snyk
+        run: |
+          set -euo pipefail
+          python -m venv .snyk-venv
+          . .snyk-venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+
+      - name: Install Snyk CLI
+        run: npm i -g snyk@1.1296.2
+
+      - name: Authenticate Snyk CLI
+        run: snyk auth "${SNYK_TOKEN}"
+
+      - name: Test backend dependencies (pip)
+        run: |
+          set -euo pipefail
+          if [ -n "${SNYK_ORG:-}" ]; then
+            snyk test --org="${SNYK_ORG}" \
+              --file=backend/requirements.txt \
+              --package-manager=pip \
+              --command=.snyk-venv/bin/python \
+              --skip-unresolved \
+              --severity-threshold=low
+          else
+            snyk test \
+              --file=backend/requirements.txt \
+              --package-manager=pip \
+              --command=.snyk-venv/bin/python \
+              --skip-unresolved \
+              --severity-threshold=low
+          fi
+
+      - name: Test frontend dependencies (npm)
+        run: |
+          set -euo pipefail
+          if [ -n "${SNYK_ORG:-}" ]; then
+            snyk test --org="${SNYK_ORG}" \
+              --file=frontend/package-lock.json \
+              --package-manager=npm \
+              --severity-threshold=low
+          else
+            snyk test \
+              --file=frontend/package-lock.json \
+              --package-manager=npm \
+              --severity-threshold=low
+          fi

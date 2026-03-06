@@ -17,7 +17,7 @@ jobs:
       CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
       CODACY_ORGANIZATION_PROVIDER: gh
       CODACY_USERNAME: Prekzursil
-      CODACY_PROJECT_NAME: AdrianaArt
+      CODACY_PROJECT_NAME: momentstudio
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -81,4 +81,4 @@ jobs:
             --username "${CODACY_USERNAME}" \
             --project-name "${CODACY_PROJECT_NAME}" \
             --coverage-reports backend/coverage.xml \
-            --coverage-reports frontend/coverage/app/lcov.info
+            --coverage-reports frontend/coverage/lcov.info

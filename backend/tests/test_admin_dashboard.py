@@ -23,7 +23,7 @@ from app.models.catalog import (
 )
 from app.models.cart import Cart, CartItem
 from app.models.content import ContentAuditLog, ContentBlock, ContentStatus
-from app.models.coupons_v2 import Promotion, PromotionDiscountType
+from app.models.coupons import Promotion, PromotionDiscountType
 from app.models.order import Order, OrderItem, OrderStatus
 from app.models.promo import PromoCode
 from app.models.passkeys import UserPasskey

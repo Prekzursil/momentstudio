@@ -2,7 +2,7 @@ import { ThemeService, ThemePreference } from './theme.service';
 
 function mockMatchMedia(prefersDark: boolean) {
   const listeners: Array<(event: MediaQueryListEvent) => void> = [];
-  spyOn(window, 'matchMedia').and.callFake(() => ({
+  spyOn(globalThis, 'matchMedia').and.callFake(() => ({
     matches: prefersDark,
     media: '(prefers-color-scheme: dark)',
     addEventListener: (_: string, cb: (event: MediaQueryListEvent) => void) => listeners.push(cb),

@@ -55,6 +55,7 @@ Observed on production baseline (`momentstudio.ro`):
 - Sameday cities endpoint: `404` (expected for baseline deployment that predates mirror API rollout).
 
 Interpretation:
+
 - No contradiction with PR #199 baseline goals.
 - Sameday mirror behavior is a post-199 capability and deployment/config topic, not a PR #199 contract regression.
 
@@ -66,4 +67,3 @@ Interpretation:
 4. Fan/Sameday/media paths explicitly validated: **PASS**
 5. Env parity hardening added: **PASS**
 6. No unresolved S1/S2 findings: **PASS**
-
