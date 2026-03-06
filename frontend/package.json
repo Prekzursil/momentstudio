@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
     "e2e": "playwright test",
+    "e2e:chromatic": "playwright test --config=playwright.chromatic.config.ts --project=chromium",
     "dev:ssr": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js run app:serve-ssr",
     "serve:ssr": "node scripts/prepare-ssr-runtime.cjs && node dist/app/server/main.js",
     "build:ssr": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js build && node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js run app:server && node scripts/prepare-ssr-runtime.cjs",
@@ -53,6 +54,7 @@
     "@angular/cli": "^21.2.0",
     "@angular/compiler-cli": "^21.2.0",
     "@applitools/eyes-playwright": "^1.44.3",
+    "@chromatic-com/playwright": "^0.12.8",
     "@eslint/js": "^9.39.3",
     "@percy/cli": "^1.31.0",
     "@percy/playwright": "^1.0.8",
@@ -78,6 +80,7 @@
     "postcss": "^8.4.38",
     "prettier": "^3.8.1",
     "readdirp": "^3.6.0",
+    "chromatic": "^13.3.2",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.0"
