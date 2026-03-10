@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   chromatic:
-    name: Visual regression (Playwright)
+    name: Chromatic Playwright
     runs-on: ubuntu-latest
     defaults:
       run:
