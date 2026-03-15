@@ -41,21 +41,39 @@ jobs:
       - name: Upgrade npm
         run: npm i -g npm@11.7.0
 
-      - name: Validate Chromatic token
+      - name: Decide Chromatic execution
+        id: chromatic
         run: |
-          if [ -z "${{ secrets.CHROMATIC_PROJECT_TOKEN }}" ]; then
-            echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
-            exit 1
+          if [ -n "${{ secrets.CHROMATIC_PROJECT_TOKEN }}" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
+          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping Chromatic because CHROMATIC_PROJECT_TOKEN is unavailable on this Dependabot pull request."
+            exit 0
+          fi
+
+          echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
+          exit 1
+
       - name: Install dependencies
+        if: steps.chromatic.outputs.run == 'true'
         run: npm ci
 
       - name: Install Playwright browser
+        if: steps.chromatic.outputs.run == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Generate Playwright archives
+        if: steps.chromatic.outputs.run == 'true'
         run: npm run e2e:chromatic
 
       - name: Upload to Chromatic
+        if: steps.chromatic.outputs.run == 'true'
         run: npx chromatic --playwright --project-token=${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+
+      - name: Note skipped Chromatic run
+        if: steps.chromatic.outputs.run != 'true'
+        run: echo "Chromatic upload was skipped for this Dependabot PR because the project token is unavailable in Dependabot secrets."
