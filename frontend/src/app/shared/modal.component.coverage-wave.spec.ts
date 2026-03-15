@@ -25,6 +25,7 @@ function setBodyMetrics(element: HTMLElement, metrics: BodyMetrics): void {
   });
 }
 
+
 function getBodyElement(component: ModalComponent): HTMLDivElement {
   const body = component.bodyRef?.nativeElement;
   expect(body).toBeDefined();
@@ -32,6 +33,15 @@ function getBodyElement(component: ModalComponent): HTMLDivElement {
     throw new Error('Expected modal body element to be present');
   }
   return body;
+}
+
+function getDialogElement(component: ModalComponent): HTMLElement {
+  const dialog = component.dialogRef?.nativeElement;
+  expect(dialog).toBeDefined();
+  if (!dialog) {
+    throw new Error('Expected modal dialog element to be present');
+  }
+  return dialog;
 }
 
 describe('ModalComponent coverage wave', () => {
@@ -158,7 +168,7 @@ describe('ModalComponent coverage wave', () => {
     tick();
     fixture.detectChanges();
 
-    const dialog = component.dialogRef?.nativeElement as HTMLElement;
+    const dialog = getDialogElement(component);
     const hidden = document.createElement('button');
     hidden.setAttribute('aria-hidden', 'true');
     const inert = document.createElement('button');
