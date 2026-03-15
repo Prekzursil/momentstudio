@@ -4,12 +4,19 @@ on:
   workflow_run:
     workflows: ["Quality Zero Gate"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      failure_context:
+        description: Failed context to remediate
+        required: false
+        default: Quality Zero Gate
 
 jobs:
   remediate:
-    if: github.event.workflow_run.conclusion == 'failure'
-    uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-remediation-loop.yml@37a6db2c75dc6891eea39007c96e8f9cbde22579 # main
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-remediation-loop.yml@main
     with:
       repo_slug: ${{ github.repository }}
-      failure_context: Quality Zero Gate
-      sha: ${{ github.event.workflow_run.head_sha }}
+      failure_context: ${{ inputs.failure_context || 'Quality Zero Gate' }}
+      sha: ${{ github.event.workflow_run.head_sha || github.sha }}
+    secrets: inherit
