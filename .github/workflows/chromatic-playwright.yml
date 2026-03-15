@@ -41,21 +41,31 @@ jobs:
       - name: Upgrade npm
         run: npm i -g npm@11.7.0
 
-      - name: Validate Chromatic token
+      - name: Detect Chromatic token availability
+        id: chromatic_token
         run: |
-          if [ -z "${{ secrets.CHROMATIC_PROJECT_TOKEN }}" ]; then
+          if [ -n "${{ secrets.CHROMATIC_PROJECT_TOKEN }}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping Chromatic Playwright for Dependabot because CHROMATIC_PROJECT_TOKEN is unavailable in this context."
+          else
             echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
             exit 1
           fi
 
       - name: Install dependencies
+        if: steps.chromatic_token.outputs.available == 'true'
         run: npm ci
 
       - name: Install Playwright browser
+        if: steps.chromatic_token.outputs.available == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Generate Playwright archives
+        if: steps.chromatic_token.outputs.available == 'true'
         run: npm run e2e:chromatic
 
       - name: Upload to Chromatic
+        if: steps.chromatic_token.outputs.available == 'true'
         run: npx chromatic --playwright --project-token=${{ secrets.CHROMATIC_PROJECT_TOKEN }}
