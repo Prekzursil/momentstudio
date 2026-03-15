@@ -28,11 +28,13 @@ jobs:
       run:
         working-directory: frontend
     env:
-      CHROMATIC_ARCHIVE_LOCATION: test-results/chromatic-archives
+      CHROMATIC_ARCHIVE_LOCATION: test-results
+      CHROMATIC_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') || startsWith(github.event.pull_request.head.ref || github.head_ref || '', 'dependabot/') }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -43,37 +45,36 @@ jobs:
       - name: Upgrade npm
         run: npm i -g npm@11.7.0
 
-      - name: Detect Chromatic token availability
-        id: chromatic_token
-        env:
-          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-          GITHUB_ACTOR_NAME: ${{ github.actor }}
-          PULL_REQUEST_AUTHOR: ${{ github.event.pull_request.user.login || '' }}
+      - name: Fail when Chromatic token is missing for a maintained branch
+        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN == '' && env.CHROMATIC_PR_ORIGIN != 'true' }}
         run: |
-          if [ -n "${CHROMATIC_PROJECT_TOKEN:-}" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          elif [ "${GITHUB_ACTOR_NAME:-}" = "dependabot[bot]" ] || [ "${PULL_REQUEST_AUTHOR:-}" = "dependabot[bot]" ]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping Chromatic Playwright for Dependabot because CHROMATIC_PROJECT_TOKEN is unavailable in this context."
-          else
-            echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
-            exit 1
-          fi
+          echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
+          exit 1
 
       - name: Install dependencies
-        if: steps.chromatic_token.outputs.available == 'true'
+        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
         run: npm ci
 
       - name: Install Playwright browser
-        if: steps.chromatic_token.outputs.available == 'true'
+        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
         run: npx playwright install --with-deps chromium
 
       - name: Generate Playwright archives
-        if: steps.chromatic_token.outputs.available == 'true'
+        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
         run: npm run e2e:chromatic
 
       - name: Upload to Chromatic
-        if: steps.chromatic_token.outputs.available == 'true'
+        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
+        uses: chromaui/action@5ec258af08deb3e8c36653bd618cb7fe52090031 # v15.2.0
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          playwright: true
         env:
-          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-        run: npx chromatic --playwright
+          CHROMATIC_ARCHIVE_LOCATION: test-results
+          CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          CHROMATIC_SLUG: ${{ github.repository }}
+
+      - name: Note skipped Chromatic run
+        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN == '' && env.CHROMATIC_PR_ORIGIN == 'true' }}
+        run: echo "Chromatic Playwright was skipped because CHROMATIC_PROJECT_TOKEN is unavailable in this Dependabot context."
