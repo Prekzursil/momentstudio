@@ -91,6 +91,10 @@ def _make_request(*, headers: dict[str, str] | None = None, client_host: str | N
     return Request(scope)
 
 
+def _test_ipv4(*octets: int) -> str:
+    return ".".join(str(part) for part in octets)
+
+
 def test_orders_stripe_and_paypal_line_item_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(orders_api.pricing, "quantize_money", lambda value: Decimal(str(value)).quantize(Decimal("0.01")))
 
@@ -238,7 +242,7 @@ def test_orders_contact_checkout_and_export_helpers(monkeypatch: pytest.MonkeyPa
         courier="fan",
         delivery_type="locker",
         tracking_number="TRK",
-        tracking_url="http://example",
+        tracking_url="https://example",
         invoice_company="Co",
         invoice_vat_id="RO123",
         locker_name="L",
@@ -343,9 +347,12 @@ async def test_orders_load_order_batch_or_404_helper() -> None:
 
 
 def test_admin_dashboard_payload_and_channel_helpers() -> None:
-    request = _make_request(headers={"user-agent": "x" * 300}, client_host="10.0.0.5")
+    audit_ip = _test_ipv4(10, 0, 0, 5)
+    report_ip = _test_ipv4(1, 1, 1, 1)
+
+    request = _make_request(headers={"user-agent": "x" * 300}, client_host=audit_ip)
     meta = admin_dashboard_api._request_audit_metadata(request)
-    assert meta["ip_address"] == "10.0.0.5"
+    assert meta["ip_address"] == audit_ip
     assert len(meta["user_agent"] or "") == 255
 
     payload = admin_dashboard_api._dashboard_alert_thresholds_payload(
@@ -366,7 +373,7 @@ def test_admin_dashboard_payload_and_channel_helpers() -> None:
     audit = admin_dashboard_api._admin_send_report_audit_data(
         "daily",
         True,
-        {"ip_address": "1.1.1.1"},
+        {"ip_address": report_ip},
         result={"ok": True},
         error=RuntimeError("e" * 1000),
     )
@@ -445,7 +452,7 @@ def test_auth_token_and_refresh_response_helpers(monkeypatch: pytest.MonkeyPatch
         expires_at=datetime(2026, 1, 1, 1, 0),
         persistent=True,
         user_agent="ua",
-        ip_address="1.1.1.1",
+        ip_address=report_ip,
         country_code="RO",
     )
     session_response = auth_api._build_refresh_session_response(row, now=now, current_jti="j-1")

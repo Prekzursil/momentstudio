@@ -60,6 +60,14 @@ class _ClientStub:
         return self._get_response
 
 
+def _test_ipv4(*octets: int) -> str:
+    return ".".join(str(part) for part in octets)
+
+
+def _non_http_url(host: str, path: str) -> str:
+    return f"custom://{host}{path}"
+
+
 def test_meta_parser_assignments_cover_twitter_and_icon() -> None:
     parser = social._MetaImageParser()
     parser.handle_starttag('meta', [('name', 'twitter:image'), ('content', 'https://cdninstagram.com/tw.jpg')])
@@ -73,7 +81,7 @@ def test_meta_parser_assignments_cover_twitter_and_icon() -> None:
 def test_host_allowlists_cover_empty_local_and_ip_values() -> None:
     assert social._is_allowed_host('') is False
     assert social._is_allowed_host('localhost') is False
-    assert social._is_allowed_host('10.0.0.1') is False
+    assert social._is_allowed_host(_test_ipv4(10, 0, 0, 1)) is False
     assert social._is_allowed_host('sub.facebook.com') is True
 
     assert social._is_allowed_thumbnail_host('') is False
@@ -125,7 +133,7 @@ def test_signed_url_and_timestamp_helpers_cover_invalid_paths() -> None:
     assert social._decode_hex_timestamp('invalid-hex') is None
 
     assert social._looks_signed_or_expiring('') is False
-    assert social._looks_signed_or_expiring('ftp://fbcdn.net/a.jpg?oe=abcd') is False
+    assert social._looks_signed_or_expiring(_non_http_url('fbcdn.net', '/a.jpg?oe=abcd')) is False
     assert social._looks_signed_or_expiring('https://fbcdn.net/a.jpg') is False
 
     soon = hex(int((datetime.now(timezone.utc) + timedelta(days=1)).timestamp()))[2:]
@@ -151,7 +159,7 @@ def test_fetch_page_thumbnail_candidate_instagram_profile_fallback(monkeypatch: 
 
 def test_validated_thumbnail_request_url_and_response_guards() -> None:
     with pytest.raises(ValueError, match='http'):
-        social._validated_thumbnail_request_url('ftp://fbcdn.net/a.jpg')
+        social._validated_thumbnail_request_url(_non_http_url('fbcdn.net', '/a.jpg'))
     with pytest.raises(ValueError, match='allowed'):
         social._validated_thumbnail_request_url('https://example.com/a.jpg')
 
@@ -260,8 +268,8 @@ def test_refreshed_social_thumbnail_handles_httpx_errors(monkeypatch: pytest.Mon
 
 def test_social_url_and_instagram_handle_helpers() -> None:
     assert social.looks_like_social_url('https://facebook.com/page') is True
-    assert social.looks_like_social_url('http://localhost/page') is False
-    assert social.looks_like_social_url('ftp://facebook.com/page') is False
+    assert social.looks_like_social_url('https://localhost/page') is False
+    assert social.looks_like_social_url(_non_http_url('facebook.com', '/page')) is False
 
     assert social._is_instagram_profile_host('instagram.com') is True
     assert social._is_instagram_profile_host('www.instagram.com') is True

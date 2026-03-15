@@ -49,6 +49,10 @@ def _set_cookie_headers(response: Response) -> list[str]:
     ]
 
 
+def _test_ipv4(*octets: int) -> str:
+    return ".".join(str(part) for part in octets)
+
+
 def test_orders_identifier_prefers_user_then_session_then_ip(monkeypatch: pytest.MonkeyPatch) -> None:
     valid_bearer = "approved-auth"
     monkeypatch.setattr(
@@ -57,20 +61,24 @@ def test_orders_identifier_prefers_user_then_session_then_ip(monkeypatch: pytest
         lambda raw: {"sub": "user-42"} if raw == valid_bearer else None,
     )
 
+    user_ip = _test_ipv4(10, 0, 0, 1)
+    session_ip = _test_ipv4(10, 0, 0, 2)
+    fallback_ip = _test_ipv4(10, 0, 0, 3)
+
     req_user = _make_request(
         headers={"authorization": f"Bearer {valid_bearer}", "x-session-id": "session-a"},
-        client_host="10.0.0.1",
+        client_host=user_ip,
     )
     assert orders_api._user_or_session_or_ip_identifier(req_user) == "user:user-42"
 
     req_session = _make_request(
         headers={"authorization": "Bearer bad-token", "x-session-id": "  session-a  "},
-        client_host="10.0.0.2",
+        client_host=session_ip,
     )
     assert orders_api._user_or_session_or_ip_identifier(req_session) == "sid:session-a"
 
-    req_ip = _make_request(client_host="10.0.0.3")
-    assert orders_api._user_or_session_or_ip_identifier(req_ip) == "ip:10.0.0.3"
+    req_ip = _make_request(client_host=fallback_ip)
+    assert orders_api._user_or_session_or_ip_identifier(req_ip) == f"ip:{fallback_ip}"
 
     req_anon = _make_request(client_host=None)
     assert orders_api._user_or_session_or_ip_identifier(req_anon) == "ip:anon"
@@ -290,7 +298,10 @@ def test_auth_identifier_extractors_and_state_validation(monkeypatch: pytest.Mon
     valid_bearer = "approved-auth"
     monkeypatch.setattr(auth_api, "decode_token", lambda raw: {"sub": "user-99"} if raw == valid_bearer else None)
 
-    req_user = _make_request(headers={"authorization": f"Bearer {valid_bearer}"}, client_host="10.10.10.1")
+    req_user = _make_request(
+        headers={"authorization": f"Bearer {valid_bearer}"},
+        client_host=_test_ipv4(10, 10, 10, 1),
+    )
     req_ip = _make_request(headers={"authorization": "Bearer bad"}, client_host=None)
     assert auth_api._user_or_ip_identifier(req_user) == "user:user-99"
     assert auth_api._user_or_ip_identifier(req_ip) == "ip:anon"

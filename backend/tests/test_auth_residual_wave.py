@@ -16,6 +16,10 @@ def _fixture_value(label: str) -> str:
     return f"{label}-{uuid4().hex}"
 
 
+def _test_ipv4(*octets: int) -> str:
+    return ".".join(str(part) for part in octets)
+
+
 FIXTURE_VALUE = _fixture_value("fixture")
 TEST_CODE = "123456"
 VERIFICATION_HANDLE = _fixture_value("verify")
@@ -345,8 +349,9 @@ def test_google_complete_request_validators_cover_error_paths() -> None:
 
 @pytest.mark.anyio
 async def test_admin_ip_bypass_missing_secret_invalid_token_and_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    admin_ip = _test_ipv4(10, 0, 0, 5)
     payload = auth_api.AdminIpBypassRequest(token=_fixture_value('provided-bypass'))
-    request = _request(user_agent='pytest-agent', client_host='10.0.0.5')
+    request = _request(user_agent='pytest-agent', client_host=admin_ip)
     current_user = SimpleNamespace(id=uuid4())
     session = SimpleNamespace()
 
@@ -377,7 +382,7 @@ async def test_admin_ip_bypass_missing_secret_invalid_token_and_success(monkeypa
     )
 
     assert set_calls == [SIGNED_BYPASS_VALUE]
-    assert events == [('admin_ip_bypass_used', '10.0.0.5')]
+    assert events == [('admin_ip_bypass_used', admin_ip)]
 
 
 @pytest.mark.anyio

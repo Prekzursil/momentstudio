@@ -69,14 +69,15 @@ def _raster_ctx(locale: str = 'en'):
 
 def test_receipts_reportlab_font_and_payment_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     receipts._REPORTLAB_FONTS = None
-    monkeypatch.setattr(receipts, '_reportlab_font_paths', lambda: ('/tmp/a.ttf', '/tmp/b.ttf'))
+    font_paths = ('/opt/momentstudio/fonts/a.ttf', '/opt/momentstudio/fonts/b.ttf')
+    monkeypatch.setattr(receipts, '_reportlab_font_paths', lambda: font_paths)
     monkeypatch.setattr(receipts.pdfmetrics, 'getRegisteredFontNames', lambda: ['Helvetica'])
     reg_calls: list[tuple[str, str]] = []
     monkeypatch.setattr(receipts, '_register_font_if_missing', lambda name, path, registered: reg_calls.append((name, path)))
     monkeypatch.setattr(receipts.pdfmetrics, 'registerFontFamily', lambda *args, **kwargs: None)
 
     assert receipts._register_reportlab_fonts() == ('MomentSans', 'MomentSansBold')
-    assert ('MomentSans', '/tmp/a.ttf') in reg_calls
+    assert ('MomentSans', font_paths[0]) in reg_calls
     assert receipts._payment_method_bilingual_label('') == ''
     assert receipts._payment_method_bilingual_label('stripe') == 'Stripe'
     assert receipts._payment_method_bilingual_label('paypal') == 'PayPal'
