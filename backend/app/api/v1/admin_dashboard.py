@@ -368,6 +368,52 @@ async def _summary_refunded_order_count(
     return int(refunded_orders or 0)
 
 
+def _summary_day_snapshot(metrics: dict[str, float | int]) -> dict[str, float | int]:
+    return {
+        "orders": int(metrics["orders"]),
+        "sales": float(metrics["sales"]),
+        "gross_sales": float(metrics["gross_sales"]),
+        "net_sales": float(metrics["net_sales"]),
+    }
+
+
+def _summary_day_metrics_payload(
+    today_snapshot: dict[str, float | int],
+    yesterday_snapshot: dict[str, float | int],
+    today_refunds: int,
+    yesterday_refunds: int,
+) -> dict[str, float | int | None]:
+    return {
+        "today_orders": int(today_snapshot["orders"]),
+        "yesterday_orders": int(yesterday_snapshot["orders"]),
+        "orders_delta_pct": _summary_delta_pct(
+            float(today_snapshot["orders"]),
+            float(yesterday_snapshot["orders"]),
+        ),
+        "today_sales": float(today_snapshot["sales"]),
+        "yesterday_sales": float(yesterday_snapshot["sales"]),
+        "sales_delta_pct": _summary_delta_pct(
+            float(today_snapshot["sales"]),
+            float(yesterday_snapshot["sales"]),
+        ),
+        "gross_today_sales": float(today_snapshot["gross_sales"]),
+        "gross_yesterday_sales": float(yesterday_snapshot["gross_sales"]),
+        "gross_sales_delta_pct": _summary_delta_pct(
+            float(today_snapshot["gross_sales"]),
+            float(yesterday_snapshot["gross_sales"]),
+        ),
+        "net_today_sales": float(today_snapshot["net_sales"]),
+        "net_yesterday_sales": float(yesterday_snapshot["net_sales"]),
+        "net_sales_delta_pct": _summary_delta_pct(
+            float(today_snapshot["net_sales"]),
+            float(yesterday_snapshot["net_sales"]),
+        ),
+        "today_refunds": today_refunds,
+        "yesterday_refunds": yesterday_refunds,
+        "refunds_delta_pct": _summary_delta_pct(float(today_refunds), float(yesterday_refunds)),
+    }
+
+
 async def _summary_day_metrics(
     session: AsyncSession,
     now: datetime,
@@ -401,31 +447,12 @@ async def _summary_day_metrics(
     yesterday_refunds = await _summary_refunded_order_count(
         session, yesterday_start, today_start, exclude_test_orders
     )
-    today_orders = int(today_metrics["orders"])
-    yesterday_orders = int(yesterday_metrics["orders"])
-    today_sales = float(today_metrics["sales"])
-    yesterday_sales = float(yesterday_metrics["sales"])
-    gross_today_sales = float(today_metrics["gross_sales"])
-    gross_yesterday_sales = float(yesterday_metrics["gross_sales"])
-    net_today_sales = float(today_metrics["net_sales"])
-    net_yesterday_sales = float(yesterday_metrics["net_sales"])
-    return {
-        "today_orders": today_orders,
-        "yesterday_orders": yesterday_orders,
-        "orders_delta_pct": _summary_delta_pct(float(today_orders), float(yesterday_orders)),
-        "today_sales": today_sales,
-        "yesterday_sales": yesterday_sales,
-        "sales_delta_pct": _summary_delta_pct(today_sales, yesterday_sales),
-        "gross_today_sales": gross_today_sales,
-        "gross_yesterday_sales": gross_yesterday_sales,
-        "gross_sales_delta_pct": _summary_delta_pct(gross_today_sales, gross_yesterday_sales),
-        "net_today_sales": net_today_sales,
-        "net_yesterday_sales": net_yesterday_sales,
-        "net_sales_delta_pct": _summary_delta_pct(net_today_sales, net_yesterday_sales),
-        "today_refunds": today_refunds,
-        "yesterday_refunds": yesterday_refunds,
-        "refunds_delta_pct": _summary_delta_pct(float(today_refunds), float(yesterday_refunds)),
-    }
+    return _summary_day_metrics_payload(
+        _summary_day_snapshot(today_metrics),
+        _summary_day_snapshot(yesterday_metrics),
+        today_refunds,
+        yesterday_refunds,
+    )
 
 
 async def _summary_failed_payment_counts(
@@ -716,6 +743,94 @@ def _summary_day_payload(day_metrics: dict[str, float | int | None]) -> dict[str
     }
 
 
+@dataclass(frozen=True, slots=True)
+class _AdminSummaryContext:
+    now: datetime
+    start: datetime
+    end: datetime
+    effective_range_days: int
+    successful_statuses: tuple[OrderStatus, ...]
+    sales_statuses: tuple[OrderStatus, ...]
+    exclude_test_orders: Any
+
+
+def _admin_summary_context(
+    now: datetime,
+    range_days: int,
+    range_from: date | None,
+    range_to: date | None,
+) -> _AdminSummaryContext:
+    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
+    sales_statuses = (*successful_statuses, OrderStatus.refunded)
+    exclude_test_orders = Order.id.notin_(select(OrderTag.order_id).where(OrderTag.tag == "test"))
+    start, end, effective_range_days = _summary_resolve_range(now, range_days, range_from, range_to)
+    return _AdminSummaryContext(
+        now=now,
+        start=start,
+        end=end,
+        effective_range_days=effective_range_days,
+        successful_statuses=successful_statuses,
+        sales_statuses=sales_statuses,
+        exclude_test_orders=exclude_test_orders,
+    )
+
+
+async def _admin_summary_payload_components(
+    session: AsyncSession,
+    context: _AdminSummaryContext,
+) -> tuple[dict[str, object], dict[str, object]]:
+    totals = await _summary_totals(session, context.exclude_test_orders)
+    sales_30d_metrics = await _summary_sales_metrics(
+        session,
+        _SummarySalesMetricsParams(
+            start=context.now - timedelta(days=30),
+            end=context.now,
+            successful_statuses=context.successful_statuses,
+            sales_statuses=context.sales_statuses,
+            exclude_test_orders=context.exclude_test_orders,
+        ),
+    )
+    range_metrics = await _summary_sales_metrics(
+        session,
+        _SummarySalesMetricsParams(
+            start=context.start,
+            end=context.end,
+            successful_statuses=context.successful_statuses,
+            sales_statuses=context.sales_statuses,
+            exclude_test_orders=context.exclude_test_orders,
+        ),
+    )
+    day_metrics = await _summary_day_metrics(
+        session,
+        context.now,
+        context.successful_statuses,
+        context.sales_statuses,
+        context.exclude_test_orders,
+    )
+    return (
+        _summary_overview_payload(
+            _SummaryOverviewPayloadParams(
+                totals=totals,
+                sales_30d_metrics=sales_30d_metrics,
+                range_metrics=range_metrics,
+                effective_range_days=context.effective_range_days,
+                start=context.start,
+                end=context.end,
+            )
+        ),
+        _summary_day_payload(day_metrics),
+    )
+
+
+async def _admin_summary_alerts_payload(
+    session: AsyncSession,
+    context: _AdminSummaryContext,
+) -> tuple[dict[str, object], dict[str, object]]:
+    thresholds_payload = _dashboard_alert_thresholds_payload(await _get_dashboard_alert_thresholds(session))
+    anomaly_inputs = await _summary_anomaly_inputs(session, context.now, context.exclude_test_orders)
+    return _summary_anomalies_payload(anomaly_inputs, thresholds_payload), thresholds_payload
+
+
 @router.get("/summary")
 async def admin_summary(
     session: Annotated[AsyncSession, Depends(get_session)],
@@ -724,51 +839,12 @@ async def admin_summary(
     range_from: date | None = Query(default=None),
     range_to: date | None = Query(default=None),
 ) -> dict:
-    now = datetime.now(timezone.utc)
-    successful_statuses = (OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered)
-    sales_statuses = (*successful_statuses, OrderStatus.refunded)
-    exclude_test_orders = Order.id.notin_(select(OrderTag.order_id).where(OrderTag.tag == "test"))
-    start, end, effective_range_days = _summary_resolve_range(now, range_days, range_from, range_to)
-    totals = await _summary_totals(session, exclude_test_orders)
-    sales_30d_metrics = await _summary_sales_metrics(
-        session,
-        _SummarySalesMetricsParams(
-            start=now - timedelta(days=30),
-            end=now,
-            successful_statuses=successful_statuses,
-            sales_statuses=sales_statuses,
-            exclude_test_orders=exclude_test_orders,
-        ),
-    )
-    range_metrics = await _summary_sales_metrics(
-        session,
-        _SummarySalesMetricsParams(
-            start=start,
-            end=end,
-            successful_statuses=successful_statuses,
-            sales_statuses=sales_statuses,
-            exclude_test_orders=exclude_test_orders,
-        ),
-    )
-    day_metrics = await _summary_day_metrics(
-        session, now, successful_statuses, sales_statuses, exclude_test_orders
-    )
-    thresholds_payload = _dashboard_alert_thresholds_payload(await _get_dashboard_alert_thresholds(session))
-    anomalies = _summary_anomalies_payload(
-        await _summary_anomaly_inputs(session, now, exclude_test_orders), thresholds_payload
-    )
+    context = _admin_summary_context(datetime.now(timezone.utc), range_days, range_from, range_to)
+    overview_payload, day_payload = await _admin_summary_payload_components(session, context)
+    anomalies, thresholds_payload = await _admin_summary_alerts_payload(session, context)
     return {
-        **_summary_overview_payload(
-            _SummaryOverviewPayloadParams(
-                totals=totals,
-                sales_30d_metrics=sales_30d_metrics,
-                range_metrics=range_metrics,
-                effective_range_days=effective_range_days,
-                start=start,
-                end=end,
-            )
-        ),
-        **_summary_day_payload(day_metrics),
+        **overview_payload,
+        **day_payload,
         "anomalies": anomalies,
         "alert_thresholds": thresholds_payload,
         "system": {"db_ready": True, "backup_last_at": settings.backup_last_at},
@@ -822,6 +898,46 @@ async def _admin_send_report_audit_log(
     )
 
 
+def _admin_send_report_audit_entry(
+    *,
+    action: str,
+    actor_user_id: UUID,
+    kind: str,
+    force: bool,
+    request_meta: dict[str, str | None],
+    result: dict | None = None,
+    error: Exception | None = None,
+) -> _AdminSendReportAuditLogEntry:
+    return _AdminSendReportAuditLogEntry(
+        action=action,
+        actor_user_id=actor_user_id,
+        data=_AdminSendReportAuditData(
+            kind=kind,
+            force=force,
+            request_meta=request_meta,
+            result=result,
+            error=error,
+        ),
+    )
+
+
+async def _admin_send_report_record(
+    session: AsyncSession,
+    entry: _AdminSendReportAuditLogEntry,
+) -> None:
+    await _admin_send_report_audit_log(session, entry)
+    await session.commit()
+
+
+def _admin_send_report_request_values(
+    request: Request,
+    payload: dict,
+) -> tuple[str, bool, dict[str, str | None]]:
+    kind = str(payload.get("kind") or "").strip().lower()
+    force = bool(payload.get("force", False))
+    return kind, force, _admin_request_metadata(request)
+
+
 @router.post("/reports/send")
 async def admin_send_scheduled_report(
     request: Request,
@@ -829,60 +945,49 @@ async def admin_send_scheduled_report(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
 ) -> dict:
-    kind = str(payload.get("kind") or "").strip().lower()
-    force = bool(payload.get("force", False))
-    request_meta = _admin_request_metadata(request)
+    kind, force, request_meta = _admin_send_report_request_values(request, payload)
     try:
         result = await admin_reports_service.send_report_now(session, kind=kind, force=force)
     except ValueError as exc:
         await session.rollback()
-        await _admin_send_report_audit_log(
+        await _admin_send_report_record(
             session,
-            _AdminSendReportAuditLogEntry(
+            _admin_send_report_audit_entry(
                 action="admin_reports.send_now_failed",
                 actor_user_id=current_user.id,
-                data=_AdminSendReportAuditData(
-                    kind=kind,
-                    force=force,
-                    request_meta=request_meta,
-                    error=exc,
-                ),
-            ),
-        )
-        await session.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    except Exception as exc:
-        await session.rollback()
-        await _admin_send_report_audit_log(
-            session,
-            _AdminSendReportAuditLogEntry(
-                action="admin_reports.send_now_error",
-                actor_user_id=current_user.id,
-                data=_AdminSendReportAuditData(
-                    kind=kind,
-                    force=force,
-                    request_meta=request_meta,
-                    error=exc,
-                ),
-            ),
-        )
-        await session.commit()
-        raise
-
-    await _admin_send_report_audit_log(
-        session,
-        _AdminSendReportAuditLogEntry(
-            action="admin_reports.send_now",
-            actor_user_id=current_user.id,
-            data=_AdminSendReportAuditData(
                 kind=kind,
                 force=force,
                 request_meta=request_meta,
-                result=result,
+                error=exc,
             ),
+        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        await session.rollback()
+        await _admin_send_report_record(
+            session,
+            _admin_send_report_audit_entry(
+                action="admin_reports.send_now_error",
+                actor_user_id=current_user.id,
+                kind=kind,
+                force=force,
+                request_meta=request_meta,
+                error=exc,
+            ),
+        )
+        raise
+
+    await _admin_send_report_record(
+        session,
+        _admin_send_report_audit_entry(
+            action="admin_reports.send_now",
+            actor_user_id=current_user.id,
+            kind=kind,
+            force=force,
+            request_meta=request_meta,
+            result=result,
         ),
     )
-    await session.commit()
     return result
 
 
