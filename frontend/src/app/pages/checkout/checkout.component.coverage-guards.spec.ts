@@ -461,6 +461,61 @@ describe('CheckoutComponent targeted branch coverage guards', () => {
   });
 
 
+
+  it('guards placeOrder when checkout is already being placed', () => {
+    const cmp = createCheckoutHarness();
+    const form = buildForm(true);
+    cmp.placing = true;
+
+    cmp.placeOrder(form);
+
+    expect(form.control.updateValueAndValidity).not.toHaveBeenCalled();
+    expect(cmp.submitCheckout).not.toHaveBeenCalled();
+    expect(cmp.submitGuestCheckout).not.toHaveBeenCalled();
+  });
+
+  it('guards placeOrder on country normalization failure and invalid form state', () => {
+    const cmp = createCheckoutHarness();
+
+    cmp.normalizeCheckoutCountries.and.returnValue(false);
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.addressError).toBe('checkout.countryInvalid');
+    expect(cmp.focusFirstInvalidField).toHaveBeenCalled();
+    expect(cmp.submitCheckout).not.toHaveBeenCalled();
+
+    cmp.normalizeCheckoutCountries.and.returnValue(true);
+    cmp.focusFirstInvalidField.calls.reset();
+    cmp.placeOrder(buildForm(false));
+    expect(cmp.addressError).toBe('checkout.addressRequired');
+    expect(cmp.focusFirstInvalidField).toHaveBeenCalled();
+    expect(cmp.submitCheckout).not.toHaveBeenCalled();
+  });
+
+  it('guards locker and email verification paths before checkout submission', () => {
+    const cmp = createCheckoutHarness();
+
+    cmp.deliveryType = 'locker';
+    cmp.locker = null;
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.deliveryError).toBe('checkout.deliveryLockerRequired');
+    expect(cmp.focusLockerPicker).toHaveBeenCalled();
+    expect(cmp.submitCheckout).not.toHaveBeenCalled();
+
+    cmp.deliveryType = 'home';
+    cmp.auth.isAuthenticated.and.returnValue(true);
+    cmp.emailVerified.and.returnValue(false);
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.errorMessage).toBe('auth.emailVerificationNeeded');
+    expect(cmp.focusGlobalError).toHaveBeenCalled();
+    expect(cmp.submitCheckout).not.toHaveBeenCalled();
+
+    cmp.auth.isAuthenticated.and.returnValue(false);
+    cmp.guestEmailVerified = false;
+    cmp.placeOrder(buildForm(true));
+    expect(cmp.errorMessage).toBe('auth.emailVerificationNeeded');
+    expect(cmp.submitGuestCheckout).not.toHaveBeenCalled();
+  });
+
   it('covers openEditSavedAddress guard and happy-path branches', () => {
     const cmp = createCheckoutHarness();
     cmp.auth.isAuthenticated.and.returnValue(true);

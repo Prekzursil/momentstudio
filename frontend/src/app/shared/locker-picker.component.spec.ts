@@ -78,6 +78,9 @@ describe('LockerPickerComponent', () => {
   defineInitMapGuardSpec();
   defineRedrawMarkersSpec();
   defineSamedayApplyFirstSpec();
+  defineProviderChangeWithoutInitSpec();
+  defineLoadLockersSuccessSpec();
+  defineMirrorSnapshotRefreshSuccessSpec();
 });
 
 function defineCitySuggestionSpec(): void {
@@ -415,5 +418,89 @@ function defineSamedayApplyFirstSpec(): void {
     expect(lockerPickerComponent.searchLoading).toBeFalse();
     expect(applySpy).toHaveBeenCalled();
     expect(lockerPickerComponent.selectedLocation?.display_name).toBe('Iasi');
+  });
+}
+
+function defineProviderChangeWithoutInitSpec(): void {
+  it('resets provider state without triggering area search when map is not initialized', () => {
+    const searchAreaSpy = spyOn(lockerPickerComponent, 'searchThisArea');
+    const refreshSpy = spyOn<any>(lockerPickerComponent as any, 'refreshMirrorSnapshot').and.returnValue(Promise.resolve());
+
+    lockerPickerComponent.searchResults = [{ display_name: 'Old city', lat: 44.1, lng: 26.1 }];
+    lockerPickerComponent.searchError = 'stale';
+    lockerPickerComponent.searchQuery = 'old';
+    lockerPickerComponent.mirrorSnapshot = { stale: true } as any;
+
+    lockerPickerComponent.provider = 'fan_courier';
+    lockerPickerComponent.ngOnChanges({
+      provider: new SimpleChange('sameday', 'fan_courier', false),
+    });
+
+    expect(lockerPickerComponent.searchResults).toEqual([]);
+    expect(lockerPickerComponent.searchError).toBe('');
+    expect(lockerPickerComponent.searchQuery).toBe('');
+    expect(lockerPickerComponent.mirrorSnapshot).toBeNull();
+    expect(searchAreaSpy).not.toHaveBeenCalled();
+
+    lockerPickerComponent.provider = 'sameday';
+    lockerPickerComponent.ngOnChanges({
+      provider: new SimpleChange('fan_courier', 'sameday', false),
+    });
+
+    expect(refreshSpy).toHaveBeenCalled();
+    expect(searchAreaSpy).not.toHaveBeenCalled();
+  });
+}
+
+function defineLoadLockersSuccessSpec(): void {
+  it('loads lockers successfully and redraws markers for searched area', async () => {
+    lockerPickerShipping.listLockers.and.returnValue(
+      of([
+        {
+          id: 'locker-1',
+          provider: 'sameday',
+          name: 'Locker One',
+          address: 'Main street',
+          lat: 44.43,
+          lng: 26.1,
+          distance_km: 0.5,
+        },
+      ] as any)
+    );
+    const redrawSpy = spyOn<any>(lockerPickerComponent as any, 'redrawMarkers').and.callThrough();
+
+    await (lockerPickerComponent as any).loadLockers(44.43, 26.1);
+
+    expect(lockerPickerComponent.loading).toBeFalse();
+    expect(lockerPickerComponent.error).toBe('');
+    expect(lockerPickerComponent.lockers.length).toBe(1);
+    expect(lockerPickerComponent.lockers[0].id).toBe('locker-1');
+    expect(redrawSpy).toHaveBeenCalled();
+  });
+}
+
+function defineMirrorSnapshotRefreshSuccessSpec(): void {
+  it('refreshes mirror snapshot metadata for sameday provider', async () => {
+    lockerPickerComponent.provider = 'sameday';
+    lockerPickerShipping.listLockerCities.and.returnValue(
+      of({
+        items: [],
+        snapshot: {
+          provider: 'sameday',
+          stale: false,
+          stale_age_seconds: 0,
+        },
+      } as any)
+    );
+
+    await (lockerPickerComponent as any).refreshMirrorSnapshot();
+
+    expect(lockerPickerShipping.listLockerCities).toHaveBeenCalledWith({
+      provider: 'sameday',
+      q: '',
+      limit: 1,
+    });
+    expect(lockerPickerComponent.mirrorSnapshot?.stale).toBeFalse();
+    expect(lockerPickerComponent.mirrorSnapshot?.provider).toBe('sameday');
   });
 }
