@@ -41,19 +41,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Set up Chrome
-        id: chrome
-        uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
-
       - name: Install frontend dependencies
         run: |
           cd frontend
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
+          npx playwright install --with-deps chromium
 
       - name: Run frontend tests with coverage
         run: |
           cd frontend
-          export CHROME_BIN="${{ steps.chrome.outputs.chrome-path }}"
           npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox --code-coverage || npm test -- --watch=false --code-coverage
 
       - name: Warn when Codacy token is missing
