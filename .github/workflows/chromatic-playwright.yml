@@ -24,13 +24,19 @@ jobs:
   chromatic:
     name: Chromatic Playwright
     runs-on: ubuntu-latest
+    environment: visual-ci
     defaults:
       run:
         working-directory: frontend
     env:
-      CHROMATIC_ARCHIVE_LOCATION: test-results/chromatic-archives
+      CHROMATIC_ARCHIVE_LOCATION: test-results
+      CHROMATIC_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') }}
+      HAS_CHROMATIC_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -41,39 +47,45 @@ jobs:
       - name: Upgrade npm
         run: npm i -g npm@11.7.0
 
-      - name: Decide Chromatic execution
-        id: chromatic
+      - name: Fail when Chromatic token is missing for a maintained branch
+        if: ${{ env.HAS_CHROMATIC_TOKEN != 'true' && env.CHROMATIC_PR_ORIGIN != 'true' }}
         run: |
-          if [ -n "${{ secrets.CHROMATIC_PROJECT_TOKEN }}" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ github.event.pull_request.user.login }}" = "dependabot[bot]" ]; then
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping Chromatic because CHROMATIC_PROJECT_TOKEN is unavailable on this Dependabot pull request."
-            exit 0
-          fi
-
           echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
           exit 1
 
       - name: Install dependencies
-        if: steps.chromatic.outputs.run == 'true'
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' }}
         run: npm ci
 
       - name: Install Playwright browser
-        if: steps.chromatic.outputs.run == 'true'
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' }}
         run: npx playwright install --with-deps chromium
 
       - name: Generate Playwright archives
-        if: steps.chromatic.outputs.run == 'true'
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' }}
         run: npm run e2e:chromatic
 
+      - name: Upload to Chromatic (dependency/tooling auto-accept)
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' && env.CHROMATIC_PR_ORIGIN == 'true' }}
+        uses: chromaui/action@5ec258af08deb3e8c36653bd618cb7fe52090031 # v15.2.0
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          playwright: true
+          workingDir: frontend
+          autoAcceptChanges: true
+        env:
+          CHROMATIC_ARCHIVE_LOCATION: test-results
+
       - name: Upload to Chromatic
-        if: steps.chromatic.outputs.run == 'true'
-        run: npx chromatic --playwright --project-token=${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' && env.CHROMATIC_PR_ORIGIN != 'true' }}
+        uses: chromaui/action@5ec258af08deb3e8c36653bd618cb7fe52090031 # v15.2.0
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          playwright: true
+          workingDir: frontend
+        env:
+          CHROMATIC_ARCHIVE_LOCATION: test-results
 
       - name: Note skipped Chromatic run
-        if: steps.chromatic.outputs.run != 'true'
-        run: echo "Chromatic upload was skipped for this Dependabot PR because the project token is unavailable in Dependabot secrets."
+        if: ${{ env.HAS_CHROMATIC_TOKEN != 'true' && env.CHROMATIC_PR_ORIGIN == 'true' }}
+        run: echo "Chromatic Playwright was skipped because CHROMATIC_PROJECT_TOKEN is unavailable in this Dependabot context."

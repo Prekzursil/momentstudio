@@ -5,7 +5,6 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,9 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
-      CODACY_ORGANIZATION_PROVIDER: gh
-      CODACY_USERNAME: Prekzursil
-      CODACY_PROJECT_NAME: AdrianaArt
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -47,23 +43,20 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Set up Chrome
-        id: chrome
-        uses: browser-actions/setup-chrome@c785b87e244131f27c9f19c1a33e2ead956ab7ce # v1
-
       - name: Install frontend dependencies
         run: |
           cd frontend
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci
+          npx playwright install --with-deps chromium
 
       - name: Run frontend tests with coverage
         run: |
           cd frontend
-          export CHROME_BIN="${{ steps.chrome.outputs.chrome-path }}"
           npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox --code-coverage || npm test -- --watch=false --code-coverage
 
       - name: Validate Codacy token
         id: codacy_token
+        shell: bash
         run: |
           if [ -z "${CODACY_API_TOKEN}" ]; then
             echo "::warning::Missing CODACY_API_TOKEN secret. Skipping Codacy upload."
@@ -74,11 +67,7 @@ jobs:
 
       - name: Upload coverage reports to Codacy
         if: ${{ steps.codacy_token.outputs.upload_enabled == 'true' }}
-        run: |
-          bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
-            --api-token "${CODACY_API_TOKEN}" \
-            --organization-provider "${CODACY_ORGANIZATION_PROVIDER}" \
-            --username "${CODACY_USERNAME}" \
-            --project-name "${CODACY_PROJECT_NAME}" \
-            --coverage-reports backend/coverage.xml \
-            --coverage-reports frontend/coverage/app/lcov.info
+        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1.3.0
+        with:
+          api-token: ${{ secrets.CODACY_API_TOKEN }}
+          coverage-reports: backend/coverage.xml,frontend/coverage/**/lcov.info
