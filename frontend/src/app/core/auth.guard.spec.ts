@@ -38,6 +38,14 @@ describe('auth/admin guards', () => {
     return resolveGuardResult(guardResult$);
   }
 
+  function runAuthGuard(): unknown {
+    return TestBed.runInInjectionContext(() => (authGuard as unknown as () => unknown)());
+  }
+
+  function runAdminGuard(): unknown {
+    return TestBed.runInInjectionContext(() => (adminGuard as unknown as () => unknown)());
+  }
+
   beforeEach(() => {
     toast.error.calls.reset();
     Object.values(authMock).forEach((spy) => {
@@ -63,14 +71,14 @@ describe('auth/admin guards', () => {
   });
 
   it('authGuard allows authenticated users', async () => {
-    const result$ = TestBed.runInInjectionContext(() => authGuard({} as any, {} as any));
+    const result$ = runAuthGuard();
     expect(await resolveGuardResult(result$)).toBeTrue();
   });
 
   it('authGuard redirects unauthenticated users to login', async () => {
     authMock.ensureAuthenticated.and.returnValue(of(false));
     const router = TestBed.inject(Router);
-    const result$ = TestBed.runInInjectionContext(() => authGuard({} as any, {} as any));
+    const result$ = runAuthGuard();
 
     const result = await resolveGuardResult(result$);
     expect(result instanceof UrlTree).toBeTrue();
@@ -82,13 +90,13 @@ describe('auth/admin guards', () => {
     authMock.ensureAuthenticated.and.returnValue(throwError(() => new Error('boom')));
     const router = TestBed.inject(Router);
 
-    const result$ = TestBed.runInInjectionContext(() => authGuard({} as any, {} as any));
+    const result$ = runAuthGuard();
     const result = await resolveGuardResult(result$);
     expect(router.serializeUrl(result as UrlTree)).toBe('/login');
   });
 
   it('adminGuard allows authenticated staff users', async () => {
-    const result$ = TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any));
+    const result$ = runAdminGuard();
     expect(await resolveGuardResult(result$)).toBeTrue();
   });
 
@@ -96,7 +104,7 @@ describe('auth/admin guards', () => {
     authMock.isStaff.and.returnValue(false);
     const router = TestBed.inject(Router);
 
-    const result$ = TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any));
+    const result$ = runAdminGuard();
     const result = await resolveGuardResult(result$);
     expect(router.serializeUrl(result as UrlTree)).toBe('/');
     expect(toast.error).toHaveBeenCalledWith('errors.staffRequired');
@@ -107,7 +115,7 @@ describe('auth/admin guards', () => {
     authMock.isAuthenticated.and.returnValue(false);
     const router = TestBed.inject(Router);
 
-    const result$ = TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any));
+    const result$ = runAdminGuard();
     const result = await resolveGuardResult(result$);
     expect(router.serializeUrl(result as UrlTree)).toBe('/');
     expect(toast.error).toHaveBeenCalledWith('errors.signInRequired');
@@ -117,7 +125,7 @@ describe('auth/admin guards', () => {
     authMock.ensureAuthenticated.and.returnValue(throwError(() => new Error('oops')));
     const router = TestBed.inject(Router);
 
-    const result$ = TestBed.runInInjectionContext(() => adminGuard({} as any, {} as any));
+    const result$ = runAdminGuard();
     const result = await resolveGuardResult(result$);
     expect(router.serializeUrl(result as UrlTree)).toBe('/');
     expect(toast.error).toHaveBeenCalledWith('errors.staffRequired');

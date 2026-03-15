@@ -70,28 +70,28 @@ function applyTranslations(): void {
   translate.use('en');
 }
 
+function configureProviders(overrides?: {
+  social?: SiteSocialService;
+  company?: SiteCompanyService;
+  navigation?: SiteNavigationService;
+}): void {
+  const social = overrides?.social ?? socialServiceFrom(of(DEFAULT_SOCIAL));
+  const company = overrides?.company ?? companyServiceFrom(of(DEFAULT_COMPANY));
+  const navigation = overrides?.navigation ?? navigationServiceFrom(of(DEFAULT_NAV));
+
+  TestBed.configureTestingModule({
+    imports: [RouterTestingModule, TranslateModule.forRoot(), FooterComponent],
+    providers: [
+      { provide: SiteSocialService, useValue: social },
+      { provide: SiteCompanyService, useValue: company },
+      { provide: SiteNavigationService, useValue: navigation }
+    ]
+  });
+
+  applyTranslations();
+}
+
 describe('FooterComponent', () => {
-  function configureProviders(overrides?: {
-    social?: SiteSocialService;
-    company?: SiteCompanyService;
-    navigation?: SiteNavigationService;
-  }): void {
-    const social = overrides?.social ?? socialServiceFrom(of(DEFAULT_SOCIAL));
-    const company = overrides?.company ?? companyServiceFrom(of(DEFAULT_COMPANY));
-    const navigation = overrides?.navigation ?? navigationServiceFrom(of(DEFAULT_NAV));
-
-    TestBed.configureTestingModule({
-      imports: [RouterTestingModule, TranslateModule.forRoot(), FooterComponent],
-      providers: [
-        { provide: SiteSocialService, useValue: social },
-        { provide: SiteCompanyService, useValue: company },
-        { provide: SiteNavigationService, useValue: navigation }
-      ]
-    });
-
-    applyTranslations();
-  }
-
   it('renders reserved placeholders before async footer data resolves', () => {
     configureProviders({
       social: socialServiceFrom(NEVER),
@@ -204,7 +204,7 @@ describe('FooterComponent', () => {
 
     const inside = document.createElement('button');
     const wrapper = document.createElement('div');
-    wrapper.dataset.footerDropdown = 'true';
+    wrapper.dataset['footerDropdown'] = 'true';
     wrapper.appendChild(inside);
     cmp.onDocumentClick({ target: inside } as unknown as MouseEvent);
     expect(cmp.openMenu).toBe('instagram');
