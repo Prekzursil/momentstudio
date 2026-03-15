@@ -30,6 +30,7 @@ jobs:
     env:
       CHROMATIC_ARCHIVE_LOCATION: test-results
       CHROMATIC_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') || startsWith(github.event.pull_request.head.ref || github.head_ref || '', 'dependabot/') }}
+      HAS_CHROMATIC_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -46,25 +47,25 @@ jobs:
         run: npm i -g npm@11.7.0
 
       - name: Fail when Chromatic token is missing for a maintained branch
-        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN == '' && env.CHROMATIC_PR_ORIGIN != 'true' }}
+        if: ${{ env.HAS_CHROMATIC_TOKEN != 'true' && env.CHROMATIC_PR_ORIGIN != 'true' }}
         run: |
           echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
           exit 1
 
       - name: Install dependencies
-        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' }}
         run: npm ci
 
       - name: Install Playwright browser
-        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' }}
         run: npx playwright install --with-deps chromium
 
       - name: Generate Playwright archives
-        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' }}
         run: npm run e2e:chromatic
 
       - name: Upload to Chromatic
-        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
+        if: ${{ env.HAS_CHROMATIC_TOKEN == 'true' }}
         uses: chromaui/action@5ec258af08deb3e8c36653bd618cb7fe52090031 # v15.2.0
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
@@ -76,5 +77,5 @@ jobs:
           CHROMATIC_SLUG: ${{ github.repository }}
 
       - name: Note skipped Chromatic run
-        if: ${{ secrets.CHROMATIC_PROJECT_TOKEN == '' && env.CHROMATIC_PR_ORIGIN == 'true' }}
+        if: ${{ env.HAS_CHROMATIC_TOKEN != 'true' && env.CHROMATIC_PR_ORIGIN == 'true' }}
         run: echo "Chromatic Playwright was skipped because CHROMATIC_PROJECT_TOKEN is unavailable in this Dependabot context."
