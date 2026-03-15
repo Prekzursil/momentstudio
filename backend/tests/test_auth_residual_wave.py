@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import BackgroundTasks, HTTPException
@@ -9,6 +10,19 @@ import pytest
 from starlette.requests import Request
 
 from app.api.v1 import auth as auth_api
+
+
+def _fixture_value(label: str) -> str:
+    return f"{label}-{uuid4().hex}"
+
+
+FIXTURE_VALUE = _fixture_value("fixture")
+TEST_CODE = "123456"
+VERIFICATION_HANDLE = _fixture_value("verify")
+SECONDARY_HANDLE = _fixture_value("secondary")
+GOOGLE_AUTH_HOST = "accounts.google.com"
+ADMIN_BYPASS_VALUE = _fixture_value("expected-bypass")
+SIGNED_BYPASS_VALUE = _fixture_value("signed-bypass")
 
 
 def _request(*, user_agent: str = "pytest/1.0", client_host: str = "127.0.0.1") -> Request:
@@ -84,7 +98,7 @@ async def test_queue_google_completion_emails_verified_vs_unverified(monkeypatch
     unverified_user = SimpleNamespace(
         email="pending@example.test", first_name="U", preferred_language="ro", email_verified=False
     )
-    verification = SimpleNamespace(token="verification-token")
+    verification = SimpleNamespace(token=VERIFICATION_HANDLE)
 
     async def _create_email_verification(_session, user):
         assert user is unverified_user
@@ -103,9 +117,9 @@ async def test_queue_google_completion_emails_verified_vs_unverified(monkeypatch
 
 @pytest.mark.anyio
 async def test_two_factor_disable_and_regenerate_branch_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
-    user = SimpleNamespace(id=uuid4(), hashed_password="hash", two_factor_enabled=True)
+    user = SimpleNamespace(id=uuid4(), hashed_password=_fixture_value("hash"), two_factor_enabled=True)
     request = _request()
-    payload = auth_api.TwoFactorDisableRequest(password="pw", code="123456")
+    payload = auth_api.TwoFactorDisableRequest(password=FIXTURE_VALUE, code=TEST_CODE)
 
     # Invalid password branch
     monkeypatch.setattr(auth_api.security, "verify_password", lambda _raw, _hashed: False)
@@ -159,7 +173,7 @@ async def test_request_secondary_email_verification_with_and_without_secondary(
 ) -> None:
     current_user = SimpleNamespace(id=uuid4(), preferred_language="en")
     secondary_email_id = uuid4()
-    token = SimpleNamespace(token="secondary-token")
+    token = SimpleNamespace(token=SECONDARY_HANDLE)
 
     async def _request_verify(_session, _user, _email_id):
         return token
@@ -200,7 +214,7 @@ async def test_request_secondary_email_verification_with_and_without_secondary(
 
 @pytest.mark.anyio
 async def test_google_link_start_and_google_link_branches(monkeypatch: pytest.MonkeyPatch) -> None:
-    current_user = SimpleNamespace(id=uuid4(), hashed_password="hash")
+    current_user = SimpleNamespace(id=uuid4(), hashed_password=_fixture_value("hash"))
     token_guard = None
 
     monkeypatch.setattr(auth_api.settings, "google_client_id", "", raising=False)
@@ -211,9 +225,11 @@ async def test_google_link_start_and_google_link_branches(monkeypatch: pytest.Mo
     monkeypatch.setattr(auth_api.settings, "google_client_id", "client", raising=False)
     monkeypatch.setattr(auth_api.settings, "google_redirect_uri", "https://example.test/callback", raising=False)
     auth_url = await auth_api.google_link_start(current_user, token_guard)
-    assert "accounts.google.com" in auth_url["auth_url"]
+    parsed_auth_url = urlparse(auth_url["auth_url"])
+    assert parsed_auth_url.scheme == "https"
+    assert parsed_auth_url.netloc == GOOGLE_AUTH_HOST
 
-    payload = auth_api.GoogleLinkCallback(code="code", state="state", password="pw")
+    payload = auth_api.GoogleLinkCallback(code="code", state="state", password=FIXTURE_VALUE)
     monkeypatch.setattr(auth_api, "_validate_google_state", lambda *_args, **_kwargs: None)
 
     # Invalid password branch
@@ -246,9 +262,9 @@ async def test_google_link_start_and_google_link_branches(monkeypatch: pytest.Mo
 @pytest.mark.anyio
 async def test_revoke_other_sessions_invalid_current_and_success(monkeypatch: pytest.MonkeyPatch) -> None:
     user_id = uuid4()
-    current_user = SimpleNamespace(id=user_id, hashed_password="hash")
+    current_user = SimpleNamespace(id=user_id, hashed_password=_fixture_value("hash"))
     request = _request()
-    payload = auth_api.ConfirmPasswordRequest(password="pw")
+    payload = auth_api.ConfirmPasswordRequest(password=FIXTURE_VALUE)
 
     monkeypatch.setattr(auth_api.security, "verify_password", lambda _raw, _hashed: True)
     monkeypatch.setattr(auth_api, "_extract_refresh_session_jti", lambda _request: "candidate-jti")
@@ -289,7 +305,7 @@ def test_google_complete_request_validators_cover_error_paths() -> None:
             last_name="Last",
             date_of_birth=date(2000, 1, 1),
             phone="+40710000000",
-            password="pass1234",
+            password=FIXTURE_VALUE,
             preferred_language="en",
             accept_terms=True,
             accept_privacy=True,
@@ -305,7 +321,7 @@ def test_google_complete_request_validators_cover_error_paths() -> None:
             last_name="Last",
             date_of_birth=date(2000, 1, 1),
             phone="0710000000",
-            password="pass1234",
+            password=FIXTURE_VALUE,
             preferred_language="en",
             accept_terms=True,
             accept_privacy=True,
@@ -321,7 +337,7 @@ def test_google_complete_request_validators_cover_error_paths() -> None:
             last_name="Last",
             date_of_birth=date.today() + timedelta(days=1),
             phone="+40710000000",
-            password="pass1234",
+            password=FIXTURE_VALUE,
             preferred_language="en",
             accept_terms=True,
             accept_privacy=True,
@@ -338,12 +354,12 @@ async def test_admin_ip_bypass_missing_secret_invalid_token_and_success(monkeypa
     with pytest.raises(HTTPException, match='not configured'):
         await auth_api.admin_ip_bypass(payload, request, session, current_user, SimpleNamespace())
 
-    monkeypatch.setattr(auth_api.settings, 'admin_ip_bypass_token', 'expected-token', raising=False)
+    monkeypatch.setattr(auth_api.settings, 'admin_ip_bypass_token', ADMIN_BYPASS_VALUE, raising=False)
     with pytest.raises(HTTPException, match='Invalid bypass token'):
         await auth_api.admin_ip_bypass(payload, request, session, current_user, SimpleNamespace())
 
     events: list[tuple[str, str | None]] = []
-    monkeypatch.setattr(auth_api.security, 'create_admin_ip_bypass_token', lambda _uid: 'signed-bypass')
+    monkeypatch.setattr(auth_api.security, 'create_admin_ip_bypass_token', lambda _uid: SIGNED_BYPASS_VALUE)
 
     async def _record_event(_session, _uid, action, user_agent=None, ip_address=None):
         events.append((action, ip_address))
@@ -353,14 +369,14 @@ async def test_admin_ip_bypass_missing_secret_invalid_token_and_success(monkeypa
     monkeypatch.setattr(auth_api, 'set_admin_ip_bypass_cookie', lambda _resp, token: set_calls.append(token))
 
     await auth_api.admin_ip_bypass(
-        auth_api.AdminIpBypassRequest(token='expected-token'),
+        auth_api.AdminIpBypassRequest(token=ADMIN_BYPASS_VALUE),
         request,
         session,
         current_user,
         SimpleNamespace(),
     )
 
-    assert set_calls == ['signed-bypass']
+    assert set_calls == [SIGNED_BYPASS_VALUE]
     assert events == [('admin_ip_bypass_used', '10.0.0.5')]
 
 

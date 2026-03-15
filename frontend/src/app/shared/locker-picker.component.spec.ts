@@ -225,7 +225,7 @@ function defineProviderChangeRefreshSpec(): void {
   it('resets transient state and refreshes nearby results when provider changes after initialization', () => {
     const refreshSpy = spyOn<any>(lockerPickerComponent as any, 'refreshMirrorSnapshot').and.returnValue(Promise.resolve());
     const searchAreaSpy = spyOn(lockerPickerComponent, 'searchThisArea');
-    const selectSpy = spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
+    spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
     lockerPickerComponent.searchResults = [{ display_name: 'Old', lat: 1, lng: 2 }];
     lockerPickerComponent.searchError = 'old error';
     lockerPickerComponent.searchQuery = 'old query';
@@ -391,7 +391,7 @@ function defineRedrawMarkersSpec(): void {
     (lockerPickerComponent as any).markers = { clearLayers: jasmine.createSpy('clearLayers') } as any;
     lockerPickerComponent.lockers = [{ id: 'l-1', lat: 44.4, lng: 26.1 } as any];
 
-    const selectSpy = spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
+    spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
     (lockerPickerComponent as any).redrawMarkers();
 
     expect((lockerPickerComponent as any).markers.clearLayers).toHaveBeenCalled();
