@@ -30,20 +30,40 @@ def write_output(name: str, value: str) -> None:
         handle.write(f"{name}={value}\n")
 
 
+def normalize_scheme(parsed: ParseResult) -> str | None:
+    scheme = (parsed.scheme or "https").lower()
+    if scheme in {"http", "https"}:
+        return scheme
+    return None
+
+
+def resolve_host(parsed: ParseResult) -> str:
+    return parsed.netloc or parsed.path
+
+
+def resolve_base_path(parsed: ParseResult) -> str:
+    if not parsed.netloc:
+        return ""
+    return parsed.path.rstrip("/")
+
+
+def build_request_path(base_path: str) -> str:
+    if not base_path:
+        return RENDERINFO_PATH
+    return f"{base_path}{RENDERINFO_PATH}"
+
+
 def resolve_probe_target(server_url: str) -> tuple[str, str, str] | None:
     parsed = urlparse(server_url)
-    scheme = (parsed.scheme or "https").lower()
-    if scheme not in {"http", "https"}:
+    scheme = normalize_scheme(parsed)
+    if scheme is None:
         return None
 
-    host = parsed.netloc or parsed.path
+    host = resolve_host(parsed)
     if not host:
         return None
 
-    base_path = parsed.path.rstrip("/") if parsed.netloc else ""
-    request_path = f"{base_path}/api/sessions/renderinfo" if base_path else "/api/sessions/renderinfo"
-    return scheme, host, request_path
-
+    return scheme, host, build_request_path(resolve_base_path(parsed))
 
 
 def probe(server_url: str, api_key: str) -> str:
@@ -76,7 +96,7 @@ def skip(message: str) -> int:
 
 def main() -> int:
     api_key = os.environ.get("APPLITOOLS_API_KEY", "").strip()
-    server_url = os.environ.get("APPLITOOLS_SERVER_URL") or "https://eyesapi.applitools.com"
+    server_url = os.environ.get("APPLITOOLS_SERVER_URL") or DEFAULT_APPLITOOLS_SERVER
     dependabot_origin = is_dependabot_origin()
 
     if not api_key:
