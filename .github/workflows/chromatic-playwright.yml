@@ -76,4 +76,4 @@ jobs:
         if: steps.chromatic_token.outputs.available == 'true'
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
-        run: npx chromatic --playwright --project-token="${CHROMATIC_PROJECT_TOKEN}"
+        run: npx chromatic --playwright
