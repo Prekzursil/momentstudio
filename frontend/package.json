@@ -52,7 +52,7 @@
     "@codecov/bundle-analyzer": "^1.9.1",
     "@angular-devkit/build-angular": "^21.2.1",
     "@angular/cli": "^21.2.1",
-    "@angular/compiler-cli": "^21.2.1",
+    "@angular/compiler-cli": "^21.2.4",
     "@applitools/eyes-playwright": "^1.45.0",
     "@chromatic-com/playwright": "^0.12.8",
     "@eslint/js": "^9.39.4",
