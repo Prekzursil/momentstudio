@@ -36,55 +36,10 @@ jobs:
         env:
           APPLITOOLS_API_KEY: ${{ secrets.APPLITOOLS_API_KEY }}
           APPLITOOLS_SERVER_URL: ${{ vars.APPLITOOLS_SERVER_URL }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${APPLITOOLS_API_KEY:-}" ]; then
-            if [ "${APPLITOOLS_PR_ORIGIN:-false}" = "true" ]; then
-              echo "available=false" >> "$GITHUB_OUTPUT"
-              echo "Skipping Applitools for Dependabot because APPLITOOLS_API_KEY is unavailable in this context."
-              exit 0
-            fi
-
-            echo "APPLITOOLS_API_KEY is not configured for this repository."
-            exit 1
-          fi
-
-          server_url="${APPLITOOLS_SERVER_URL:-https://eyesapi.applitools.com}"
-          probe_status="$(python - <<'PY'
-          import os
-          import urllib.error
-          import urllib.request
-
-          server_url = (os.environ.get("APPLITOOLS_SERVER_URL") or "https://eyesapi.applitools.com").rstrip("/")
-          url = f"{server_url}/api/sessions/renderinfo"
-          request = urllib.request.Request(
-              url,
-              headers={"X-Api-Key": os.environ["APPLITOOLS_API_KEY"]},
-          )
-          try:
-              with urllib.request.urlopen(request, timeout=20) as response:
-                  print(response.getcode())
-          except urllib.error.HTTPError as exc:
-              print(exc.code)
-          except Exception:
-              print("000")
-          PY
-          )"
-
-          if [ "$probe_status" = "200" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ "${APPLITOOLS_PR_ORIGIN:-false}" = "true" ]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping Applitools for Dependabot because credentials/server validation failed with HTTP ${probe_status}."
-            exit 0
-          fi
-
-          echo "Applitools credentials/server validation failed with HTTP ${probe_status}."
-          exit 1
+          GITHUB_ACTOR_NAME: ${{ github.actor }}
+          PULL_REQUEST_AUTHOR: ${{ github.event.pull_request.user.login || '' }}
+          PULL_REQUEST_HEAD_REF: ${{ github.event.pull_request.head.ref || github.head_ref || '' }}
+        run: python scripts/quality/check_applitools_availability.py
 
       - name: Install frontend dependencies
         if: steps.applitools.outputs.available == 'true'
