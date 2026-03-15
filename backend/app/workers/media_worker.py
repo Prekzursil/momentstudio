@@ -129,52 +129,50 @@ def _normalize_job_id_candidate(raw: object) -> str | None:
     return candidate
 
 
-async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
-    redis = get_redis()
-    worker_id = _worker_id()
-    heartbeat_interval = max(5.0, float(HEARTBEAT_TTL_SECONDS) / 2.0)
-    bounded_sleep = min(FALLBACK_MAX_SLEEP_SECONDS, max(0.1, float(poll_interval_seconds)))
-    if redis is None:
-        logger.warning(
-            "media_worker_degraded_mode_started",
-            extra={
-                "worker_id": worker_id,
-                "poll_interval_seconds": bounded_sleep,
-                "retry_sweep_seconds": float(RETRY_SWEEP_SECONDS),
-                "job_batch_size": int(FALLBACK_JOB_BATCH_SIZE),
-            },
-        )
-        last_heartbeat = 0.0
-        last_retry_sweep = 0.0
-        last_stats_log = 0.0
-        processed_count = 0
-        retry_enqueued_count = 0
-        while True:
-            try:
-                now = time.monotonic()
-                if now - last_heartbeat >= heartbeat_interval:
-                    await _publish_heartbeat(None, worker_id=worker_id)
-                    last_heartbeat = now
-                if now - last_retry_sweep >= float(RETRY_SWEEP_SECONDS):
-                    retry_enqueued_count += await _enqueue_due_retries_once(limit=100)
-                    last_retry_sweep = now
-                processed_count += await _process_queued_jobs_once(limit=FALLBACK_JOB_BATCH_SIZE)
-                if now - last_stats_log >= float(FALLBACK_STATS_LOG_SECONDS):
-                    logger.warning(
-                        "media_worker_degraded_mode_stats",
-                        extra={
-                            "worker_id": worker_id,
-                            "processed_count": processed_count,
-                            "retry_enqueued_count": retry_enqueued_count,
-                        },
-                    )
-                    last_stats_log = now
-                await asyncio.sleep(bounded_sleep)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("media_worker_degraded_mode_loop_error", extra={"worker_id": worker_id})
-                await asyncio.sleep(bounded_sleep)
+async def _run_degraded_worker_loop(*, worker_id: str, bounded_sleep: float, heartbeat_interval: float) -> None:
+    logger.warning(
+        "media_worker_degraded_mode_started",
+        extra={
+            "worker_id": worker_id,
+            "poll_interval_seconds": bounded_sleep,
+            "retry_sweep_seconds": float(RETRY_SWEEP_SECONDS),
+            "job_batch_size": int(FALLBACK_JOB_BATCH_SIZE),
+        },
+    )
+    last_heartbeat = 0.0
+    last_retry_sweep = 0.0
+    last_stats_log = 0.0
+    processed_count = 0
+    retry_enqueued_count = 0
+    while True:
+        try:
+            now = time.monotonic()
+            if now - last_heartbeat >= heartbeat_interval:
+                await _publish_heartbeat(None, worker_id=worker_id)
+                last_heartbeat = now
+            if now - last_retry_sweep >= float(RETRY_SWEEP_SECONDS):
+                retry_enqueued_count += await _enqueue_due_retries_once(limit=100)
+                last_retry_sweep = now
+            processed_count += await _process_queued_jobs_once(limit=FALLBACK_JOB_BATCH_SIZE)
+            if now - last_stats_log >= float(FALLBACK_STATS_LOG_SECONDS):
+                logger.warning(
+                    "media_worker_degraded_mode_stats",
+                    extra={
+                        "worker_id": worker_id,
+                        "processed_count": processed_count,
+                        "retry_enqueued_count": retry_enqueued_count,
+                    },
+                )
+                last_stats_log = now
+            await asyncio.sleep(bounded_sleep)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("media_worker_degraded_mode_loop_error", extra={"worker_id": worker_id})
+            await asyncio.sleep(bounded_sleep)
+
+
+async def _run_redis_worker_loop(*, redis, worker_id: str, heartbeat_interval: float, poll_interval_seconds: float) -> None:
     logger.info("media_worker_started")
     last_heartbeat = 0.0
     last_retry_sweep = 0.0
@@ -200,6 +198,26 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
         except Exception:
             logger.exception("media_worker_loop_error")
             await asyncio.sleep(max(0.5, poll_interval_seconds))
+
+
+async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
+    redis = get_redis()
+    worker_id = _worker_id()
+    heartbeat_interval = max(5.0, float(HEARTBEAT_TTL_SECONDS) / 2.0)
+    bounded_sleep = min(FALLBACK_MAX_SLEEP_SECONDS, max(0.1, float(poll_interval_seconds)))
+    if redis is None:
+        await _run_degraded_worker_loop(
+            worker_id=worker_id,
+            bounded_sleep=bounded_sleep,
+            heartbeat_interval=heartbeat_interval,
+        )
+        return
+    await _run_redis_worker_loop(
+        redis=redis,
+        worker_id=worker_id,
+        heartbeat_interval=heartbeat_interval,
+        poll_interval_seconds=poll_interval_seconds,
+    )
 
 
 async def _await_if_needed(result: Awaitable[T] | T) -> T:

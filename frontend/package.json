@@ -87,7 +87,7 @@
   },
   "overrides": {
     "@toast-ui/editor": {
-      "dompurify": "3.3.1"
+      "dompurify": "3.3.2"
     },
     "fastify": "5.7.2",
     "hono": "4.12.2",

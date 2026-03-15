@@ -451,21 +451,7 @@ export class HeaderComponent implements OnDestroy {
     { label: 'nav.terms', path: '/pages/terms' }
   ];
 
-  readonly storefrontLinks = computed<NavLink[]>(() => {
-    const nav = this.cmsNavigation();
-    const lang = this.languageSig();
-    const items = nav?.headerLinks || [];
-    if (!nav || !items.length) return this.fallbackStorefrontLinks;
-
-    const out: NavLink[] = [];
-    for (const item of items) {
-      const url = (item.url || '').trim();
-      const label = (lang === 'ro' ? item.label.ro : item.label.en).trim();
-      if (!url || !label) continue;
-      out.push({ label, path: url, translate: false, external: this.isExternalLink(url) });
-    }
-    return out.length ? out : this.fallbackStorefrontLinks;
-  });
+  readonly storefrontLinks = computed<NavLink[]>(() => this.resolveStorefrontLinks());
 
   readonly navLinks = computed<NavLink[]>(() => {
     const authenticated = this.isAuthenticated();
@@ -481,6 +467,27 @@ export class HeaderComponent implements OnDestroy {
     }
     return links;
   });
+
+  private resolveStorefrontLinks(): NavLink[] {
+    const nav = this.cmsNavigation();
+    const items = nav?.headerLinks ?? [];
+    if (!items.length) return this.fallbackStorefrontLinks;
+    const links = this.toStorefrontLinks(items, this.languageSig());
+    return links.length ? links : this.fallbackStorefrontLinks;
+  }
+
+  private toStorefrontLinks(items: SiteNavigationData['headerLinks'], lang: 'en' | 'ro'): NavLink[] {
+    return items
+      .map((item) => this.toStorefrontLink(item, lang))
+      .filter((link): link is NavLink => Boolean(link));
+  }
+
+  private toStorefrontLink(item: SiteNavigationData['headerLinks'][number], lang: 'en' | 'ro'): NavLink | null {
+    const url = (item.url || '').trim();
+    const label = (lang === 'ro' ? item.label.ro : item.label.en).trim();
+    if (!url || !label) return null;
+    return { label, path: url, translate: false, external: this.isExternalLink(url) };
+  }
 
     constructor(
       private readonly cart: CartStore,
@@ -725,4 +732,3 @@ export class HeaderComponent implements OnDestroy {
     });
   }
 }
-

@@ -47,16 +47,7 @@ export class AdminRecentService {
 
   add(item: Omit<AdminRecentItem, 'viewed_at'>): void {
     const userId = this.auth.user()?.id ?? null;
-    const now = new Date().toISOString();
-    const entry: AdminRecentItem = {
-      key: (item.key || '').slice(0, 128),
-      type: item.type,
-      label: (item.label || '').slice(0, 180) || item.url,
-      subtitle: (item.subtitle || '').slice(0, 240),
-      url: (item.url || '').slice(0, 500) || '/',
-      state: item.state && typeof item.state === 'object' ? item.state : null,
-      viewed_at: now
-    };
+    const entry = this.buildRecentItem(item);
     if (!entry.key) return;
 
     const existing = this.items().filter((it) => it.key !== entry.key);
@@ -139,5 +130,17 @@ export class AdminRecentService {
       // ignore
     }
   }
-}
 
+  private buildRecentItem(item: Omit<AdminRecentItem, 'viewed_at'>): AdminRecentItem {
+    const url = (item.url || '').slice(0, 500);
+    return {
+      key: (item.key || '').slice(0, 128),
+      type: item.type,
+      label: (item.label || '').slice(0, 180) || item.url,
+      subtitle: (item.subtitle || '').slice(0, 240),
+      url: url || '/',
+      state: item.state && typeof item.state === 'object' ? item.state : null,
+      viewed_at: new Date().toISOString()
+    };
+  }
+}

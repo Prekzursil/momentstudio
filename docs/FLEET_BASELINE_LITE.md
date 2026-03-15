@@ -5,6 +5,7 @@ This repository baseline package is intended for rollout to additional repos aft
 ## Included components
 
 ### Core governance files
+
 1. **`AGENTS.md`** - Operating contract for AI-assisted workflows
    - Source: `/AGENTS.md`
    - Evidence-first workflow model
@@ -23,31 +24,33 @@ This repository baseline package is intended for rollout to additional repos aft
    - Backlog sync tracking
 
 ### Workflow automations
-4. **`.github/workflows/agent-label-sync.yml`** - Label synchronization
+
+1. **`.github/workflows/agent-label-sync.yml`** - Label synchronization
    - Source: `/.github/workflows/agent-label-sync.yml`
    - Creates/updates agent:*, risk:*, area:* labels
    - Manual dispatch trigger
 
-5. **`.github/workflows/agent-task-queue.yml`** - Agent task queue
+2. **`.github/workflows/agent-task-queue.yml`** - Agent task queue
    - Source: `/.github/workflows/agent-task-queue.yml`
    - Triggers on `agent:ready` label
    - Posts execution packet for @copilot
    - Includes verification command and guardrails
 
-6. **`.github/workflows/kpi-weekly-digest.yml`** - KPI reporting
+3. **`.github/workflows/kpi-weekly-digest.yml`** - KPI reporting
    - Source: `/.github/workflows/kpi-weekly-digest.yml`
    - Automated PR/issue metrics snapshot
    - Weekly schedule (Mondays 06:15 UTC)
    - Creates tracking issue with KPI fields
 
-7. **`.github/workflows/branch-protection-audit.yml`** - Protection validation
+4. **`.github/workflows/branch-protection-audit.yml`** - Protection validation
    - Source: `/.github/workflows/branch-protection-audit.yml`
    - Audits main branch protection settings
    - Weekly schedule (Mondays 06:30 UTC)
    - Creates issue on policy violations
 
 ### Agent profiles (optional)
-8. **`.github/agents/`** - Starter agent profiles
+
+1. **`.github/agents/`** - Starter agent profiles
    - `docs-gardener.agent.md` - Documentation alignment
    - `release-assistant.agent.md` - Release preparation
    - `security-sheriff.agent.md` - Security hardening
@@ -56,13 +59,14 @@ This repository baseline package is intended for rollout to additional repos aft
    - `ui-polish.agent.md` - UX improvements
 
 ### Supporting documentation
-9. **`docs/KPI_BASELINE.md`** - KPI definitions
+
+1. **`docs/KPI_BASELINE.md`** - KPI definitions
    - Source: `/docs/KPI_BASELINE.md`
    - Core metrics (6 KPIs)
    - Escaped-regression tracking
    - Operating notes
 
-10. **`docs/REPOSITORY_POLICY.md`** - Repository policy baseline
+2. **`docs/REPOSITORY_POLICY.md`** - Repository policy baseline
     - Source: `/docs/REPOSITORY_POLICY.md`
     - Branch protection requirements
     - Label taxonomy
@@ -73,11 +77,13 @@ This repository baseline package is intended for rollout to additional repos aft
 Use this checklist when applying baseline-lite to a new repository:
 
 ### Prerequisites
+
 - [ ] Repository has a clear verification command (e.g., `make verify`, `npm test`)
 - [ ] Repository has CI workflows for linting/testing
 - [ ] Team has agreed on risk-gating policy
 
 ### Installation steps
+
 1. **Core files** (required)
    - [ ] Copy `AGENTS.md` to repository root
    - [ ] Copy `.github/ISSUE_TEMPLATE/agent_task.yml`
@@ -107,6 +113,7 @@ Use this checklist when applying baseline-lite to a new repository:
    - [ ] Test agent queue by creating test issue with `agent:ready` label
 
 ### Validation
+
 - [ ] Weekly KPI digest workflow runs successfully
 - [ ] Branch protection audit workflow runs successfully
 - [ ] Agent queue workflow responds to `agent:ready` label

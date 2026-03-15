@@ -48,24 +48,35 @@ export class AdminUiPrefsService {
     return `admin.ui.mode.v1:${userId || 'anonymous'}`;
   }
 
+  private isMode(value: unknown): value is AdminUiMode {
+    return value === 'simple' || value === 'advanced';
+  }
+
+  private isPreset(value: unknown): value is AdminUiPreset {
+    return value === 'custom' || value === 'owner_basic';
+  }
+
+  private normalizeLoadedState(parsed: unknown): {
+    mode: AdminUiMode | null;
+    preset: AdminUiPreset | null;
+    sidebarCompact: boolean | null;
+  } {
+    const data = (parsed ?? {}) as Record<string, unknown>;
+    const mode = this.isMode(data['mode']) ? data['mode'] : null;
+    const preset = this.isPreset(data['preset']) ? data['preset'] : null;
+    const sidebarCompact = typeof data['sidebarCompact'] === 'boolean' ? data['sidebarCompact'] : null;
+    return { mode, preset, sidebarCompact };
+  }
+
   private load(): void {
     if (typeof localStorage === 'undefined') return;
     try {
       const raw = localStorage.getItem(this.storageKey());
       if (!raw) return;
-      const parsed = JSON.parse(raw);
-      const mode = (parsed)?.mode;
-      if (mode === 'simple' || mode === 'advanced') {
-        this.mode.set(mode);
-      }
-      const preset = (parsed)?.preset;
-      if (preset === 'custom' || preset === 'owner_basic') {
-        this.preset.set(preset);
-      }
-      const sidebarCompact = (parsed)?.sidebarCompact;
-      if (typeof sidebarCompact === 'boolean') {
-        this.sidebarCompact.set(sidebarCompact);
-      }
+      const normalized = this.normalizeLoadedState(JSON.parse(raw));
+      if (normalized.mode) this.mode.set(normalized.mode);
+      if (normalized.preset) this.preset.set(normalized.preset);
+      if (normalized.sidebarCompact !== null) this.sidebarCompact.set(normalized.sidebarCompact);
       if (this.preset() === 'owner_basic') {
         this.mode.set('simple');
       }
@@ -86,4 +97,3 @@ export class AdminUiPrefsService {
     }
   }
 }
-

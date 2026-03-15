@@ -110,6 +110,29 @@ def _mask_contact_submission_read(record: ContactSubmissionRead) -> ContactSubmi
     )
 
 
+async def _queue_contact_submission_admin_notification(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    *,
+    record,
+) -> None:
+    owner = await auth_service.get_owner_user(session)
+    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    if not admin_to:
+        return
+    background_tasks.add_task(
+        email_service.send_contact_submission_notification,
+        admin_to,
+        topic=record.topic.value,
+        from_name=record.name,
+        from_email=record.email,
+        message=record.message,
+        order_reference=record.order_reference,
+        admin_url=f"{settings.frontend_origin.rstrip('/')}/admin/support",
+        lang=owner.preferred_language if owner else None,
+    )
+
+
 @router.post("/contact", response_model=ContactSubmissionRead, status_code=status.HTTP_201_CREATED)
 async def submit_contact(
     payload: ContactSubmissionCreate,
@@ -131,22 +154,7 @@ async def submit_contact(
         order_reference=payload.order_reference,
         user=current_user,
     )
-
-    owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
-    if admin_to:
-        background_tasks.add_task(
-            email_service.send_contact_submission_notification,
-            admin_to,
-            topic=record.topic.value,
-            from_name=record.name,
-            from_email=record.email,
-            message=record.message,
-            order_reference=record.order_reference,
-            admin_url=f"{settings.frontend_origin.rstrip('/')}/admin/support",
-            lang=owner.preferred_language if owner else None,
-        )
-
+    await _queue_contact_submission_admin_notification(session, background_tasks, record=record)
     hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
     return ContactSubmissionRead.model_validate(hydrated or record)
 

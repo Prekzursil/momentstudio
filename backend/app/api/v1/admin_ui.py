@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,18 +33,18 @@ def _parse_favorites(raw: object) -> list[AdminFavoriteItem]:
     return unique[:50]
 
 
-@router.get("/favorites", response_model=AdminFavoritesResponse)
+@router.get("/favorites")
 async def get_admin_favorites(
-    admin: User = Depends(require_admin_section("dashboard")),
+    admin: Annotated[User, Depends(require_admin_section("dashboard"))],
 ) -> AdminFavoritesResponse:
     return AdminFavoritesResponse(items=_parse_favorites(getattr(admin, "admin_favorites", None)))
 
 
-@router.put("/favorites", response_model=AdminFavoritesResponse)
+@router.put("/favorites")
 async def update_admin_favorites(
     payload: AdminFavoritesUpdateRequest,
-    session: AsyncSession = Depends(get_session),
-    admin: User = Depends(require_admin_section("dashboard")),
+    session: Annotated[AsyncSession, Depends(get_session)],
+    admin: Annotated[User, Depends(require_admin_section("dashboard"))],
 ) -> AdminFavoritesResponse:
     seen: set[str] = set()
     items: list[AdminFavoriteItem] = []
@@ -58,4 +60,3 @@ async def update_admin_favorites(
     session.add(admin)
     await session.commit()
     return AdminFavoritesResponse(items=items)
-

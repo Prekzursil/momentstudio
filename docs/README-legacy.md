@@ -394,8 +394,8 @@ alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- Backend available at: http://localhost:8000
-- Docs: http://localhost:8000/docs
+- Backend available at: <http://localhost:8000>
+- Docs: <http://localhost:8000/docs>
 
 ### Frontend
 
@@ -408,7 +408,7 @@ cp .env.example .env            # or .env.local if you prefer
 npm start
 ```
 
-- Frontend available at: http://localhost:4200
+- Frontend available at: <http://localhost:4200>
 
 ### Docker (optional, all‑in‑one)
 
@@ -417,8 +417,8 @@ cd infra
 docker compose up --build
 ```
 
-- Docker frontend available at: http://localhost:4201
-- Docker backend available at: http://localhost:8001 (docs at: http://localhost:8001/docs)
+- Docker frontend available at: <http://localhost:4201>
+- Docker backend available at: <http://localhost:8001> (docs at: <http://localhost:8001/docs>)
 
 ### Caching & CDN (guidance)
 

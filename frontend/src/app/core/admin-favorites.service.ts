@@ -72,18 +72,9 @@ export class AdminFavoritesService {
   add(item: AdminFavoriteItem): void {
     const key = (item?.key || '').trim();
     if (!key) return;
+    const normalized = this.normalizeItem(item, key);
     const existing = this.items().filter((it) => it.key !== key);
-    const next = [
-      {
-        key,
-        type: item.type,
-        label: (item.label || '').trim() || item.url,
-        subtitle: (item.subtitle || '').trim(),
-        url: (item.url || '').trim() || '/',
-        state: item.state && typeof item.state === 'object' ? item.state : null,
-      },
-      ...existing,
-    ].slice(0, this.maxItems);
+    const next = [normalized, ...existing].slice(0, this.maxItems);
     this.save(next, existing);
   }
 
@@ -123,6 +114,19 @@ export class AdminFavoritesService {
     const value = this.translate.instant(key);
     return value === key ? key : value;
   }
-}
 
+  private normalizeItem(item: AdminFavoriteItem, key: string): AdminFavoriteItem {
+    const label = (item.label || '').trim();
+    const url = (item.url || '').trim();
+    const state = item.state && typeof item.state === 'object' ? item.state : null;
+    return {
+      key,
+      type: item.type,
+      label: label || url,
+      subtitle: (item.subtitle || '').trim(),
+      url: url || '/',
+      state,
+    };
+  }
+}
 

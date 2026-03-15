@@ -19,6 +19,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Key env vars:
+
 - `SECRET_KEY`, `JWT_ALGORITHM`, `ACCESS_TOKEN_EXP_MINUTES`, `REFRESH_TOKEN_EXP_DAYS`
 - `DATABASE_URL` (async driver, e.g., `postgresql+asyncpg://...`)
 - Optional (recommended for multi-replica): `REDIS_URL` (shared rate limiting/caches)
@@ -29,6 +30,7 @@ Key env vars:
 - `DATABASE_URL` is also used by backup scripts and CLI import/export.
 
 ### Google OAuth quick notes
+
 - Configure a Google OAuth client (Web) with authorized redirect URI matching `GOOGLE_REDIRECT_URI` (e.g., `http://localhost:4200/auth/google/callback` in dev).
 - Set env vars above; `GOOGLE_ALLOWED_DOMAINS` is optional for restricting enterprise domains.
 - Frontend calls `/auth/google/start` and then posts the returned `code`/`state` to `/auth/google/callback` to exchange for tokens.
@@ -46,7 +48,6 @@ alembic upgrade head
 alembic revision --autogenerate -m "describe change"  # after models exist
 ```
 
-
 ## Seed profiles (tenant bootstrap)
 
 Schema evolution stays in Alembic migrations, while tenant/business defaults are seeded from
@@ -60,6 +61,7 @@ python -m app.cli seed-data --profile default
 ```
 
 To supply defaults for a new repo/tenant without changing migration history:
+
 1. Create `app/seed_profiles/<profile>/`.
 2. Add `catalog.json` and `content_blocks.json`.
 3. Add any referenced markdown assets (for example `legal/*.md`).

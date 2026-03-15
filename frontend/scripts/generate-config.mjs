@@ -9,12 +9,29 @@ function isPathWithinRoot(rootPath, candidatePath) {
   return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
-function assertPathWithinRoot(rootPath, candidatePath, label) {
-  const candidate = path.resolve(candidatePath);
-  if (!isPathWithinRoot(rootPath, candidate)) {
+function resolvePathUnderBase(rootPath, candidatePath, label) {
+  const base = path.resolve(rootPath);
+  const candidate = path.resolve(base, candidatePath);
+  if (!isPathWithinRoot(base, candidate)) {
     throw new Error(`[config] Refusing ${label} outside allowed root: ${candidate}`);
   }
   return candidate;
+}
+
+function readUtf8UnderBase(rootPath, candidatePath, label) {
+  const safePath = resolvePathUnderBase(rootPath, candidatePath, label);
+  return fs.readFileSync(safePath, 'utf8');
+}
+
+function mkdirUnderBase(rootPath, candidatePath, label) {
+  const safePath = resolvePathUnderBase(rootPath, candidatePath, label);
+  fs.mkdirSync(safePath, { recursive: true });
+  return safePath;
+}
+
+function writeUtf8UnderBase(rootPath, candidatePath, payload, label) {
+  const safePath = resolvePathUnderBase(rootPath, candidatePath, label);
+  fs.writeFileSync(safePath, payload, 'utf8');
 }
 
 function parseDotEnv(contents) {
@@ -39,7 +56,7 @@ function parseDotEnv(contents) {
     PUBLIC_BASE_URL: undefined,
     SUPPORT_EMAIL: undefined,
     DEFAULT_LOCALE: undefined,
-    SUPPORTED_LOCALES: undefined
+    SUPPORTED_LOCALES: undefined,
   };
   for (const line of contents.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -127,7 +144,7 @@ function parseDotEnv(contents) {
 
 function firstExisting(rootPath, paths) {
   for (const candidate of paths) {
-    const safeCandidate = assertPathWithinRoot(rootPath, candidate, 'candidate path');
+    const safeCandidate = resolvePathUnderBase(rootPath, candidate, 'candidate path');
     if (fs.existsSync(safeCandidate)) return safeCandidate;
   }
   return null;
@@ -135,68 +152,96 @@ function firstExisting(rootPath, paths) {
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.resolve(scriptsDir, '..');
+const packageJsonRelativePath = 'package.json';
+const envCandidatePaths = ['.env', '.env.local', '.env.example'];
+const outputConfigRelativePath = path.join('src', 'assets', 'app-config.js');
 let packageVersion = '';
 try {
-  const packageJsonPath = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'package.json'), 'package.json');
-  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const packageJsonPath = resolvePathUnderBase(
+    frontendRoot,
+    packageJsonRelativePath,
+    'package.json',
+  );
+  const pkg = JSON.parse(readUtf8UnderBase(frontendRoot, packageJsonPath, 'package.json'));
   if (typeof pkg?.version === 'string') packageVersion = pkg.version;
 } catch {
   packageVersion = '';
 }
-const envPath = firstExisting(frontendRoot, [
-  path.join(frontendRoot, '.env'),
-  path.join(frontendRoot, '.env.local'),
-  path.join(frontendRoot, '.env.example')
-]);
+const envPath = firstExisting(frontendRoot, envCandidatePaths);
 
-const parsed = envPath ? parseDotEnv(fs.readFileSync(assertPathWithinRoot(frontendRoot, envPath, 'env file'), 'utf8')) : {};
+const parsed = envPath ? parseDotEnv(readUtf8UnderBase(frontendRoot, envPath, 'env file')) : {};
 
 const apiBaseUrl = process.env.API_BASE_URL ?? parsed.API_BASE_URL ?? '/api/v1';
 const appEnv = process.env.APP_ENV ?? parsed.APP_ENV ?? 'development';
 const appVersion = process.env.APP_VERSION ?? parsed.APP_VERSION ?? packageVersion;
 const stripeEnabledRaw = process.env.STRIPE_ENABLED ?? parsed.STRIPE_ENABLED;
-const stripeEnabled = ['1', 'true', 'yes', 'on'].includes(String(stripeEnabledRaw ?? '').trim().toLowerCase());
+const stripeEnabled = ['1', 'true', 'yes', 'on'].includes(
+  String(stripeEnabledRaw ?? '')
+    .trim()
+    .toLowerCase(),
+);
 const paypalEnabledRaw = process.env.PAYPAL_ENABLED ?? parsed.PAYPAL_ENABLED ?? '';
 const netopiaEnabledRaw = process.env.NETOPIA_ENABLED ?? parsed.NETOPIA_ENABLED ?? '';
-const addressAutocompleteEnabledRaw = process.env.ADDRESS_AUTOCOMPLETE_ENABLED ?? parsed.ADDRESS_AUTOCOMPLETE_ENABLED ?? '';
-const clarityProjectId = process.env.FRONTEND_CLARITY_PROJECT_ID ?? parsed.FRONTEND_CLARITY_PROJECT_ID ?? '';
+const addressAutocompleteEnabledRaw =
+  process.env.ADDRESS_AUTOCOMPLETE_ENABLED ?? parsed.ADDRESS_AUTOCOMPLETE_ENABLED ?? '';
+const clarityProjectId =
+  process.env.FRONTEND_CLARITY_PROJECT_ID ?? parsed.FRONTEND_CLARITY_PROJECT_ID ?? '';
 const clarityEnabledRaw = process.env.CLARITY_ENABLED ?? parsed.CLARITY_ENABLED ?? '';
 const sentryEnabledRaw = process.env.SENTRY_ENABLED ?? parsed.SENTRY_ENABLED ?? '1';
 const sentryDsn = process.env.SENTRY_DSN ?? parsed.SENTRY_DSN ?? '';
-const sentrySendDefaultPiiRaw = process.env.SENTRY_SEND_DEFAULT_PII ?? parsed.SENTRY_SEND_DEFAULT_PII ?? '1';
-const sentryTracesSampleRateRaw = process.env.SENTRY_TRACES_SAMPLE_RATE ?? parsed.SENTRY_TRACES_SAMPLE_RATE ?? '1.0';
+const sentrySendDefaultPiiRaw =
+  process.env.SENTRY_SEND_DEFAULT_PII ?? parsed.SENTRY_SEND_DEFAULT_PII ?? '1';
+const sentryTracesSampleRateRaw =
+  process.env.SENTRY_TRACES_SAMPLE_RATE ?? parsed.SENTRY_TRACES_SAMPLE_RATE ?? '1.0';
 const sentryReplaySessionSampleRateRaw =
-  process.env.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? parsed.SENTRY_REPLAY_SESSION_SAMPLE_RATE ?? '0.25';
+  process.env.SENTRY_REPLAY_SESSION_SAMPLE_RATE ??
+  parsed.SENTRY_REPLAY_SESSION_SAMPLE_RATE ??
+  '0.25';
 const sentryReplayOnErrorSampleRateRaw =
-  process.env.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ?? parsed.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ?? '1.0';
+  process.env.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ??
+  parsed.SENTRY_REPLAY_ON_ERROR_SAMPLE_RATE ??
+  '1.0';
 const captchaSiteKey = process.env.CAPTCHA_SITE_KEY ?? parsed.CAPTCHA_SITE_KEY ?? '';
 const siteName = process.env.SITE_NAME ?? parsed.SITE_NAME ?? 'momentstudio';
-const publicBaseUrl = process.env.PUBLIC_BASE_URL ?? parsed.PUBLIC_BASE_URL ?? 'https://momentstudio.ro';
-const supportEmail = process.env.SUPPORT_EMAIL ?? parsed.SUPPORT_EMAIL ?? 'momentstudio.ro@gmail.com';
+const publicBaseUrl =
+  process.env.PUBLIC_BASE_URL ?? parsed.PUBLIC_BASE_URL ?? 'https://momentstudio.ro';
+const supportEmail =
+  process.env.SUPPORT_EMAIL ?? parsed.SUPPORT_EMAIL ?? 'momentstudio.ro@gmail.com';
 const defaultLocale = process.env.DEFAULT_LOCALE ?? parsed.DEFAULT_LOCALE ?? 'en';
 const supportedLocalesRaw = process.env.SUPPORTED_LOCALES ?? parsed.SUPPORTED_LOCALES ?? 'en,ro';
-const paypalEnabled = ['1', 'true', 'yes', 'on'].includes(String(paypalEnabledRaw).trim().toLowerCase());
-const netopiaEnabled = ['1', 'true', 'yes', 'on'].includes(String(netopiaEnabledRaw).trim().toLowerCase());
-const addressAutocompleteEnabled = ['1', 'true', 'yes', 'on'].includes(String(addressAutocompleteEnabledRaw).trim().toLowerCase());
-const clarityEnabled =
-  String(clarityEnabledRaw ?? '').trim()
-    ? ['1', 'true', 'yes', 'on'].includes(String(clarityEnabledRaw).trim().toLowerCase())
-    : Boolean(String(clarityProjectId).trim());
-const sentrySendDefaultPii = ['1', 'true', 'yes', 'on'].includes(String(sentrySendDefaultPiiRaw).trim().toLowerCase());
-const sentryEnabled = ['1', 'true', 'yes', 'on'].includes(String(sentryEnabledRaw).trim().toLowerCase());
-const sentryTracesSampleRate = Math.max(0, Math.min(1, Number.parseFloat(String(sentryTracesSampleRateRaw)) || 0));
+const paypalEnabled = ['1', 'true', 'yes', 'on'].includes(
+  String(paypalEnabledRaw).trim().toLowerCase(),
+);
+const netopiaEnabled = ['1', 'true', 'yes', 'on'].includes(
+  String(netopiaEnabledRaw).trim().toLowerCase(),
+);
+const addressAutocompleteEnabled = ['1', 'true', 'yes', 'on'].includes(
+  String(addressAutocompleteEnabledRaw).trim().toLowerCase(),
+);
+const clarityEnabled = String(clarityEnabledRaw ?? '').trim()
+  ? ['1', 'true', 'yes', 'on'].includes(String(clarityEnabledRaw).trim().toLowerCase())
+  : Boolean(String(clarityProjectId).trim());
+const sentrySendDefaultPii = ['1', 'true', 'yes', 'on'].includes(
+  String(sentrySendDefaultPiiRaw).trim().toLowerCase(),
+);
+const sentryEnabled = ['1', 'true', 'yes', 'on'].includes(
+  String(sentryEnabledRaw).trim().toLowerCase(),
+);
+const sentryTracesSampleRate = Math.max(
+  0,
+  Math.min(1, Number.parseFloat(String(sentryTracesSampleRateRaw)) || 0),
+);
 const sentryReplaySessionSampleRate = Math.max(
   0,
-  Math.min(1, Number.parseFloat(String(sentryReplaySessionSampleRateRaw)) || 0)
+  Math.min(1, Number.parseFloat(String(sentryReplaySessionSampleRateRaw)) || 0),
 );
 const sentryReplayOnErrorSampleRate = Math.max(
   0,
-  Math.min(1, Number.parseFloat(String(sentryReplayOnErrorSampleRateRaw)) || 0)
+  Math.min(1, Number.parseFloat(String(sentryReplayOnErrorSampleRateRaw)) || 0),
 );
 
-const outPath = assertPathWithinRoot(frontendRoot, path.join(frontendRoot, 'src', 'assets', 'app-config.js'), 'output file');
-const outDir = assertPathWithinRoot(frontendRoot, path.dirname(outPath), 'output directory');
-fs.mkdirSync(outDir, { recursive: true });
+const outPath = resolvePathUnderBase(frontendRoot, outputConfigRelativePath, 'output file');
+mkdirUnderBase(frontendRoot, path.dirname(outputConfigRelativePath), 'output directory');
 
 const config = {
   apiBaseUrl,
@@ -225,9 +270,11 @@ const config = {
       .map((entry) => entry.trim())
       .filter(Boolean);
     return locales.length ? locales : ['en', 'ro'];
-  })()
+  })(),
 };
 const payload = `// Auto-generated by scripts/generate-config.mjs\nwindow.__APP_CONFIG__ = ${JSON.stringify(config, null, 2)};\n`;
 
-fs.writeFileSync(assertPathWithinRoot(frontendRoot, outPath, 'output file'), payload, 'utf8');
-console.log(`Wrote ${path.relative(frontendRoot, outPath)} from ${envPath ? path.relative(frontendRoot, envPath) : 'defaults'}`);
+writeUtf8UnderBase(frontendRoot, outputConfigRelativePath, payload, 'output file');
+console.log(
+  `Wrote ${path.relative(frontendRoot, outPath)} from ${envPath ? path.relative(frontendRoot, envPath) : 'defaults'}`,
+);

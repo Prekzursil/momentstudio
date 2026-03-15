@@ -504,17 +504,26 @@ export class AccountState implements OnInit, OnDestroy {
 
   private countAvailableCoupons(coupons: CouponRead[]): number {
     const now = Date.now();
-    return (coupons ?? []).filter((coupon) => {
-      if (!coupon?.is_active) return false;
-      const promoActive = coupon.promotion ? coupon.promotion.is_active !== false : true;
-      if (!promoActive) return false;
+    return (coupons ?? []).filter((coupon) => this.isCouponAvailableAt(coupon, now)).length;
+  }
 
-      const startsAt = coupon.starts_at ? Date.parse(coupon.starts_at) : NaN;
-      if (Number.isFinite(startsAt) && startsAt > now) return false;
-      const endsAt = coupon.ends_at ? Date.parse(coupon.ends_at) : NaN;
-      if (Number.isFinite(endsAt) && endsAt < now) return false;
-      return true;
-    }).length;
+  private isCouponAvailableAt(coupon: CouponRead | null | undefined, now: number): boolean {
+    if (!coupon?.is_active) return false;
+    if (coupon.promotion?.is_active === false) return false;
+
+    const startsAt = this.parseCouponDateBoundary(coupon.starts_at);
+    if (startsAt !== null && startsAt > now) return false;
+
+    const endsAt = this.parseCouponDateBoundary(coupon.ends_at);
+    if (endsAt !== null && endsAt < now) return false;
+
+    return true;
+  }
+
+  private parseCouponDateBoundary(value: string | null | undefined): number | null {
+    if (!value) return null;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private loadProfile(force: boolean = false): void {
@@ -526,30 +535,7 @@ export class AccountState implements OnInit, OnDestroy {
     this.error.set(null);
     this.account.getProfile().subscribe({
       next: (profile) => {
-        this.profile.set(profile);
-        this.googleEmail.set(profile.google_email ?? null);
-        this.googlePicture.set(profile.google_picture_url ?? null);
-        this.emailVerified.set(Boolean(profile?.email_verified));
-        this.notifyBlogComments = Boolean(profile?.notify_blog_comments);
-        this.notifyBlogCommentReplies = Boolean(profile?.notify_blog_comment_replies);
-        this.notifyMarketing = Boolean(profile?.notify_marketing);
-        this.notificationLastUpdated = profile.updated_at ?? null;
-        this.avatar = profile.avatar_url ?? null;
-        this.profileName = profile.name ?? '';
-        this.profileUsername = (profile.username ?? '').trim();
-        this.profileFirstName = profile.first_name ?? '';
-        this.profileMiddleName = profile.middle_name ?? '';
-        this.profileLastName = profile.last_name ?? '';
-        this.profileDateOfBirth = profile.date_of_birth ?? '';
-        this.profilePhone = profile.phone ?? '';
-        const phoneSplit = splitE164(this.profilePhone);
-        this.profilePhoneCountry = phoneSplit.country ?? 'RO';
-        this.profilePhoneNational = phoneSplit.nationalNumber || '';
-        this.profileLanguage = (profile.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
-        this.profileThemePreference = (this.theme.preference()() ?? 'system') as ThemePreference;
-        this.profileUsernamePassword = '';
-        this.profileBaseline = this.captureProfileSnapshot();
-        this.notificationsBaseline = this.captureNotificationSnapshot();
+        this.applyLoadedProfile(profile);
         this.profileLoaded = true;
       },
       error: () => {
@@ -558,6 +544,45 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => this.loading.set(false)
     });
+  }
+
+  private applyLoadedProfile(profile: AuthUser): void {
+    this.profile.set(profile);
+    this.googleEmail.set(profile.google_email ?? null);
+    this.googlePicture.set(profile.google_picture_url ?? null);
+    this.emailVerified.set(Boolean(profile?.email_verified));
+    this.notifyBlogComments = Boolean(profile?.notify_blog_comments);
+    this.notifyBlogCommentReplies = Boolean(profile?.notify_blog_comment_replies);
+    this.notifyMarketing = Boolean(profile?.notify_marketing);
+    this.notificationLastUpdated = profile.updated_at ?? null;
+    this.avatar = profile.avatar_url ?? null;
+    this.syncProfileFormFromUser(profile);
+    this.profileThemePreference = (this.theme.preference()() ?? 'system') as ThemePreference;
+    this.profileUsernamePassword = '';
+    this.profileBaseline = this.captureProfileSnapshot();
+    this.notificationsBaseline = this.captureNotificationSnapshot();
+  }
+
+  private syncProfileFormFromUser(user: AuthUser): void {
+    this.profileName = user.name ?? '';
+    this.profileUsername = (user.username ?? '').trim();
+    this.profileFirstName = user.first_name ?? '';
+    this.profileMiddleName = user.middle_name ?? '';
+    this.profileLastName = user.last_name ?? '';
+    this.profileDateOfBirth = user.date_of_birth ?? '';
+    this.profilePhone = user.phone ?? '';
+    this.syncProfilePhoneFields(this.profilePhone);
+    this.profileLanguage = this.normalizePreferredLanguage(user.preferred_language);
+  }
+
+  private syncProfilePhoneFields(phone: string): void {
+    const phoneSplit = splitE164(phone);
+    this.profilePhoneCountry = phoneSplit.country ?? 'RO';
+    this.profilePhoneNational = phoneSplit.nationalNumber || '';
+  }
+
+  private normalizePreferredLanguage(value: string | null | undefined): 'en' | 'ro' {
+    return value === 'ro' ? 'ro' : 'en';
   }
 
   loadOrders(force: boolean = false): void {
@@ -1529,38 +1554,7 @@ export class AccountState implements OnInit, OnDestroy {
     maybeUpdateUsername$
       .pipe(switchMap(() => this.auth.updateProfile(payload)))
       .subscribe({
-        next: (user) => {
-          this.profile.set(user);
-          this.profileName = user.name ?? '';
-          this.profileUsername = (user.username ?? '').trim();
-          this.profileFirstName = user.first_name ?? '';
-          this.profileMiddleName = user.middle_name ?? '';
-          this.profileLastName = user.last_name ?? '';
-          this.profileDateOfBirth = user.date_of_birth ?? '';
-          this.profilePhone = user.phone ?? '';
-          const phoneSplit = splitE164(this.profilePhone);
-          this.profilePhoneCountry = phoneSplit.country ?? 'RO';
-          this.profilePhoneNational = phoneSplit.nationalNumber || '';
-          this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
-          this.avatar = user.avatar_url ?? this.avatar;
-          this.profileUsernamePassword = '';
-          this.profileBaseline = this.captureProfileSnapshot();
-          this.profileSaved = true;
-          this.toast.success(this.t('account.profile.savedToast'));
-          this.loadAliases(true);
-          this.loadCooldowns(true);
-
-          if (this.forceProfileCompletion && computeMissingRequiredProfileFields(user).length === 0) {
-            this.forceProfileCompletion = false;
-            void this.router.navigate([], {
-              relativeTo: this.route,
-              queryParams: { complete: null },
-              queryParamsHandling: 'merge',
-              replaceUrl: true,
-              fragment: 'profile'
-            });
-          }
-        },
+        next: (user) => this.applySavedProfile(user),
         error: (err) => {
           const message = err?.error?.detail || this.t('account.profile.errors.saveError');
           this.profileError = message;
@@ -1568,6 +1562,33 @@ export class AccountState implements OnInit, OnDestroy {
         },
         complete: () => (this.savingProfile = false)
       });
+  }
+
+  private applySavedProfile(user: AuthUser): void {
+    this.profile.set(user);
+    this.syncProfileFormFromUser(user);
+    this.avatar = user.avatar_url ?? this.avatar;
+    this.profileUsernamePassword = '';
+    this.profileBaseline = this.captureProfileSnapshot();
+    this.profileSaved = true;
+    this.toast.success(this.t('account.profile.savedToast'));
+    this.loadAliases(true);
+    this.loadCooldowns(true);
+    this.completeForcedProfileFlowIfSatisfied(user);
+  }
+
+  private completeForcedProfileFlowIfSatisfied(user: AuthUser): void {
+    if (!this.forceProfileCompletion) return;
+    if (computeMissingRequiredProfileFields(user).length !== 0) return;
+
+    this.forceProfileCompletion = false;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { complete: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+      fragment: 'profile'
+    });
   }
 
   loadAliases(force: boolean = false): void {
@@ -3019,4 +3040,3 @@ export class AccountState implements OnInit, OnDestroy {
     return this.translate.instant(key, params);
   }
 }
-

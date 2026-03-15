@@ -1,0 +1,1125 @@
+    <div class="grid gap-6">
+      <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+
+	      <app-admin-page-header [titleKey]="'adminUi.orders.title'" [hintKey]="'adminUi.orders.hint'">
+	        <ng-template #primaryActions>
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
+	          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.exports.nav' | translate" (action)="openExports()"></app-button>
+	        </ng-template>
+
+		        <ng-template #secondaryActions>
+		          <app-button size="sm" variant="ghost" [label]="viewToggleLabelKey() | translate" (action)="toggleViewMode()"></app-button>
+		          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.tags.manage' | translate"
+                (action)="openTagManager()"
+              ></app-button>
+		          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
+		        </ng-template>
+	      </app-admin-page-header>
+
+      <app-table-layout-modal
+        [open]="layoutModalOpen()"
+        [columns]="tableColumns"
+        [layout]="tableLayout()"
+        [defaults]="tableDefaults"
+        (closed)="closeLayoutModal()"
+        (applied)="applyTableLayout($event)"
+      ></app-table-layout-modal>
+
+      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <app-help-panel
+          [titleKey]="'adminUi.help.title'"
+          [subtitleKey]="'adminUi.orders.help.subtitle'"
+          [mediaSrc]="'assets/help/admin-orders-help.svg'"
+          [mediaAltKey]="'adminUi.orders.help.mediaAlt'"
+        >
+          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+            <li>{{ 'adminUi.orders.help.points.status' | translate }}</li>
+            <li>{{ 'adminUi.orders.help.points.tags' | translate }}</li>
+            <li>{{ 'adminUi.orders.help.points.export' | translate }}</li>
+          </ul>
+        </app-help-panel>
+
+          <app-form-section [titleKey]="'adminUi.orders.filtersTitle'" [descriptionKey]="'adminUi.orders.filtersHint'">
+	        <div class="grid gap-3 lg:grid-cols-[1fr_220px_220px_220px_220px_auto] items-end">
+	          <app-input [label]="'adminUi.orders.search' | translate" [(value)]="q"></app-input>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.statusFilter' | translate }}
+	            <select
+	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+	              [(ngModel)]="status"
+	            >
+	              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
+	              <option value="sales">{{ 'adminUi.orders.sales' | translate }}</option>
+	              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+	              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
+	              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
+	              <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+	              <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+	              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
+              <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
+              <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.sla.filter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="sla"
+            >
+              <option value="all">{{ 'adminUi.orders.sla.options.all' | translate }}</option>
+              <option value="any_overdue">{{ 'adminUi.orders.sla.options.any_overdue' | translate }}</option>
+              <option value="accept_overdue">{{ 'adminUi.orders.sla.options.accept_overdue' | translate }}</option>
+              <option value="ship_overdue">{{ 'adminUi.orders.sla.options.ship_overdue' | translate }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.fraud.filter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="fraud"
+            >
+              <option value="all">{{ 'adminUi.orders.fraud.options.all' | translate }}</option>
+              <option value="queue">{{ 'adminUi.orders.fraud.options.queue' | translate }}</option>
+              <option value="flagged">{{ 'adminUi.orders.fraud.options.flagged' | translate }}</option>
+              <option value="approved">{{ 'adminUi.orders.fraud.options.approved' | translate }}</option>
+              <option value="denied">{{ 'adminUi.orders.fraud.options.denied' | translate }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.tagFilter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="tag"
+            >
+              <option value="">{{ 'adminUi.orders.tags.all' | translate }}</option>
+              <option *ngFor="let tagOption of tagOptions()" [value]="tagOption">{{ tagLabel(tagOption) }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.testOrdersFilter' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="includeTestOrders"
+            >
+              <option [ngValue]="true">{{ 'adminUi.orders.testOrders.include' | translate }}</option>
+              <option [ngValue]="false">{{ 'adminUi.orders.testOrders.exclude' | translate }}</option>
+            </select>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.from' | translate }}
+            <input
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              type="date"
+              [(ngModel)]="fromDate"
+            />
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.orders.to' | translate }}
+            <input
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              type="date"
+              [(ngModel)]="toDate"
+            />
+          </label>
+
+	          <div class="hidden sm:flex items-center gap-2">
+	            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
+	            <app-button
+	              size="sm"
+	              variant="ghost"
+	              [label]="'adminUi.actions.reset' | translate"
+	              (action)="resetFilters()"
+	            ></app-button>
+	          </div>
+	        </div>
+
+          <app-action-bar class="sm:hidden" [stickyOnMobile]="false">
+            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.reset' | translate"
+              (action)="resetFilters()"
+            ></app-button>
+          </app-action-bar>
+
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+              {{ 'adminUi.orders.presets.label' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
+                [(ngModel)]="selectedPresetId"
+                (ngModelChange)="applyPreset($event)"
+              >
+                <option value="">{{ 'adminUi.orders.presets.none' | translate }}</option>
+                <option *ngFor="let preset of presets" [value]="preset.id">{{ preset.name }}</option>
+              </select>
+            </label>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.presets.save' | translate"
+                (action)="savePreset()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.presets.delete' | translate"
+                [disabled]="!selectedPresetId"
+                (action)="deletePreset()"
+              ></app-button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-end justify-between gap-3">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+              {{ 'adminUi.favorites.savedViews.label' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
+                [(ngModel)]="selectedSavedViewKey"
+                (ngModelChange)="applySavedView($event)"
+              >
+                <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
+                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+              </select>
+            </label>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
+                [disabled]="favorites.loading()"
+                (action)="toggleCurrentViewPin()"
+              ></app-button>
+            </div>
+          </div>
+          </app-form-section>
+
+	        <app-error-state
+            *ngIf="error()"
+            [message]="error()!"
+            [requestId]="errorRequestId()"
+            [showRetry]="true"
+            (retry)="retryLoad()"
+          ></app-error-state>
+
+	        <div *ngIf="loading(); else tableTpl">
+	          <app-skeleton [rows]="8"></app-skeleton>
+	        </div>
+		        <ng-template #tableTpl>
+              <ng-container *ngIf="viewMode() === 'kanban'; else listTpl">
+                <div class="grid gap-3">
+                  <div class="text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.kanban.hint' | translate }}
+                  </div>
+
+                  <div *ngIf="kanbanTotalCards() === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.empty' | translate }}
+                  </div>
+
+                  <div *ngIf="kanbanTotalCards() > 0" class="overflow-x-auto pb-2">
+                    <div class="flex gap-4 min-w-[900px]" cdkDropListGroup>
+                      <ng-container *ngFor="let colStatus of kanbanColumnStatuses(); trackBy: trackKanbanStatus">
+                        <div
+                          class="w-[320px] shrink-0 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-800 dark:bg-slate-950/30"
+                        >
+                          <div class="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                              {{ ('adminUi.orders.' + colStatus) | translate }}
+                            </div>
+                            <div class="text-xs text-slate-500 dark:text-slate-300">
+                              {{ kanbanTotalsByStatus()[colStatus] ?? (kanbanItemsByStatus()[colStatus]?.length || 0) }}
+                            </div>
+                          </div>
+
+                          <div
+                            cdkDropList
+                            [cdkDropListData]="kanbanItemsByStatus()[colStatus] || []"
+                            (cdkDropListDropped)="onKanbanDrop($event, colStatus)"
+                            class="min-h-[160px] p-3 grid gap-2"
+                          >
+                            <ng-container
+                              *ngFor="let order of kanbanItemsByStatus()[colStatus] || []; trackBy: trackOrderId"
+                            >
+                              <div
+                                cdkDrag
+                                [cdkDragData]="order"
+                                [cdkDragDisabled]="kanbanBusy()"
+                                class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing dark:border-slate-800 dark:bg-slate-900"
+                              >
+                                <div class="flex items-start justify-between gap-2">
+                                  <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2 min-w-0">
+                                      <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                                        {{ order.reference_code || (order.id | slice: 0:8) }}
+                                      </div>
+                                      <ng-container *ngIf="slaBadge(order) as badge">
+                                        <span
+                                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                                          [ngClass]="badge.className"
+                                          [attr.title]="badge.title"
+                                        >
+                                          {{ badge.label }}
+                                        </span>
+                                      </ng-container>
+                                      <ng-container *ngIf="fraudBadge(order) as fraud">
+                                        <span
+                                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                                          [ngClass]="fraud.className"
+                                          [attr.title]="fraud.title"
+                                        >
+                                          {{ fraud.label }}
+                                        </span>
+                                      </ng-container>
+                                    </div>
+                                    <div class="text-xs text-slate-600 dark:text-slate-300 truncate">
+                                      {{ customerLabel(order) }}
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    class="shrink-0 rounded-md px-2 py-1 text-xs text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50"
+                                    (click)="$event.stopPropagation(); open(order.id)"
+                                    [attr.aria-label]="'adminUi.orders.view' | translate"
+                                  >
+                                    {{ 'adminUi.orders.view' | translate }}
+                                  </button>
+                                </div>
+
+                                <div class="mt-2 flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                  <span class="font-medium text-slate-700 dark:text-slate-200">
+                                    {{ order.total_amount | localizedCurrency : order.currency }}
+                                  </span>
+                                  <span>{{ order.created_at | date: 'short' }}</span>
+                                </div>
+
+                                <div class="mt-2 flex flex-wrap gap-1">
+                                  <span
+                                    *ngIf="order.payment_method"
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                                  >
+                                    {{ order.payment_method }}
+                                  </span>
+                                  <ng-container *ngFor="let tagValue of order.tags || []">
+                                    <span
+                                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
+                                      [ngClass]="tagChipColorClass(tagValue)"
+                                    >
+                                      {{ tagLabel(tagValue) }}
+                                    </span>
+                                  </ng-container>
+                                </div>
+                              </div>
+                            </ng-container>
+                          </div>
+                        </div>
+                      </ng-container>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+
+              <ng-template #listTpl>
+		          <div *ngIf="orders().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+		            {{ 'adminUi.orders.empty' | translate }}
+		          </div>
+
+            <div
+              *ngIf="selectedIds.size"
+              id="admin-orders-bulk-actions"
+              class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+            >
+              <div class="font-medium">
+                {{ 'adminUi.orders.bulk.selected' | translate: { count: selectedIds.size } }}
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.status' | translate }}
+                  <select
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="bulkStatus"
+                    [disabled]="bulkBusy"
+                  >
+                    <option value="">{{ 'adminUi.orders.bulk.noChange' | translate }}</option>
+                    <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
+                    <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+                    <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+                    <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
+                  </select>
+                </label>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.courier' | translate }}
+                  <select
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="bulkCourier"
+                    [disabled]="bulkBusy"
+                  >
+                    <option value="">{{ 'adminUi.orders.bulk.noChange' | translate }}</option>
+                    <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
+                    <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
+                    <option value="clear">{{ 'adminUi.orders.bulk.clearCourier' | translate }}</option>
+                  </select>
+                </label>
+
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.orders.bulk.apply' | translate"
+                  [disabled]="bulkBusy || (!bulkStatus && !bulkCourier)"
+                  (action)="applyBulkUpdate()"
+                ></app-button>
+
+                <span class="hidden sm:block h-9 w-px bg-slate-200 dark:bg-slate-800"></span>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.tagAdd' | translate }}
+                  <input
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="text"
+                    [placeholder]="'vip'"
+                    [(ngModel)]="bulkTagAdd"
+                    [disabled]="bulkBusy"
+                  />
+                </label>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.tagRemove' | translate }}
+                  <input
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="text"
+                    [placeholder]="'test'"
+                    [(ngModel)]="bulkTagRemove"
+                    [disabled]="bulkBusy"
+                  />
+                </label>
+
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.applyTags' | translate"
+                  [disabled]="bulkBusy || (!bulkTagAdd.trim() && !bulkTagRemove.trim())"
+                  (action)="applyBulkTags()"
+                ></app-button>
+
+                <span class="hidden sm:block h-9 w-px bg-slate-200 dark:bg-slate-800"></span>
+
+                <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.bulk.email' | translate }}
+                  <select
+                    class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="bulkEmailKind"
+                    [disabled]="bulkBusy"
+                  >
+                    <option value="">{{ 'adminUi.orders.bulk.noChange' | translate }}</option>
+                    <option value="confirmation">{{ 'adminUi.orders.bulk.emailConfirmation' | translate }}</option>
+                    <option value="delivery">{{ 'adminUi.orders.bulk.emailDelivery' | translate }}</option>
+                  </select>
+                </label>
+
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.sendEmails' | translate"
+                  [disabled]="bulkBusy || !bulkEmailKind"
+                  (action)="resendBulkEmails()"
+                ></app-button>
+
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.packingSlips' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="downloadBatchPackingSlips()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.pickListCsv' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="downloadPickListCsv()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.pickListPdf' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="downloadPickListPdf()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.shippingLabels' | translate"
+	                  [disabled]="bulkBusy"
+	                  (action)="openShippingLabelsModal()"
+	                ></app-button>
+	                <app-button
+	                  size="sm"
+	                  variant="ghost"
+	                  [label]="'adminUi.orders.bulk.clearSelection' | translate"
+	                  [disabled]="bulkBusy"
+                  (action)="clearSelection()"
+                ></app-button>
+              </div>
+            </div>
+
+          <div *ngIf="orders().length > 0" class="grid gap-3 md:hidden">
+            <article
+              *ngFor="let order of orders(); trackBy: trackOrderId"
+              class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ order.reference_code || (order.id | slice: 0:8) }}
+                  </h3>
+                  <div class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ customerLabel(order) }}</div>
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    <ng-container *ngFor="let tagValue of order.tags || []">
+                      <span
+                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
+                        [ngClass]="tagChipColorClass(tagValue)"
+                      >
+                        {{ tagLabel(tagValue) }}
+                      </span>
+                    </ng-container>
+                  </div>
+                </div>
+
+                <span
+                  [ngClass]="statusPillClass(order.status)"
+                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                >
+                  {{ ('adminUi.orders.' + order.status) | translate }}
+                </span>
+              </div>
+
+              <div class="mt-3 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+                <div>
+                  <span class="font-semibold">{{ 'adminUi.orders.table.total' | translate }}:</span>
+                  {{ order.total_amount | localizedCurrency : order.currency }}
+                </div>
+                <div>
+                  <span class="font-semibold">{{ 'adminUi.orders.table.created' | translate }}:</span>
+                  {{ order.created_at | date: 'short' }}
+                </div>
+              </div>
+
+              <app-action-bar class="mt-3" [stickyOnMobile]="false">
+                <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    [checked]="selectedIds.has(order.id)"
+                    (change)="toggleSelected(order.id, $any($event.target).checked)"
+                    [disabled]="bulkBusy"
+                    [attr.aria-label]="'adminUi.orders.a11y.selectOrder' | translate: { ref: order.reference_code || (order.id | slice: 0:8) }"
+                  />
+                  {{ 'adminUi.actions.bulkActions' | translate }}
+                </label>
+
+                <app-button size="sm" variant="ghost" [label]="'adminUi.orders.view' | translate" (action)="open(order.id)"></app-button>
+              </app-action-bar>
+            </article>
+          </div>
+
+          <div *ngIf="orders().length > 0" class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <ng-template #ordersTableHeader>
+              <tr>
+                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+                  <th *ngSwitchCase="'select'" class="text-left font-semibold w-10" [ngClass]="cellPaddingClass()">
+                    <input
+                      type="checkbox"
+                      [checked]="allSelectedOnPage()"
+                      [indeterminate]="someSelectedOnPage()"
+                      (change)="toggleSelectAllOnPage($any($event.target).checked)"
+                      [disabled]="bulkBusy"
+                      [attr.aria-label]="'adminUi.orders.a11y.selectAllOnPage' | translate"
+                    />
+                  </th>
+                  <th *ngSwitchCase="'reference'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.reference' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'customer'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.customer' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'status'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.status' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'tags'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.tags' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'total'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.total' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'created'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.created' | translate }}
+                  </th>
+                  <th *ngSwitchCase="'actions'" class="text-right font-semibold" [ngClass]="cellPaddingClass()">
+                    {{ 'adminUi.orders.table.actions' | translate }}
+                  </th>
+                </ng-container>
+              </tr>
+            </ng-template>
+
+            <ng-template #ordersTableRow let-order>
+              <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
+                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
+                  <td *ngSwitchCase="'select'" [ngClass]="cellPaddingClass()">
+                    <input
+                      type="checkbox"
+                      [checked]="selectedIds.has(order.id)"
+                      (change)="toggleSelected(order.id, $any($event.target).checked)"
+                      [disabled]="bulkBusy"
+                      [attr.aria-label]="'adminUi.orders.a11y.selectOrder' | translate: { ref: order.reference_code || (order.id | slice: 0:8) }"
+                    />
+                  </td>
+                  <td
+                    *ngSwitchCase="'reference'"
+                    class="font-medium text-slate-900 dark:text-slate-50"
+                    [ngClass]="cellPaddingClass()"
+                  >
+                    {{ order.reference_code || (order.id | slice: 0:8) }}
+                  </td>
+                  <td *ngSwitchCase="'customer'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
+                    {{ customerLabel(order) }}
+                  </td>
+                  <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span
+                        [ngClass]="statusPillClass(order.status)"
+                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                      >
+                        {{ ('adminUi.orders.' + order.status) | translate }}
+                      </span>
+                      <ng-container *ngIf="slaBadge(order) as badge">
+                        <span
+                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                          [ngClass]="badge.className"
+                          [attr.title]="badge.title"
+                        >
+                          {{ badge.label }}
+                        </span>
+                      </ng-container>
+                      <ng-container *ngIf="fraudBadge(order) as fraud">
+                        <span
+                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                          [ngClass]="fraud.className"
+                          [attr.title]="fraud.title"
+                        >
+                          {{ fraud.label }}
+                        </span>
+                      </ng-container>
+                    </div>
+                  </td>
+                  <td *ngSwitchCase="'tags'" [ngClass]="cellPaddingClass()">
+                    <div class="flex flex-wrap gap-1">
+                      <ng-container *ngFor="let tagValue of order.tags || []">
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                          [ngClass]="tagChipColorClass(tagValue)"
+                        >
+                          {{ tagLabel(tagValue) }}
+                        </span>
+                      </ng-container>
+                      <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
+                    </div>
+                  </td>
+                  <td *ngSwitchCase="'total'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
+                    {{ order.total_amount | localizedCurrency : order.currency }}
+                  </td>
+                  <td *ngSwitchCase="'created'" class="text-slate-600 dark:text-slate-300" [ngClass]="cellPaddingClass()">
+                    {{ order.created_at | date: 'short' }}
+                  </td>
+                  <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
+                    <app-button size="sm" variant="ghost" [label]="'adminUi.orders.view' | translate" (action)="open(order.id)"></app-button>
+                  </td>
+                </ng-container>
+              </tr>
+            </ng-template>
+
+            <ng-container *ngIf="orders().length > 100; else ordersTableStandard">
+              <cdk-virtual-scroll-viewport
+                class="block h-[min(70vh,720px)]"
+                [itemSize]="orderRowHeight"
+                [minBufferPx]="orderRowHeight * 10"
+                [maxBufferPx]="orderRowHeight * 20"
+              >
+                <table class="min-w-[1050px] w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                    <tr class="sr-only"><th scope="col">{{ 'adminUi.orders.table.reference' | translate }}</th></tr>
+                    <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
+                  </thead>
+                  <tbody>
+                    <ng-container *cdkVirtualFor="let order of orders(); trackBy: trackOrderId">
+                      <ng-container
+                        [ngTemplateOutlet]="ordersTableRow"
+                        [ngTemplateOutletContext]="{ $implicit: order }"
+                      ></ng-container>
+                    </ng-container>
+                  </tbody>
+                </table>
+              </cdk-virtual-scroll-viewport>
+            </ng-container>
+            <ng-template #ordersTableStandard>
+              <table class="min-w-[1050px] w-full text-sm">
+                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <tr class="sr-only"><th scope="col">{{ 'adminUi.orders.table.reference' | translate }}</th></tr>
+                  <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
+                </thead>
+                <tbody>
+                  <ng-container *ngFor="let order of orders(); trackBy: trackOrderId">
+                    <ng-container
+                      [ngTemplateOutlet]="ordersTableRow"
+                      [ngTemplateOutletContext]="{ $implicit: order }"
+                    ></ng-container>
+                  </ng-container>
+                </tbody>
+              </table>
+            </ng-template>
+          </div>
+
+		          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
+	            <div>
+	              {{ 'adminUi.orders.pagination' | translate: { page: meta()!.page, total_pages: meta()!.total_pages, total_items: meta()!.total_items } }}
+	            </div>
+            <div class="flex items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.prev' | translate"
+                [disabled]="meta()!.page <= 1"
+                (action)="goToPage(meta()!.page - 1)"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.next' | translate"
+                [disabled]="meta()!.page >= meta()!.total_pages"
+                (action)="goToPage(meta()!.page + 1)"
+              ></app-button>
+            </div>
+		          </div>
+		        </ng-template>
+	          </ng-template>
+			      </section>
+
+        <ng-container *ngIf="shippingLabelsModalOpen()">
+          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeShippingLabelsModal()" (keydown.enter)="closeShippingLabelsModal()" (keydown.space)="closeShippingLabelsModal(); $event.preventDefault()">
+            <div
+              class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+              (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <div class="grid gap-1">
+                  <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.orders.shippingLabelsModal.title' | translate }}
+                  </h3>
+                  <div class="text-xs text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.shippingLabelsModal.hint' | translate: { count: selectedIds.size } }}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
+                  (click)="closeShippingLabelsModal()"
+                  [disabled]="shippingLabelsBusy"
+                  [attr.aria-label]="'adminUi.actions.cancel' | translate"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div class="mt-4 grid gap-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                    <input type="file" class="hidden" multiple (change)="onShippingLabelsSelected($event)" />
+                    <span class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.shippingLabelsModal.chooseFiles' | translate }}</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-300">{{ 'adminUi.orders.shippingLabelsModal.chooseFilesHint' | translate }}</span>
+                  </label>
+
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      [label]="'adminUi.orders.shippingLabelsModal.uploadAll' | translate"
+                      [disabled]="shippingLabelsBusy || shippingLabelsUploads.length === 0"
+                      (action)="uploadAllShippingLabels()"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.shippingLabelsModal.downloadZip' | translate"
+                      [disabled]="shippingLabelsBusy"
+                      (action)="downloadSelectedShippingLabelsZip()"
+                    ></app-button>
+                  </div>
+                </div>
+
+                <div *ngIf="shippingLabelsUploads.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.shippingLabelsModal.empty' | translate }}
+                </div>
+
+                <div
+                  *ngIf="shippingLabelsUploads.length > 0"
+                  class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+                >
+                  <table class="min-w-[900px] w-full text-sm">
+                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                      <tr>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.file' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.order' | translate }}</th>
+                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.status' | translate }}</th>
+                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.actions' | translate }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        *ngFor="let row of shippingLabelsUploads; let idx = index"
+                        class="border-t border-slate-200 dark:border-slate-800"
+                      >
+                        <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                          <div class="font-medium truncate max-w-[420px]">{{ row.file.name }}</div>
+                          <div
+                            *ngIf="row.error"
+                            class="mt-1 text-xs text-rose-700 dark:text-rose-300"
+                          >
+                            {{ row.error }}
+                          </div>
+                        </td>
+                        <td class="px-3 py-2">
+                          <select
+                            class="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                            [(ngModel)]="shippingLabelsUploads[idx].assignedOrderId"
+                            [disabled]="shippingLabelsBusy"
+                          >
+                            <option [ngValue]="null">{{ 'adminUi.orders.shippingLabelsModal.unassigned' | translate }}</option>
+                            <option *ngFor="let opt of shippingLabelsOrderOptions" [value]="opt.id">{{ opt.label }}</option>
+                          </select>
+                        </td>
+                        <td class="px-3 py-2">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                            [ngClass]="shippingLabelStatusPillClass(row.status)"
+                          >
+                            {{ shippingLabelStatusLabelKey(row.status) | translate }}
+                          </span>
+                        </td>
+                        <td class="px-3 py-2 text-right">
+                          <app-button
+                            *ngIf="row.status === 'error'"
+                            size="sm"
+                            variant="ghost"
+                            [label]="'adminUi.actions.retry' | translate"
+                            [disabled]="shippingLabelsBusy"
+                            (action)="retryShippingLabelUpload(idx)"
+                          ></app-button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="flex justify-end">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.common.close' | translate"
+                    [disabled]="shippingLabelsBusy"
+                    (action)="closeShippingLabelsModal()"
+                  ></app-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+	      <ng-container *ngIf="exportModalOpen()">
+	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeExportModal()" (keydown.enter)="closeExportModal()" (keydown.space)="closeExportModal(); $event.preventDefault()">
+	          <div
+	            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.orders.exportModal.title' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.exportModal.hint' | translate }}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeExportModal()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="mt-4 grid gap-4">
+              <div class="flex flex-wrap items-end justify-between gap-3">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.exportModal.template' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="selectedExportTemplateId"
+                    (ngModelChange)="applyExportTemplate($event)"
+                  >
+                    <option value="">{{ 'adminUi.orders.exportModal.custom' | translate }}</option>
+                    <option *ngFor="let tpl of exportTemplates" [value]="tpl.id">{{ tpl.name }}</option>
+                  </select>
+                </label>
+
+                <div class="flex items-center gap-2">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.exportModal.saveTemplate' | translate"
+                    (action)="saveExportTemplate()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.exportModal.deleteTemplate' | translate"
+                    [disabled]="!selectedExportTemplateId"
+                    (action)="deleteExportTemplate()"
+                  ></app-button>
+                </div>
+              </div>
+
+              <div class="grid gap-2">
+                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.orders.exportModal.columnsTitle' | translate }}
+                </div>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <label
+                    *ngFor="let col of exportColumnOptions"
+                    class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      class="h-4 w-4"
+                      [checked]="!!exportColumns[col]"
+                      (change)="toggleExportColumn(col, $any($event.target).checked)"
+                    />
+                    <span class="font-medium text-slate-900 dark:text-slate-50">
+                      {{ ('adminUi.orders.exportColumns.' + col) | translate }}
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.cancel' | translate"
+                  (action)="closeExportModal()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.orders.exportModal.download' | translate"
+                  (action)="downloadExport()"
+                ></app-button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="tagManagerOpen()">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeTagManager()" (keydown.enter)="closeTagManager()" (keydown.space)="closeTagManager(); $event.preventDefault()">
+          <div
+            class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()" (keydown.space)="$event.stopPropagation(); $event.preventDefault()"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.orders.tags.manageTitle' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.orders.tags.manageHint' | translate }}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeTagManager()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div class="mt-4 grid gap-4">
+              <div class="flex flex-wrap items-end justify-between gap-3">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.actions.search' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="text"
+                    [(ngModel)]="tagManagerQuery"
+                    [placeholder]="'adminUi.orders.tags.searchPlaceholder' | translate"
+                  />
+                </label>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.actions.refresh' | translate"
+                  [disabled]="tagManagerLoading()"
+                  (action)="reloadTagManager()"
+                ></app-button>
+              </div>
+
+              <div *ngIf="tagManagerLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                <app-skeleton [rows]="3"></app-skeleton>
+              </div>
+
+              <div
+                *ngIf="!tagManagerLoading() && tagManagerError()"
+                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+              >
+                {{ tagManagerError() }}
+              </div>
+
+              <div
+                *ngIf="!tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
+                {{ 'adminUi.orders.tags.empty' | translate }}
+              </div>
+
+              <div *ngIf="!tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length" class="overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table class="min-w-[720px] w-full text-sm">
+                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                    <tr>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.tag' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.count' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.color' | translate }}</th>
+                      <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.actions' | translate }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="let row of filteredTagManagerRows()"
+                      class="border-t border-slate-200 dark:border-slate-800"
+                    >
+                      <td class="px-3 py-2">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border" [ngClass]="tagChipColorClass(row.tag)">
+                            {{ tagLabel(row.tag) }}
+                          </span>
+                          <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ row.tag }}</span>
+                        </div>
+                      </td>
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        {{ row.count }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <select
+                          class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [ngModel]="tagColorValue(row.tag)"
+                          (ngModelChange)="setTagColor(row.tag, $event)"
+                        >
+                          <option *ngFor="let c of tagColorPalette" [value]="c">
+                            {{ ('adminUi.orders.tags.colors.' + c) | translate }}
+                          </option>
+                        </select>
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.orders.tags.resetColor' | translate"
+                          (action)="resetTagColor(row.tag)"
+                        ></app-button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.tags.renameTitle' | translate }}</div>
+                <div class="mt-2 grid gap-3 md:grid-cols-[1fr_1fr_auto] items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.orders.tags.renameFrom' | translate }}
+                    <select
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="tagRenameFrom"
+                      [disabled]="tagRenameBusy"
+                    >
+                      <option value="">{{ 'adminUi.orders.tags.renameFromPlaceholder' | translate }}</option>
+                      <option *ngFor="let t of tagOptions()" [value]="t">{{ tagLabel(t) }}</option>
+                    </select>
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.orders.tags.renameTo' | translate }}
+                    <input
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      type="text"
+                      [(ngModel)]="tagRenameTo"
+                      [placeholder]="'priority'"
+                      [disabled]="tagRenameBusy"
+                    />
+                  </label>
+
+                  <app-button
+                    size="sm"
+                    [label]="'adminUi.orders.tags.rename' | translate"
+                    [disabled]="tagRenameBusy || !tagRenameFrom.trim() || !tagRenameTo.trim()"
+                    (action)="renameTag()"
+                  ></app-button>
+                </div>
+                <div *ngIf="tagRenameError" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ tagRenameError }}</div>
+              </div>
+
+              <div class="flex justify-end">
+                <app-button size="sm" variant="ghost" [label]="'adminUi.common.close' | translate" (action)="closeTagManager()"></app-button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <div *ngIf="selectedIds.size" class="h-24"></div>
+
+      <div *ngIf="selectedIds.size" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
+        <div class="max-w-6xl mx-auto">
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-sm text-slate-700 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-none"
+          >
+            <div class="font-medium">
+              {{ 'adminUi.orders.bulk.selected' | translate: { count: selectedIds.size } }}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.bulkActions' | translate" (action)="scrollToBulkActions()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.bulk.clearSelection' | translate"
+                [disabled]="bulkBusy"
+                (action)="clearSelection()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </div>
+	    </div>
+	  

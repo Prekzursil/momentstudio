@@ -19,6 +19,15 @@ const TAG_COLOR_CLASSES: Record<TagColor, string> = {
   slate: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100'
 };
 
+const TAG_COLOR_HINTS: Record<string, TagColor> = {
+  vip: 'violet',
+  fraud_risk: 'amber',
+  fraud_approved: 'emerald',
+  fraud_denied: 'rose',
+  gift: 'indigo',
+  test: 'slate'
+};
+
 export function normalizeTagKey(tag: string): string {
   const raw = (tag || '').toString().trim().toLowerCase();
   if (!raw) return '';
@@ -58,13 +67,8 @@ export function persistTagColorOverrides(overrides: Record<string, TagColor>): v
 export function tagColorFor(tag: string, overrides: Record<string, TagColor>): TagColor {
   const key = normalizeTagKey(tag);
   if (key && overrides[key]) return overrides[key];
-
-  if (key === 'vip') return 'violet';
-  if (key === 'fraud_risk') return 'amber';
-  if (key === 'fraud_approved') return 'emerald';
-  if (key === 'fraud_denied') return 'rose';
-  if (key === 'gift') return 'indigo';
-  if (key === 'test') return 'slate';
+  const hintedColor = key ? TAG_COLOR_HINTS[key] : undefined;
+  if (hintedColor) return hintedColor;
 
   if (!key) return 'slate';
   let hash = 0;

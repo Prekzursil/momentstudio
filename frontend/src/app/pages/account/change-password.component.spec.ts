@@ -7,6 +7,57 @@ import { ChangePasswordComponent } from './change-password.component';
 import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 
+function expectPasswordMismatchValidation(
+  auth: jasmine.SpyObj<AuthService>,
+  fixture = TestBed.createComponent(ChangePasswordComponent)
+): void {
+  const cmp = fixture.componentInstance;
+  cmp.current = 'old';
+  cmp.password = 'new1';
+  cmp.confirm = 'new2';
+
+  cmp.onSubmit({ valid: true } as any);
+
+  expect(cmp.error).toContain('account.passwordChange.errors.mismatch');
+  expect(auth.changePassword).not.toHaveBeenCalled();
+}
+
+function expectSubmitChangePasswordSuccess(
+  toast: jasmine.SpyObj<ToastService>,
+  auth: jasmine.SpyObj<AuthService>,
+  fixture = TestBed.createComponent(ChangePasswordComponent)
+): void {
+  const cmp = fixture.componentInstance;
+  cmp.current = 'old';
+  cmp.password = 'new';
+  cmp.confirm = 'new';
+
+  cmp.onSubmit({ valid: true } as any);
+
+  expect(auth.changePassword).toHaveBeenCalledWith('old', 'new');
+  expect(toast.success).toHaveBeenCalled();
+  expect(cmp.current).toBe('');
+  expect(cmp.password).toBe('');
+  expect(cmp.confirm).toBe('');
+}
+
+function expectBackendErrorDetailOnFailure(
+  toast: jasmine.SpyObj<ToastService>,
+  auth: jasmine.SpyObj<AuthService>,
+  fixture = TestBed.createComponent(ChangePasswordComponent)
+): void {
+  auth.changePassword.and.returnValue(throwError(() => ({ error: { detail: 'Nope' } })));
+  const cmp = fixture.componentInstance;
+  cmp.current = 'old';
+  cmp.password = 'new';
+  cmp.confirm = 'new';
+
+  cmp.onSubmit({ valid: true } as any);
+
+  expect(cmp.error).toBe('Nope');
+  expect(toast.error).toHaveBeenCalledWith('Nope');
+}
+
 describe('ChangePasswordComponent', () => {
   let toast: jasmine.SpyObj<ToastService>;
   let auth: jasmine.SpyObj<AuthService>;
@@ -26,45 +77,14 @@ describe('ChangePasswordComponent', () => {
   });
 
   it('shows error when passwords do not match', () => {
-    const fixture = TestBed.createComponent(ChangePasswordComponent);
-    const cmp = fixture.componentInstance;
-    cmp.current = 'old';
-    cmp.password = 'new1';
-    cmp.confirm = 'new2';
-
-    cmp.onSubmit({ valid: true } as any);
-
-    expect(cmp.error).toContain('account.passwordChange.errors.mismatch');
-    expect(auth.changePassword).not.toHaveBeenCalled();
+    expectPasswordMismatchValidation(auth);
   });
 
   it('submits change password and clears fields', () => {
-    const fixture = TestBed.createComponent(ChangePasswordComponent);
-    const cmp = fixture.componentInstance;
-    cmp.current = 'old';
-    cmp.password = 'new';
-    cmp.confirm = 'new';
-
-    cmp.onSubmit({ valid: true } as any);
-
-    expect(auth.changePassword).toHaveBeenCalledWith('old', 'new');
-    expect(toast.success).toHaveBeenCalled();
-    expect(cmp.current).toBe('');
-    expect(cmp.password).toBe('');
-    expect(cmp.confirm).toBe('');
+    expectSubmitChangePasswordSuccess(toast, auth);
   });
 
   it('shows backend error detail when change fails', () => {
-    auth.changePassword.and.returnValue(throwError(() => ({ error: { detail: 'Nope' } })));
-    const fixture = TestBed.createComponent(ChangePasswordComponent);
-    const cmp = fixture.componentInstance;
-    cmp.current = 'old';
-    cmp.password = 'new';
-    cmp.confirm = 'new';
-
-    cmp.onSubmit({ valid: true } as any);
-
-    expect(cmp.error).toBe('Nope');
-    expect(toast.error).toHaveBeenCalledWith('Nope');
+    expectBackendErrorDetailOnFailure(toast, auth);
   });
 });

@@ -4,6 +4,23 @@ function padBase64(base64: string): string {
   return base64 + '='.repeat(4 - missing);
 }
 
+function replaceAllChar(value: string, search: string, replacement: string): string {
+  return value.split(search).join(replacement);
+}
+
+function urlSafeToBase64(value: string): string {
+  const withPlus = replaceAllChar(value, '-', '+');
+  return replaceAllChar(withPlus, '_', '/');
+}
+
+function binaryToBytes(binary: string): Uint8Array {
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
 export function isWebAuthnSupported(): boolean {
   if (typeof window === 'undefined') return false;
   if (!window.isSecureContext) return false;
@@ -13,27 +30,38 @@ export function isWebAuthnSupported(): boolean {
 export function base64urlToUint8Array(value: string): Uint8Array {
   const trimmed = (value ?? '').trim();
   if (!trimmed) return new Uint8Array();
-  const base64 = padBase64(trimmed.replace(/-/g, '+').replace(/_/g, '/'));
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
+  const base64 = padBase64(urlSafeToBase64(trimmed));
+  return binaryToBytes(atob(base64));
 }
 
-export function bufferToBase64url(data: ArrayBuffer | ArrayBufferView): string {
-  const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-  if (!bytes.length) return '';
+function asBytes(data: ArrayBuffer | ArrayBufferView): Uint8Array {
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+}
 
+function bytesToBinary(bytes: Uint8Array): string {
   let binary = '';
   const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
+    binary += String.fromCodePoint(...bytes.subarray(i, i + chunkSize));
   }
-  const base64 = btoa(binary);
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  return binary;
+}
+
+function base64ToUrlSafe(base64: string): string {
+  const withoutPlus = replaceAllChar(base64, '+', '-');
+  const withoutSlash = replaceAllChar(withoutPlus, '/', '_');
+  let end = withoutSlash.length;
+  while (end > 0 && withoutSlash[end - 1] === '=') {
+    end -= 1;
+  }
+  return withoutSlash.slice(0, end);
+}
+
+export function bufferToBase64url(data: ArrayBuffer | ArrayBufferView): string {
+  const bytes = asBytes(data);
+  if (!bytes.length) return '';
+  return base64ToUrlSafe(btoa(bytesToBinary(bytes)));
 }
 
 export function toPublicKeyCredentialCreationOptions(raw: any): PublicKeyCredentialCreationOptions {
@@ -97,4 +125,3 @@ export function serializePublicKeyCredential(credential: PublicKeyCredential): a
   }
   return json;
 }
-

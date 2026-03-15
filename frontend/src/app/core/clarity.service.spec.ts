@@ -36,7 +36,7 @@ function getClarityScript(): HTMLScriptElement | null {
 
 function resetClarityScript(): void {
   getClarityScript()?.remove();
-  const clarityWindow = window as Window & { clarity?: unknown };
+  const clarityWindow = globalThis as unknown as Window & { clarity?: unknown };
   if ('clarity' in clarityWindow) {
     delete clarityWindow.clarity;
   }
@@ -91,7 +91,7 @@ describe('ClarityService', () => {
     expect(getClarityScript()).toBeNull();
 
     analytics.enabledValue = true;
-    window.dispatchEvent(new CustomEvent('app:analytics-opt-in', { detail: { enabled: true } }));
+    globalThis.dispatchEvent(new CustomEvent('app:analytics-opt-in', { detail: { enabled: true } }));
     tick();
 
     const script = getClarityScript();

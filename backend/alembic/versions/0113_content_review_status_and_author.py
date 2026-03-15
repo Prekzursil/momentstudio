@@ -53,22 +53,20 @@ def upgrade() -> None:
 
     if bind.dialect.name == "postgresql":
         op.execute(
-            sa.text(
-                """
-                UPDATE content_blocks cb
-                SET author_id = src.user_id
-                FROM (
-                  SELECT DISTINCT ON (content_block_id)
-                    content_block_id,
-                    user_id
-                  FROM content_audit_log
-                  WHERE user_id IS NOT NULL
-                  ORDER BY content_block_id, created_at ASC
-                ) AS src
-                WHERE cb.id = src.content_block_id
-                  AND cb.author_id IS NULL;
-                """
-            )
+            """
+            UPDATE content_blocks cb
+            SET author_id = src.user_id
+            FROM (
+              SELECT DISTINCT ON (content_block_id)
+                content_block_id,
+                user_id
+              FROM content_audit_log
+              WHERE user_id IS NOT NULL
+              ORDER BY content_block_id, created_at ASC
+            ) AS src
+            WHERE cb.id = src.content_block_id
+              AND cb.author_id IS NULL;
+            """
         )
 
 

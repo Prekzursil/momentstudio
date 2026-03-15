@@ -4,29 +4,33 @@ import { provideHttpClientTesting, HttpTestingController } from '@angular/common
 import { of } from 'rxjs';
 import { authAndErrorInterceptor } from './http.interceptor';
 import { AuthService } from './auth.service';
-import { ErrorHandlerService } from '../shared/error-handler.service';
+import { HttpErrorBusService } from './http-error-bus.service';
 
 describe('authAndErrorInterceptor', () => {
   let http: HttpClient;
   let httpMock: HttpTestingController;
+  let auth: any;
+  let errorBus: { emit: jasmine.Spy };
 
   beforeEach(() => {
-    const auth = {
+    auth = {
       getAccessToken: jasmine.createSpy('getAccessToken').and.returnValue('access123'),
       getStepUpToken: jasmine.createSpy('getStepUpToken').and.returnValue(null),
       getRefreshToken: jasmine.createSpy('getRefreshToken').and.returnValue(null),
       user: jasmine.createSpy('user').and.returnValue(null),
       clearStepUpToken: jasmine.createSpy('clearStepUpToken'),
       ensureStepUp: jasmine.createSpy('ensureStepUp').and.returnValue(of(null)),
+      refresh: jasmine.createSpy('refresh').and.returnValue(of({ access_token: 'refreshed' })),
+      expireSession: jasmine.createSpy('expireSession')
     } as Partial<AuthService> as AuthService;
-    const handler = { handle: jasmine.createSpy('handle') } as Partial<ErrorHandlerService> as ErrorHandlerService;
+    errorBus = { emit: jasmine.createSpy('emit') };
 
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authAndErrorInterceptor])),
         provideHttpClientTesting(),
         { provide: AuthService, useValue: auth },
-        { provide: ErrorHandlerService, useValue: handler }
+        { provide: HttpErrorBusService, useValue: errorBus }
       ]
     });
 
@@ -55,7 +59,6 @@ describe('authAndErrorInterceptor', () => {
   });
 
   it('adds step-up token when available', () => {
-    const auth = TestBed.inject(AuthService) as any;
     (auth.getStepUpToken as jasmine.Spy).and.returnValue('step123');
 
     http.get('/api/v1/orders/admin/export').subscribe();
@@ -65,7 +68,6 @@ describe('authAndErrorInterceptor', () => {
   });
 
   it('retries blob requests after step-up prompt', fakeAsync(() => {
-    const auth = TestBed.inject(AuthService) as any;
     (auth.ensureStepUp as jasmine.Spy).and.returnValue(of('step123'));
 
     http.get('/api/v1/newsletter/admin/export', { responseType: 'blob' as 'json' }).subscribe();
@@ -85,4 +87,98 @@ describe('authAndErrorInterceptor', () => {
     expect(retry.request.headers.get('X-Step-Up-Retry')).toBe('1');
     retry.flush(new Blob(['email,confirmed_at,source\n'], { type: 'text/csv' }));
   }));
+
+  it('does not inject auth for non-api requests', () => {
+    http.get('/assets/i18n/en.json').subscribe();
+    const req = httpMock.expectOne('/assets/i18n/en.json');
+    expect(req.request.headers.has('Authorization')).toBeFalse();
+    expect(req.request.withCredentials).toBeFalse();
+    req.flush({ ok: true });
+  });
+
+  it('retries 401 API requests by refreshing session when session exists', fakeAsync(() => {
+    (auth.getRefreshToken as jasmine.Spy).and.returnValue('refresh-token');
+    (auth.getAccessToken as jasmine.Spy).and.returnValues('access-old', 'access-new');
+    (auth.refresh as jasmine.Spy).and.returnValue(of({ access_token: 'access-new' }));
+
+    http.get('/api/v1/orders').subscribe();
+    const first = httpMock.expectOne('/api/v1/orders');
+    expect(first.request.headers.get('Authorization')).toBe('Bearer access-old');
+    first.flush({ detail: 'unauthorized' }, { status: 401, statusText: 'Unauthorized' });
+    tick(0);
+
+    expect(auth.refresh).toHaveBeenCalled();
+    const retry = httpMock.expectOne('/api/v1/orders');
+    expect(retry.request.headers.get('Authorization')).toBe('Bearer access-new');
+    retry.flush({ ok: true });
+  }));
+
+  it('does not refresh on excluded auth endpoints', () => {
+    (auth.getRefreshToken as jasmine.Spy).and.returnValue('refresh-token');
+    http.post('/api/auth/login', {}).subscribe({
+      error: () => undefined
+    });
+    const req = httpMock.expectOne('/api/auth/login');
+    req.flush({ detail: 'unauthorized' }, { status: 401, statusText: 'Unauthorized' });
+    expect(auth.refresh).not.toHaveBeenCalled();
+  });
+
+  it('expires session when refresh returns empty tokens', fakeAsync(() => {
+    (auth.getRefreshToken as jasmine.Spy).and.returnValue('refresh-token');
+    (auth.refresh as jasmine.Spy).and.returnValue(of(null));
+    const onError = jasmine.createSpy('onError');
+
+    http.get('/api/v1/account').subscribe({
+      error: onError
+    });
+    const req = httpMock.expectOne('/api/v1/account');
+    req.flush({ detail: 'unauthorized' }, { status: 401, statusText: 'Unauthorized' });
+    tick(0);
+
+    expect(auth.expireSession).toHaveBeenCalled();
+    expect(onError).toHaveBeenCalled();
+    expect(onError.calls.mostRecent().args[0].status).toBe(401);
+  }));
+
+  it('does not retry step-up when server code is not step_up_required', fakeAsync(() => {
+    (auth.ensureStepUp as jasmine.Spy).and.returnValue(of('step123'));
+    const onError = jasmine.createSpy('onError');
+
+    http.get('/api/v1/orders/admin/export').subscribe({
+      error: onError
+    });
+    const req = httpMock.expectOne('/api/v1/orders/admin/export');
+    req.flush({ code: 'forbidden' }, { status: 403, statusText: 'Forbidden' });
+    tick(0);
+
+    expect(auth.ensureStepUp).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalled();
+    expect(onError.calls.mostRecent().args[0].status).toBe(403);
+  }));
+
+  it('emits global bus event for 5xx responses unless silent', () => {
+    http.get('/api/v1/admin/reports').subscribe({
+      error: () => undefined
+    });
+    const noisy = httpMock.expectOne('/api/v1/admin/reports');
+    noisy.flush({ detail: 'server error' }, { status: 500, statusText: 'Server Error' });
+    expect(errorBus.emit).toHaveBeenCalledWith(jasmine.objectContaining({ status: 500, method: 'GET' }));
+
+    errorBus.emit.calls.reset();
+    http.get('/api/v1/admin/reports', { headers: new HttpHeaders({ 'X-Silent': '1' }) }).subscribe({
+      error: () => undefined
+    });
+    const silent = httpMock.expectOne('/api/v1/admin/reports');
+    silent.flush({ detail: 'server error' }, { status: 500, statusText: 'Server Error' });
+    expect(errorBus.emit).not.toHaveBeenCalled();
+  });
+
+  it('emits global bus event for network failures', () => {
+    http.get('/api/v1/catalog').subscribe({
+      error: () => undefined
+    });
+    const req = httpMock.expectOne('/api/v1/catalog');
+    req.error(new ProgressEvent('error'), { status: 0, statusText: 'Unknown Error' });
+    expect(errorBus.emit).toHaveBeenCalledWith(jasmine.objectContaining({ status: 0, method: 'GET' }));
+  });
 });

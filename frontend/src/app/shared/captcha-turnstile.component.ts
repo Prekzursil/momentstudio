@@ -70,9 +70,7 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
   @Input({ required: true }) siteKey!: string;
   @Input() theme: 'auto' | 'light' | 'dark' = 'auto';
   @Output() tokenChange = new EventEmitter<string | null>();
-
   @ViewChild('host', { static: true }) host!: ElementRef<HTMLDivElement>;
-
   errorKey: string | null = null;
   private widgetId: string | null = null;
 
@@ -106,13 +104,11 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
       this.errorKey = 'auth.captchaFailedLoad';
     }
   }
-
   reset(): void {
     if (!this.widgetId) return;
     window.turnstile?.reset(this.widgetId);
     this.tokenChange.emit(null);
   }
-
   ngOnDestroy(): void {
     if (this.widgetId) {
       window.turnstile?.remove(this.widgetId);
@@ -120,4 +116,3 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
     }
   }
 }
-

@@ -17,6 +17,16 @@ SPEC.loader.exec_module(upsert_audit_issues)
 GitHubContext = upsert_audit_issues.GitHubContext
 
 
+def _paged_issue_rows(path: str, page_1_rows: list[dict[str, object]], page_2_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    query = parse_qs(urlparse(path).query)
+    page = query.get("page", ["1"])[0]
+    if page == "1":
+        return page_1_rows
+    if page == "2":
+        return page_2_rows
+    return []
+
+
 def test_upsert_severe_uses_paginated_open_issues_for_dedupe(monkeypatch):
     ctx = GitHubContext(token="token", owner="octo", repo="demo")
     finding = {
@@ -43,13 +53,7 @@ def test_upsert_severe_uses_paginated_open_issues_for_dedupe(monkeypatch):
 
     def fake_request(_ctx, method, path, payload=None):
         if method == "GET" and path.startswith("/repos/octo/demo/issues?"):
-            query = parse_qs(urlparse(path).query)
-            page = query.get("page", ["1"])[0]
-            if page == "1":
-                return page_1_rows
-            if page == "2":
-                return page_2_rows
-            return []
+            return _paged_issue_rows(path, page_1_rows, page_2_rows)
         if method == "PATCH":
             patch_calls.append((path, payload or {}))
             return {"number": 999}

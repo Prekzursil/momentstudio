@@ -1,0 +1,979 @@
+{
+  "total": 1001,
+  "by_pattern": [
+    {
+      "pattern": "Lizard_ccn-medium",
+      "count": 362
+    },
+    {
+      "pattern": "Lizard_nloc-medium",
+      "count": 235
+    },
+    {
+      "pattern": "markdownlint_MD032",
+      "count": 149
+    },
+    {
+      "pattern": "ESLint_prettier-vue_prettier",
+      "count": 53
+    },
+    {
+      "pattern": "Prospector_mccabe",
+      "count": 44
+    },
+    {
+      "pattern": "ESLint8_@typescript-eslint_prefer-nullish-coalescing",
+      "count": 38
+    },
+    {
+      "pattern": "ESLint_node_no-unsupported-features_es-syntax",
+      "count": 28
+    },
+    {
+      "pattern": "PyLint_W0612",
+      "count": 16
+    },
+    {
+      "pattern": "ESLint_security_detect-non-literal-fs-filename",
+      "count": 12
+    },
+    {
+      "pattern": "PyLintPython3_W0612",
+      "count": 11
+    },
+    {
+      "pattern": "Stylelint_selector-class-pattern",
+      "count": 9
+    },
+    {
+      "pattern": "Bandit_B110",
+      "count": 6
+    },
+    {
+      "pattern": "Checkov_CKV_GHA_7",
+      "count": 5
+    },
+    {
+      "pattern": "shellcheck_SC2034",
+      "count": 5
+    },
+    {
+      "pattern": "Stylelint_color-hex-length",
+      "count": 4
+    },
+    {
+      "pattern": "ESLint_regexp_prefer-d",
+      "count": 3
+    },
+    {
+      "pattern": "ESLint_regexp_prefer-w",
+      "count": 3
+    },
+    {
+      "pattern": "Stylelint_font-family-name-quotes",
+      "count": 3
+    },
+    {
+      "pattern": "Stylelint_media-feature-range-notation",
+      "count": 3
+    },
+    {
+      "pattern": "Semgrep_python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text",
+      "count": 2
+    },
+    {
+      "pattern": "Checkov_CKV_SECRET_6",
+      "count": 1
+    },
+    {
+      "pattern": "Hadolint_DL3008",
+      "count": 1
+    },
+    {
+      "pattern": "Hadolint_DL3013",
+      "count": 1
+    },
+    {
+      "pattern": "Ruff_F401_unused-import",
+      "count": 1
+    },
+    {
+      "pattern": "Semgrep_yaml.github-actions.security.run-shell-injection.run-shell-injection",
+      "count": 1
+    },
+    {
+      "pattern": "Stylelint_alpha-value-notation",
+      "count": 1
+    },
+    {
+      "pattern": "Stylelint_color-function-notation",
+      "count": 1
+    },
+    {
+      "pattern": "Stylelint_declaration-empty-line-before",
+      "count": 1
+    },
+    {
+      "pattern": "Stylelint_scss_function-disallowed-list",
+      "count": 1
+    },
+    {
+      "pattern": "markdownlint_MD034",
+      "count": 1
+    }
+  ],
+  "by_category": [
+    {
+      "category": "Complexity",
+      "count": 641
+    },
+    {
+      "category": "CodeStyle",
+      "count": 227
+    },
+    {
+      "category": "BestPractice",
+      "count": 45
+    },
+    {
+      "category": "Compatibility",
+      "count": 28
+    },
+    {
+      "category": "Security",
+      "count": 27
+    },
+    {
+      "category": "UnusedCode",
+      "count": 27
+    },
+    {
+      "category": "ErrorProne",
+      "count": 5
+    },
+    {
+      "category": "Performance",
+      "count": 1
+    }
+  ],
+  "by_level": [
+    {
+      "level": "Warning",
+      "count": 694
+    },
+    {
+      "level": "Info",
+      "count": 258
+    },
+    {
+      "level": "High",
+      "count": 36
+    },
+    {
+      "level": "Error",
+      "count": 13
+    }
+  ],
+  "by_file": [
+    {
+      "file": "scripts/audit/collect_browser_evidence.mjs",
+      "count": 49
+    },
+    {
+      "file": "backend/app/services/catalog.py",
+      "count": 37
+    },
+    {
+      "file": "backend/app/services/content.py",
+      "count": 37
+    },
+    {
+      "file": "UX_IA_AUDIT.md",
+      "count": 35
+    },
+    {
+      "file": "backend/app/services/order.py",
+      "count": 35
+    },
+    {
+      "file": "frontend/scripts/generate-config.mjs",
+      "count": 29
+    },
+    {
+      "file": "backend/app/services/media_dam.py",
+      "count": 28
+    },
+    {
+      "file": "TODO.md",
+      "count": 25
+    },
+    {
+      "file": "backend/app/api/v1/auth.py",
+      "count": 24
+    },
+    {
+      "file": "backend/app/api/v1/coupons_v2.py",
+      "count": 24
+    },
+    {
+      "file": "frontend/src/styles.css",
+      "count": 23
+    },
+    {
+      "file": "frontend/src/app/shared/product-image-manager-modal.component.ts",
+      "count": 20
+    },
+    {
+      "file": "backend/alembic/seed_data/legal/privacy.en.md",
+      "count": 15
+    },
+    {
+      "file": "backend/alembic/seed_data/legal/privacy.ro.md",
+      "count": 15
+    },
+    {
+      "file": "backend/app/services/blog.py",
+      "count": 15
+    },
+    {
+      "file": "backend/app/services/sameday_easybox_mirror.py",
+      "count": 15
+    },
+    {
+      "file": "backend/app/services/auth.py",
+      "count": 14
+    },
+    {
+      "file": "backend/tests/test_catalog_api.py",
+      "count": 14
+    },
+    {
+      "file": "backend/app/services/coupons_v2.py",
+      "count": 13
+    },
+    {
+      "file": "backend/app/api/v1/content.py",
+      "count": 12
+    },
+    {
+      "file": "backend/tests/test_coupons_v2.py",
+      "count": 12
+    },
+    {
+      "file": "backend/app/services/netopia.py",
+      "count": 11
+    },
+    {
+      "file": "backend/app/services/receipts.py",
+      "count": 11
+    },
+    {
+      "file": "backend/app/services/storage.py",
+      "count": 11
+    },
+    {
+      "file": "frontend/scripts/check-i18n.mjs",
+      "count": 11
+    },
+    {
+      "file": "backend/app/cli.py",
+      "count": 10
+    },
+    {
+      "file": "backend/app/services/email.py",
+      "count": 10
+    },
+    {
+      "file": "backend/tests/test_checkout_flow.py",
+      "count": 10
+    },
+    {
+      "file": "backend/tests/test_orders_api.py",
+      "count": 10
+    },
+    {
+      "file": "backend/app/api/v1/blog.py",
+      "count": 9
+    },
+    {
+      "file": "backend/app/services/cart.py",
+      "count": 9
+    },
+    {
+      "file": "backend/app/services/ops.py",
+      "count": 9
+    },
+    {
+      "file": "backend/app/services/support.py",
+      "count": 9
+    },
+    {
+      "file": "frontend/src/app/pages/account/account.state.ts",
+      "count": 9
+    },
+    {
+      "file": "backend/alembic/seed_data/legal/terms.en.md",
+      "count": 8
+    },
+    {
+      "file": "backend/alembic/seed_data/legal/terms.ro.md",
+      "count": 8
+    },
+    {
+      "file": "backend/app/services/admin_reports.py",
+      "count": 8
+    },
+    {
+      "file": "backend/app/services/lockers.py",
+      "count": 8
+    },
+    {
+      "file": "backend/app/services/payments.py",
+      "count": 7
+    },
+    {
+      "file": "backend/app/services/social_thumbnails.py",
+      "count": 7
+    },
+    {
+      "file": "scripts/audit/collect_audit_evidence.py",
+      "count": 7
+    },
+    {
+      "file": "backend/app/api/v1/payments.py",
+      "count": 6
+    },
+    {
+      "file": "backend/app/services/paypal.py",
+      "count": 6
+    },
+    {
+      "file": "backend/tests/test_cart_api.py",
+      "count": 6
+    },
+    {
+      "file": "docs/GOOGLE_OAUTH.md",
+      "count": 6
+    },
+    {
+      "file": "docs/reports/main-vs-pr199/local-matrix-results.md",
+      "count": 6
+    },
+    {
+      "file": "frontend/src/app/pages/checkout/checkout.component.ts",
+      "count": 6
+    },
+    {
+      "file": "ADMIN_DASHBOARD_IDEAS.md",
+      "count": 5
+    },
+    {
+      "file": "backend/alembic/seed_data/legal/anpc.en.md",
+      "count": 5
+    },
+    {
+      "file": "backend/alembic/seed_data/legal/anpc.ro.md",
+      "count": 5
+    },
+    {
+      "file": "backend/app/api/v1/catalog.py",
+      "count": 5
+    },
+    {
+      "file": "backend/app/core/dependencies.py",
+      "count": 5
+    },
+    {
+      "file": "backend/app/services/inventory.py",
+      "count": 5
+    },
+    {
+      "file": "backend/app/services/webhook_handlers.py",
+      "count": 5
+    },
+    {
+      "file": "backend/tests/test_admin_dashboard.py",
+      "count": 5
+    },
+    {
+      "file": "backend/tests/test_media_dam_api.py",
+      "count": 5
+    },
+    {
+      "file": "frontend/scripts/fetch-sameday-lockers.mjs",
+      "count": 5
+    },
+    {
+      "file": "backend/app/api/v1/analytics.py",
+      "count": 4
+    },
+    {
+      "file": "backend/app/services/packing_slips.py",
+      "count": 4
+    },
+    {
+      "file": "backend/app/services/returns.py",
+      "count": 4
+    },
+    {
+      "file": "backend/app/services/taxes.py",
+      "count": 4
+    },
+    {
+      "file": "frontend/eslint.config.mjs",
+      "count": 4
+    },
+    {
+      "file": "frontend/src/app/pages/admin/shared/customer-timeline.component.ts",
+      "count": 4
+    },
+    {
+      "file": "infra/load-testing/k6-smoke.js",
+      "count": 4
+    },
+    {
+      "file": "scripts/audit/extract_route_map.py",
+      "count": 4
+    },
+    {
+      "file": "scripts/env/_common.sh",
+      "count": 4
+    },
+    {
+      "file": "backend/alembic/versions/0137_update_legal_pages_content.py",
+      "count": 3
+    },
+    {
+      "file": "backend/alembic/versions/0145_strip_legal_index_table.py",
+      "count": 3
+    },
+    {
+      "file": "backend/alembic/versions/0152_create_media_dam_foundation.py",
+      "count": 3
+    },
+    {
+      "file": "backend/app/core/startup_checks.py",
+      "count": 3
+    },
+    {
+      "file": "backend/app/services/pick_lists.py",
+      "count": 3
+    },
+    {
+      "file": "backend/app/services/self_service.py",
+      "count": 3
+    },
+    {
+      "file": "backend/app/services/structured_data.py",
+      "count": 3
+    },
+    {
+      "file": "backend/app/workers/media_worker.py",
+      "count": 3
+    },
+    {
+      "file": "backend/tests/test_admin_dashboard_extended.py",
+      "count": 3
+    },
+    {
+      "file": "backend/tests/test_backpressure_middleware.py",
+      "count": 3
+    },
+    {
+      "file": "backend/tests/test_blog_api.py",
+      "count": 3
+    },
+    {
+      "file": "frontend/README.md",
+      "count": 3
+    },
+    {
+      "file": "frontend/src/app/pages/admin/orders/admin-orders.component.ts",
+      "count": 3
+    },
+    {
+      "file": "frontend/src/app/pages/home/home.component.ts",
+      "count": 3
+    },
+    {
+      "file": "frontend/src/app/pages/shop/shop.component.ts",
+      "count": 3
+    },
+    {
+      "file": "scripts/seo/generate_content_backlog.py",
+      "count": 3
+    },
+    {
+      "file": ".github/workflows/release.yml",
+      "count": 2
+    },
+    {
+      "file": "README.md",
+      "count": 2
+    },
+    {
+      "file": "backend/Dockerfile",
+      "count": 2
+    },
+    {
+      "file": "backend/README.md",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0040_home_page_builder_blocks.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0041_site_social_and_contact_page.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0077_home_hero_to_banner_blocks.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0125_legal_pages_and_company_info.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0135_seed_optional_site_content.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0136_home_sections_default_hero_banner_image.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0138_remove_legal_index_template_disclaimer.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0141_seed_homepage_layout_defaults.py",
+      "count": 2
+    },
+    {
+      "file": "backend/alembic/versions/0151_fix_homepage_hero_ro_translation.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/api/v1/cart.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/api/v1/newsletter.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/core/logging_config.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/main.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/middleware/security.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/services/checkout_settings.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/services/exporter.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/services/fx_rates.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/services/private_storage.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/services/sitemap.py",
+      "count": 2
+    },
+    {
+      "file": "backend/app/services/user_export.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_account_self_service.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_auth.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_content_api.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_google_oauth.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_integration_postgres.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_ops_api.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_returns_api.py",
+      "count": 2
+    },
+    {
+      "file": "backend/tests/test_wishlist_api.py",
+      "count": 2
+    },
+    {
+      "file": "docs/EMAIL_UNSUBSCRIBE_VERIFICATION.md",
+      "count": 2
+    },
+    {
+      "file": "docs/ENVIRONMENT_PROFILES.md",
+      "count": 2
+    },
+    {
+      "file": "frontend/src/app/pages/blog/blog-post.component.ts",
+      "count": 2
+    },
+    {
+      "file": "frontend/src/app/shared/page-blocks.ts",
+      "count": 2
+    },
+    {
+      "file": "frontend/src/app/shared/product-card.component.ts",
+      "count": 2
+    },
+    {
+      "file": "frontend/src/app/shared/user-identity.ts",
+      "count": 2
+    },
+    {
+      "file": "infra/load-testing/README.md",
+      "count": 2
+    },
+    {
+      "file": "scripts/audit/collect_browser_evidence.max-routes.test.mjs",
+      "count": 2
+    },
+    {
+      "file": ".github/workflows/audit-agent-watchdog.yml",
+      "count": 1
+    },
+    {
+      "file": ".github/workflows/audit-pr-agent.yml",
+      "count": 1
+    },
+    {
+      "file": ".github/workflows/audit-pr-deep-agent.yml",
+      "count": 1
+    },
+    {
+      "file": ".github/workflows/percy-visual.yml",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0002_add_catalog_models.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0017_content_blocks.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0032_content_version_snapshots_v2.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0033_blog_comment_moderation_and_notifications.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0036_about_page_copy.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0037_usernames_and_alias_history.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0039_ron_currency_policy.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0042_fix_site_social_labels.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0049_guest_checkout_support.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0050_support_inbox_returns_and_shipping_labels.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0057_site_checkout_settings.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0066_secondary_emails.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0072_coupons_v2.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0108_tax_groups.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0143_hide_unused_faq_shipping_pages.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0154_media_job_retry_dead_letter_v2.py",
+      "count": 1
+    },
+    {
+      "file": "backend/alembic/versions/0156_sameday_easybox_mirror.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/api/v1/ops.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/api/v1/support.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/core/config.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/core/totp.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/services/address.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/services/captcha.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/services/fx_store.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/services/og_images.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/services/order_expiration_scheduler.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/services/passkeys.py",
+      "count": 1
+    },
+    {
+      "file": "backend/app/services/pricing.py",
+      "count": 1
+    },
+    {
+      "file": "backend/tests/test_admin_e2e_smoke.py",
+      "count": 1
+    },
+    {
+      "file": "backend/tests/test_admin_reports.py",
+      "count": 1
+    },
+    {
+      "file": "backend/tests/test_backpressure_maintenance.py",
+      "count": 1
+    },
+    {
+      "file": "backend/tests/test_content_admin_scheduling.py",
+      "count": 1
+    },
+    {
+      "file": "backend/tests/test_full_checkout_flow.py",
+      "count": 1
+    },
+    {
+      "file": "backend/tests/test_support_api.py",
+      "count": 1
+    },
+    {
+      "file": "docs/DEV_PORTS.md",
+      "count": 1
+    },
+    {
+      "file": "docs/UI_UX_KEYBOARD_SMOKE.md",
+      "count": 1
+    },
+    {
+      "file": "docs/reports/main-vs-pr199/final-audit-scorecard.md",
+      "count": 1
+    },
+    {
+      "file": "docs/reports/main-vs-pr199/production-safe-smoke.md",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/core/account.service.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/core/app-config.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/core/auth.guard.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/core/auth.service.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/core/checkout-prefs.service.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/core/recently-viewed.service.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/core/structured-data.service.spec.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/account/account-wishlist.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/content/admin-content-scheduling.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/coupons/admin-coupons.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/orders/admin-order-exports.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/orders/order-tag-colors.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/products/admin-products-image-manager.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/returns/admin-returns.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/shared/admin-table-layout.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/shared/content-revisions.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/shared/dam-asset-library.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/admin/users/admin-users.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/auth/google-callback.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/auth/register.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/auth/two-factor.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/blog/blog-list.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/checkout/success.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/page/page.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/pages/product/product.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/shared/address-form.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/shared/banner-block.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/shared/cms-global-sections.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/shared/http-error.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/shared/password-strength.component.ts",
+      "count": 1
+    },
+    {
+      "file": "frontend/src/app/shared/product-quick-view-modal.component.ts",
+      "count": 1
+    },
+    {
+      "file": "infra/prod/deploy.sh",
+      "count": 1
+    },
+    {
+      "file": "scripts/audit/agent_issue_watchdog.py",
+      "count": 1
+    },
+    {
+      "file": "scripts/audit/fixtures/route-samples.json",
+      "count": 1
+    },
+    {
+      "file": "scripts/audit/test_upsert_audit_issues_pagination.py",
+      "count": 1
+    }
+  ]
+}

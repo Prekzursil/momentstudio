@@ -26,6 +26,18 @@ export interface CartQuote {
   freeShippingThresholdRon: number | null;
 }
 
+type AddFromProductPayload = {
+  product_id: string;
+  variant_id?: string | null;
+  quantity: number;
+  name?: string;
+  slug?: string;
+  image?: string;
+  price?: number;
+  currency?: string;
+  stock?: number;
+};
+
 const STORAGE_KEY = 'cart_cache';
 const UNLIMITED_CART_STOCK = 9_999;
 
@@ -74,49 +86,17 @@ export class CartStore {
     });
   }
 
-  addFromProduct(payload: {
-    product_id: string;
-    variant_id?: string | null;
-    quantity: number;
-    name?: string;
-    slug?: string;
-    image?: string;
-    price?: number;
-    currency?: string;
-    stock?: number;
-  }): void {
+  addFromProduct(payload: AddFromProductPayload): void {
     this.api
       .addItem({
         product_id: payload.product_id,
         variant_id: payload.variant_id,
         quantity: payload.quantity
       })
-      .pipe(
-        map((res): CartItem => ({
-          id: res.id,
-          product_id: res.product_id,
-          variant_id: res.variant_id,
-          name: res.name ?? payload.name ?? '',
-          slug: res.slug ?? payload.slug ?? '',
-          price: Number(res.unit_price_at_add ?? payload.price ?? 0),
-          currency: res.currency ?? payload.currency ?? 'RON',
-          quantity: res.quantity,
-          stock: res.max_quantity == null ? UNLIMITED_CART_STOCK : Number(res.max_quantity ?? payload.stock ?? 99),
-          image: res.image_url ?? payload.image ?? ''
-        }))
-      )
+      .pipe(map((res) => this.mapAddedItem(res, payload)))
       .subscribe({
         next: (item) => {
-          const current = this.itemsSignal();
-          const idx = current.findIndex(
-            (i) => i.product_id === item.product_id && i.variant_id === item.variant_id
-          );
-          const nextItems =
-            idx >= 0
-              ? current.map((existing, index) =>
-                  index === idx ? { ...existing, quantity: existing.quantity + item.quantity } : existing
-                )
-              : [...current, item];
+          const nextItems = this.mergeAddedItem(this.itemsSignal(), item);
           this.itemsSignal.set(nextItems);
           this.persist(nextItems);
         },
@@ -211,6 +191,28 @@ export class CartStore {
     }));
   }
 
+  private mapAddedItem(res: any, payload: AddFromProductPayload): CartItem {
+    const maxQuantity = Number(res.max_quantity ?? payload.stock ?? 99);
+    return {
+      id: res.id,
+      product_id: res.product_id,
+      variant_id: res.variant_id,
+      name: res.name ?? payload.name ?? '',
+      slug: res.slug ?? payload.slug ?? '',
+      price: Number(res.unit_price_at_add ?? payload.price ?? 0),
+      currency: res.currency ?? payload.currency ?? 'RON',
+      quantity: res.quantity,
+      stock: res.max_quantity == null ? UNLIMITED_CART_STOCK : maxQuantity,
+      image: res.image_url ?? payload.image ?? ''
+    };
+  }
+
+  private mergeAddedItem(current: CartItem[], item: CartItem): CartItem[] {
+    const idx = current.findIndex((existing) => existing.product_id === item.product_id && existing.variant_id === item.variant_id);
+    if (idx < 0) return [...current, item];
+    return current.map((existing, index) => (index === idx ? { ...existing, quantity: existing.quantity + item.quantity } : existing));
+  }
+
   private scheduleSyncBackend(delayMs = 350): void {
     if (this.syncTimeoutId) clearTimeout(this.syncTimeoutId);
     this.syncTimeoutId = setTimeout(() => {
@@ -261,4 +263,3 @@ export class CartStore {
     }
   }
 }
-

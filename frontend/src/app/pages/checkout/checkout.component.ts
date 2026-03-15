@@ -53,6 +53,11 @@ type CheckoutBillingAddress = {
 
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
 type PaymentMethodCapability = { enabled?: boolean; reason?: string | null; reason_code?: string | null };
+type PaymentCapabilitiesResponse = {
+  stripe?: PaymentMethodCapability;
+  paypal?: PaymentMethodCapability;
+  netopia?: PaymentMethodCapability;
+};
 
 type CheckoutStartResponse = {
   order_id: string;
@@ -143,167 +148,12 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         PageHeaderComponent,
         InlineErrorCardComponent
 		  ],
-	  template: `
-	      <app-container classes="py-10 grid gap-6">
-	        <app-page-header [crumbs]="crumbs" [titleKey]="'checkout.title'">
-            <span pageHeaderActions *ngIf="cartSyncPending()" class="text-xs text-slate-500 dark:text-slate-400">
-              {{ 'checkout.syncing' | translate }}
-            </span>
-          </app-page-header>
-          <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ liveAssertive }}</div>
-		        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
-		          <section class="grid gap-4">
-	            <div
-	              *ngIf="syncNotice"
-	              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-	            >
-	              {{ syncNotice }}
-	            </div>
-	            <div
-                *ngIf="errorMessage"
-                id="checkout-global-error"
-                tabindex="-1"
-              >
-                <app-inline-error-card
-                  [titleKey]="'errors.unexpected.title'"
-                  [message]="errorMessage"
-                  [retryLabelKey]="'checkout.retry'"
-                  [showContact]="false"
-                  [backToUrl]="null"
-                  (retry)="retryValidation()"
-                ></app-inline-error-card>
-              </div>
-            <div
-              *ngIf="!auth.isAuthenticated()"
-              class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-            >
-              <span class="font-medium">{{ 'checkout.guest' | translate }}</span>
-              <div class="flex flex-wrap gap-2">
-                <app-button size="sm" variant="ghost" [label]="'auth.login' | translate" routerLink="/login"></app-button>
-                <app-button size="sm" variant="ghost" [label]="'auth.register' | translate" routerLink="/register"></app-button>
-              </div>
-            </div>
-            <div
-              *ngIf="auth.isAuthenticated() && !emailVerified()"
-              class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-            >
-              <div class="grid gap-2 w-full">
-                <div class="flex items-start justify-between gap-3">
-                  <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="
-                      primaryEmailVerificationResendRemainingSeconds() > 0
-                        ? ('account.verification.resendIn' | translate: { seconds: primaryEmailVerificationResendRemainingSeconds() })
-                        : ('auth.emailVerificationResend' | translate)
-                    "
-                    [disabled]="primaryEmailVerificationBusy || primaryEmailVerificationResendRemainingSeconds() > 0"
-                    (action)="resendPrimaryEmailVerification()"
-                  ></app-button>
-                </div>
-                <p class="text-xs text-amber-800 dark:text-amber-200">{{ 'account.verification.linkInstructions' | translate }}</p>
-                <p *ngIf="primaryEmailVerificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ primaryEmailVerificationStatus }}</p>
-              </div>
-            </div>
-		            <form #checkoutForm="ngForm" #checkoutFormEl class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
-	              <app-checkout-shipping-step [vm]="vm" [checkoutForm]="checkoutForm"></app-checkout-shipping-step>
-	              <app-checkout-promo-step [vm]="vm"></app-checkout-promo-step>
-	              <app-checkout-payment-step [vm]="vm"></app-checkout-payment-step>
-          </form>
-        </section>
-
-	        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-	          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.summary' | translate }}</h2>
-	          <div class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
-	            <div *ngFor="let item of items()" class="flex gap-3">
-	              <a class="shrink-0" [routerLink]="['/products', item.slug]">
-	                <img
-	                  class="h-12 w-12 rounded-xl object-cover border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
-	                  [src]="item.image || 'assets/placeholder/product-placeholder.svg'"
-	                  [alt]="item.name"
-	                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-	                />
-	              </a>
-	              <div class="min-w-0 flex-1">
-	                <div class="flex items-start justify-between gap-3">
-	                  <div class="min-w-0">
-	                    <a class="font-medium text-slate-900 hover:underline dark:text-slate-50" [routerLink]="['/products', item.slug]">
-	                      {{ item.name }}
-	                    </a>
-	                    <p class="text-xs text-slate-500 dark:text-slate-400">
-	                      {{ item.quantity }} × {{ item.price | localizedCurrency : item.currency }}
-	                    </p>
-	                  </div>
-	                  <span class="font-medium text-slate-900 dark:text-slate-50">
-	                    {{ item.price * item.quantity | localizedCurrency : item.currency }}
-	                  </span>
-	                </div>
-	                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.inStock' | translate : { count: item.stock } }}</p>
-	              </div>
-	            </div>
-	          </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-            <span>{{ 'checkout.subtotal' | translate }}</span>
-            <span>{{ quoteSubtotal() | localizedCurrency : currency }}</span>
-          </div>
-          <div
-            class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200"
-            *ngIf="quoteFee() > 0"
-          >
-            <span>{{ 'checkout.additionalCost' | translate }}</span>
-            <span>{{ quoteFee() | localizedCurrency : currency }}</span>
-          </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quoteTax() > 0">
-            <span>{{ 'checkout.tax' | translate }}</span>
-            <span>{{ quoteTax() | localizedCurrency : currency }}</span>
-          </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-            <span>{{ 'checkout.shipping' | translate }}</span>
-            <span>{{ quoteShipping() | localizedCurrency : currency }}</span>
-          </div>
-	          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quotePromoSavings() > 0">
-	            <span>{{ 'checkout.discount' | translate }}</span>
-	            <span class="text-emerald-700 dark:text-emerald-300">{{ -quotePromoSavings() | localizedCurrency : currency }}</span>
-	          </div>
-          <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
-            <span>{{ 'checkout.estimatedTotal' | translate }}</span>
-            <span>{{ quoteTotal() | localizedCurrency : currency }}</span>
-          </div>
-          </aside>
-        </div>
-
-        <app-legal-consent-modal
-          [open]="consentModalOpen"
-          [slug]="consentModalSlug"
-          (accepted)="confirmConsentModal()"
-          (closed)="closeConsentModal()"
-        ></app-legal-consent-modal>
-
-        <app-modal
-          [open]="editSavedAddressOpen"
-          [title]="editSavedAddressTitle()"
-          [showActions]="false"
-          [closeLabel]="'addressForm.cancel' | translate"
-          (closed)="closeEditSavedAddress()"
-        >
-          <p *ngIf="editSavedAddressError" class="text-sm text-rose-700 dark:text-rose-300">{{ editSavedAddressError }}</p>
-          <app-address-form
-            *ngIf="editSavedAddressModel"
-            [model]="editSavedAddressModel"
-            [stickyActions]="true"
-            (cancel)="closeEditSavedAddress()"
-            (save)="saveEditedSavedAddress($event)"
-          ></app-address-form>
-        </app-modal>
-      </app-container>
-    `
-})
+	  	  templateUrl: './checkout.component.html',})
 		export class CheckoutComponent implements OnInit, OnDestroy {
 	    @ViewChild('checkoutFormEl') checkoutFormEl?: ElementRef<HTMLFormElement>;
       readonly vm = this;
 
-		  crumbs = [
+	  readonly crumbs = [
 		    { label: 'nav.home', url: '/' },
 		    { label: 'nav.cart', url: '/cart' },
 	    { label: 'checkout.title' }
@@ -443,7 +293,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private readonly translate: TranslateService,
     private readonly checkoutPrefs: CheckoutPrefsService,
     private readonly analytics: AnalyticsService,
-    public auth: AuthService,
+    public readonly auth: AuthService,
     private readonly zone: NgZone,
     private readonly cdr: ChangeDetectorRef
   ) {
@@ -473,7 +323,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  scrollToStep(id: string): void {
       if (typeof document === 'undefined') return;
       try {
-        const step = document.getElementById(id) as HTMLElement | null;
+        const step = document.getElementById(id);
         if (!step) return;
         step.scrollIntoView({ behavior: 'smooth', block: 'start' });
         setTimeout(() => {
@@ -495,7 +345,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
       for (const candidate of candidates) {
         if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (
+          candidate instanceof HTMLButtonElement ||
+          candidate instanceof HTMLInputElement ||
+          candidate instanceof HTMLSelectElement ||
+          candidate instanceof HTMLTextAreaElement
+        ) {
+          if (candidate.disabled) continue;
+        }
         if (!this.isElementVisible(candidate)) continue;
         return candidate;
       }
@@ -541,7 +398,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private focusElementById(id: string): void {
       if (typeof document === 'undefined') return;
       setTimeout(() => {
-        const el = document.getElementById(id) as HTMLElement | null;
+        const el = document.getElementById(id);
         if (!el) return;
         this.scrollAndFocus(el);
       });
@@ -561,7 +418,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
       for (const candidate of candidates) {
         if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+        if (
+          candidate instanceof HTMLButtonElement ||
+          candidate instanceof HTMLInputElement ||
+          candidate instanceof HTMLSelectElement ||
+          candidate instanceof HTMLTextAreaElement
+        ) {
+          if (candidate.disabled) continue;
+        }
         if (!this.isElementVisible(candidate)) continue;
         return candidate;
       }
@@ -941,7 +805,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     const trimmed = (raw || '').trim();
     if (!trimmed) return null;
 
-    const codeMatch = trimmed.match(/^([A-Za-z]{2})\b/);
+    const codeMatch = /^([A-Za-z]{2})\b/.exec(trimmed);
     if (codeMatch) {
       const code = codeMatch[1].toUpperCase();
       if (this.countries.some((c) => c.code === code)) return code;
@@ -980,31 +844,63 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.savedAddressesLoading = true;
     this.savedAddressesError = '';
     this.accountService.getAddresses().subscribe({
-      next: (addresses) => {
-        this.savedAddresses = Array.isArray(addresses) ? addresses : [];
-        if (this.savedAddresses.length) {
-          const defaultShipping = this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
-          const defaultBilling = this.savedAddresses.find((a) => a.is_default_billing) ?? defaultShipping;
-          if (!this.selectedBillingAddressId && defaultBilling) {
-            this.selectedBillingAddressId = defaultBilling.id;
-          }
-          if (!this.billingSameAsShipping && !this.billing.line1.trim() && !this.billing.city.trim() && !this.billing.postal.trim() && defaultBilling) {
-            this.applySavedAddressToBilling(defaultBilling);
-          }
-
-          if (!this.address.line1.trim() && !this.address.city.trim() && !this.address.postal.trim()) {
-          this.selectedShippingAddressId = defaultShipping.id;
-          this.applySavedAddressToShipping(defaultShipping);
-          }
-        }
-        this.savedAddressesLoading = false;
-      },
+      next: (addresses) => this.handleSavedAddressesLoaded(addresses),
       error: () => {
         this.savedAddresses = [];
         this.savedAddressesError = this.translate.instant('checkout.savedAddressesLoadError');
         this.savedAddressesLoading = false;
       }
     });
+  }
+
+  private handleSavedAddressesLoaded(addresses: Address[] | null | undefined): void {
+    this.savedAddresses = Array.isArray(addresses) ? addresses : [];
+    const defaults = this.getDefaultSavedAddresses();
+    if (!defaults) {
+      this.savedAddressesLoading = false;
+      return;
+    }
+
+    this.ensureDefaultBillingSelection(defaults.billing);
+    this.prefillBillingFromSavedAddress(defaults.billing);
+    this.prefillShippingFromSavedAddress(defaults.shipping);
+    this.savedAddressesLoading = false;
+  }
+
+  private getDefaultSavedAddresses(): { shipping: Address; billing: Address } | null {
+    if (!this.savedAddresses.length) return null;
+    const shipping = this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
+    const billing = this.savedAddresses.find((a) => a.is_default_billing) ?? shipping;
+    return { shipping, billing };
+  }
+
+  private ensureDefaultBillingSelection(defaultBilling: Address): void {
+    if (this.selectedBillingAddressId) return;
+    this.selectedBillingAddressId = defaultBilling.id;
+  }
+
+  private prefillBillingFromSavedAddress(defaultBilling: Address): void {
+    if (!this.shouldPrefillBillingFromSavedAddress()) return;
+    this.applySavedAddressToBilling(defaultBilling);
+  }
+
+  private shouldPrefillBillingFromSavedAddress(): boolean {
+    if (this.billingSameAsShipping) return false;
+    if (this.billing.line1.trim()) return false;
+    if (this.billing.city.trim()) return false;
+    return !this.billing.postal.trim();
+  }
+
+  private prefillShippingFromSavedAddress(defaultShipping: Address): void {
+    if (!this.shouldPrefillShippingFromSavedAddress()) return;
+    this.selectedShippingAddressId = defaultShipping.id;
+    this.applySavedAddressToShipping(defaultShipping);
+  }
+
+  private shouldPrefillShippingFromSavedAddress(): boolean {
+    if (this.address.line1.trim()) return false;
+    if (this.address.city.trim()) return false;
+    return !this.address.postal.trim();
   }
 
   onEmailChanged(): void {
@@ -1117,7 +1013,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     try {
       const raw = localStorage.getItem(CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY);
       if (!raw) return false;
-      const parsed = JSON.parse(raw) as unknown;
+      const parsed = JSON.parse(raw);
       return parsed === true;
     } catch {
       return false;
@@ -1401,7 +1297,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (!items.length) return;
     this.checkoutStartTracked = true;
     const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    const currency = this.currency || items[0]?.currency || 'RON';
     this.analytics.track('checkout_start', {
       line_items: items.length,
       units,
@@ -1416,7 +1312,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (this.checkoutFlowCompleted) return;
     const items = this.items();
     const units = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const currency = (this.currency || items[0]?.currency || 'RON') as string;
+    const currency = this.currency || items[0]?.currency || 'RON';
     this.analytics.track('checkout_abandon', {
       line_items: items.length,
       units,
@@ -1486,28 +1382,46 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.couponEligibilityLoading = true;
     this.couponEligibilityError = '';
     this.couponsService.eligibility().subscribe({
-      next: (res) => {
-        this.couponEligibility = res ?? { eligible: [], ineligible: [] };
-        this.couponEligibilityLoading = false;
-        this.suggestedCouponOffer = this.pickBestCouponOffer(this.couponEligibility.eligible ?? []);
-
-        const current = (this.promo || '').trim().toUpperCase();
-        if (!current) {
-          this.appliedCouponOffer = null;
-        } else {
-          const offers = [...(this.couponEligibility.eligible ?? []), ...(this.couponEligibility.ineligible ?? [])];
-          const match = offers.find((offer) => offer.coupon?.code?.toUpperCase() === current) ?? null;
-          this.appliedCouponOffer = match;
-        }
-
-        this.maybeAutoApplyBestCoupon();
-      },
+      next: (res) => this.handleCouponEligibilityLoaded(res),
       error: (err) => {
         this.couponEligibilityLoading = false;
         this.couponEligibilityError =
           err?.error?.detail || this.translate.instant('checkout.couponsLoadError');
       }
     });
+  }
+
+  private handleCouponEligibilityLoaded(res: CouponEligibilityResponse | null | undefined): void {
+    const eligibility = this.normalizeCouponEligibility(res);
+    this.couponEligibility = eligibility;
+    this.couponEligibilityLoading = false;
+    this.suggestedCouponOffer = this.pickBestCouponOffer(eligibility.eligible ?? []);
+    this.appliedCouponOffer = this.findAppliedCouponOffer(eligibility);
+    this.maybeAutoApplyBestCoupon();
+  }
+
+  private normalizeCouponEligibility(
+    res: CouponEligibilityResponse | null | undefined
+  ): CouponEligibilityResponse {
+    return res ?? { eligible: [], ineligible: [] };
+  }
+
+  private findAppliedCouponOffer(eligibility: CouponEligibilityResponse): CouponOffer | null {
+    const current = this.currentPromoCode();
+    if (!current) return null;
+    return this.findCouponOfferByCode(eligibility, current);
+  }
+
+  private currentPromoCode(): string {
+    return (this.promo || '').trim().toUpperCase();
+  }
+
+  private findCouponOfferByCode(
+    eligibility: CouponEligibilityResponse,
+    code: string
+  ): CouponOffer | null {
+    const offers = [...(eligibility.eligible ?? []), ...(eligibility.ineligible ?? [])];
+    return offers.find((offer) => offer.coupon?.code?.toUpperCase() === code) ?? null;
   }
 
   private applyPendingPromoCode(): void {
@@ -1818,33 +1732,40 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 	  }
 
     private loadPaymentCapabilities(): void {
-      this.api.get<{
-        stripe?: PaymentMethodCapability;
-        paypal?: PaymentMethodCapability;
-        netopia?: PaymentMethodCapability;
-      }>('/payments/capabilities')
+      this.api.get<PaymentCapabilitiesResponse>('/payments/capabilities')
       .subscribe({
-        next: (cap) => {
-          this.stripeEnabled = Boolean(appConfig.stripeEnabled) && Boolean(cap?.stripe?.enabled);
-          this.paypalEnabled = Boolean(cap?.paypal?.enabled);
-          const netopiaUiEnabled = Boolean(appConfig.netopiaEnabled);
-          const netopiaBackendEnabled = Boolean(cap?.netopia?.enabled);
-          this.netopiaEnabled = netopiaUiEnabled && netopiaBackendEnabled;
-          if (netopiaUiEnabled && !netopiaBackendEnabled) {
-            const reasonCode = String(cap?.netopia?.reason_code || '').trim();
-            const reasonKey = reasonCode ? `checkout.paymentDisabledReasons.${reasonCode}` : '';
-            const translated = reasonKey ? this.translate.instant(reasonKey) : '';
-            const fallback = String(cap?.netopia?.reason || '').trim();
-            this.netopiaDisabledReason = translated && translated !== reasonKey ? translated : fallback;
-          } else {
-            this.netopiaDisabledReason = '';
-          }
-          this.ensurePaymentMethodAvailable();
-        },
+        next: (cap) => this.applyPaymentCapabilities(cap),
         error: () => {
           // Keep app-config defaults when the backend cannot be reached.
         }
       });
+    }
+
+    private applyPaymentCapabilities(cap: PaymentCapabilitiesResponse | null | undefined): void {
+      this.stripeEnabled = Boolean(appConfig.stripeEnabled) && Boolean(cap?.stripe?.enabled);
+      this.paypalEnabled = Boolean(cap?.paypal?.enabled);
+      const netopiaUiEnabled = Boolean(appConfig.netopiaEnabled);
+      const netopiaBackendEnabled = Boolean(cap?.netopia?.enabled);
+      this.netopiaEnabled = netopiaUiEnabled && netopiaBackendEnabled;
+      this.netopiaDisabledReason = this.resolveNetopiaDisabledReason(
+        cap?.netopia,
+        netopiaUiEnabled,
+        netopiaBackendEnabled
+      );
+      this.ensurePaymentMethodAvailable();
+    }
+
+    private resolveNetopiaDisabledReason(
+      netopia: PaymentMethodCapability | undefined,
+      netopiaUiEnabled: boolean,
+      netopiaBackendEnabled: boolean
+    ): string {
+      if (!netopiaUiEnabled || netopiaBackendEnabled) return '';
+      const reasonCode = String(netopia?.reason_code || '').trim();
+      const reasonKey = reasonCode ? `checkout.paymentDisabledReasons.${reasonCode}` : '';
+      const translated = reasonKey ? this.translate.instant(reasonKey) : '';
+      if (translated && translated !== reasonKey) return translated;
+      return String(netopia?.reason || '').trim();
     }
 
 	  ngOnDestroy(): void {

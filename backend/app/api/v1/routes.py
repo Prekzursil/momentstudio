@@ -19,7 +19,7 @@ from app.api.v1 import returns
 from app.api.v1 import shipping
 from app.api.v1 import shipping_admin
 from app.api.v1 import legal
-from app.api.v1 import coupons_v2
+from app.api.v1 import coupons
 from app.api.v1 import taxes
 from app.api.v1 import ops
 from app.api.v1 import observability
@@ -57,7 +57,7 @@ api_router.include_router(returns.router)
 api_router.include_router(shipping.router)
 api_router.include_router(shipping_admin.router)
 api_router.include_router(legal.router)
-api_router.include_router(coupons_v2.router)
+api_router.include_router(coupons.router)
 api_router.include_router(taxes.router)
 api_router.include_router(ops.router)
 api_router.include_router(observability.router)

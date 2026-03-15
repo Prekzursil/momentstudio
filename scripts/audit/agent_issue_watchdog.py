@@ -107,11 +107,11 @@ def _matches_filter(issue: dict[str, Any], audit_filter: str) -> bool:
     if normalized in {"", "all"}:
         return True
 
-    labels = [str(row.get("name") or "") for row in issue.get("labels") or []]
+    labels = {str(row.get("name") or "").lower() for row in issue.get("labels") or []}
     if normalized in {"audit", "audit:*", "audit-only"}:
         return any(label.startswith("audit:") for label in labels)
     if normalized.startswith("audit:"):
-        return normalized in {label.lower() for label in labels}
+        return normalized in labels
     raise ValueError("--audit-filter must be one of: all, audit:*, audit-only, or an exact audit:* label.")
 
 
