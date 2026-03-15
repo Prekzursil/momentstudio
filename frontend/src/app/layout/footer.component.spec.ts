@@ -131,7 +131,9 @@ describe('FooterComponent', () => {
 
   it('falls back to timer update path when requestAnimationFrame is unavailable', fakeAsync(() => {
     configureProviders();
-    const frameHost = globalThis as typeof globalThis & { requestAnimationFrame?: typeof requestAnimationFrame };
+    const frameHost = globalThis as Omit<typeof globalThis, 'requestAnimationFrame'> & {
+      requestAnimationFrame?: typeof requestAnimationFrame;
+    };
     const originalRaf = frameHost.requestAnimationFrame;
     frameHost.requestAnimationFrame = undefined;
 
