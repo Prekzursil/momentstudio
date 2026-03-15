@@ -1,2 +1,10 @@
+---
 # Strict-zero mode: no path suppressions.
 exclude_paths: []
+
+engines:
+  # Scope Codacy ESLint engines to the frontend package where lint config lives.
+  eslint-8:
+    base_sub_dir: frontend
+  eslint-9:
+    base_sub_dir: frontend
