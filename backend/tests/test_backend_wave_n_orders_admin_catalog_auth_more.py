@@ -445,6 +445,7 @@ def test_auth_token_and_refresh_response_helpers(monkeypatch: pytest.MonkeyPatch
     assert auth_api._extract_token_jti("wrong", token_type="refresh") is None
 
     now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    report_ip = _test_ipv4(1, 1, 1, 1)
     row = SimpleNamespace(
         id=uuid4(),
         jti="j-1",
