@@ -126,7 +126,7 @@ async def test_allocate_name_tag_picks_first_available_slot() -> None:
             _owner_namespace(
                 command="bootstrap-owner",
                 email="owner@example.com",
-                secret="owner-secret",
+                secret=OWNER_BOOTSTRAP_VALUE,
                 username="owner",
                 display_name="Owner",
             ),
@@ -137,7 +137,7 @@ async def test_allocate_name_tag_picks_first_available_slot() -> None:
             _owner_namespace(
                 command="repair-owner",
                 email="owner2@example.com",
-                secret="repair-secret",
+                secret=OWNER_RESET_VALUE,
                 username="owner2",
                 display_name="Owner Two",
                 verify_email=True,

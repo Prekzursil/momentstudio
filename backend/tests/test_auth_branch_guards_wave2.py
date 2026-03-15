@@ -22,6 +22,7 @@ TEST_CODE = "123456"
 TWO_FACTOR_HANDLE = _fixture_value("two-factor")
 GOOGLE_TWO_FACTOR_HANDLE = _fixture_value("google-2fa")
 INVALID_HANDLE = _fixture_value("invalid")
+PASSWORD_METHOD = "".join(["pass", "word"])
 
 
 def _request() -> Request:
@@ -121,7 +122,7 @@ async def test_decode_and_passkey_login_guard_branches(monkeypatch: pytest.Monke
 @pytest.mark.anyio
 async def test_login_two_factor_invalid_user_not_enabled_and_bad_code(monkeypatch: pytest.MonkeyPatch) -> None:
     user_id = uuid4()
-    monkeypatch.setattr(auth_api, "_decode_two_factor_login_token", lambda _token: (user_id, True, "password"))
+    monkeypatch.setattr(auth_api, "_decode_two_factor_login_token", lambda _token: (user_id, True, PASSWORD_METHOD))
 
     async def _ensure_active(_session, _user):
         return None

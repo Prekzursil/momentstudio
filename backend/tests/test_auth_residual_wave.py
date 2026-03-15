@@ -227,7 +227,7 @@ async def test_google_link_start_and_google_link_branches(monkeypatch: pytest.Mo
     auth_url = await auth_api.google_link_start(current_user, token_guard)
     parsed_auth_url = urlparse(auth_url["auth_url"])
     assert parsed_auth_url.scheme == "https"
-    assert parsed_auth_url.netloc == GOOGLE_AUTH_HOST
+    assert parsed_auth_url.hostname == GOOGLE_AUTH_HOST
 
     payload = auth_api.GoogleLinkCallback(code="code", state="state", password=FIXTURE_VALUE)
     monkeypatch.setattr(auth_api, "_validate_google_state", lambda *_args, **_kwargs: None)
@@ -345,7 +345,7 @@ def test_google_complete_request_validators_cover_error_paths() -> None:
 
 @pytest.mark.anyio
 async def test_admin_ip_bypass_missing_secret_invalid_token_and_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = auth_api.AdminIpBypassRequest(token='tok')
+    payload = auth_api.AdminIpBypassRequest(token=_fixture_value('provided-bypass'))
     request = _request(user_agent='pytest-agent', client_host='10.0.0.5')
     current_user = SimpleNamespace(id=uuid4())
     session = SimpleNamespace()
