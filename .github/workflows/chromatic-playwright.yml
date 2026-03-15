@@ -30,14 +30,13 @@ jobs:
         working-directory: frontend
     env:
       CHROMATIC_ARCHIVE_LOCATION: test-results
-      CHROMATIC_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') || startsWith(github.event.pull_request.head.ref || github.head_ref || '', 'dependabot/') }}
+      CHROMATIC_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') }}
       HAS_CHROMATIC_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN != '' }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -74,9 +73,6 @@ jobs:
           playwright: true
         env:
           CHROMATIC_ARCHIVE_LOCATION: test-results
-          CHROMATIC_BRANCH: ${{ github.event.pull_request.head.ref || github.ref_name }}
-          CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          CHROMATIC_SLUG: ${{ github.repository }}
 
       - name: Note skipped Chromatic run
         if: ${{ env.HAS_CHROMATIC_TOKEN != 'true' && env.CHROMATIC_PR_ORIGIN == 'true' }}

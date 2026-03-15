@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: visual-ci
     env:
-      APPLITOOLS_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') || startsWith(github.event.pull_request.head.ref || github.head_ref || '', 'dependabot/') }}
+      APPLITOOLS_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
