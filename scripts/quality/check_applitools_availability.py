@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 import os
 from http.client import HTTPConnection, HTTPSConnection, HTTPException
-from pathlib import Path
 from typing import Optional, Tuple
 from urllib.parse import ParseResult, urlparse
 
@@ -23,27 +22,9 @@ def is_dependabot_origin() -> bool:
 
 
 def write_output(name: str, value: str) -> None:
-    github_output = os.environ.get("GITHUB_OUTPUT", "").strip()
-    if not github_output:
-        return
-    path = Path(github_output)
-    if not is_safe_github_output_path(path):
-        return
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(f"{name}={value}\n")
-
-
-def is_safe_github_output_path(path: Path) -> bool:
-    runner_temp = os.environ.get("RUNNER_TEMP", "").strip()
-    if not runner_temp:
-        # Outside Actions, skip writing outputs entirely.
-        return False
-    try:
-        temp_root = Path(runner_temp).resolve(strict=True)
-        resolved = path.resolve(strict=False)
-    except OSError:
-        return False
-    return resolved == temp_root or temp_root in resolved.parents
+    # Step output is handled in workflow YAML to avoid writing to env-provided paths here.
+    _ = name
+    _ = value
 
 
 def normalize_scheme(parsed: ParseResult) -> Optional[str]:
@@ -121,7 +102,7 @@ def skip(message: str) -> int:
 
 def main() -> int:
     api_key = os.environ.get("APPLITOOLS_API_KEY", "").strip()
-    server_url = os.environ.get("APPLITOOLS_SERVER_URL") or DEFAULT_APPLITOOLS_SERVER
+    server_url = DEFAULT_APPLITOOLS_SERVER
     dependabot_origin = is_dependabot_origin()
 
     if not api_key:

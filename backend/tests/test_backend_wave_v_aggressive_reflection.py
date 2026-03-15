@@ -308,8 +308,8 @@ def _construct_instance(cls, *, alternate: bool):
         return cls(**kwargs)
     except (KeyboardInterrupt, SystemExit):
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        _ = str(exc)
 
     try:
         return cls(*())
