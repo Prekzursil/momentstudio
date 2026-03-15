@@ -225,7 +225,7 @@ function defineProviderChangeRefreshSpec(): void {
   it('resets transient state and refreshes nearby results when provider changes after initialization', () => {
     const refreshSpy = spyOn<any>(lockerPickerComponent as any, 'refreshMirrorSnapshot').and.returnValue(Promise.resolve());
     const searchAreaSpy = spyOn(lockerPickerComponent, 'searchThisArea');
-    spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
+    const selectSpy = spyOn(lockerPickerComponent, 'selectLocker').and.callThrough();
     lockerPickerComponent.searchResults = [{ display_name: 'Old', lat: 1, lng: 2 }];
     lockerPickerComponent.searchError = 'old error';
     lockerPickerComponent.searchQuery = 'old query';

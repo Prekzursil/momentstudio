@@ -71,6 +71,7 @@ jobs:
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           playwright: true
+          workingDir: frontend
         env:
           CHROMATIC_ARCHIVE_LOCATION: test-results
 

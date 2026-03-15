@@ -15,9 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
-      CODACY_ORGANIZATION_PROVIDER: gh
-      CODACY_USERNAME: Prekzursil
-      CODACY_PROJECT_NAME: momentstudio
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -74,11 +71,7 @@ jobs:
 
       - name: Upload coverage reports to Codacy
         if: ${{ steps.codacy_token.outputs.upload_enabled == 'true' }}
-        run: |
-          bash <(curl -Ls https://coverage.codacy.com/get.sh) report \
-            --api-token "${CODACY_API_TOKEN}" \
-            --organization-provider "${CODACY_ORGANIZATION_PROVIDER}" \
-            --username "${CODACY_USERNAME}" \
-            --project-name "${CODACY_PROJECT_NAME}" \
-            --coverage-reports backend/coverage.xml \
-            --coverage-reports frontend/coverage/lcov.info
+        uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1.3.0
+        with:
+          api-token: ${{ secrets.CODACY_API_TOKEN }}
+          coverage-reports: backend/coverage.xml,frontend/coverage/**/lcov.info

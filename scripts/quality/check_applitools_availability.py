@@ -1,10 +1,13 @@
-from __future__ import annotations
+from __future__ import absolute_import
 
 import os
-import sys
-import urllib.error
-import urllib.request
+from http.client import HTTPConnection, HTTPSConnection, HTTPException
 from pathlib import Path
+from typing import Optional, Tuple
+from urllib.parse import ParseResult, urlparse
+
+DEFAULT_APPLITOOLS_SERVER = "https://eyesapi.applitools.com"
+RENDERINFO_PATH = "/api/sessions/renderinfo"
 
 
 def is_dependabot_origin() -> bool:
@@ -27,16 +30,57 @@ def write_output(name: str, value: str) -> None:
         handle.write(f"{name}={value}\n")
 
 
+def normalize_scheme(parsed: ParseResult) -> Optional[str]:
+    scheme = (parsed.scheme or "https").lower()
+    if scheme in {"http", "https"}:
+        return scheme
+    return None
+
+
+def resolve_host(parsed: ParseResult) -> str:
+    return parsed.netloc or parsed.path
+
+
+def resolve_base_path(parsed: ParseResult) -> str:
+    if not parsed.netloc:
+        return ""
+    return parsed.path.rstrip("/")
+
+
+def build_request_path(base_path: str) -> str:
+    if not base_path:
+        return RENDERINFO_PATH
+    return f"{base_path}{RENDERINFO_PATH}"
+
+
+def resolve_probe_target(server_url: str) -> Optional[Tuple[str, str, str]]:
+    parsed = urlparse(server_url)
+    scheme = normalize_scheme(parsed)
+    if scheme is None:
+        return None
+
+    host = resolve_host(parsed)
+    if not host:
+        return None
+
+    return scheme, host, build_request_path(resolve_base_path(parsed))
+
+
 def probe(server_url: str, api_key: str) -> str:
-    url = f"{server_url.rstrip('/')}/api/sessions/renderinfo"
-    request = urllib.request.Request(url, headers={"X-Api-Key": api_key})
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return str(response.getcode())
-    except urllib.error.HTTPError as exc:
-        return str(exc.code)
-    except Exception:
+    target = resolve_probe_target(server_url)
+    if target is None:
         return "000"
+
+    scheme, host, request_path = target
+    connection_cls = HTTPSConnection if scheme == "https" else HTTPConnection
+    connection = connection_cls(host, timeout=20)
+    try:
+        connection.request("GET", request_path, headers={"X-Api-Key": api_key})
+        return str(connection.getresponse().status)
+    except (HTTPException, OSError):
+        return "000"
+    finally:
+        connection.close()
 
 
 def fail(message: str) -> int:
@@ -52,7 +96,7 @@ def skip(message: str) -> int:
 
 def main() -> int:
     api_key = os.environ.get("APPLITOOLS_API_KEY", "").strip()
-    server_url = os.environ.get("APPLITOOLS_SERVER_URL") or "https://eyesapi.applitools.com"
+    server_url = os.environ.get("APPLITOOLS_SERVER_URL") or DEFAULT_APPLITOOLS_SERVER
     dependabot_origin = is_dependabot_origin()
 
     if not api_key:
