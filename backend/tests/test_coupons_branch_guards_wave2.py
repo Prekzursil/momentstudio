@@ -1,4 +1,6 @@
 from __future__ import annotations
+import asyncio
+
 
 from types import SimpleNamespace
 from uuid import uuid4
@@ -8,6 +10,9 @@ import pytest
 
 from app.api.v1 import coupons as coupons_api
 
+
+def _raise(exc: BaseException):
+    raise exc
 
 class _ScalarResult:
     def __init__(self, value):
@@ -25,7 +30,8 @@ class _Session:
         self.bind = bind
         self.added: list[object] = []
 
-    def get(self, model, _id):
+    async def get(self, model, _id):
+        await asyncio.sleep(0)
         if model is coupons_api.Coupon:
             return self._coupon
         if model is coupons_api.Promotion:
@@ -34,13 +40,16 @@ class _Session:
             return self._job
         return None
 
-    def execute(self, _stmt):
+    async def execute(self, _stmt):
+        await asyncio.sleep(0)
         return _ScalarResult(0)
 
-    def commit(self):
+    async def commit(self):
+        await asyncio.sleep(0)
         return None
 
-    def refresh(self, obj, attribute_names=None):
+    async def refresh(self, obj, attribute_names=None):
+        await asyncio.sleep(0)
         return obj
 
     def add(self, obj):
@@ -68,7 +77,8 @@ async def test_coupon_admin_not_found_and_generate_code_response(monkeypatch: py
         await coupons_api.admin_create_coupon(payload_create, missing, object())
     assert create_err.value.status_code == status.HTTP_404_NOT_FOUND
 
-    def _gen_code(*_args, **_kwargs):
+    async def _gen_code(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return 'SAVE-WAVE2'
 
     monkeypatch.setattr(coupons_api.coupons_service, 'generate_unique_coupon_code', _gen_code)
@@ -116,7 +126,7 @@ async def test_coupon_segment_preview_and_start_not_found_and_bad_bucket(monkeyp
     assert start_revoke_missing.value.status_code == status.HTTP_404_NOT_FOUND
 
     existing = _Session(coupon=SimpleNamespace(id=uuid4()), bind=object())
-    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_kwargs: (_ for _ in ()).throw(ValueError('bad-bucket')))
+    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_kwargs: _raise(ValueError('bad-bucket')))
 
     with pytest.raises(HTTPException) as preview_assign_bad:
         await coupons_api.admin_preview_segment_assign(uuid4(), assign_payload, existing, object())
@@ -140,13 +150,16 @@ async def test_coupon_assign_revoke_noop_and_bulk_enqueue_guards(monkeypatch: py
     coupon = SimpleNamespace(id=uuid4(), promotion=SimpleNamespace(name='Promo', description='Desc'), code='SAVE10')
     user = SimpleNamespace(id=uuid4(), email='user@example.test', notify_marketing=True, preferred_language='en')
 
-    def _coupon(_session, *, coupon_id):
+    async def _coupon(_session, *, coupon_id):
+        await asyncio.sleep(0)
         return coupon
 
-    def _user_find(_session, *, user_id, email):
+    async def _user_find(_session, *, user_id, email):
+        await asyncio.sleep(0)
         return user
 
-    def _assignment(_session, *, coupon_id, user_id):
+    async def _assignment(_session, *, coupon_id, user_id):
+        await asyncio.sleep(0)
         return SimpleNamespace(revoked_reason='cleanup')
 
     monkeypatch.setattr(coupons_api, '_get_coupon_with_promotion_or_404', _coupon)

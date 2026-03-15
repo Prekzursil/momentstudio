@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ class _ScalarSession:
         self._values = list(values)
 
     async def scalar(self, _stmt: object) -> object | None:
+        await asyncio.sleep(0)
         if not self._values:
             return None
         return self._values.pop(0)
@@ -44,6 +46,7 @@ async def test_content_resolve_redirect_key_chain_loop_and_empty_paths() -> None
 @pytest.mark.anyio
 async def test_content_resolve_available_page_key_validation_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _fake_resolve(_session: object, _new_key: str) -> str:
+        await asyncio.sleep(0)
         return 'page.other'
 
     monkeypatch.setattr(content_service, 'resolve_redirect_key', _fake_resolve)

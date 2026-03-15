@@ -8,6 +8,7 @@ from typing import Dict
 from urllib.parse import urlparse
 from uuid import uuid4
 
+
 import pytest
 from fastapi import HTTPException, UploadFile
 from fastapi.testclient import TestClient
@@ -30,10 +31,13 @@ from app.core import security
 from app.core.config import settings
 
 
+def _raise(exc: BaseException):
+    raise exc
+
 @pytest.fixture
 def test_app() -> Dict[str, object]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
-    SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+    session_local = async_sessionmaker(engine, expire_on_commit=False)
 
     async def init_models() -> None:
         async with engine.begin() as conn:
@@ -42,12 +46,12 @@ def test_app() -> Dict[str, object]:
     asyncio.run(init_models())
 
     async def override_get_session():
-        async with SessionLocal() as session:
+        async with session_local() as session:
             yield session
 
     app.dependency_overrides[get_session] = override_get_session
     client = TestClient(app)
-    yield {"client": client, "session_factory": SessionLocal}
+    yield {"client": client, "session_factory": session_local}
     client.close()
     app.dependency_overrides.clear()
 
@@ -90,8 +94,8 @@ def _jpeg_bytes() -> bytes:
 
 def test_content_asset_delete_versions_flag(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal)
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local)
 
     img_resp = client.post(
         "/api/v1/content/admin/home.hero/images",
@@ -134,11 +138,11 @@ def test_content_asset_delete_versions_flag(test_app: Dict[str, object]) -> None
 
 def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal)
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local)
 
     async def create_customer_token() -> str:
-        async with SessionLocal() as session:
+        async with session_local() as session:
             user = await create_user(session, UserCreate(email="user@example.com", password="password123", name="User"))
             user.role = UserRole.customer
             await session.commit()
@@ -549,7 +553,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert loop.status_code == 400
 
     async def seed_loop() -> None:
-        async with SessionLocal() as session:
+        async with session_local() as session:
             session.add(ContentRedirect(from_key="page.loop1", to_key="page.loop2"))
             session.add(ContentRedirect(from_key="page.loop2", to_key="page.loop1"))
             await session.commit()
@@ -568,7 +572,7 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert any("/pages/new" in url for url in by_lang["en"])
 
     async def seed_product() -> None:
-        async with SessionLocal() as session:
+        async with session_local() as session:
             cat = Category(slug="mugs", name="Mugs")
             session.add(cat)
             await session.flush()
@@ -694,8 +698,8 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
 def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object], tmp_path: Path) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal)
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local)
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
 
     instagram_html = (
@@ -711,6 +715,7 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
     image_bytes = _jpeg_bytes()
 
     async def handler(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(0)
         host = (request.url.host or "").lower().rstrip(".")
         if host in {"scontent.cdninstagram.com", "scontent.fbcdn.net"}:
             return httpx.Response(200, content=image_bytes, headers={"content-type": "image/jpeg"}, request=request)
@@ -731,6 +736,7 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
             )
 
         async def __aenter__(self):
+            await asyncio.sleep(0)
             return self._client
 
         async def __aexit__(self, exc_type, exc, tb):
@@ -773,8 +779,8 @@ def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
     test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal)
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local)
 
     stale_remote = "https://scontent.cdninstagram.com/v/t51.2885-19/stale.jpg?oe=696AF278"
     create = client.post(
@@ -807,6 +813,7 @@ def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
         force_refresh: bool = False,
         allow_remote_fallback: bool = True,
     ) -> str | None:
+        await asyncio.sleep(0)
         parsed = urlparse(url)
         host = (parsed.hostname or "").lower().rstrip(".")
         assert host == "www.instagram.com"
@@ -829,8 +836,8 @@ def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
 
 def test_legal_pages_require_bilingual_before_publish(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal)
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local)
 
     create = client.post(
         "/api/v1/content/admin/page.terms",
@@ -871,15 +878,15 @@ def test_legal_pages_require_bilingual_before_publish(test_app: Dict[str, object
     assert "EN and RO" in str(clear_ro.json().get("detail"))
 
 
-
 def test_content_media_admin_error_branches_and_preview_signatures(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal)
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local)
     headers = auth_headers(admin_token)
     asset_id = uuid4()
 
     async def _missing_asset(_session, _asset_id):
+        await asyncio.sleep(0)
         raise ValueError('missing')
 
     monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _missing_asset)
@@ -907,6 +914,7 @@ def test_content_media_admin_error_branches_and_preview_signatures(monkeypatch: 
     assert preview_missing.status_code == 404, preview_missing.text
 
     async def _asset(_session, _asset_id):
+        await asyncio.sleep(0)
         return type('Asset', (), {'id': asset_id})()
 
     monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _asset)
@@ -934,11 +942,12 @@ def test_content_media_admin_error_branches_and_preview_signatures(monkeypatch: 
 
 def test_content_retry_policy_value_error_branches(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_admin_token(SessionLocal)
+    session_local = test_app["session_factory"]  # type: ignore[assignment]
+    admin_token = create_admin_token(session_local)
     headers = auth_headers(admin_token)
 
     async def _raise_value_error(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise ValueError('unsupported')
 
     monkeypatch.setattr('app.services.media_dam.rollback_retry_policy', _raise_value_error)
@@ -1058,13 +1067,13 @@ async def test_content_api_direct_media_update_reject_preview_edit_branches(monk
 
     monkeypatch.setattr('app.services.media_dam.get_asset_or_404', _existing_asset)
     monkeypatch.setattr('app.services.media_dam.verify_preview_signature', lambda *_args, **_kwargs: True)
-    monkeypatch.setattr('app.services.media_dam.resolve_asset_preview_path', lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError('bad-variant')))
+    monkeypatch.setattr('app.services.media_dam.resolve_asset_preview_path', lambda *_args, **_kwargs: _raise(ValueError('bad-variant')))
 
     with pytest.raises(HTTPException) as variant_err:
         await content_api.admin_media_asset_preview(asset_id=asset_id, exp=2_000_000_000, sig='x' * 16, variant_profile='bad', session=session)
     assert variant_err.value.status_code == 404
 
-    monkeypatch.setattr('app.services.media_dam.resolve_asset_preview_path', lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError('missing')))
+    monkeypatch.setattr('app.services.media_dam.resolve_asset_preview_path', lambda *_args, **_kwargs: _raise(FileNotFoundError('missing')))
 
     with pytest.raises(HTTPException) as missing_file_err:
         await content_api.admin_media_asset_preview(asset_id=asset_id, exp=2_000_000_000, sig='y' * 16, variant_profile=None, session=session)

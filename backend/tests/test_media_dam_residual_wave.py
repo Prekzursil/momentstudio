@@ -7,12 +7,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
+
 import pytest
 from PIL import Image
 
 from app.models.media import MediaAssetStatus, MediaAssetType, MediaJobStatus, MediaJobType, MediaVisibility
 from app.services import media_dam
 
+
+def _raise(exc: BaseException):
+    raise exc
 
 class _ExecResult:
     def __init__(self, rows):
@@ -77,7 +81,8 @@ class _AsyncRedisScan:
     def __init__(self, keys: list[str]):
         self._keys = list(keys)
 
-    def scan_iter(self, *, match: str):
+    async def scan_iter(self, *, match: str):
+        await asyncio.sleep(0)
         assert match.startswith('media:')
         for key in self._keys:
             yield key
@@ -127,10 +132,12 @@ async def test_replace_asset_i18n_and_apply_asset_update_paths(monkeypatch: pyte
 
     calls = {'tags': 0, 'i18n': 0, 'asset_move': 0, 'variant_move': 0}
 
-    def _fake_replace_tags(_session, _asset, _tags):
+    async def _fake_replace_tags(_session, _asset, _tags):
+        await asyncio.sleep(0)
         calls['tags'] += 1
 
-    def _fake_replace_i18n(_session, _asset, _i18n):
+    async def _fake_replace_i18n(_session, _asset, _i18n):
+        await asyncio.sleep(0)
         calls['i18n'] += 1
 
     monkeypatch.setattr(media_dam, '_replace_asset_tags', _fake_replace_tags)
@@ -177,7 +184,8 @@ async def test_collect_workers_and_get_telemetry_exception_branch(monkeypatch: p
 
     monkeypatch.setattr(media_dam, '_heartbeat_scan_limit', lambda: 2)
 
-    def _consume(_redis, *, key, now):
+    async def _consume(_redis, *, key, now):
+        await asyncio.sleep(0)
         return SimpleNamespace(worker_id=str(key), last_seen_at=now)
 
     monkeypatch.setattr(media_dam, '_consume_heartbeat', _consume)
@@ -191,10 +199,12 @@ async def test_collect_workers_and_get_telemetry_exception_branch(monkeypatch: p
 
     monkeypatch.setattr(media_dam, 'get_redis', lambda: _RedisQueue())
 
-    def _raise_collect(_redis, *, prefix: str, now: datetime):
+    async def _raise_collect(_redis, *, prefix: str, now: datetime):
+        await asyncio.sleep(0)
         raise RuntimeError('scan-failed')
 
-    def _counters(_session, *, now: datetime):
+    async def _counters(_session, *, now: datetime):
+        await asyncio.sleep(0)
         return (1, 2, 3, 4, 5, {'queued': 2}, {'ingest': 1}, 33)
 
     monkeypatch.setattr(media_dam, '_collect_telemetry_workers', _raise_collect)
@@ -224,7 +234,7 @@ async def test_restore_and_purge_paths(monkeypatch: pytest.MonkeyPatch) -> None:
         variants=[]
     )
 
-    monkeypatch.setattr(media_dam, '_asset_file_path', lambda _asset: (_ for _ in ()).throw(RuntimeError('move error')))
+    monkeypatch.setattr(media_dam, '_asset_file_path', lambda _asset: _raise(RuntimeError('move error')))
     moved = {'variant': 0}
     monkeypatch.setattr(media_dam, '_move_variant_file_roots', lambda *_a, **_k: moved.__setitem__('variant', moved['variant'] + 1))
 
@@ -235,7 +245,8 @@ async def test_restore_and_purge_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assets = [SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4())]
     purge_calls: list[object] = []
 
-    def _fake_purge(_session, asset):
+    async def _fake_purge(_session, asset):
+        await asyncio.sleep(0)
         purge_calls.append(asset)
 
     monkeypatch.setattr(media_dam, 'purge_asset', _fake_purge)
@@ -255,7 +266,8 @@ async def test_rebuild_usage_edges_and_processing_helpers(monkeypatch: pytest.Mo
         ('content_block', 'page.about', '1', 'auto_scan', None),
     ]
 
-    def _fake_collect(_session, _asset):
+    async def _fake_collect(_session, _asset):
+        await asyncio.sleep(0)
         return refs
 
     monkeypatch.setattr(media_dam, '_collect_usage_refs', _fake_collect)
@@ -317,7 +329,8 @@ async def test_media_job_specialized_branches(monkeypatch: pytest.MonkeyPatch) -
     ai_session = _SessionStub(scalar_values=[tagged_asset])
     captured_tags: list[str] = []
 
-    def _fake_replace_tags(_session, _asset, tags):
+    async def _fake_replace_tags(_session, _asset, tags):
+        await asyncio.sleep(0)
         captured_tags[:] = list(tags)
 
     monkeypatch.setattr(media_dam, '_replace_asset_tags', _fake_replace_tags)
@@ -338,7 +351,8 @@ async def test_media_job_specialized_branches(monkeypatch: pytest.MonkeyPatch) -
 
     assets = [SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4())]
 
-    def _no_commit(_session, _asset, *, commit):
+    async def _no_commit(_session, _asset, *, commit):
+        await asyncio.sleep(0)
         assert commit is False
 
     monkeypatch.setattr(media_dam, 'rebuild_usage_edges', _no_commit)
@@ -393,10 +407,12 @@ async def test_retryability_bulk_retry_collection_and_public_asset_paths(monkeyp
     events: list[str] = []
     queued: list[str] = []
 
-    def _record_event(_session, *, job, actor_user_id, action, meta):
+    async def _record_event(_session, *, job, actor_user_id, action, meta):
+        await asyncio.sleep(0)
         events.append(f'{action}:{job.id}')
 
-    def _queue_job(job_id):
+    async def _queue_job(job_id):
+        await asyncio.sleep(0)
         queued.append(str(job_id))
 
     monkeypatch.setattr(media_dam, '_record_job_event', _record_event)
@@ -446,12 +462,14 @@ async def test_rollback_retry_policy_creates_row_and_returns_updated_read(monkey
     monkeypatch.setattr(media_dam, '_parse_job_type', lambda _value: parsed)
     monkeypatch.setattr(media_dam, '_policy_row_to_resolved', lambda _row, *, job_type: before if _row is None else target)
 
-    def _resolve(_session, *, parsed_job_type, payload):
+    async def _resolve(_session, *, parsed_job_type, payload):
+        await asyncio.sleep(0)
         return target, 'known_good'
 
     events: list[str] = []
 
-    def _record(_session, **kwargs):
+    async def _record(_session, **kwargs):
+        await asyncio.sleep(0)
         events.append(kwargs['action'])
 
     monkeypatch.setattr(media_dam, '_resolve_rollback_target_policy', _resolve)
@@ -508,7 +526,8 @@ async def test_duplicate_scan_and_usage_reconcile_progress(monkeypatch: pytest.M
     reconcile_session = _SessionStub(execute_values=[reconcile_assets])
     calls: list[object] = []
 
-    def _fake_rebuild(_session, asset, commit: bool):
+    async def _fake_rebuild(_session, asset, commit: bool):
+        await asyncio.sleep(0)
         assert commit is False
         calls.append(asset.id)
 
@@ -555,12 +574,14 @@ async def test_bulk_retry_jobs_filters_records_and_refreshes(monkeypatch: pytest
     )
     session = _SessionStub(execute_values=[[retryable, skipped]])
 
-    def _record(*_args, **_kwargs):
+    async def _record(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     queued: list[object] = []
 
-    def _queue(job_id):
+    async def _queue(job_id):
+        await asyncio.sleep(0)
         queued.append(job_id)
 
     monkeypatch.setattr(media_dam, '_record_job_event', _record)
@@ -618,7 +639,8 @@ async def test_collection_upsert_and_public_asset_guard_paths() -> None:
         def __init__(self, rows):
             self._rows = list(rows)
 
-        def scalar(self, _stmt):
+        async def scalar(self, _stmt):
+            await asyncio.sleep(0)
             return self._rows.pop(0) if self._rows else None
 
     session = _EnsureSession([

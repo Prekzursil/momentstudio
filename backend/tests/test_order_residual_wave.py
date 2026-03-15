@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -22,9 +23,11 @@ class _SessionStub:
         self.added.append(value)
 
     async def delete(self, value: object) -> None:
+        await asyncio.sleep(0)
         self.deleted.append(value)
 
     async def flush(self) -> None:
+        await asyncio.sleep(0)
         self.flush_calls += 1
 
 
@@ -166,6 +169,7 @@ async def test_address_snapshot_rerate_and_cancel_reason_paths(monkeypatch: pyte
     monkeypatch.setattr(order_service, '_has_payment_captured', lambda _order: False)
 
     async def _rerate(_session, _order):
+        await asyncio.sleep(0)
         return {'shipping': {'from': '10', 'to': '12'}}
 
     monkeypatch.setattr(order_service, '_rerate_order_shipping', _rerate)
@@ -216,6 +220,7 @@ async def test_apply_tag_rename_rows_and_update_shipment_not_found() -> None:
 
     class _SessionGetNone:
         async def get(self, *_args, **_kwargs):
+            await asyncio.sleep(0)
             return None
 
     class _Payload:

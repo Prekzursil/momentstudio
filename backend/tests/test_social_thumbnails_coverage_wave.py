@@ -19,15 +19,18 @@ class _ResponseStub:
         self.headers = headers or {}
 
     async def __aenter__(self):
+        await asyncio.sleep(0)
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.sleep(0)
         return False
 
     def raise_for_status(self) -> None:
         return None
 
     async def aiter_bytes(self):
+        await asyncio.sleep(0)
         if self._html:
             yield self._html.encode('utf-8')
 
@@ -38,9 +41,11 @@ class _ClientStub:
         self._get_response = get_response
 
     async def __aenter__(self):
+        await asyncio.sleep(0)
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.sleep(0)
         return False
 
     def stream(self, _method: str, _url: str):
@@ -49,6 +54,7 @@ class _ClientStub:
         return self._stream_response
 
     async def get(self, _url: str):
+        await asyncio.sleep(0)
         if self._get_response is None:
             raise RuntimeError('missing get response')
         return self._get_response
@@ -238,9 +244,11 @@ def test_refreshed_social_thumbnail_handles_httpx_errors(monkeypatch: pytest.Mon
     assert asyncio.run(social._refreshed_social_thumbnail('https://facebook.com/p')) == '/media/social/ok.jpg'
 
     async def _raise_value(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise ValueError('bad')
 
     async def _raise_http(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise httpx.HTTPError('http fail')
 
     monkeypatch.setattr(social, 'fetch_social_thumbnail_url', _raise_value)

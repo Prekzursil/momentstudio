@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -137,9 +138,11 @@ class _SessionForSnapshot:
         self.added.append(obj)
 
     async def refresh(self, obj: object, attribute_names=None) -> None:
+        await asyncio.sleep(0)
         self.refreshed.append((obj, attribute_names))
 
     async def delete(self, obj: object) -> None:
+        await asyncio.sleep(0)
         self.deleted.append(obj)
 
 

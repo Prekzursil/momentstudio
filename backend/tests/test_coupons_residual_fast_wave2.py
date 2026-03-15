@@ -4,11 +4,15 @@ import asyncio
 from types import SimpleNamespace
 from uuid import uuid4
 
+
 import pytest
 from fastapi import BackgroundTasks, HTTPException, status
 
 from app.api.v1 import coupons as coupons_api
 
+
+def _raise(exc: BaseException):
+    raise exc
 
 class _ScalarResult:
     def __init__(self, value):
@@ -26,6 +30,7 @@ class _Session:
         self.added: list[object] = []
 
     async def get(self, model, _id):
+        await asyncio.sleep(0)
         if model is coupons_api.Coupon:
             return self._coupon
         if model is coupons_api.Promotion:
@@ -214,9 +219,11 @@ async def test_preview_and_start_segment_jobs_validation_and_engine_guard(monkey
 async def test_run_bulk_segment_job_non_runnable_and_failure_path(monkeypatch: pytest.MonkeyPatch) -> None:
     class _SessionCtx:
         async def __aenter__(self):
+            await asyncio.sleep(0)
             return _Session(coupon=SimpleNamespace(id=uuid4()), bind=object())
 
         async def __aexit__(self, exc_type, exc, tb):
+            await asyncio.sleep(0)
             return False
 
     monkeypatch.setattr(coupons_api, 'async_sessionmaker', lambda *args, **kwargs: (lambda: _SessionCtx()))
@@ -315,7 +322,7 @@ async def test_admin_retry_bulk_job_branch_matrix(monkeypatch: pytest.MonkeyPatc
     assert in_progress.value.status_code == status.HTTP_400_BAD_REQUEST
 
     base_job.status = coupons_api.CouponBulkJobStatus.failed
-    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_kwargs: (_ for _ in ()).throw(ValueError('bad-bucket')))
+    monkeypatch.setattr(coupons_api, '_parse_bucket_config', lambda **_kwargs: _raise(ValueError('bad-bucket')))
     with pytest.raises(HTTPException) as bad_bucket:
         await coupons_api.admin_retry_bulk_job(base_job.id, BackgroundTasks(), _RetrySession(job=base_job), SimpleNamespace(id=uuid4()))
     assert bad_bucket.value.status_code == status.HTTP_400_BAD_REQUEST

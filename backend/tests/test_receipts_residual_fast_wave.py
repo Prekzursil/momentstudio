@@ -5,11 +5,15 @@ from decimal import Decimal
 from types import SimpleNamespace
 from uuid import uuid4
 
+
 import pytest
 from PIL import Image, ImageDraw, ImageFont
 
 from app.services import receipts
 
+
+def _raise(exc: BaseException):
+    raise exc
 
 def _sample_receipt(**overrides):
     base = {
@@ -177,7 +181,7 @@ def test_receipts_mask_email_and_fallback_render_path(monkeypatch: pytest.Monkey
     assert receipts._mask_email('broken@') == '••••••'
 
     called = {'fallback': False}
-    monkeypatch.setattr(receipts, '_render_order_receipt_pdf_reportlab', lambda *_a, **_k: (_ for _ in ()).throw(RuntimeError('boom')))
+    monkeypatch.setattr(receipts, '_render_order_receipt_pdf_reportlab', lambda *_a, **_k: _raise(RuntimeError('boom')))
     monkeypatch.setattr(receipts, 'render_order_receipt_pdf_raster', lambda *_a, **_k: called.__setitem__('fallback', True) or b'pdf')
 
     order = SimpleNamespace(created_at=datetime.now(timezone.utc), items=[], currency='RON')

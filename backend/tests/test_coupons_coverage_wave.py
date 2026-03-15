@@ -1508,10 +1508,12 @@ async def test_coupon_api_bulk_job_finish_and_notification_branches(monkeypatch:
     calls: list[tuple[str, int]] = []
 
     async def _send_assign(*, notify, context):
+        await asyncio.sleep(0)
         del context
         calls.append(('assign', len(notify)))
 
     async def _send_revoke(*, notify, context, revoke_reason):
+        await asyncio.sleep(0)
         del context, revoke_reason
         calls.append(('revoke', len(notify)))
 

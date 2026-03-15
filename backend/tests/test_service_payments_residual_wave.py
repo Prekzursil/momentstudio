@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
+
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -11,6 +12,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.services import payments as payments_service
 
+
+def _raise(exc: BaseException):
+    raise exc
 
 class _ExecuteResult:
     def __init__(self, value=None) -> None:
@@ -27,19 +31,23 @@ class _SessionStub:
         self.commits = 0
         self.rollbacks = 0
 
-    def execute(self, _stmt):
+    async def execute(self, _stmt):
+        await asyncio.sleep(0)
         return _ExecuteResult(self._execute_values.pop(0) if self._execute_values else None)
 
     def add(self, obj):
         self.added.append(obj)
 
-    def commit(self):
+    async def commit(self):
+        await asyncio.sleep(0)
         self.commits += 1
 
-    def rollback(self):
+    async def rollback(self):
+        await asyncio.sleep(0)
         self.rollbacks += 1
 
-    def refresh(self, _obj):
+    async def refresh(self, _obj):
+        await asyncio.sleep(0)
         return None
 
 
@@ -60,19 +68,22 @@ async def test_get_or_create_coupon_mapping_branches(monkeypatch: pytest.MonkeyP
 
     promo = SimpleNamespace(id='promo-1', currency='RON')
 
-    def _promo_and_currency(_session, *, promo_code: str, currency: str):
+    async def _promo_and_currency(_session, *, promo_code: str, currency: str):
+        await asyncio.sleep(0)
         assert promo_code == 'SPRING'
         assert currency == 'RON'
         return promo, 'RON'
 
     monkeypatch.setattr(payments_service, '_promo_and_currency', _promo_and_currency)
-    def _load_none(*_args, **_kwargs):
+    async def _load_none(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(payments_service, '_load_existing_coupon_mapping', _load_none)
     monkeypatch.setattr(payments_service, '_create_stripe_discount_coupon_id', lambda **_k: 'coupon_123')
 
-    def _persist(_session, **_kwargs):
+    async def _persist(_session, **_kwargs):
+        await asyncio.sleep(0)
         return 'coupon_saved'
 
     monkeypatch.setattr(payments_service, '_persist_coupon_mapping', _persist)
@@ -90,7 +101,8 @@ async def test_get_or_create_coupon_mapping_branches(monkeypatch: pytest.MonkeyP
 async def test_discounts_param_fallback_coupon_creation(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub()
 
-    def _cached_none(*_args, **_kwargs):
+    async def _cached_none(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(payments_service, '_get_or_create_cached_amount_off_coupon', _cached_none)
@@ -122,7 +134,8 @@ async def test_create_checkout_session_matrix(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(payments_service, 'is_stripe_configured', lambda: True)
     monkeypatch.setattr(payments_service, 'init_stripe', lambda: None)
 
-    def _discounts_none(**_kwargs):
+    async def _discounts_none(**_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(payments_service, '_discounts_param', _discounts_none)
@@ -187,10 +200,11 @@ async def test_capture_void_refund_and_mapping_integrity_recovery(monkeypatch: p
 
     session = _SessionStub(execute_values=[SimpleNamespace(stripe_coupon_id='recovered_coupon')])
 
-    def _commit_fail_once():
+    async def _commit_fail_once():
+        await asyncio.sleep(0)
         if session.commits == 0:
             session.commits += 1
-            raise IntegrityError('insert', params={}, orig=Exception('dup'))
+            raise IntegrityError('insert', params={}, orig=ValueError('dup'))
         session.commits += 1
 
     session.commit = _commit_fail_once
@@ -204,7 +218,6 @@ async def test_capture_void_refund_and_mapping_integrity_recovery(monkeypatch: p
     )
     assert recovered == 'recovered_coupon'
     assert session.rollbacks == 1
-
 
 
 def test_stripe_webhook_secret_env_selection(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -223,10 +236,11 @@ def test_stripe_webhook_secret_env_selection(monkeypatch: pytest.MonkeyPatch) ->
 async def test_coupon_mapping_and_coupon_generation_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub(execute_values=[None])
 
-    def _commit_fail_once_no_recovery():
+    async def _commit_fail_once_no_recovery():
+        await asyncio.sleep(0)
         if session.commits == 0:
             session.commits += 1
-            raise IntegrityError('insert', params={}, orig=Exception('dup'))
+            raise IntegrityError('insert', params={}, orig=ValueError('dup'))
         session.commits += 1
 
     session.commit = _commit_fail_once_no_recovery
@@ -239,7 +253,7 @@ async def test_coupon_mapping_and_coupon_generation_error_paths(monkeypatch: pyt
     )
     assert coupon_id == 'coupon_fallback'
 
-    monkeypatch.setattr(payments_service.stripe, 'Coupon', SimpleNamespace(create=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError('boom'))))
+    monkeypatch.setattr(payments_service.stripe, 'Coupon', SimpleNamespace(create=lambda **_kwargs: _raise(RuntimeError('boom'))))
     assert payments_service._create_stripe_discount_coupon_id(
         promo_code='PROMO',
         discount_cents=100,
@@ -251,7 +265,8 @@ async def test_coupon_mapping_and_coupon_generation_error_paths(monkeypatch: pyt
 async def test_get_or_create_coupon_short_circuit_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub()
 
-    def _promo_and_currency(_session, *, promo_code: str, currency: str):
+    async def _promo_and_currency(_session, *, promo_code: str, currency: str):
+        await asyncio.sleep(0)
         return SimpleNamespace(id='promo-1', currency=''), 'RON'
 
     monkeypatch.setattr(payments_service, '_promo_and_currency', _promo_and_currency)
@@ -302,7 +317,7 @@ async def test_promo_and_currency_and_payment_intent_error_paths(monkeypatch: py
     monkeypatch.setattr(
         payments_service.stripe,
         'PaymentIntent',
-        SimpleNamespace(create=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError('intent-fail'))),
+        SimpleNamespace(create=lambda **_kwargs: _raise(RuntimeError('intent-fail'))),
     )
     cart = SimpleNamespace(id='c-1', user_id='u-1', items=[SimpleNamespace(unit_price_at_add=Decimal('5.00'), quantity=2)])
     with pytest.raises(HTTPException, match='intent-fail'):
@@ -349,7 +364,8 @@ async def test_discounts_and_checkout_session_missing_url(monkeypatch: pytest.Mo
 
     assert await payments_service._discounts_param(session=session, discount_value=0, promo_code=None) is None
 
-    def _cached_coupon(*_args, **_kwargs):
+    async def _cached_coupon(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(payments_service, '_get_or_create_cached_amount_off_coupon', _cached_coupon)
@@ -360,7 +376,8 @@ async def test_discounts_and_checkout_session_missing_url(monkeypatch: pytest.Mo
     monkeypatch.setattr(payments_service, 'is_stripe_configured', lambda: True)
     monkeypatch.setattr(payments_service, 'init_stripe', lambda: None)
 
-    def _discounts_ok(**_kwargs):
+    async def _discounts_ok(**_kwargs):
+        await asyncio.sleep(0)
         return [{'coupon': 'cp_1'}]
 
     monkeypatch.setattr(payments_service, '_discounts_param', _discounts_ok)
@@ -395,14 +412,14 @@ async def test_capture_void_refund_not_configured_and_gateway_errors(monkeypatch
         payments_service.stripe,
         'PaymentIntent',
         SimpleNamespace(
-            capture=lambda _id: (_ for _ in ()).throw(RuntimeError('cap-fail')),
-            cancel=lambda _id: (_ for _ in ()).throw(RuntimeError('void-fail')),
+            capture=lambda _id: _raise(RuntimeError('cap-fail')),
+            cancel=lambda _id: _raise(RuntimeError('void-fail')),
         ),
     )
     monkeypatch.setattr(
         payments_service.stripe,
         'Refund',
-        SimpleNamespace(create=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError('refund-fail'))),
+        SimpleNamespace(create=lambda **_kwargs: _raise(RuntimeError('refund-fail'))),
     )
 
     with pytest.raises(HTTPException, match='cap-fail'):
