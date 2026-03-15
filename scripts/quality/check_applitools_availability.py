@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import os
-import sys
-import urllib.error
-import urllib.request
+from http.client import HTTPConnection, HTTPSConnection, HTTPException
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 def is_dependabot_origin() -> bool:
@@ -28,15 +27,26 @@ def write_output(name: str, value: str) -> None:
 
 
 def probe(server_url: str, api_key: str) -> str:
-    url = f"{server_url.rstrip('/')}/api/sessions/renderinfo"
-    request = urllib.request.Request(url, headers={"X-Api-Key": api_key})
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return str(response.getcode())
-    except urllib.error.HTTPError as exc:
-        return str(exc.code)
-    except Exception:
+    parsed = urlparse(server_url)
+    scheme = (parsed.scheme or "https").lower()
+    if scheme not in {"http", "https"}:
         return "000"
+
+    host = parsed.netloc or parsed.path
+    if not host:
+        return "000"
+
+    base_path = parsed.path.rstrip("/") if parsed.netloc else ""
+    request_path = f"{base_path}/api/sessions/renderinfo" if base_path else "/api/sessions/renderinfo"
+    connection_cls = HTTPSConnection if scheme == "https" else HTTPConnection
+    connection = connection_cls(host, timeout=20)
+    try:
+        connection.request("GET", request_path, headers={"X-Api-Key": api_key})
+        return str(connection.getresponse().status)
+    except (HTTPException, OSError):
+        return "000"
+    finally:
+        connection.close()
 
 
 def fail(message: str) -> int:
