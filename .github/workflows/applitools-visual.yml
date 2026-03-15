@@ -26,28 +26,58 @@ jobs:
       - name: Upgrade npm
         run: npm i -g npm@11.7.0
 
-      - name: Require Applitools key
+      - name: Detect Applitools availability
+        id: applitools
         env:
           APPLITOOLS_API_KEY: ${{ secrets.APPLITOOLS_API_KEY }}
+          APPLITOOLS_SERVER_URL: ${{ vars.APPLITOOLS_SERVER_URL }}
         run: |
+          set -euo pipefail
+
           if [ -z "${APPLITOOLS_API_KEY:-}" ]; then
+            if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+              echo "available=false" >> "$GITHUB_OUTPUT"
+              echo "Skipping Applitools for Dependabot because APPLITOOLS_API_KEY is unavailable in this context."
+              exit 0
+            fi
+
             echo "APPLITOOLS_API_KEY is not configured for this repository."
             exit 1
           fi
 
+          server_url="${APPLITOOLS_SERVER_URL:-https://eyesapi.applitools.com}"
+          probe_status="$(curl -sS -o /tmp/applitools-renderinfo.json -w "%{http_code}" -H "X-Api-Key: ${APPLITOOLS_API_KEY}" "${server_url%/}/api/sessions/renderinfo" || true)"
+
+          if [ "$probe_status" = "200" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping Applitools for Dependabot because credentials/server validation failed with HTTP ${probe_status}."
+            exit 0
+          fi
+
+          echo "Applitools credentials/server validation failed with HTTP ${probe_status}."
+          exit 1
+
       - name: Install frontend dependencies
+        if: steps.applitools.outputs.available == 'true'
         run: |
           cd frontend
           npm ci
           npx playwright install --with-deps chromium
 
       - name: Build and start compose stack
+        if: steps.applitools.outputs.available == 'true'
         env:
           LOCKERS_USE_OVERPASS_FALLBACK: "0"
           PAYMENTS_PROVIDER: "mock"
         run: docker compose -f infra/docker-compose.yml up -d --build
 
       - name: Wait for frontend/backend
+        if: steps.applitools.outputs.available == 'true'
         run: |
           set -euo pipefail
           for i in $(seq 1 60); do
@@ -65,19 +95,25 @@ jobs:
           curl -fsS http://localhost:4201 >/dev/null
 
       - name: Applitools Eyes snapshot run
+        if: steps.applitools.outputs.available == 'true'
         env:
           APPLITOOLS_API_KEY: ${{ secrets.APPLITOOLS_API_KEY }}
           APPLITOOLS_BATCH_NAME: GitHub-${{ github.workflow }}-${{ github.ref_name }}
+          APPLITOOLS_SERVER_URL: ${{ vars.APPLITOOLS_SERVER_URL }}
           E2E_BASE_URL: http://localhost:4201
         run: |
           set -euo pipefail
           cd frontend
           timeout 20m npm run e2e -- --project=chromium e2e/applitools-core-routes.spec.ts
 
+      - name: Note skipped Applitools run
+        if: steps.applitools.outputs.available != 'true'
+        run: echo "Applitools visual validation was skipped because the credential/server preflight is not usable in this Dependabot context."
+
       - name: Logs (on failure)
-        if: failure()
+        if: failure() && steps.applitools.outputs.available == 'true'
         run: docker compose -f infra/docker-compose.yml logs --no-color --tail=200
 
       - name: Tear down
-        if: always()
+        if: always() && steps.applitools.outputs.available == 'true'
         run: docker compose -f infra/docker-compose.yml down -v
