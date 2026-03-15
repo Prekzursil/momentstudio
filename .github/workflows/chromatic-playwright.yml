@@ -47,10 +47,12 @@ jobs:
         id: chromatic_token
         env:
           CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          GITHUB_ACTOR_NAME: ${{ github.actor }}
+          PULL_REQUEST_AUTHOR: ${{ github.event.pull_request.user.login || '' }}
         run: |
           if [ -n "${CHROMATIC_PROJECT_TOKEN:-}" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+          elif [ "${GITHUB_ACTOR_NAME:-}" = "dependabot[bot]" ] || [ "${PULL_REQUEST_AUTHOR:-}" = "dependabot[bot]" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "Skipping Chromatic Playwright for Dependabot because CHROMATIC_PROJECT_TOKEN is unavailable in this context."
           else
