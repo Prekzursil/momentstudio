@@ -334,6 +334,16 @@ def _value_for_param(param: inspect.Parameter, *, alternate: bool):
     return MagicMock(name=f"auto_{param.name}")
 
 
+def _should_skip_param(param: inspect.Parameter, *, include_optional: bool) -> bool:
+    if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+        return True
+    if param.name in {"self", "cls"}:
+        return True
+    if param.default is not inspect._empty and not include_optional:
+        return True
+    return False
+
+
 def _build_kwargs(func, *, alternate: bool, include_optional: bool) -> dict[str, object]:
     kwargs: dict[str, object] = {}
     try:
@@ -342,25 +352,28 @@ def _build_kwargs(func, *, alternate: bool, include_optional: bool) -> dict[str,
         return kwargs
 
     for param in params:
-        if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-            continue
-        if param.name in {"self", "cls"}:
-            continue
-        if param.default is not inspect._empty and not include_optional:
+        if _should_skip_param(param, include_optional=include_optional):
             continue
         kwargs[param.name] = _value_for_param(param, alternate=alternate)
     return kwargs
 
 
+async def _await_with_timeout(coro) -> None:
+    async with asyncio.timeout(2.0):
+        await coro
+
+
 def _invoke(func, kwargs: dict[str, object]) -> None:
     try:
         if inspect.iscoroutinefunction(func):
-            asyncio.run(asyncio.wait_for(func(**kwargs), timeout=2.0))
+            asyncio.run(_await_with_timeout(func(**kwargs)))
             return
         result = func(**kwargs)
         if inspect.iscoroutine(result):
-            asyncio.run(asyncio.wait_for(result, timeout=2.0))
-    except (Exception, SystemExit) as exc:
+            asyncio.run(_await_with_timeout(result))
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception as exc:
         _ = str(exc)
         return
 
@@ -376,6 +389,8 @@ def _build_instance(cls, *, alternate: bool):
     init = getattr(cls, "__init__", None)
     try:
         return cls()
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except Exception:
         if not callable(init):
             return None
@@ -383,6 +398,8 @@ def _build_instance(cls, *, alternate: bool):
     kwargs = _build_kwargs(init, alternate=alternate, include_optional=True)
     try:
         return cls(**kwargs)
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except Exception:
         return None
 
@@ -433,6 +450,7 @@ def _install_fast_network_guards(monkeypatch: pytest.MonkeyPatch) -> None:
         raise RuntimeError('network disabled in hotspot sweep')
 
     async def _raise_async(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise RuntimeError('network disabled in hotspot sweep')
 
     for name in ('request', 'get', 'post', 'put', 'delete', 'patch', 'head', 'options'):
@@ -457,29 +475,36 @@ def _invoke_class_methods(module_name: str, module, *, alternate: bool) -> int:
     return invoked
 
 
+def _invoke_function_variants(func) -> int:
+    variants = ((False, False), (False, True), (True, False), (True, True))
+    for alternate, include_optional in variants:
+        _invoke(func, _build_kwargs(func, alternate=alternate, include_optional=include_optional))
+    return len(variants)
+
+
+def _should_skip_function_target(module_name: str, name: str, func) -> bool:
+    if func.__module__ != module_name:
+        return True
+    if module_name == "app.cli" and name == "main":
+        return True
+    return _is_blocked(name)
+
+
+def _invoke_module_functions(module_name: str, module) -> int:
+    invoked = 0
+    for name, func in inspect.getmembers(module, inspect.isfunction):
+        if _should_skip_function_target(module_name, name, func):
+            continue
+        invoked += _invoke_function_variants(func)
+    return invoked
+
+
 @pytest.mark.parametrize("module_name", MODULES)
 def test_hotspot_reflection_wave_invokes_functions(module_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fast_network_guards(monkeypatch)
     module = importlib.import_module(module_name)
-    invoked = 0
 
-    for name, func in inspect.getmembers(module, inspect.isfunction):
-        if func.__module__ != module_name:
-            continue
-        if module_name == "app.cli" and name == "main":
-            continue
-        if _is_blocked(name):
-            continue
-
-        _invoke(func, _build_kwargs(func, alternate=False, include_optional=False))
-        invoked += 1
-        _invoke(func, _build_kwargs(func, alternate=False, include_optional=True))
-        invoked += 1
-        _invoke(func, _build_kwargs(func, alternate=True, include_optional=False))
-        invoked += 1
-        _invoke(func, _build_kwargs(func, alternate=True, include_optional=True))
-        invoked += 1
-
+    invoked = _invoke_module_functions(module_name, module)
     invoked += _invoke_class_methods(module_name, module, alternate=False)
     invoked += _invoke_class_methods(module_name, module, alternate=True)
 

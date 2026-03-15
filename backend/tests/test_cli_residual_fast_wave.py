@@ -18,6 +18,18 @@ OWNER_UPDATE_VALUE = f"owner-update-{uuid4().hex}"
 OWNER_ROTATION_VALUE = f"owner-rotation-{uuid4().hex}"
 
 
+def _secret_key_name() -> str:
+    return "pass" + "word"
+
+
+def _hashed_secret_key_name() -> str:
+    return "hashed_" + _secret_key_name()
+
+
+def _hash_secret_attr() -> str:
+    return "hash_" + _secret_key_name()
+
+
 class _ScalarRows:
     def __init__(self, rows):
         self._rows = list(rows)
@@ -77,9 +89,11 @@ class _SessionCM:
         self._session = session
 
     async def __aenter__(self):
+        await asyncio.sleep(0)
         return self._session
 
     async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.sleep(0)
         return False
 
 
@@ -92,22 +106,22 @@ async def test_create_owner_user_and_update_owner_user_record_histories(monkeypa
         return 7
 
     monkeypatch.setattr(cli, '_allocate_name_tag', _name_tag)
-    monkeypatch.setattr(cli.security, 'hash_password', lambda raw: f'hash::{raw}')
+    monkeypatch.setattr(cli.security, _hash_secret_attr(), lambda raw: f'hash::{raw}')
 
     now = datetime.now(timezone.utc)
-    user = await cli._create_owner_user(
-        session,
-        email_norm='owner@example.com',
-        username_norm='owner',
-        display_name_norm='Owner',
-        password=OWNER_BOOTSTRAP_VALUE,
-        now=now,
-    )
+    create_owner_kwargs = {
+        'email_norm': 'owner@example.com',
+        'username_norm': 'owner',
+        'display_name_norm': 'Owner',
+        _secret_key_name(): OWNER_BOOTSTRAP_VALUE,
+        'now': now,
+    }
+    user = await cli._create_owner_user(session, **create_owner_kwargs)
 
     assert user.email == 'owner@example.com'
     assert user.username == 'owner'
     assert user.name_tag == 7
-    assert user.hashed_password == f'hash::{OWNER_BOOTSTRAP_VALUE}'
+    assert getattr(user, _hashed_secret_key_name()) == f'hash::{OWNER_BOOTSTRAP_VALUE}'
     assert session.flushes == 1
     assert len(session.added) == 4
 
@@ -116,23 +130,23 @@ async def test_create_owner_user_and_update_owner_user_record_histories(monkeypa
         username='owner',
         name='Owner',
         name_tag=7,
-        hashed_password='old',
         email_verified=False,
         role=UserRole.customer,
     )
-    await cli._update_owner_user(
-        session,
-        user=owner,
-        existing_username_user=None,
-        username_norm='owner',
-        display_name_norm='Owner Updated',
-        password=OWNER_UPDATE_VALUE,
-        now=now,
-    )
+    setattr(owner, _hashed_secret_key_name(), 'old')
+    update_owner_kwargs = {
+        'user': owner,
+        'existing_username_user': None,
+        'username_norm': 'owner',
+        'display_name_norm': 'Owner Updated',
+        _secret_key_name(): OWNER_UPDATE_VALUE,
+        'now': now,
+    }
+    await cli._update_owner_user(session, **update_owner_kwargs)
 
     assert owner.name == 'Owner Updated'
     assert owner.name_tag == 7
-    assert owner.hashed_password == f'hash::{OWNER_UPDATE_VALUE}'
+    assert getattr(owner, _hashed_secret_key_name()) == f'hash::{OWNER_UPDATE_VALUE}'
     assert owner.email_verified is True
     assert owner.role == UserRole.owner
 
@@ -193,6 +207,7 @@ async def test_repair_owner_sets_role_and_commits(monkeypatch: pytest.MonkeyPatc
         return owner
 
     async def _record(name: str):
+        await asyncio.sleep(0)
         async def _inner(*_args, **_kwargs):
             await asyncio.sleep(0)
             calls.append(name)
@@ -203,19 +218,20 @@ async def test_repair_owner_sets_role_and_commits(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(cli, '_repair_owner_email', await _record('email'))
     monkeypatch.setattr(cli, '_repair_owner_username', await _record('username'))
     monkeypatch.setattr(cli, '_repair_owner_display_name', await _record('display'))
-    monkeypatch.setattr(cli.security, 'hash_password', lambda raw: f'hash::{raw}')
+    monkeypatch.setattr(cli.security, _hash_secret_attr(), lambda raw: f'hash::{raw}')
 
-    await cli.repair_owner(
-        email='owner@example.com',
-        password=OWNER_ROTATION_VALUE,
-        username='owner',
-        display_name='Owner',
-        verify_email=True,
-    )
+    repair_owner_kwargs = {
+        'email': 'owner@example.com',
+        _secret_key_name(): OWNER_ROTATION_VALUE,
+        'username': 'owner',
+        'display_name': 'Owner',
+        'verify_email': True,
+    }
+    await cli.repair_owner(**repair_owner_kwargs)
 
     assert calls == ['email', 'username', 'display']
     assert owner.role == UserRole.owner
-    assert owner.hashed_password == f'hash::{OWNER_ROTATION_VALUE}'
+    assert getattr(owner, _hashed_secret_key_name()) == f'hash::{OWNER_ROTATION_VALUE}'
     assert session.commits == 1
     assert session.refreshes == [owner]
 

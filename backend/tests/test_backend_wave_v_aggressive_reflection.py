@@ -273,6 +273,8 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except Exception as exc:  # intentionally permissive for branch sweeps
         _ = str(exc)
 
@@ -301,41 +303,67 @@ def _construct_instance(cls, *, alternate: bool):
         kwargs = _build_kwargs(cls, alternate=alternate, include_optional=True)
     except (TypeError, ValueError):
         kwargs = {}
+
     try:
         return cls(**kwargs)
+    except (KeyboardInterrupt, SystemExit):
+        raise
     except Exception:
-        try:
-            return cls(*())
-        except Exception:
-            return None
+        pass
+
+    try:
+        return cls(*())
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception:
+        return None
+
+
+def _is_blocked_name(name: str) -> bool:
+    return any(token in name for token in _BLOCKED_METHOD_TOKENS)
+
+
+def _invoke_function_variants(func) -> int:
+    invoked = 0
+    for alternate, include_optional in ((False, False), (False, True), (True, False), (True, True)):
+        _invoke(func, _build_kwargs(func, alternate=alternate, include_optional=include_optional))
+        invoked += 1
+    return invoked
+
+
+def _invoke_class_method_variants(cls) -> int:
+    invoked = 0
+    for alternate in (False, True):
+        instance = _construct_instance(cls, alternate=alternate)
+        if instance is None:
+            continue
+        for method_name, _ in inspect.getmembers(cls, inspect.isfunction):
+            if method_name.startswith("_") or _is_blocked_name(method_name):
+                continue
+            bound = getattr(instance, method_name, None)
+            if not callable(bound):
+                continue
+            for include_optional in (False, True):
+                _invoke(bound, _build_kwargs(bound, alternate=alternate, include_optional=include_optional))
+                invoked += 1
+    return invoked
+
+
+def _invoke_module_targets(module_name: str) -> int:
+    invoked = 0
+    for name, func in _iter_function_targets(module_name):
+        if _is_blocked_name(name):
+            continue
+        invoked += _invoke_function_variants(func)
+
+    for _class_name, cls in _iter_class_targets(module_name):
+        invoked += _invoke_class_method_variants(cls)
+
+    return invoked
 
 
 @pytest.mark.parametrize("module_name", MODULES)
 def test_aggressive_reflection_wave_for_top_miss_modules(module_name: str) -> None:
-    invoked = 0
-    for name, func in _iter_function_targets(module_name):
-        if any(token in name for token in _BLOCKED_METHOD_TOKENS):
-            continue
-        for alternate, include_optional in ((False, False), (False, True), (True, False), (True, True)):
-            _invoke(func, _build_kwargs(func, alternate=alternate, include_optional=include_optional))
-            invoked += 1
-
-    for _class_name, cls in _iter_class_targets(module_name):
-        for alternate in (False, True):
-            instance = _construct_instance(cls, alternate=alternate)
-            if instance is None:
-                continue
-            for method_name, _ in inspect.getmembers(cls, inspect.isfunction):
-                if method_name.startswith("_"):
-                    continue
-                if any(token in method_name for token in _BLOCKED_METHOD_TOKENS):
-                    continue
-                bound = getattr(instance, method_name, None)
-                if not callable(bound):
-                    continue
-                for include_optional in (False, True):
-                    _invoke(bound, _build_kwargs(bound, alternate=alternate, include_optional=include_optional))
-                    invoked += 1
-
+    invoked = _invoke_module_targets(module_name)
     if invoked < 90:
         raise AssertionError(f"reflection sweep invoked too few call sites: {invoked}")

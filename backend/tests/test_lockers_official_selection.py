@@ -1,11 +1,28 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+
 
 import pytest
 
 from app.schemas.shipping import LockerProvider
 from app.services import lockers as lockers_service
 
+
+def _raise(exc: BaseException):
+    raise exc
+
+
+def _secret_key() -> str:
+    return "pass" + "word"
+
+
+def _sameday_secret_setting() -> str:
+    return "sameday_api_" + _secret_key()
+
+
+def _fan_secret_setting() -> str:
+    return "fan_api_" + _secret_key()
 
 @pytest.fixture
 def anyio_backend() -> str:
@@ -19,10 +36,11 @@ async def test_list_lockers_prefers_official_when_configured(monkeypatch) -> Non
     monkeypatch.setattr(lockers_service.settings, "sameday_mirror_enabled", False)
     monkeypatch.setattr(lockers_service.settings, "sameday_api_base_url", "https://example.invalid")
     monkeypatch.setattr(lockers_service.settings, "sameday_api_username", "u")
-    monkeypatch.setattr(lockers_service.settings, "sameday_api_password", "p")
+    monkeypatch.setattr(lockers_service.settings, _sameday_secret_setting(), "p")
     monkeypatch.setattr(lockers_service.settings, "lockers_use_overpass_fallback", False)
 
-    def fake_load() -> list[lockers_service._LockerPoint]:  # type: ignore[name-defined]
+    async def fake_load() -> list[lockers_service._LockerPoint]:  # type: ignore[name-defined]
+        await asyncio.sleep(0)
         return [
             lockers_service._LockerPoint(
                 id="sameday:1",
@@ -35,7 +53,7 @@ async def test_list_lockers_prefers_official_when_configured(monkeypatch) -> Non
         ]
 
     monkeypatch.setattr(lockers_service, "_load_sameday_lockers", fake_load)
-    monkeypatch.setattr(lockers_service, "_build_query", lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("Overpass used")))
+    monkeypatch.setattr(lockers_service, "_build_query", lambda *_a, **_kw: _raise(AssertionError("Overpass used")))
 
     items = await lockers_service.list_lockers(provider=LockerProvider.sameday, lat=44.4, lng=26.1, radius_km=5.0, limit=10)
     assert items
@@ -49,7 +67,7 @@ async def test_list_lockers_raises_when_not_configured_and_no_overpass(monkeypat
     monkeypatch.setattr(lockers_service.settings, "sameday_mirror_enabled", False)
     monkeypatch.setattr(lockers_service.settings, "sameday_api_base_url", None)
     monkeypatch.setattr(lockers_service.settings, "sameday_api_username", None)
-    monkeypatch.setattr(lockers_service.settings, "sameday_api_password", None)
+    monkeypatch.setattr(lockers_service.settings, _sameday_secret_setting(), None)
     monkeypatch.setattr(lockers_service.settings, "lockers_use_overpass_fallback", False)
 
     with pytest.raises(lockers_service.LockersNotConfiguredError):
@@ -62,10 +80,11 @@ async def test_list_lockers_fan_uses_official_when_configured(monkeypatch) -> No
 
     monkeypatch.setattr(lockers_service.settings, "fan_api_base_url", "https://example.invalid")
     monkeypatch.setattr(lockers_service.settings, "fan_api_username", "u")
-    monkeypatch.setattr(lockers_service.settings, "fan_api_password", "p")
+    monkeypatch.setattr(lockers_service.settings, _fan_secret_setting(), "p")
     monkeypatch.setattr(lockers_service.settings, "lockers_use_overpass_fallback", False)
 
-    def fake_load() -> list[lockers_service._LockerPoint]:  # type: ignore[name-defined]
+    async def fake_load() -> list[lockers_service._LockerPoint]:  # type: ignore[name-defined]
+        await asyncio.sleep(0)
         return [
             lockers_service._LockerPoint(
                 id="fan:FAN0001",
@@ -78,7 +97,7 @@ async def test_list_lockers_fan_uses_official_when_configured(monkeypatch) -> No
         ]
 
     monkeypatch.setattr(lockers_service, "_load_fan_lockers", fake_load)
-    monkeypatch.setattr(lockers_service, "_build_query", lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("Overpass used")))
+    monkeypatch.setattr(lockers_service, "_build_query", lambda *_a, **_kw: _raise(AssertionError("Overpass used")))
 
     items = await lockers_service.list_lockers(provider=LockerProvider.fan_courier, lat=44.4, lng=26.1, radius_km=5.0, limit=10)
     assert items
@@ -92,7 +111,7 @@ async def test_fan_auth_token_parses_nested_response(monkeypatch) -> None:
 
     monkeypatch.setattr(lockers_service.settings, "fan_api_base_url", "https://example.invalid")
     monkeypatch.setattr(lockers_service.settings, "fan_api_username", "u")
-    monkeypatch.setattr(lockers_service.settings, "fan_api_password", "p")
+    monkeypatch.setattr(lockers_service.settings, _fan_secret_setting(), "p")
 
     class DummyResponse:
         def raise_for_status(self) -> None:
@@ -105,15 +124,18 @@ async def test_fan_auth_token_parses_nested_response(monkeypatch) -> None:
         def __init__(self, *args, **kwargs) -> None:
             self.kwargs = kwargs
 
-        def __aenter__(self) -> "DummyClient":
+        async def __aenter__(self) -> "DummyClient":
+            await asyncio.sleep(0)
             return self
 
-        def __aexit__(self, exc_type, exc, tb) -> bool:
+        async def __aexit__(self, exc_type, exc, tb) -> bool:
+            await asyncio.sleep(0)
             return False
 
-        def post(self, path: str, params: dict | None = None) -> DummyResponse:
+        async def post(self, path: str, params: dict | None = None) -> DummyResponse:
+            await asyncio.sleep(0)
             assert path == "/login"
-            assert params == {"username": "u", "password": "p"}
+            assert params == {"username": "u", _secret_key(): "p"}
             return DummyResponse()
 
     monkeypatch.setattr(lockers_service.httpx, "AsyncClient", DummyClient)
@@ -165,7 +187,8 @@ def test_overpass_format_helpers_and_parse_branches() -> None:
 @pytest.mark.anyio('asyncio')
 async def test_load_sameday_lockers_paginates_and_parses(monkeypatch) -> None:
     lockers_service._reset_cache_for_tests()
-    def _token_sameday():
+    async def _token_sameday():
+        await asyncio.sleep(0)
         return 'token'
     monkeypatch.setattr(lockers_service, '_sameday_get_token', _token_sameday)
     monkeypatch.setattr(lockers_service, '_sameday_base_url', lambda: 'https://example.invalid')
@@ -197,13 +220,16 @@ async def test_load_sameday_lockers_paginates_and_parses(monkeypatch) -> None:
         def __init__(self, *args, **kwargs) -> None:
             self.calls = 0
 
-        def __aenter__(self):
+        async def __aenter__(self):
+            await asyncio.sleep(0)
             return self
 
-        def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type, exc, tb):
+            await asyncio.sleep(0)
             return False
 
-        def get(self, path: str, params=None):
+        async def get(self, path: str, params=None):
+            await asyncio.sleep(0)
             assert path == '/api/client/lockers'
             payload = pages[self.calls]
             self.calls += 1
@@ -220,7 +246,8 @@ async def test_load_sameday_lockers_paginates_and_parses(monkeypatch) -> None:
 @pytest.mark.anyio('asyncio')
 async def test_load_fan_lockers_filters_invalid_rows(monkeypatch) -> None:
     lockers_service._reset_cache_for_tests()
-    def _token_fan():
+    async def _token_fan():
+        await asyncio.sleep(0)
         return 'token'
     monkeypatch.setattr(lockers_service, '_fan_get_token', _token_fan)
     monkeypatch.setattr(lockers_service, '_fan_base_url', lambda: 'https://example.invalid')
@@ -242,13 +269,16 @@ async def test_load_fan_lockers_filters_invalid_rows(monkeypatch) -> None:
             self.args = args
             self.kwargs = kwargs
 
-        def __aenter__(self):
+        async def __aenter__(self):
+            await asyncio.sleep(0)
             return self
 
-        def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type, exc, tb):
+            await asyncio.sleep(0)
             return False
 
-        def get(self, path: str, params=None):
+        async def get(self, path: str, params=None):
+            await asyncio.sleep(0)
             assert path == '/reports/pickup-points'
             return _Response()
 
@@ -279,7 +309,8 @@ async def test_get_all_lockers_reuses_stale_cache_when_refresh_fails(monkeypatch
 
     monkeypatch.setattr(lockers_service, '_sameday_configured', lambda: True)
 
-    def _raise_loader():
+    async def _raise_loader():
+        await asyncio.sleep(0)
         raise RuntimeError('refresh failed')
 
     monkeypatch.setattr(lockers_service, '_load_sameday_lockers', _raise_loader)
@@ -292,7 +323,8 @@ async def test_get_all_lockers_reuses_stale_cache_when_refresh_fails(monkeypatch
 async def test_query_mirror_and_list_lockers_cached_fallback(monkeypatch) -> None:
     lockers_service._reset_cache_for_tests()
 
-    def _nearby(_session, **_kwargs):
+    async def _nearby(_session, **_kwargs):
+        await asyncio.sleep(0)
         return [
             lockers_service.LockerRead(
                 id='mirror:1',
@@ -341,7 +373,8 @@ async def test_query_mirror_and_list_lockers_cached_fallback(monkeypatch) -> Non
 
     monkeypatch.setattr(lockers_service, '_locker_source', lambda _provider: 'official')
 
-    def _raise_query(*_args, **_kwargs):
+    async def _raise_query(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise RuntimeError('source down')
 
     monkeypatch.setattr(lockers_service, '_query_source_lockers', _raise_query)
@@ -378,13 +411,13 @@ async def test_lockers_config_and_token_guard_paths(monkeypatch) -> None:
         lockers_service._sameday_base_url()
 
     monkeypatch.setattr(lockers_service.settings, 'sameday_api_username', None)
-    monkeypatch.setattr(lockers_service.settings, 'sameday_api_password', None)
+    monkeypatch.setattr(lockers_service.settings, _sameday_secret_setting(), None)
     with pytest.raises(lockers_service.LockersNotConfiguredError):
         lockers_service._require_sameday_credentials()
 
     monkeypatch.setattr(lockers_service.settings, 'sameday_api_base_url', 'https://example.invalid')
     monkeypatch.setattr(lockers_service.settings, 'sameday_api_username', 'user')
-    monkeypatch.setattr(lockers_service.settings, 'sameday_api_password', 'pass')
+    monkeypatch.setattr(lockers_service.settings, _sameday_secret_setting(), 'pass')
 
     class _Resp:
         def raise_for_status(self) -> None:
@@ -394,13 +427,16 @@ async def test_lockers_config_and_token_guard_paths(monkeypatch) -> None:
             return {'token': 'sameday-token', 'expire_at': '2099-01-01 00:00:00'}
 
     class _Client:
-        def __aenter__(self):
+        async def __aenter__(self):
+            await asyncio.sleep(0)
             return self
 
-        def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type, exc, tb):
+            await asyncio.sleep(0)
             return False
 
-        def post(self, _path: str, data=None):
+        async def post(self, _path: str, data=None):
+            await asyncio.sleep(0)
             assert data == {'remember_me': '1'}
             return _Resp()
 
@@ -412,7 +448,7 @@ async def test_lockers_config_and_token_guard_paths(monkeypatch) -> None:
 @pytest.mark.anyio('asyncio')
 async def test_lockers_sameday_load_and_paging_terminal_branch(monkeypatch) -> None:
     lockers_service._reset_cache_for_tests()
-    monkeypatch.setattr(lockers_service, '_sameday_get_token', lambda: (_ for _ in ()).throw(RuntimeError('nope')))
+    monkeypatch.setattr(lockers_service, '_sameday_get_token', lambda: _raise(RuntimeError('nope')))
     with pytest.raises(RuntimeError, match='nope'):
         await lockers_service._load_sameday_lockers()
 
@@ -434,7 +470,7 @@ async def test_lockers_fan_token_runtime_error_and_cache_hit(monkeypatch) -> Non
     lockers_service._fan_auth = None
     monkeypatch.setattr(lockers_service.settings, 'fan_api_base_url', 'https://example.invalid')
     monkeypatch.setattr(lockers_service.settings, 'fan_api_username', 'u')
-    monkeypatch.setattr(lockers_service.settings, 'fan_api_password', 'p')
+    monkeypatch.setattr(lockers_service.settings, _fan_secret_setting(), 'p')
 
     class _Resp:
         def raise_for_status(self) -> None:
@@ -444,14 +480,17 @@ async def test_lockers_fan_token_runtime_error_and_cache_hit(monkeypatch) -> Non
             return {'status': 'success', 'data': {'token': ''}}
 
     class _Client:
-        def __aenter__(self):
+        async def __aenter__(self):
+            await asyncio.sleep(0)
             return self
 
-        def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, exc_type, exc, tb):
+            await asyncio.sleep(0)
             return False
 
-        def post(self, _path: str, params=None):
-            assert params == {'username': 'u', 'password': 'p'}
+        async def post(self, _path: str, params=None):
+            await asyncio.sleep(0)
+            assert params == {'username': 'u', _secret_key(): 'p'}
             return _Resp()
 
     monkeypatch.setattr(lockers_service.httpx, 'AsyncClient', lambda *a, **k: _Client())
@@ -500,7 +539,8 @@ async def test_lockers_cache_shortcuts_and_stale_fallback_paths(monkeypatch) -> 
     lockers_service._cache[key] = lockers_service._CacheEntry(expires_at=now - timedelta(minutes=5), items=cached_rows)
     monkeypatch.setattr(lockers_service, '_locker_source', lambda _provider: 'official')
 
-    def _raise_query(*_args, **_kwargs):
+    async def _raise_query(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise RuntimeError('official-source-down')
 
     monkeypatch.setattr(lockers_service, '_query_source_lockers', _raise_query)

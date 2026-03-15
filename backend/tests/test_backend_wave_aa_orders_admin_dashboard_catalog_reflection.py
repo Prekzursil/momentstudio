@@ -252,7 +252,9 @@ def _invoke(func, kwargs: dict[str, object]) -> None:
         result = func(**kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except (Exception, SystemExit) as exc:
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception as exc:
         _ = str(exc)
         return
 
@@ -267,7 +269,9 @@ def _invoke_method(func, owner_cls: type, kwargs: dict[str, object]) -> None:
         result = func(receiver, **kwargs)
         if inspect.iscoroutine(result):
             asyncio.run(result)
-    except (Exception, SystemExit) as exc:
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except Exception as exc:
         _ = str(exc)
         return
 

@@ -14,10 +14,12 @@ class _SessionCtx:
     def __init__(self, payload: object = "session") -> None:
         self.payload = payload
 
-    def __aenter__(self):
+    async def __aenter__(self):
+        await asyncio.sleep(0)
         return self.payload
 
-    def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.sleep(0)
         return False
 
 
@@ -30,7 +32,8 @@ class _AwaitableTask:
         self.cancel_called = True
 
     def __await__(self):
-        def _done():
+        async def _done():
+            await asyncio.sleep(0)
             if self.cancel_raises:
                 raise asyncio.CancelledError
             return None
@@ -48,15 +51,13 @@ def test_account_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     process.assert_awaited_once_with("sess", limit=17)
 
     stop = asyncio.Event()
-    run_once = AsyncMock(side_effect=[RuntimeError("boom"), None])
-    monkeypatch.setattr(account_sched, "_run_once", run_once)
 
-    async def _wait_for(coro, timeout):
+    async def _run_once_once() -> None:
         stop.set()
-        await coro
-        return None
+        raise RuntimeError("boom")
 
-    monkeypatch.setattr(account_sched.asyncio, "wait_for", _wait_for)
+    run_once = AsyncMock(side_effect=_run_once_once)
+    monkeypatch.setattr(account_sched, "_run_once", run_once)
     asyncio.run(account_sched._loop(stop))
     assert run_once.await_count >= 1
 
@@ -70,15 +71,13 @@ def test_admin_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     send_due.assert_awaited_once_with("sess")
 
     stop = asyncio.Event()
-    run_once = AsyncMock(side_effect=[None, asyncio.CancelledError()])
-    monkeypatch.setattr(admin_sched, "_run_once", run_once)
 
-    async def _wait_for(coro, timeout):
+    async def _run_once_cancel() -> None:
         stop.set()
-        await coro
-        return None
+        raise asyncio.CancelledError()
 
-    monkeypatch.setattr(admin_sched.asyncio, "wait_for", _wait_for)
+    run_once = AsyncMock(side_effect=_run_once_cancel)
+    monkeypatch.setattr(admin_sched, "_run_once", run_once)
     asyncio.run(admin_sched._loop(stop))
 
 
@@ -92,15 +91,13 @@ def test_fx_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     refresh.assert_awaited_once_with("sess")
 
     stop = asyncio.Event()
-    refresh_once = AsyncMock(side_effect=[None, RuntimeError("err")])
-    monkeypatch.setattr(fx_sched, "_refresh_once", refresh_once)
 
-    async def _wait_for(coro, timeout):
+    async def _refresh_once_fail() -> None:
         stop.set()
-        await coro
-        return None
+        raise RuntimeError("err")
 
-    monkeypatch.setattr(fx_sched.asyncio, "wait_for", _wait_for)
+    refresh_once = AsyncMock(side_effect=_refresh_once_fail)
+    monkeypatch.setattr(fx_sched, "_refresh_once", refresh_once)
     asyncio.run(fx_sched._refresh_loop(stop))
 
 
@@ -129,15 +126,13 @@ def test_sameday_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     assert asyncio.run(sameday_sched._run_once()) == 0
 
     stop = asyncio.Event()
-    run_once = AsyncMock(return_value=1)
-    monkeypatch.setattr(sameday_sched, "_run_once", run_once)
 
-    async def _wait_for(coro, timeout):
+    async def _run_once_stop() -> int:
         stop.set()
-        await coro
-        return None
+        return 1
 
-    monkeypatch.setattr(sameday_sched.asyncio, "wait_for", _wait_for)
+    run_once = AsyncMock(side_effect=_run_once_stop)
+    monkeypatch.setattr(sameday_sched, "_run_once", run_once)
     asyncio.run(sameday_sched._loop(stop))
 
 

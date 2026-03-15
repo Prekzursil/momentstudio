@@ -36,22 +36,27 @@ class _SessionStub:
         self.refreshes = 0
         self.rollbacks = 0
 
-    def execute(self, _stmt):
+    async def execute(self, _stmt):
+        await asyncio.sleep(0)
         return _ExecResult(None)
 
     def add(self, value):
         self.added.append(value)
 
-    def commit(self):
+    async def commit(self):
+        await asyncio.sleep(0)
         self.commits += 1
 
-    def refresh(self, _obj):
+    async def refresh(self, _obj):
+        await asyncio.sleep(0)
         self.refreshes += 1
 
-    def rollback(self):
+    async def rollback(self):
+        await asyncio.sleep(0)
         self.rollbacks += 1
 
-    def delete(self, value):
+    async def delete(self, value):
+        await asyncio.sleep(0)
         self.deleted.append(value)
 
     def get_bind(self):
@@ -151,15 +156,17 @@ async def test_upsert_row_unknown_dialect_commit_and_integrity_paths(monkeypatch
 
     recovered = _row(source='recovered')
 
-    def _after_integrity(*_args, **_kwargs):
+    async def _after_integrity(*_args, **_kwargs):
+        await asyncio.sleep(0)
         return recovered
 
     monkeypatch.setattr(fx_store, '_upsert_row_after_integrity_error', _after_integrity)
 
-    def _commit_raise_once():
+    async def _commit_raise_once():
+        await asyncio.sleep(0)
         if session.commits == 0:
             session.commits += 1
-            raise IntegrityError('insert', params={}, orig=Exception('dup'))
+            raise IntegrityError('insert', params={}, orig=ValueError('dup'))
         session.commits += 1
 
     session.commit = _commit_raise_once
@@ -179,21 +186,24 @@ async def test_get_effective_rates_paths_and_clear_override(monkeypatch: pytest.
     override_row = _row(source='override')
     last_known_row = _row(source='last_known')
 
-    def _get_row_override_first(_session, *, is_override: bool):
+    async def _get_row_override_first(_session, *, is_override: bool):
+        await asyncio.sleep(0)
         return override_row if is_override else last_known_row
 
     monkeypatch.setattr(fx_store, '_get_row', _get_row_override_first)
     effective = await fx_store.get_effective_rates(session)
     assert effective.source == 'override'
 
-    def _get_row_last_known_only(_session, *, is_override: bool):
+    async def _get_row_last_known_only(_session, *, is_override: bool):
+        await asyncio.sleep(0)
         return None if is_override else last_known_row
 
     monkeypatch.setattr(fx_store, '_get_row', _get_row_last_known_only)
     effective_last = await fx_store.get_effective_rates(session)
     assert effective_last.source == 'last_known'
 
-    def _get_row_none(_session, *, is_override: bool):
+    async def _get_row_none(_session, *, is_override: bool):
+        await asyncio.sleep(0)
         return None
 
     class _Live:
@@ -207,7 +217,8 @@ async def test_get_effective_rates_paths_and_clear_override(monkeypatch: pytest.
     monkeypatch.setattr(fx_store, '_get_row', _get_row_none)
     monkeypatch.setattr(fx_store.fx_rates, 'get_fx_rates', lambda **_kwargs: asyncio.sleep(0, result=_Live()))
 
-    def _upsert_fail(*_args, **_kwargs):
+    async def _upsert_fail(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise SQLAlchemyError('persist fail')
 
     monkeypatch.setattr(fx_store, '_upsert_row', _upsert_fail)
@@ -234,7 +245,8 @@ async def test_refresh_last_known_error_and_success_paths(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(fx_store.fx_rates, 'get_fx_rates', lambda **_kwargs: asyncio.sleep(0, result=_Live()))
 
-    def _upsert_fail(*_args, **_kwargs):
+    async def _upsert_fail(*_args, **_kwargs):
+        await asyncio.sleep(0)
         raise SQLAlchemyError('persist fail')
 
     monkeypatch.setattr(fx_store, '_upsert_row', _upsert_fail)

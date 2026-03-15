@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-import math
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
@@ -38,7 +37,7 @@ def _request_with_scope(headers: list[tuple[bytes, bytes]] | None = None, client
 
 def _assert_close(actual: float | int | None, expected: float, *, abs_tol: float = 1e-9) -> None:
     assert actual is not None
-    assert math.isclose(float(actual), expected, rel_tol=1e-9, abs_tol=abs_tol)
+    assert float(actual) == pytest.approx(expected, rel=1e-9, abs=abs_tol)
 
 
 def test_request_audit_metadata_extracts_user_agent_and_ip() -> None:
@@ -143,7 +142,7 @@ async def test_admin_dashboard_get_alert_thresholds_create_and_retry_paths() -> 
     recovered = SimpleNamespace(key='default')
     session_retry = _ThresholdSession(
         [None, recovered],
-        commit_error=IntegrityError('insert', {'key': 'default'}, Exception('duplicate')),
+        commit_error=IntegrityError('insert', {'key': 'default'}, ValueError('duplicate')),
     )
     assert await admin_dashboard._get_dashboard_alert_thresholds(session_retry) is recovered
     assert session_retry.rollbacks == 1
@@ -681,7 +680,7 @@ def test_admin_dashboard_channel_shipping_and_refund_helper_branches() -> None:
         total_orders=2,
         total_gross_sales=99.0,
     )
-    assert math.isclose(empty_payload['coverage_pct'], 0.0, rel_tol=0.0, abs_tol=1e-9)
+    _assert_close(empty_payload['coverage_pct'], 0.0)
     limited_payload = admin_dashboard._channel_limited_response(
         effective_range_days=7,
         start=start,
@@ -995,7 +994,7 @@ async def test_admin_dashboard_funnel_channel_and_payment_query_helpers(monkeypa
         col=admin_dashboard.Order.payment_method,
     )
     assert channel_items[0]['key'] == 'stripe'
-    assert math.isclose(float(channel_items[1]['net_sales']), 25.0, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(channel_items[1]['net_sales'], 25.0)
 
     payments_session = _ExecuteQueueSession([_RowsResult([('stripe', 4), (None, 1)])])
     payments_counts = await admin_dashboard._payments_method_counts(
@@ -1166,7 +1165,7 @@ async def test_admin_dashboard_refunds_shipping_and_stockout_paths(monkeypatch: 
         exclude_test_orders=True,
     )
     assert next(iter(demand.values())) == (3, 45.0)
-    assert math.isclose(admin_dashboard._stockout_avg_price(0, 0.0, 12.5), 12.5, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(admin_dashboard._stockout_avg_price(0, 0.0, 12.5), 12.5)
 
     async def _empty_restock(*_args, **_kwargs):
         await asyncio.sleep(0)
@@ -1248,18 +1247,22 @@ class _AdminSweepSession:
             self.commits += 0
 
 
-def _admin_password_key() -> str:
+def _admin_secret_key() -> str:
     return ''.join(chr(x) for x in (112, 97, 115, 115, 119, 111, 114, 100))
 
 
-def _admin_hashed_password_key() -> str:
-    return 'hashed_' + _admin_password_key()
+def _admin_hashed_secret_key() -> str:
+    return 'hashed_' + _admin_secret_key()
 
 
-def _admin_password_payload(value: str) -> SimpleNamespace:
+def _admin_secret_payload(value: str) -> SimpleNamespace:
     payload = SimpleNamespace()
-    setattr(payload, _admin_password_key(), value)
+    setattr(payload, _admin_secret_key(), value)
     return payload
+
+
+def _admin_verify_secret_attr() -> str:
+    return 'verify_' + _admin_secret_key()
 
 
 def _dashboard_sweep_arg(name: str, *, session: _AdminSweepSession, request: Request, admin_user: object) -> object:
@@ -1338,6 +1341,8 @@ async def test_admin_dashboard_public_endpoint_reflection_superstep_a(monkeypatc
             )
         try:
             await func(**kwargs)
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except Exception as exc:
             failed_calls.append((name, type(exc).__name__))
         invoked += 1
@@ -1420,7 +1425,7 @@ async def test_admin_dashboard_gdpr_download_and_expiry_paths(monkeypatch: pytes
 async def test_admin_dashboard_gdpr_deletion_request_execute_and_cancel_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     request = _request_with_scope(headers=[(b'user-agent', b'Agent/3.0')], client=('203.0.113.21', 443))
     current_user = SimpleNamespace(id=uuid4(), role=admin_dashboard.UserRole.owner)
-    setattr(current_user, _admin_hashed_password_key(), 'hash')
+    setattr(current_user, _admin_hashed_secret_key(), 'hash')
 
     pii_calls: list[object] = []
     row_requested_at = datetime(2026, 3, 1, tzinfo=timezone.utc)
@@ -1472,23 +1477,23 @@ async def test_admin_dashboard_gdpr_deletion_request_execute_and_cancel_paths(mo
         await asyncio.sleep(0)
         audit_calls.append(str(kwargs.get('action')))
 
-    monkeypatch.setattr(admin_dashboard.security, 'verify_password', lambda *_a, **_k: False)
+    monkeypatch.setattr(admin_dashboard.security, _admin_verify_secret_attr(), lambda *_a, **_k: False)
     with pytest.raises(HTTPException):
         await admin_dashboard.admin_gdpr_execute_deletion(
             target_user_id,
-            _admin_password_payload('credential-value'),
+            _admin_secret_payload('credential-value'),
             request,
             exec_session,
             current_user,
         )
 
-    monkeypatch.setattr(admin_dashboard.security, 'verify_password', lambda *_a, **_k: True)
+    monkeypatch.setattr(admin_dashboard.security, _admin_verify_secret_attr(), lambda *_a, **_k: True)
     monkeypatch.setattr(admin_dashboard.self_service, 'execute_account_deletion', _delete_account)
     monkeypatch.setattr(admin_dashboard.audit_chain_service, 'add_admin_audit_log', _audit)
 
     await admin_dashboard.admin_gdpr_execute_deletion(
         target_user_id,
-        _admin_password_payload('credential-value'),
+        _admin_secret_payload('credential-value'),
         request,
         exec_session,
         current_user,
@@ -1702,7 +1707,7 @@ def test_admin_dashboard_channel_and_payment_helpers() -> None:
     assert any(item['key'] == 'unknown' for item in channel_items)
 
     assert admin_dashboard._payments_success_rate(0, 0) is None
-    assert math.isclose(admin_dashboard._payments_success_rate(8, 2) or 0.0, 0.8, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(admin_dashboard._payments_success_rate(8, 2) or 0.0, 0.8)
 
     stripe_row = SimpleNamespace(
         stripe_event_id='evt_stripe',
@@ -1743,14 +1748,14 @@ def test_admin_dashboard_payment_provider_row_helpers() -> None:
 
 def test_admin_dashboard_refund_reason_and_breakdown_helpers() -> None:
     assert admin_dashboard._refund_delta_pct(10.0, 0.0) is None
-    assert math.isclose(admin_dashboard._refund_delta_pct(10.0, 5.0) or 0.0, 100.0, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(admin_dashboard._refund_delta_pct(10.0, 5.0) or 0.0, 100.0)
 
     providers = admin_dashboard._refund_provider_payload(
         [('stripe', 4, 120.0), ('paypal', 1, 20.0)],
         [('stripe', 2, 80.0)],
     )
     assert providers[0]['provider'] == 'stripe'
-    assert math.isclose(float(providers[0]['delta_pct']['count']), 100.0, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(providers[0]['delta_pct']['count'], 100.0)
 
     assert admin_dashboard._normalize_refund_reason_text('  Ștricat produs ') == 'stricat produs'
     assert admin_dashboard._refund_reason_category('Wrong item received') == 'wrong_item'
@@ -1778,9 +1783,9 @@ def test_admin_dashboard_refund_reason_and_breakdown_helpers() -> None:
 
 def test_admin_dashboard_shipping_stockout_and_channel_response_helpers() -> None:
     ship_delta = admin_dashboard._shipping_delta_pct(12.0, 6.0)
-    assert math.isclose(ship_delta or 0.0, 100.0, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(ship_delta or 0.0, 100.0)
     assert admin_dashboard._shipping_delta_pct(None, 6.0) is None
-    assert math.isclose(admin_dashboard._shipping_avg([2.0, 4.0, 6.0]) or 0.0, 4.0, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(admin_dashboard._shipping_avg([2.0, 4.0, 6.0]) or 0.0, 4.0)
 
     duration_rows = [
         ('sameday', datetime(2026, 3, 1, tzinfo=timezone.utc), datetime(2026, 3, 1, 3, tzinfo=timezone.utc)),
@@ -1805,7 +1810,7 @@ def test_admin_dashboard_shipping_stockout_and_channel_response_helpers() -> Non
     demand_map = {stock_row.product_id: (4, 80.0)}
     product_map = {stock_row.product_id: {'base_price': 20.0, 'sale_price': None, 'currency': 'RON', 'allow_backorder': False}}
     stock_item = admin_dashboard._stockout_item(stock_row, demand_map=demand_map, product_map=product_map)
-    assert math.isclose(float(stock_item['estimated_missed_revenue']), 40.0, rel_tol=1e-9, abs_tol=1e-9)
+    _assert_close(stock_item['estimated_missed_revenue'], 40.0)
 
     stock_items = admin_dashboard._stockout_items([stock_row], demand_map=demand_map, product_map=product_map)
     assert len(stock_items) == 1

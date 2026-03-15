@@ -40,25 +40,31 @@ class _DummySession:
     def get_bind(self):
         return SimpleNamespace(dialect=SimpleNamespace(name=self._dialect_name))
 
-    def execute(self, _stmt):
+    async def execute(self, _stmt):
+        await asyncio.sleep(0)
         return _DummyResult()
 
-    def scalar(self, _stmt):
+    async def scalar(self, _stmt):
+        await asyncio.sleep(0)
         return 0
 
     def add(self, item):
         self.added.append(item)
 
-    def commit(self):
+    async def commit(self):
+        await asyncio.sleep(0)
         self.commits += 1
 
-    def rollback(self):
+    async def rollback(self):
+        await asyncio.sleep(0)
         self.rollbacks += 1
 
-    def refresh(self, item):
+    async def refresh(self, item):
+        await asyncio.sleep(0)
         self.refreshed.append(item)
 
-    def delete(self, item):
+    async def delete(self, item):
+        await asyncio.sleep(0)
         self.deleted.append(item)
 
 
@@ -66,10 +72,12 @@ class _DummySessionCtx:
     def __init__(self, session):
         self._session = session
 
-    def __aenter__(self):
+    async def __aenter__(self):
+        await asyncio.sleep(0)
         return self._session
 
-    def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.sleep(0)
         return False
 
 
@@ -166,10 +174,12 @@ def test_compute_cart_vat_amount_default_and_country(monkeypatch: pytest.MonkeyP
         )
         assert default_country > Decimal("0.00")
 
-        def _rates(*_args, **_kwargs):
+        async def _rates(*_args, **_kwargs):
+            await asyncio.sleep(0)
             return {lines[0].product_id: Decimal("9.00")}
 
-        def _default_rate(*_args, **_kwargs):
+        async def _default_rate(*_args, **_kwargs):
+            await asyncio.sleep(0)
             return Decimal("9.00")
 
         monkeypatch.setattr(taxes, "vat_rates_for_products", _rates)
@@ -201,14 +211,16 @@ def test_fx_store_helpers_and_effective_rates_paths(monkeypatch: pytest.MonkeyPa
 
         session = _DummySession()
 
-        def _get_override(*_args, **_kwargs):
+        async def _get_override(*_args, **_kwargs):
+            await asyncio.sleep(0)
             return row
 
         monkeypatch.setattr(fx_store, "_get_row", _get_override)
         effective = await fx_store.get_effective_rates(session)
         assert effective.source == "seed"
 
-        def _no_rows(*_args, **_kwargs):
+        async def _no_rows(*_args, **_kwargs):
+            await asyncio.sleep(0)
             return None
 
         class _Live:
@@ -219,10 +231,12 @@ def test_fx_store_helpers_and_effective_rates_paths(monkeypatch: pytest.MonkeyPa
             source = "live"
             fetched_at = now
 
-        def _live(*_args, **_kwargs):
+        async def _live(*_args, **_kwargs):
+            await asyncio.sleep(0)
             return _Live()
 
-        def _upsert(*_args, **_kwargs):
+        async def _upsert(*_args, **_kwargs):
+            await asyncio.sleep(0)
             raise SQLAlchemyError("persist-fail")
 
         monkeypatch.setattr(fx_store, "_get_row", _no_rows)
@@ -232,7 +246,8 @@ def test_fx_store_helpers_and_effective_rates_paths(monkeypatch: pytest.MonkeyPa
         assert effective_live.source == "live"
         assert session.rollbacks == 1
 
-        def _live_fail(*_args, **_kwargs):
+        async def _live_fail(*_args, **_kwargs):
+            await asyncio.sleep(0)
             raise RuntimeError("upstream down")
 
         monkeypatch.setattr(fx_store.fx_rates, "get_fx_rates", _live_fail)
@@ -250,10 +265,12 @@ def test_fx_override_admin_and_clear_paths(monkeypatch: pytest.MonkeyPatch) -> N
         user_id = uuid4()
         payload = SimpleNamespace(eur_per_ron=Decimal("0.20"), usd_per_ron=Decimal("0.21"), as_of=date.today())
 
-        def _upsert(*_args, **_kwargs):
+        async def _upsert(*_args, **_kwargs):
+            await asyncio.sleep(0)
             return None
 
-        def _audit(*_args, **_kwargs):
+        async def _audit(*_args, **_kwargs):
+            await asyncio.sleep(0)
             return None
 
         monkeypatch.setattr(fx_store, "_upsert_row", _upsert)
@@ -263,7 +280,8 @@ def test_fx_override_admin_and_clear_paths(monkeypatch: pytest.MonkeyPatch) -> N
 
         existing = SimpleNamespace(base="RON", eur_per_ron=Decimal("0.20"), usd_per_ron=Decimal("0.21"), as_of=date.today(), source="admin", fetched_at=now)
 
-        def _get_row(*_args, **kwargs):
+        async def _get_row(*_args, **kwargs):
+            await asyncio.sleep(0)
             if kwargs.get("is_override"):
                 return existing
             return None
@@ -272,7 +290,8 @@ def test_fx_override_admin_and_clear_paths(monkeypatch: pytest.MonkeyPatch) -> N
         await fx_store.clear_override(session, user_id=user_id)
         assert existing in session.deleted
 
-        def _get_status(*_args, **kwargs):
+        async def _get_status(*_args, **kwargs):
+            await asyncio.sleep(0)
             if kwargs.get("is_override"):
                 return existing
             return existing
@@ -294,7 +313,8 @@ def test_media_usage_scheduler_run_once_loop_and_start_stop(monkeypatch: pytest.
 
         session = _DummySession()
 
-        def _scalar(_stmt):
+        async def _scalar(_stmt):
+            await asyncio.sleep(0)
             return 0
 
         session.scalar = _scalar
@@ -302,16 +322,20 @@ def test_media_usage_scheduler_run_once_loop_and_start_stop(monkeypatch: pytest.
 
         queued = []
 
-        def _enqueue_job(_session, **_kwargs):
+        async def _enqueue_job(_session, **_kwargs):
+            await asyncio.sleep(0)
             return SimpleNamespace(id=uuid4())
 
-        def _queue_job(job_id):
+        async def _queue_job(job_id):
+            await asyncio.sleep(0)
             queued.append(job_id)
 
-        def _get_job(_session, job_id):
+        async def _get_job(_session, job_id):
+            await asyncio.sleep(0)
             return SimpleNamespace(id=job_id)
 
-        def _process_inline(_session, _job):
+        async def _process_inline(_session, _job):
+            await asyncio.sleep(0)
             return None
 
         monkeypatch.setattr(scheduler.media_dam, "enqueue_job", _enqueue_job)
@@ -325,7 +349,8 @@ def test_media_usage_scheduler_run_once_loop_and_start_stop(monkeypatch: pytest.
 
         stop = asyncio.Event()
 
-        def _run_once_loop():
+        async def _run_once_loop():
+            await asyncio.sleep(0)
             stop.set()
             return 1
 

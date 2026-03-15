@@ -49,10 +49,12 @@ def test_social_cache_and_resolution_paths(monkeypatch: pytest.MonkeyPatch) -> N
     assert social._cached_thumbnail_if_fresh(source, force_refresh=False) == '/media/social/demo.jpg'
     assert social._cached_thumbnail_if_fresh(source, force_refresh=True) is None
 
-    def _persist_ok(_source: str, _thumb: str) -> str:
+    async def _persist_ok(_source: str, _thumb: str) -> str:
+        await asyncio.sleep(0)
         return '/media/social/local.jpg'
 
-    def _persist_none(_source: str, _thumb: str) -> None:
+    async def _persist_none(_source: str, _thumb: str) -> None:
+        await asyncio.sleep(0)
         return None
 
     monkeypatch.setattr(social, '_persist_thumbnail', _persist_ok)
@@ -88,7 +90,7 @@ def test_social_url_handle_parsing() -> None:
 
 
 def test_sameday_numeric_and_coordinate_helpers() -> None:
-    assert sameday._to_float('12,5') == 12.5
+    assert sameday._to_float('12,5') == pytest.approx(12.5)
     assert sameday._to_float('not-a-number') is None
     assert sameday._to_float(100_000_001) is None
 
@@ -132,7 +134,8 @@ class _DummyClient:
     def __init__(self, response: _DummyResponse) -> None:
         self._response = response
 
-    def get(self, _url: str):
+    async def get(self, _url: str):
+        await asyncio.sleep(0)
         return self._response
 
 
@@ -167,14 +170,16 @@ def test_sameday_parse_playwright_payload() -> None:
 
 
 def test_sameday_fetch_template_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _ok(_client, _url: str):
+    async def _ok(_client, _url: str):
+        await asyncio.sleep(0)
         return [{'lockerId': 'A', 'lat': 44.0, 'lng': 26.0}]
 
     monkeypatch.setattr(sameday, '_fetch_json_url', _ok)
     rows = asyncio.run(sameday._fetch_template_rows(SimpleNamespace(), 'https://sameday.ro/api?q={q}'))
     assert rows
 
-    def _fail(_client, _url: str):
+    async def _fail(_client, _url: str):
+        await asyncio.sleep(0)
         raise RuntimeError('fail')
 
     monkeypatch.setattr(sameday, '_fetch_json_url', _fail)
@@ -187,16 +192,19 @@ class _StreamResponse:
         self.content = content
         self.headers = headers or {}
 
-    def __aenter__(self):
+    async def __aenter__(self):
+        await asyncio.sleep(0)
         return self
 
-    def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.sleep(0)
         return False
 
     def raise_for_status(self) -> None:
         return None
 
-    def aiter_bytes(self):
+    async def aiter_bytes(self):
+        await asyncio.sleep(0)
         if self._html:
             yield self._html.encode('utf-8')
 
@@ -206,10 +214,12 @@ class _AsyncClientStub:
         self._stream_response = stream_response
         self._get_response = get_response
 
-    def __aenter__(self):
+    async def __aenter__(self):
+        await asyncio.sleep(0)
         return self
 
-    def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, exc_type, exc, tb):
+        await asyncio.sleep(0)
         return False
 
     def stream(self, _method: str, _url: str):
@@ -217,7 +227,8 @@ class _AsyncClientStub:
             raise RuntimeError('missing stream response')
         return self._stream_response
 
-    def get(self, _url: str):
+    async def get(self, _url: str):
+        await asyncio.sleep(0)
         if self._get_response is None:
             raise RuntimeError('missing get response')
         return self._get_response
