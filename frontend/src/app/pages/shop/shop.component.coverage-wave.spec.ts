@@ -248,7 +248,7 @@ describe('ShopComponent coverage wave', () => {
     let attempted = 0;
     for (const name of Object.getOwnPropertyNames(ShopComponent.prototype)) {
       if (blocked.has(name)) continue;
-      const fn = (cmp as any)[name];
+      const fn = cmp[name];
       if (typeof fn !== 'function') continue;
       const baseArgs = argsByName[name] ?? [];
       for (const variant of [baseArgs, edge(baseArgs)]) {

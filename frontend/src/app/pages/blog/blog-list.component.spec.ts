@@ -10,6 +10,14 @@ import { BlogListComponent } from './blog-list.component';
 import { BlogService } from '../../core/blog.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 
+function createBlogListComponentHarness(): { fixture: any; component: any; router: Router } {
+  const fixture = TestBed.createComponent(BlogListComponent);
+  fixture.detectChanges();
+  const component = fixture.componentInstance as any;
+  const router = TestBed.inject(Router);
+  return { fixture, component, router };
+}
+
 describe('BlogListComponent SEO', () => {
   let meta: jasmine.SpyObj<Meta>;
   let title: jasmine.SpyObj<Title>;
@@ -212,13 +220,6 @@ describe('BlogListComponent behavior helpers', () => {
     });
   });
 
-  function createComponent(): { fixture: any; component: any; router: Router } {
-    const fixture = TestBed.createComponent(BlogListComponent);
-    fixture.detectChanges();
-    const component = fixture.componentInstance as any;
-    const router = TestBed.inject(Router);
-    return { fixture, component, router };
-  }
 
   it('switches between hero and grid based on active filters and sort', () => {
     const response = {
@@ -230,7 +231,7 @@ describe('BlogListComponent behavior helpers', () => {
     };
     blog.listPosts.and.returnValue(of(response as any));
 
-    const { component } = createComponent();
+    const { component } = createBlogListComponentHarness();
     component.searchQuery = '';
     component.tagQuery = '';
     component.seriesQuery = '';
@@ -247,7 +248,7 @@ describe('BlogListComponent behavior helpers', () => {
 
   it('sets error state when list load fails', () => {
     blog.listPosts.and.returnValue(throwError(() => new Error('fail')));
-    const { component } = createComponent();
+    const { component } = createBlogListComponentHarness();
 
     component.load(2);
 
@@ -258,7 +259,7 @@ describe('BlogListComponent behavior helpers', () => {
   });
 
   it('applies filter navigation branches and chip clear guards', () => {
-    const { component, router } = createComponent();
+    const { component, router } = createBlogListComponentHarness();
     const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
 
     component.searchQuery = 'a';
@@ -294,7 +295,7 @@ describe('BlogListComponent behavior helpers', () => {
   });
 
   it('handles sort, paging, thumbnail fallback, and edit/prefetch helpers', () => {
-    const { component, router } = createComponent();
+    const { component, router } = createBlogListComponentHarness();
     const navigateSpy = spyOn(router, 'navigate').and.resolveTo(true);
 
     component.pageMeta = { total_items: 10, total_pages: 2, page: 2, limit: 9 };

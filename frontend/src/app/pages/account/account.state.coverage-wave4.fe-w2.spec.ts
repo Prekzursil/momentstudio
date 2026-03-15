@@ -935,10 +935,10 @@ describe('AccountState coverage wave 4 FE-W2 helper and address matrix', () => {
     state.toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
     state.account.downloadReceipt = jasmine.createSpy('downloadReceipt').and.returnValue(of(new Blob(['pdf'])));
 
-    const createUrl = spyOn(window.URL, 'createObjectURL').and.returnValue('blob:test');
-    const revokeUrl = spyOn(window.URL, 'revokeObjectURL').and.stub();
+    const createUrl = spyOn(globalThis.URL, 'createObjectURL').and.returnValue('blob:test');
+    const revokeUrl = spyOn(globalThis.URL, 'revokeObjectURL').and.stub();
     const nativeCreate = document.createElement.bind(document);
-    const anchor = nativeCreate('a') as HTMLAnchorElement;
+    const anchor = document.createElement('a');
     const clickSpy = spyOn(anchor, 'click').and.stub();
     spyOn(document, 'createElement').and.callFake((tagName: string): any =>
       tagName.toLowerCase() === 'a' ? anchor : nativeCreate(tagName),

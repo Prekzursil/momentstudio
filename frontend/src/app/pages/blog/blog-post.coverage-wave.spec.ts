@@ -649,7 +649,7 @@ describe('BlogPostComponent coverage wave: article interaction matrix', () => {
     cmp.loadRelatedPosts('en', post);
     expect(cmp.relatedPosts()).toEqual([]);
 
-    cmp.loadMoreFromAuthor('en', { ...post, author: null } as any);
+    cmp.loadMoreFromAuthor('en', { ...post, author: null });
     expect(cmp.moreFromAuthor()).toEqual([]);
   });
 
@@ -662,7 +662,7 @@ describe('BlogPostComponent coverage wave residual method helpers', () => {
     const cmp = component as any;
 
     cmp.slug = 'first-post';
-    const navigateSpy = spyOn((cmp as any).router, 'navigate').and.returnValue(Promise.resolve(true));
+    const navigateSpy = spyOn(cmp.router, 'navigate').and.returnValue(Promise.resolve(true));
 
     cmp.editBlogPost();
     expect(navigateSpy).toHaveBeenCalledWith(['/admin/content/blog'], { queryParams: { edit: 'first-post' } });
@@ -712,13 +712,15 @@ describe('BlogPostComponent coverage wave residual method helpers', () => {
     cmp.scrollToTop();
 
     cmp.document = document;
-    const scrollSpy = (window.scrollTo as any).and ? (window.scrollTo as any) : spyOn(window, 'scrollTo').and.stub();
+    const scrollSpy = jasmine.isSpy(globalThis.scrollTo)
+      ? (globalThis.scrollTo as jasmine.Spy)
+      : spyOn(globalThis, 'scrollTo').and.stub();
     cmp.scrollToTop();
     expect(scrollSpy).toHaveBeenCalled();
 
     spyOn(cmp, 'buildShareUrl').and.returnValue('https://momentstudio.test/blog/first-post');
     cmp.post.set({ title: 'First Post' } as any);
-    const openSpy = spyOn(window, 'open').and.returnValue(null);
+    const openSpy = spyOn(globalThis, 'open').and.returnValue(null);
 
     cmp.shareWhatsApp();
     expect(openSpy).toHaveBeenCalledWith(

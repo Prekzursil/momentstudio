@@ -104,7 +104,7 @@ describe('AdminComponent coverage wave 9 legal/info/page visibility branches', (
     component.contentPages = [{ key: 'page.custom', hidden: false, slug: 'custom' } as any];
     admin.getContent.and.returnValue(throwError(() => new Error('load-fail')));
 
-    (component as any).setPageHidden('page.custom', true);
+    component.setPageHidden('page.custom', true);
 
     expect(component.pageVisibilitySaving['page.custom']).toBeFalse();
     expect(component.contentPages[0].hidden).toBeFalse();
@@ -138,11 +138,11 @@ describe('AdminComponent coverage wave 9 legal/info/page visibility branches', (
 
     admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
     component.handleContentConflict.and.returnValue(true);
-    (component as any).saveLegalMetaIfNeeded('page.terms', jasmine.createSpy('ok1'), conflictError);
+    component.saveLegalMetaIfNeeded('page.terms', jasmine.createSpy('ok1'), conflictError);
     expect(conflictError).toHaveBeenCalled();
 
     component.handleContentConflict.and.returnValue(false);
-    (component as any).saveLegalMetaIfNeeded('page.terms', jasmine.createSpy('ok2'), genericError);
+    component.saveLegalMetaIfNeeded('page.terms', jasmine.createSpy('ok2'), genericError);
     expect(genericError).toHaveBeenCalled();
   });
 
@@ -150,18 +150,18 @@ describe('AdminComponent coverage wave 9 legal/info/page visibility branches', (
     const { component } = createDynamicAdminHarness();
 
     component.cmsPrefs.translationLayout = () => 'sideBySide';
-    const bothSpy = spyOn(component as any, 'saveLegalPageBoth').and.stub();
+    const bothSpy = spyOn(component, 'saveLegalPageBoth').and.stub();
     component.saveLegalPageUi();
     expect(bothSpy).toHaveBeenCalled();
 
-    (component as any).saveLegalMetaIfNeeded = (_key: string, _ok: () => void, onError: () => void) => onError();
-    (component as any).saveLegalPage('page.terms', 'Body', 'en');
+    component.saveLegalMetaIfNeeded = (_key: string, _ok: () => void, onError: () => void) => onError();
+    component.saveLegalPage('page.terms', 'Body', 'en');
     expect(component.legalPageSaving).toBeFalse();
     expect(component.legalPageError).toBe('adminUi.site.pages.errors.save');
 
-    (component as any).saveLegalMetaIfNeeded = (_key: string, onSuccess: () => void) => onSuccess();
+    component.saveLegalMetaIfNeeded = (_key: string, onSuccess: () => void) => onSuccess();
     let calls = 0;
-    (component as any).savePageMarkdownInternal = (
+    component.savePageMarkdownInternal = (
       _key: string,
       _body: string,
       _lang: 'en' | 'ro',
@@ -172,7 +172,7 @@ describe('AdminComponent coverage wave 9 legal/info/page visibility branches', (
       if (calls === 1) onSuccess();
       else onError();
     };
-    (component as any).saveLegalPageBoth('page.terms', { en: 'EN', ro: 'RO' });
+    component.saveLegalPageBoth('page.terms', { en: 'EN', ro: 'RO' });
     expect(component.legalPageSaving).toBeFalse();
     expect(component.legalPageError).toBe('adminUi.site.pages.errors.save');
   });
@@ -183,11 +183,11 @@ describe('AdminComponent coverage wave 9 legal/info/page visibility branches', (
     admin.createContent.and.returnValue(throwError(() => ({ status: 500 })));
 
     const onError = jasmine.createSpy('onError');
-    (component as any).savePageMarkdownInternal('page.terms', 'Body', 'en', jasmine.createSpy('onSuccess'), onError);
+    component.savePageMarkdownInternal('page.terms', 'Body', 'en', jasmine.createSpy('onSuccess'), onError);
     expect(onError).toHaveBeenCalled();
 
     let step = 0;
-    (component as any).saveInfoInternal = (
+    component.saveInfoInternal = (
       _key: string,
       _body: string,
       _lang: 'en' | 'ro',
@@ -202,7 +202,7 @@ describe('AdminComponent coverage wave 9 legal/info/page visibility branches', (
     component.saveInfoBoth('page.about', { en: 'EN', ro: 'RO' } as any);
     expect(component.infoError).toBe('adminUi.site.pages.errors.save');
 
-    (component as any).saveInfoInternal = (
+    component.saveInfoInternal = (
       _key: string,
       _body: string,
       _lang: 'en' | 'ro',

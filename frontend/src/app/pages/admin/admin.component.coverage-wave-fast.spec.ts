@@ -1053,16 +1053,16 @@ describe('AdminComponent fast blog moderation and residual branch closures', () 
 
     component.blogBulkUnpublishAt = '2026-03-06T10:00';
     const scheduled = component['buildBlogBulkPayload']({ meta: {} });
-    expect((scheduled as any).status).toBe('published');
+    expect(scheduled.status).toBe('published');
 
     component.blogBulkAction = 'tags_add';
     component.blogBulkTags = 'new, featured';
-    const tagged = component['buildBlogBulkPayload']({ meta: { tags: ['old'] } }) as any;
+    const tagged = component['buildBlogBulkPayload']({ meta: { tags: ['old'] } });
     expect(tagged.meta.tags.length).toBe(3);
 
     component.blogBulkAction = 'tags_remove';
     component.blogBulkTags = 'old';
-    const removed = component['buildBlogBulkPayload']({ meta: { tags: ['old', 'fresh'] } }) as any;
+    const removed = component['buildBlogBulkPayload']({ meta: { tags: ['old', 'fresh'] } });
     expect(removed.meta.tags).toEqual(['fresh']);
 
     component.blogMeta = {
@@ -1081,8 +1081,8 @@ describe('AdminComponent fast blog moderation and residual branch closures', () 
     expect(component.blogForm.summary).toBe('Rezumat RO');
 
     const meta = component.buildBlogMeta('en');
-    expect((meta as any).summary.en).toBeTruthy();
-    expect((meta as any).pin_order).toBeGreaterThan(0);
+    expect(meta.summary.en).toBeTruthy();
+    expect(meta.pin_order).toBeGreaterThan(0);
   });
 });
 

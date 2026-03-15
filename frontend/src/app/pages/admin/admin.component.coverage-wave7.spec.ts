@@ -825,7 +825,7 @@ function primeBlogHarness(component: any, admin: any): { blog: jasmine.SpyObj<an
   admin.getContent.and.returnValue(of({ title: 'Wave', body_markdown: 'Body', status: 'draft', meta: {}, version: 1 } as any));
   admin.updateContentBlock.and.returnValue(of({ title: 'Wave', body_markdown: 'Body', status: 'draft', meta: {}, version: 2 } as any));
 
-  const adminProxy = component.admin as any;
+  const adminProxy = component.admin;
   adminProxy.getContentVersion = jasmine.createSpy('getContentVersion').and.returnValue(of({ body_markdown: 'old body' } as any));
   adminProxy.rollbackContentVersion = jasmine.createSpy('rollbackContentVersion').and.returnValue(of({} as any));
   adminProxy.uploadContentImage = jasmine
@@ -857,7 +857,7 @@ describe('AdminComponent coverage wave 7 blog action matrix', () => {
 
   it('covers moderation hide and unhide error branches plus delete', () => {
     const { component } = createAdminHarness();
-    const { blog } = primeBlogHarness(component as any, (component as any).admin as any);
+    const { blog } = primeBlogHarness(component, (component as any).admin);
     spyOn(component as any, 'loadFlaggedComments').and.stub();
     spyOn(GLOBAL_CTX, 'prompt').and.returnValue('reason');
     spyOn(GLOBAL_CTX, 'confirm').and.returnValue(true);
@@ -916,7 +916,7 @@ describe('AdminComponent coverage wave 7 blog action matrix', () => {
 describe('AdminComponent coverage wave 7 blog residual branch matrix', () => {
   it('covers blog bulk preview branches across actions', () => {
     const { component } = createAdminHarness();
-    primeBlogHarness(component as any, (component as any).admin as any);
+    primeBlogHarness(component, (component as any).admin);
 
     component.blogBulkSelection = new Set<string>();
     expect(component.blogBulkPreview()).toContain('adminUi.blog.bulk.previewEmpty');
@@ -983,7 +983,7 @@ describe('AdminComponent coverage wave 7 blog residual branch matrix', () => {
 
   it('covers moderation guard and error branches for hide/unhide/delete', () => {
     const { component } = createAdminHarness();
-    const { blog } = primeBlogHarness(component as any, (component as any).admin as any);
+    const { blog } = primeBlogHarness(component, (component as any).admin);
     spyOn(component as any, 'loadFlaggedComments').and.stub();
 
     component.blogCommentModerationBusy.add('busy-1');

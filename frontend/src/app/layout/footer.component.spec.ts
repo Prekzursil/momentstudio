@@ -52,25 +52,25 @@ const TRANSLATIONS = {
   nav: { shop: 'Shop', about: 'About', contact: 'Contact', terms: 'Terms' }
 };
 
+function socialServiceFrom(source: Observable<any>): SiteSocialService {
+  return { get: () => source } as unknown as SiteSocialService;
+}
+
+function companyServiceFrom(source: Observable<SiteCompanyInfo>): SiteCompanyService {
+  return { get: () => source } as unknown as SiteCompanyService;
+}
+
+function navigationServiceFrom(source: Observable<any>): SiteNavigationService {
+  return { get: () => source } as unknown as SiteNavigationService;
+}
+
+function applyTranslations(): void {
+  const translate = TestBed.inject(TranslateService);
+  translate.setTranslation('en', TRANSLATIONS, true);
+  translate.use('en');
+}
+
 describe('FooterComponent', () => {
-  function socialServiceFrom(source: Observable<any>): SiteSocialService {
-    return { get: () => source } as unknown as SiteSocialService;
-  }
-
-  function companyServiceFrom(source: Observable<SiteCompanyInfo>): SiteCompanyService {
-    return { get: () => source } as unknown as SiteCompanyService;
-  }
-
-  function navigationServiceFrom(source: Observable<any>): SiteNavigationService {
-    return { get: () => source } as unknown as SiteNavigationService;
-  }
-
-  function applyTranslations(): void {
-    const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', TRANSLATIONS, true);
-    translate.use('en');
-  }
-
   function configureProviders(overrides?: {
     social?: SiteSocialService;
     company?: SiteCompanyService;
@@ -110,7 +110,7 @@ describe('FooterComponent', () => {
 
   it('hydrates social/nav/company sections and clears loading flags', fakeAsync(() => {
     configureProviders();
-    spyOn(window, 'requestAnimationFrame').and.callFake((cb: FrameRequestCallback) => {
+    spyOn(globalThis, 'requestAnimationFrame').and.callFake((cb: FrameRequestCallback) => {
       cb(0);
       return 1;
     });
@@ -131,8 +131,9 @@ describe('FooterComponent', () => {
 
   it('falls back to timer update path when requestAnimationFrame is unavailable', fakeAsync(() => {
     configureProviders();
-    const originalRaf = (window as any).requestAnimationFrame;
-    (window as any).requestAnimationFrame = undefined;
+    const frameHost = globalThis as typeof globalThis & { requestAnimationFrame?: typeof requestAnimationFrame };
+    const originalRaf = frameHost.requestAnimationFrame;
+    frameHost.requestAnimationFrame = undefined;
 
     const fixture = TestBed.createComponent(FooterComponent);
     fixture.detectChanges();
@@ -140,7 +141,7 @@ describe('FooterComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.componentInstance.socialLoading).toBeFalse();
-    (window as any).requestAnimationFrame = originalRaf;
+    frameHost.requestAnimationFrame = originalRaf;
   }));
 
   it('uses localized labels and falls back safely', () => {
@@ -203,7 +204,7 @@ describe('FooterComponent', () => {
 
     const inside = document.createElement('button');
     const wrapper = document.createElement('div');
-    wrapper.setAttribute('data-footer-dropdown', 'true');
+    wrapper.dataset.footerDropdown = 'true';
     wrapper.appendChild(inside);
     cmp.onDocumentClick({ target: inside } as unknown as MouseEvent);
     expect(cmp.openMenu).toBe('instagram');

@@ -1,9 +1,10 @@
 import { CmsBlockLibraryComponent } from './cms-block-library.component';
 
+function createComponent(): CmsBlockLibraryComponent {
+  return new CmsBlockLibraryComponent();
+}
+
 describe('CmsBlockLibraryComponent', () => {
-  function createComponent(): CmsBlockLibraryComponent {
-    return new CmsBlockLibraryComponent();
-  }
 
   it('filters blocks by allowed types', () => {
     const component = createComponent();

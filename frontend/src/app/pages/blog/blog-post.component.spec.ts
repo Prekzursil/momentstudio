@@ -469,8 +469,8 @@ describe('BlogPostComponent', () => {
     cmp.quickEditUnpublishAt = '2030-01-01T10:30';
 
     admin.updateContentBlock.and.returnValues(
-      of({ ...baseBlock, version: 5, status: 'published', meta: { tags: ['new', 'featured'], summary: { en: 'New summary' } } } as any),
-      of({ ...baseBlock, version: 6, title: 'New title' } as any),
+      of({ ...baseBlock, version: 5, status: 'published', meta: { tags: ['new', 'featured'], summary: { en: 'New summary' } } }),
+      of({ ...baseBlock, version: 6, title: 'New title' }),
     );
 
     cmp.saveQuickEdit();

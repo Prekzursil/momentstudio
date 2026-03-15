@@ -164,7 +164,7 @@ describe('authAndErrorInterceptor', () => {
     noisy.flush({ detail: 'server error' }, { status: 500, statusText: 'Server Error' });
     expect(errorBus.emit).toHaveBeenCalledWith(jasmine.objectContaining({ status: 500, method: 'GET' }));
 
-    (errorBus.emit as jasmine.Spy).calls.reset();
+    errorBus.emit.calls.reset();
     http.get('/api/v1/admin/reports', { headers: new HttpHeaders({ 'X-Silent': '1' }) }).subscribe({
       error: () => undefined
     });

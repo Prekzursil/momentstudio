@@ -148,8 +148,6 @@ function handleAdminAccessError(
 }
 
 export const authGuard: CanActivateFn = (_route, _state) => {
-  void _route;
-  void _state;
   const router = inject(Router);
   const toast = inject(ToastService);
   const auth = inject(AuthService);
@@ -168,8 +166,6 @@ export const authGuard: CanActivateFn = (_route, _state) => {
 };
 
 export const adminGuard: CanActivateFn = (_route, _state) => {
-  void _route;
-  void _state;
   const router = inject(Router);
   const toast = inject(ToastService);
   const auth = inject(AuthService);

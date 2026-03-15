@@ -30,7 +30,7 @@ describe('LazyStylesService', () => {
   it('reuses inflight load promise and resolves on onload', async () => {
     const first = service.ensure('admin', '/assets/admin.css');
     const second = service.ensure('admin', '/assets/admin.css');
-    const link = doc.querySelector('link[data-lazy-style="admin"]') as HTMLLinkElement | null;
+    const link = doc.querySelector<HTMLLinkElement>('link[data-lazy-style="admin"]');
     expect(link).toBeTruthy();
 
     link?.onload?.(new Event('load'));
@@ -41,7 +41,7 @@ describe('LazyStylesService', () => {
   it('removes failed link and rejects when stylesheet fails to load', async () => {
     const failing = service.ensure('broken', '/assets/broken.css');
 
-    const link = doc.querySelector('link[data-lazy-style="broken"]') as HTMLLinkElement | null;
+    const link = doc.querySelector<HTMLLinkElement>('link[data-lazy-style="broken"]');
     expect(link).toBeTruthy();
 
     link?.onerror?.(new Event('error'));

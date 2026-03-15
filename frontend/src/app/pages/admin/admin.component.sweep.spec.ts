@@ -363,7 +363,7 @@ function runFallbackAdminSweep(dynamic: any, name: string, arity: number): numbe
   for (const variant of ADMIN_SWEEP_FALLBACK_VARIANTS) {
     const fallback = variant.slice(0, arity);
     const missing = arity - fallback.length;
-    if (missing > 0) fallback.push(...Array(missing).fill(undefined));
+    if (missing > 0) fallback.push(...new Array(missing).fill(undefined));
     callAdminMethodSafely(dynamic, name, fallback);
     attempted += 1;
   }
@@ -382,7 +382,7 @@ function runAdminPrototypeSweep(dynamic: any): number {
     }
 
     const method = dynamic[name];
-    const arity = Math.min((method && method.length) || 0, 4);
+    const arity = Math.min(method?.length ?? 0, 4);
     attempted += runFallbackAdminSweep(dynamic, name, arity);
   }
 
