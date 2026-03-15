@@ -13,6 +13,17 @@ from starlette.requests import Request
 from app.api.v1 import auth as auth_api
 
 
+def _fixture_value(label: str) -> str:
+    return f"{label}-{uuid4().hex}"
+
+
+FIXTURE_VALUE = _fixture_value("fixture")
+TEST_CODE = "123456"
+TWO_FACTOR_HANDLE = _fixture_value("two-factor")
+GOOGLE_TWO_FACTOR_HANDLE = _fixture_value("google-2fa")
+INVALID_HANDLE = _fixture_value("invalid")
+
+
 def _request() -> Request:
     scope = {
         "type": "http",
@@ -32,7 +43,7 @@ def _request() -> Request:
 def _user(**overrides):
     data = {
         "id": uuid4(),
-        "hashed_password": "hashed",
+        "hashed_password": _fixture_value("hash"),
         "two_factor_enabled": True,
         "email": "user@example.test",
         "preferred_language": "en",
@@ -88,7 +99,7 @@ def test_auth_helper_validators_and_schedule_job_branches() -> None:
 async def test_decode_and_passkey_login_guard_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(auth_api.security, "decode_token", lambda _token: {"type": "two_factor", "sub": "not-a-uuid"})
     with pytest.raises(HTTPException, match="Invalid two-factor token"):
-        auth_api._decode_two_factor_login_token("bad")
+        auth_api._decode_two_factor_login_token(INVALID_HANDLE)
 
     async def _user_by_email(*_args, **_kwargs):
         return _user()
@@ -118,7 +129,7 @@ async def test_login_two_factor_invalid_user_not_enabled_and_bad_code(monkeypatc
     monkeypatch.setattr(auth_api, "_ensure_user_account_active", _ensure_active)
 
     session = _Session(user=None)
-    payload = auth_api.TwoFactorLoginRequest(two_factor_token="token", code="123456")
+    payload = auth_api.TwoFactorLoginRequest(two_factor_token=TWO_FACTOR_HANDLE, code=TEST_CODE)
     with pytest.raises(HTTPException, match="Invalid two-factor token"):
         await auth_api.login_two_factor(payload, _request(), BackgroundTasks(), session, None, Response())
 
@@ -158,7 +169,7 @@ async def test_existing_google_user_callback_incomplete_and_two_factor(monkeypat
 
     monkeypatch.setattr(auth_api.auth_service, "is_profile_complete", lambda _u: True)
     monkeypatch.setattr(auth_api.UserResponse, "model_validate", lambda _u: SimpleNamespace(id=str(existing_user.id)))
-    monkeypatch.setattr(auth_api.security, "create_two_factor_token", lambda *_args, **_kwargs: "google-2fa-token")
+    monkeypatch.setattr(auth_api.security, "create_two_factor_token", lambda *_args, **_kwargs: GOOGLE_TWO_FACTOR_HANDLE)
     monkeypatch.setattr(auth_api, "GoogleCallbackResponse", lambda **kwargs: SimpleNamespace(**kwargs))
     existing_user.two_factor_enabled = True
 
@@ -170,7 +181,7 @@ async def test_existing_google_user_callback_incomplete_and_two_factor(monkeypat
         response=Response(),
     )
     assert response.requires_two_factor is True
-    assert response.two_factor_token == "google-2fa-token"
+    assert response.two_factor_token == GOOGLE_TWO_FACTOR_HANDLE
 
 
 @pytest.mark.anyio
@@ -181,29 +192,29 @@ async def test_invalid_password_guards_cover_many_endpoints(monkeypatch: pytest.
     current_user = _user()
 
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.passkey_register_options(SimpleNamespace(password="pw"), current_user, session)
+        await auth_api.passkey_register_options(SimpleNamespace(password=FIXTURE_VALUE), current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.passkey_delete(uuid4(), SimpleNamespace(password="pw"), request, current_user, session)
+        await auth_api.passkey_delete(uuid4(), SimpleNamespace(password=FIXTURE_VALUE), request, current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.step_up(SimpleNamespace(password="pw"), request, None, session, current_user)
+        await auth_api.step_up(SimpleNamespace(password=FIXTURE_VALUE), request, None, session, current_user)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.two_factor_setup(SimpleNamespace(password="pw"), request, current_user, session)
+        await auth_api.two_factor_setup(SimpleNamespace(password=FIXTURE_VALUE), request, current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.two_factor_regenerate_codes(SimpleNamespace(password="pw", code="123456"), request, current_user, session)
+        await auth_api.two_factor_regenerate_codes(SimpleNamespace(password=FIXTURE_VALUE, code=TEST_CODE), request, current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.update_username(SimpleNamespace(username="newname", password="pw"), current_user, session)
+        await auth_api.update_username(SimpleNamespace(username="newname", password=FIXTURE_VALUE), current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.update_email(SimpleNamespace(email="new@example.test", password="pw"), request, BackgroundTasks(), current_user, session)
+        await auth_api.update_email(SimpleNamespace(email="new@example.test", password=FIXTURE_VALUE), request, BackgroundTasks(), current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.make_secondary_email_primary(uuid4(), SimpleNamespace(password="pw"), request, current_user, session)
+        await auth_api.make_secondary_email_primary(uuid4(), SimpleNamespace(password=FIXTURE_VALUE), request, current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.delete_secondary_email(uuid4(), SimpleNamespace(password="pw"), current_user, session)
+        await auth_api.delete_secondary_email(uuid4(), SimpleNamespace(password=FIXTURE_VALUE), current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.request_account_deletion(SimpleNamespace(confirm="DELETE", password="pw"), current_user, session)
+        await auth_api.request_account_deletion(SimpleNamespace(confirm="DELETE", password=FIXTURE_VALUE), current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.revoke_other_sessions(SimpleNamespace(password="pw"), request, current_user, session)
+        await auth_api.revoke_other_sessions(SimpleNamespace(password=FIXTURE_VALUE), request, current_user, session)
     with pytest.raises(HTTPException, match="Invalid password"):
-        await auth_api.google_unlink(SimpleNamespace(password="pw"), current_user, session, None)
+        await auth_api.google_unlink(SimpleNamespace(password=FIXTURE_VALUE), current_user, session, None)
 
 
 @pytest.mark.anyio

@@ -15,6 +15,10 @@ import pytest
 from app import cli
 
 
+OWNER_RESET_VALUE = f"owner-reset-{uuid.uuid4().hex}"
+OWNER_BOOTSTRAP_VALUE = f"owner-bootstrap-{uuid.uuid4().hex}"
+
+
 class _ScalarRows:
     def __init__(self, rows: list[object]) -> None:
         self._rows = rows
@@ -579,8 +583,8 @@ async def test_cli_wave_owner_repair_helper_branches(monkeypatch: pytest.MonkeyP
     assert owner.email_verified is True
 
     monkeypatch.setattr(cli.security, "hash_password", lambda value: f"hashed::{value}")
-    cli._repair_owner_password(owner, "replacement-code")
-    assert owner.hashed_password == "hashed::replacement-code"
+    cli._repair_owner_password(owner, OWNER_RESET_VALUE)
+    assert owner.hashed_password == f"hashed::{OWNER_RESET_VALUE}"
 
     owner.email = "owner@example.com"
     owner.email_verified = False
@@ -961,7 +965,7 @@ async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(cli, '_demote_owner_if_needed', _demote)
     monkeypatch.setattr(cli, '_create_owner_user', _create)
 
-    await cli.bootstrap_owner(email='owner@example.com', password='secret-123', username='owner', display_name='Owner')
+    await cli.bootstrap_owner(email='owner@example.com', password=OWNER_BOOTSTRAP_VALUE, username='owner', display_name='Owner')
 
     async def _require_owner(_session):
         calls['require'] = calls.get('require', 0) + 1
@@ -983,7 +987,7 @@ async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPat
 
     await cli.repair_owner(
         email='owner@example.com',
-        password='secret-123',
+        password=OWNER_BOOTSTRAP_VALUE,
         username='owner-fixed',
         display_name='Owner Fixed',
         verify_email=True,

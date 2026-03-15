@@ -13,6 +13,11 @@ from app import cli
 from app.models.user import UserRole
 
 
+OWNER_BOOTSTRAP_VALUE = f"owner-bootstrap-{uuid4().hex}"
+OWNER_UPDATE_VALUE = f"owner-update-{uuid4().hex}"
+OWNER_ROTATION_VALUE = f"owner-rotation-{uuid4().hex}"
+
+
 class _ScalarRows:
     def __init__(self, rows):
         self._rows = list(rows)
@@ -95,14 +100,14 @@ async def test_create_owner_user_and_update_owner_user_record_histories(monkeypa
         email_norm='owner@example.com',
         username_norm='owner',
         display_name_norm='Owner',
-        password='secret-1',
+        password=OWNER_BOOTSTRAP_VALUE,
         now=now,
     )
 
     assert user.email == 'owner@example.com'
     assert user.username == 'owner'
     assert user.name_tag == 7
-    assert user.hashed_password == 'hash::secret-1'
+    assert user.hashed_password == f'hash::{OWNER_BOOTSTRAP_VALUE}'
     assert session.flushes == 1
     assert len(session.added) == 4
 
@@ -121,13 +126,13 @@ async def test_create_owner_user_and_update_owner_user_record_histories(monkeypa
         existing_username_user=None,
         username_norm='owner',
         display_name_norm='Owner Updated',
-        password='secret-2',
+        password=OWNER_UPDATE_VALUE,
         now=now,
     )
 
     assert owner.name == 'Owner Updated'
     assert owner.name_tag == 7
-    assert owner.hashed_password == 'hash::secret-2'
+    assert owner.hashed_password == f'hash::{OWNER_UPDATE_VALUE}'
     assert owner.email_verified is True
     assert owner.role == UserRole.owner
 
@@ -202,7 +207,7 @@ async def test_repair_owner_sets_role_and_commits(monkeypatch: pytest.MonkeyPatc
 
     await cli.repair_owner(
         email='owner@example.com',
-        password='new-secret',
+        password=OWNER_ROTATION_VALUE,
         username='owner',
         display_name='Owner',
         verify_email=True,
@@ -210,7 +215,7 @@ async def test_repair_owner_sets_role_and_commits(monkeypatch: pytest.MonkeyPatc
 
     assert calls == ['email', 'username', 'display']
     assert owner.role == UserRole.owner
-    assert owner.hashed_password == 'hash::new-secret'
+    assert owner.hashed_password == f'hash::{OWNER_ROTATION_VALUE}'
     assert session.commits == 1
     assert session.refreshes == [owner]
 
