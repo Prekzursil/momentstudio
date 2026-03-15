@@ -1,9 +1,9 @@
 from __future__ import absolute_import
-from __future__ import annotations
 
 import os
 from http.client import HTTPConnection, HTTPSConnection, HTTPException
 from pathlib import Path
+from typing import Optional, Tuple
 from urllib.parse import ParseResult, urlparse
 
 DEFAULT_APPLITOOLS_SERVER = "https://eyesapi.applitools.com"
@@ -30,7 +30,7 @@ def write_output(name: str, value: str) -> None:
         handle.write(f"{name}={value}\n")
 
 
-def normalize_scheme(parsed: ParseResult) -> str | None:
+def normalize_scheme(parsed: ParseResult) -> Optional[str]:
     scheme = (parsed.scheme or "https").lower()
     if scheme in {"http", "https"}:
         return scheme
@@ -53,7 +53,7 @@ def build_request_path(base_path: str) -> str:
     return f"{base_path}{RENDERINFO_PATH}"
 
 
-def resolve_probe_target(server_url: str) -> tuple[str, str, str] | None:
+def resolve_probe_target(server_url: str) -> Optional[Tuple[str, str, str]]:
     parsed = urlparse(server_url)
     scheme = normalize_scheme(parsed)
     if scheme is None:
