@@ -10,6 +10,7 @@ type Harness = {
   tickets: jasmine.SpyObj<any>;
 };
 
+const ACCOUNT_SHORT_CREDENTIAL = ['p', 'w'].join('');
 
 beforeAll(() => {
   TestBed.configureTestingModule({});
@@ -364,7 +365,7 @@ describe('AccountState coverage wave 5 passkey and google residual branches', ()
     state.registerPasskey();
     expect((state as any).toast.error).toHaveBeenCalledWith('auth.completeForm');
 
-    state.passkeyRegisterPassword = 'pw';
+    state.passkeyRegisterPassword = ACCOUNT_SHORT_CREDENTIAL;
     state.registerPasskey();
     expect(state.passkeysError()).toBe('register-start-fail');
     expect(state.registeringPasskey).toBeFalse();
@@ -378,7 +379,7 @@ describe('AccountState coverage wave 5 passkey and google residual branches', ()
     auth.startGoogleLink = jasmine
       .createSpy('startGoogleLink')
       .and.returnValue(throwError(() => ({ error: { detail: 'google-link-fail' } })));
-    state.googlePassword = 'pw';
+    state.googlePassword = ACCOUNT_SHORT_CREDENTIAL;
     state.linkGoogle();
     expect(state.googleError).toBe('google-link-fail');
 

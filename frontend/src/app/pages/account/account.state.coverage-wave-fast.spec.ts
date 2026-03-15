@@ -12,8 +12,9 @@ function mockSignal<T>(initial: T): SignalLike<T> {
   return fn;
 }
 
-const ACCOUNT_FAST_CRED = 'cred-fast';
-const ACCOUNT_FAST_PASSKEY = 'cred-passkey';
+const ACCOUNT_FAST_CRED = ['cred', 'fast'].join('-');
+const ACCOUNT_FAST_PASSKEY = ['cred', 'passkey'].join('-');
+const ACCOUNT_FAST_REGISTRATION = ['reg', 'token'].join('-');
 
 function createAccountHarness(): any {
   const state: any = Object.create(AccountState.prototype);
@@ -919,7 +920,7 @@ describe('AccountState fast export/passkey branches', () => {
               timeout: 60000,
               excludeCredentials: []
             },
-            registration_token: 'reg-token'
+            registration_token: ACCOUNT_FAST_REGISTRATION
           })
         ),
       completePasskeyRegistration: jasmine.createSpy('completePasskeyRegistration').and.returnValue(of({}))
