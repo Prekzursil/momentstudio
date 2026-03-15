@@ -10,5 +10,3 @@ jobs:
     with:
       repo_slug: ${{ github.repository }}
       lane: coverage
-    secrets:
-      CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
