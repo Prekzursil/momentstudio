@@ -12,6 +12,8 @@ permissions:
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    env:
+      CODACY_API_TOKEN: ${{ secrets.CODACY_API_TOKEN }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -52,12 +54,19 @@ jobs:
           cd frontend
           npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox --code-coverage || npm test -- --watch=false --code-coverage
 
-      - name: Warn when Codacy token is missing
-        if: ${{ secrets.CODACY_API_TOKEN == '' }}
-        run: echo "::warning::Missing CODACY_API_TOKEN secret. Skipping Codacy upload."
+      - name: Validate Codacy token
+        id: codacy_token
+        shell: bash
+        run: |
+          if [ -z "${CODACY_API_TOKEN}" ]; then
+            echo "::warning::Missing CODACY_API_TOKEN secret. Skipping Codacy upload."
+            echo "upload_enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "upload_enabled=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload coverage reports to Codacy
-        if: ${{ secrets.CODACY_API_TOKEN != '' }}
+        if: ${{ steps.codacy_token.outputs.upload_enabled == 'true' }}
         uses: codacy/codacy-coverage-reporter-action@89d6c85cfafaec52c72b6c5e8b2878d33104c699 # v1.3.0
         with:
           api-token: ${{ secrets.CODACY_API_TOKEN }}
