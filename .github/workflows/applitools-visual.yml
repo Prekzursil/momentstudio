@@ -14,6 +14,8 @@ jobs:
   applitools-core:
     name: Applitools Visual
     runs-on: ubuntu-latest
+    env:
+      APPLITOOLS_PR_ORIGIN: ${{ (github.actor == 'dependabot[bot]') || (github.event.pull_request.user.login == 'dependabot[bot]') || startsWith(github.event.pull_request.head.ref || github.head_ref || '', 'dependabot/') }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
@@ -31,18 +33,11 @@ jobs:
         env:
           APPLITOOLS_API_KEY: ${{ secrets.APPLITOOLS_API_KEY }}
           APPLITOOLS_SERVER_URL: ${{ vars.APPLITOOLS_SERVER_URL }}
-          GITHUB_ACTOR_NAME: ${{ github.actor }}
-          PULL_REQUEST_AUTHOR: ${{ github.event.pull_request.user.login || '' }}
         run: |
           set -euo pipefail
 
-          is_dependabot_origin=false
-          if [ "${GITHUB_ACTOR_NAME:-}" = "dependabot[bot]" ] || [ "${PULL_REQUEST_AUTHOR:-}" = "dependabot[bot]" ]; then
-            is_dependabot_origin=true
-          fi
-
           if [ -z "${APPLITOOLS_API_KEY:-}" ]; then
-            if [ "$is_dependabot_origin" = "true" ]; then
+            if [ "${APPLITOOLS_PR_ORIGIN:-false}" = "true" ]; then
               echo "available=false" >> "$GITHUB_OUTPUT"
               echo "Skipping Applitools for Dependabot because APPLITOOLS_API_KEY is unavailable in this context."
               exit 0
@@ -79,7 +74,7 @@ jobs:
             exit 0
           fi
 
-          if [ "$is_dependabot_origin" = "true" ]; then
+          if [ "${APPLITOOLS_PR_ORIGIN:-false}" = "true" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "Skipping Applitools for Dependabot because credentials/server validation failed with HTTP ${probe_status}."
             exit 0
