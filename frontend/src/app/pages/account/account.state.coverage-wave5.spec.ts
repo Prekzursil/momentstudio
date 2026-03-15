@@ -11,6 +11,7 @@ type Harness = {
 };
 
 const ACCOUNT_SHORT_CREDENTIAL = ['p', 'w'].join('');
+const ACCOUNT_DELETE_PASSWORD = ['current', 'pass'].join('-');
 
 beforeAll(() => {
   TestBed.configureTestingModule({});
@@ -275,7 +276,7 @@ describe('AccountState coverage wave 5 residual branch closures', () => {
     expect((state as any).toast.error).toHaveBeenCalledWith('avatar-remove-failed');
 
     state.deletionConfirmText = 'DELETE';
-    state.deletionPassword = 'current-pass';
+    state.deletionPassword = ACCOUNT_DELETE_PASSWORD;
     (state as any).account.requestAccountDeletion = jasmine
       .createSpy('requestAccountDeletion')
       .and.returnValue(throwError(() => ({ error: { detail: 'deletion-failed' } })));

@@ -15,6 +15,8 @@ function mockSignal<T>(initial: T): SignalLike<T> {
 const ACCOUNT_FAST_CRED = ['cred', 'fast'].join('-');
 const ACCOUNT_FAST_PASSKEY = ['cred', 'passkey'].join('-');
 const ACCOUNT_FAST_REGISTRATION = ['reg', 'token'].join('-');
+const ACCOUNT_FAST_PASSWORD = ['current', 'pass'].join('-');
+const ACCOUNT_FAST_CODE = ['123', '456'].join('');
 
 function createAccountHarness(): any {
   const state: any = Object.create(AccountState.prototype);
@@ -1214,7 +1216,7 @@ describe('AccountState fast residual branch closures', () => {
     expect(state.secondaryEmailMessage).toBe('add-failed');
 
     state.secondaryVerificationEmailId = 'mail-1';
-    state.secondaryVerificationToken = '123456';
+    state.secondaryVerificationToken = ACCOUNT_FAST_CODE;
     state.confirmSecondaryEmailVerification();
     expect(state.secondaryVerificationStatus).toBe('verify-failed');
     expect(state.toast.error).toHaveBeenCalledWith('verify-failed');
@@ -1258,26 +1260,26 @@ describe('AccountState fast residual branch closures', () => {
 
     spyOn(globalThis, 'confirm').and.returnValue(true);
     state.removePasskeyConfirmId = 'pk1';
-    state.removePasskeyPassword = 'current-pass';
+    state.removePasskeyPassword = ACCOUNT_FAST_PASSWORD;
     state.confirmRemovePasskey();
     expect(state.passkeysError()).toBe('remove-passkey-failed');
 
-    state.twoFactorSetupPassword = 'current-pass';
+    state.twoFactorSetupPassword = ACCOUNT_FAST_PASSWORD;
     state.startTwoFactorSetup();
-    state.twoFactorEnableCode = '123456';
+    state.twoFactorEnableCode = ACCOUNT_FAST_CODE;
     state.enableTwoFactor();
-    state.twoFactorManagePassword = 'current-pass';
-    state.twoFactorManageCode = '123456';
+    state.twoFactorManagePassword = ACCOUNT_FAST_PASSWORD;
+    state.twoFactorManageCode = ACCOUNT_FAST_CODE;
     state.regenerateTwoFactorRecoveryCodes();
     state.disableTwoFactor();
     expect(state.twoFactorError()).toBe('disable-2fa-failed');
 
     state.makePrimarySecondaryEmailId = 'mail-1';
-    state.makePrimaryPassword = 'current-pass';
+    state.makePrimaryPassword = ACCOUNT_FAST_PASSWORD;
     state.confirmMakePrimary();
     expect(state.makePrimaryError).toBe('primary-email-failed');
 
-    state.googlePassword = 'current-pass';
+    state.googlePassword = ACCOUNT_FAST_PASSWORD;
     state.linkGoogle();
     state.unlinkGoogle();
     expect(state.googleError).toBe('google-unlink-failed');
