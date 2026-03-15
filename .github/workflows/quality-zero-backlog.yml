@@ -3,12 +3,12 @@ name: Quality Zero Backlog
 on:
   schedule:
     - cron: "0 3 * * *"
-  workflow_dispatch:
 
 jobs:
   backlog-sweep:
     uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-backlog-sweep.yml@37a6db2c75dc6891eea39007c96e8f9cbde22579 # main
     with:
       repo_slug: ${{ github.repository }}
-      tool: coverage
-    secrets: inherit
+      lane: coverage
+    secrets:
+      CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
