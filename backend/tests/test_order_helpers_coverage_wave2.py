@@ -39,20 +39,20 @@ class _SessionStub:
     def add(self, value):
         self.added.append(value)
 
-    async def delete(self, value):
+    def delete(self, value):
         self.added.append(('delete', value))
 
-    async def execute(self, *_args, **_kwargs):
+    def execute(self, *_args, **_kwargs):
         if self.tags:
             return _ResultMany(self.tags)
         return _ResultOne(self.existing)
 
-    async def commit(self):
+    def commit(self):
         self.commit_calls += 1
         if self.fail_commit:
             raise IntegrityError('stmt', {}, Exception('dup'))
 
-    async def rollback(self):
+    def rollback(self):
         self.rollback_calls += 1
 
 
@@ -115,10 +115,10 @@ async def test_order_auto_ship_tracking_update_branch(monkeypatch: pytest.Monkey
     session = _SessionStub()
     calls: list[str] = []
 
-    async def _commit(_session, _order):
+    def _commit(_session, _order):
         calls.append('commit_stock')
 
-    async def _log(_session, _order_id, _event, _note, data=None):
+    def _log(_session, _order_id, _event, _note, data=None):
         del data
         calls.append(_event)
 
@@ -147,17 +147,17 @@ async def test_order_auto_ship_tracking_update_branch(monkeypatch: pytest.Monkey
 
 @pytest.mark.anyio
 async def test_order_void_or_refund_payment_intent_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _void_ok(_intent_id: str):
+    def _void_ok(_intent_id: str):
         return {'ok': True}
 
     monkeypatch.setattr(order_service.payments, 'void_payment_intent', _void_ok)
     event, note = await order_service._void_or_refund_payment_intent('pi_1')
     assert (event, note) == ('payment_voided', 'Intent pi_1')
 
-    async def _void_fail(_intent_id: str):
+    def _void_fail(_intent_id: str):
         raise HTTPException(status_code=400, detail='cannot void')
 
-    async def _refund_ok(_intent_id: str):
+    def _refund_ok(_intent_id: str):
         return {'id': 're_2'}
 
     monkeypatch.setattr(order_service.payments, 'void_payment_intent', _void_fail)
@@ -172,7 +172,7 @@ async def test_order_add_tag_paths_and_review_fraud_audit(monkeypatch: pytest.Mo
     order = _OrderLike()
     session_existing = _SessionStub(existing=SimpleNamespace(tag='vip'))
 
-    async def _hydrate(_session, _order_id):
+    def _hydrate(_session, _order_id):
         return None
 
     monkeypatch.setattr(order_service, 'get_order_by_id_admin', _hydrate)
@@ -188,7 +188,7 @@ async def test_order_add_tag_paths_and_review_fraud_audit(monkeypatch: pytest.Mo
 
     fraud_session = _SessionStub(tags=[SimpleNamespace(tag='fraud_approved')])
 
-    async def _sync(*_args, **_kwargs):
+    def _sync(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(order_service, '_sync_fraud_decision_tags', _sync)

@@ -286,7 +286,7 @@ async def test_service_auth_lookup_and_unique_username_edges(monkeypatch: pytest
 
     seen: list[str] = []
 
-    async def _get_user(_session: object, username: str):
+    def _get_user(_session: object, username: str):
         seen.append(username)
         return object() if len(seen) < 3 else None
 
@@ -310,7 +310,7 @@ async def test_service_auth_google_registration_update_branches(monkeypatch: pyt
     user = SimpleNamespace(id=uuid4(), username="current", name="Current", name_tag=1)
     other = SimpleNamespace(id=uuid4())
 
-    async def _get_user(_session: object, username: str):
+    def _get_user(_session: object, username: str):
         return other if username == "taken-name" else None
 
     monkeypatch.setattr(auth_service, "get_user_by_username", _get_user)
@@ -324,12 +324,12 @@ async def test_service_auth_google_registration_update_branches(monkeypatch: pyt
     with pytest.raises(HTTPException, match="Display name is required"):
         await auth_service._update_google_registration_display_name(session, user, "   ")
 
-    async def _reuse_none(_session: object, *, user_id: object, name: str):
+    def _reuse_none(_session: object, *, user_id: object, name: str):
         _ = user_id
         _ = name
         return None
 
-    async def _allocate(_session: object, name: str, *, exclude_user_id: object | None = None):
+    def _allocate(_session: object, name: str, *, exclude_user_id: object | None = None):
         _ = name
         _ = exclude_user_id
         return 7
@@ -412,17 +412,17 @@ class _HttpClientStub:
         self._post = post_resp
         self._get = get_resp
 
-    async def __aenter__(self):
+    def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    def __aexit__(self, exc_type, exc, tb):
         _ = (exc_type, exc, tb)
         return False
 
-    async def post(self, *_args, **_kwargs):
+    def post(self, *_args, **_kwargs):
         return self._post
 
-    async def get(self, *_args, **_kwargs):
+    def get(self, *_args, **_kwargs):
         return self._get
 
 

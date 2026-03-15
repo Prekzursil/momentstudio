@@ -23,7 +23,7 @@ class _Session:
     def add(self, item):
         self.added.append(item)
 
-    async def commit(self):
+    def commit(self):
         self.commits += 1
 
 
@@ -93,10 +93,10 @@ def test_returns_admin_list_get_and_order_listing_paths(monkeypatch):
             assert request is req
             pii_called['value'] += 1
 
-        async def _list(*_args, **_kwargs):
+        def _list(*_args, **_kwargs):
             return [record], 1
 
-        async def _get(_session, rid):
+        def _get(_session, rid):
             if rid == record.id:
                 return record
             return None
@@ -115,7 +115,7 @@ def test_returns_admin_list_get_and_order_listing_paths(monkeypatch):
 
         rows = [SimpleNamespace(id=record.id), SimpleNamespace(id=uuid4())]
 
-        async def _list_rows(*_args, **_kwargs):
+        def _list_rows(*_args, **_kwargs):
             return rows, len(rows)
 
         monkeypatch.setattr(returns_api.returns_service, 'list_return_requests', _list_rows)
@@ -138,7 +138,7 @@ def test_returns_label_upload_download_and_delete_paths(monkeypatch, tmp_path):
 
         calls = {'get': 0, 'deleted': []}
 
-        async def _get(_session, rid):
+        def _get(_session, rid):
             assert rid == return_id
             calls['get'] += 1
             if calls['get'] == 1:
@@ -167,7 +167,7 @@ def test_returns_label_upload_download_and_delete_paths(monkeypatch, tmp_path):
 
         delete_record = _record(return_id, label_path='labels/new.pdf')
 
-        async def _get_for_delete(_session, rid):
+        def _get_for_delete(_session, rid):
             assert rid == return_id
             return delete_record
 
@@ -176,7 +176,7 @@ def test_returns_label_upload_download_and_delete_paths(monkeypatch, tmp_path):
         assert delete_record.return_label_path is None
         assert 'labels/new.pdf' in calls['deleted']
 
-        async def _get_missing(_session, _rid):
+        def _get_missing(_session, _rid):
             return None
 
         monkeypatch.setattr(returns_api.returns_service, 'get_return_request', _get_missing)

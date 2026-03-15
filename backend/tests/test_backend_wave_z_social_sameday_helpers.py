@@ -49,10 +49,10 @@ def test_social_cache_and_resolution_paths(monkeypatch: pytest.MonkeyPatch) -> N
     assert social._cached_thumbnail_if_fresh(source, force_refresh=False) == '/media/social/demo.jpg'
     assert social._cached_thumbnail_if_fresh(source, force_refresh=True) is None
 
-    async def _persist_ok(_source: str, _thumb: str) -> str:
+    def _persist_ok(_source: str, _thumb: str) -> str:
         return '/media/social/local.jpg'
 
-    async def _persist_none(_source: str, _thumb: str) -> None:
+    def _persist_none(_source: str, _thumb: str) -> None:
         return None
 
     monkeypatch.setattr(social, '_persist_thumbnail', _persist_ok)
@@ -132,7 +132,7 @@ class _DummyClient:
     def __init__(self, response: _DummyResponse) -> None:
         self._response = response
 
-    async def get(self, _url: str):
+    def get(self, _url: str):
         return self._response
 
 
@@ -167,14 +167,14 @@ def test_sameday_parse_playwright_payload() -> None:
 
 
 def test_sameday_fetch_template_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _ok(_client, _url: str):
+    def _ok(_client, _url: str):
         return [{'lockerId': 'A', 'lat': 44.0, 'lng': 26.0}]
 
     monkeypatch.setattr(sameday, '_fetch_json_url', _ok)
     rows = asyncio.run(sameday._fetch_template_rows(SimpleNamespace(), 'https://sameday.ro/api?q={q}'))
     assert rows
 
-    async def _fail(_client, _url: str):
+    def _fail(_client, _url: str):
         raise RuntimeError('fail')
 
     monkeypatch.setattr(sameday, '_fetch_json_url', _fail)
@@ -187,16 +187,16 @@ class _StreamResponse:
         self.content = content
         self.headers = headers or {}
 
-    async def __aenter__(self):
+    def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    def __aexit__(self, exc_type, exc, tb):
         return False
 
     def raise_for_status(self) -> None:
         return None
 
-    async def aiter_bytes(self):
+    def aiter_bytes(self):
         if self._html:
             yield self._html.encode('utf-8')
 
@@ -206,10 +206,10 @@ class _AsyncClientStub:
         self._stream_response = stream_response
         self._get_response = get_response
 
-    async def __aenter__(self):
+    def __aenter__(self):
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    def __aexit__(self, exc_type, exc, tb):
         return False
 
     def stream(self, _method: str, _url: str):
@@ -217,7 +217,7 @@ class _AsyncClientStub:
             raise RuntimeError('missing stream response')
         return self._stream_response
 
-    async def get(self, _url: str):
+    def get(self, _url: str):
         if self._get_response is None:
             raise RuntimeError('missing get response')
         return self._get_response

@@ -63,13 +63,13 @@ class _SessionForRevocation:
         self.commits = 0
         self.added = []
 
-    async def execute(self, _stmt):
+    def execute(self, _stmt):
         return _ExecuteResult(self.rows)
 
     def add_all(self, rows):
         self.added.extend(rows)
 
-    async def commit(self):
+    def commit(self):
         self.commits += 1
 
 
@@ -80,7 +80,7 @@ async def test_ensure_user_account_active_executes_due_deletion(monkeypatch: pyt
 
     monkeypatch.setattr(auth_api.self_service, "is_deletion_due", lambda _user: True)
 
-    async def _execute(session, target):
+    def _execute(session, target):
         assert target is user
         deleted["called"] += 1
 
@@ -100,7 +100,7 @@ async def test_queue_google_completion_emails_verified_vs_unverified(monkeypatch
     )
     verification = SimpleNamespace(token=VERIFICATION_HANDLE)
 
-    async def _create_email_verification(_session, user):
+    def _create_email_verification(_session, user):
         assert user is unverified_user
         return verification
 
@@ -135,7 +135,7 @@ async def test_two_factor_disable_and_regenerate_branch_matrix(monkeypatch: pyte
     # Invalid code branch
     user.two_factor_enabled = True
 
-    async def _verify_code_false(_session, _user, _code):
+    def _verify_code_false(_session, _user, _code):
         return False
 
     monkeypatch.setattr(auth_api.auth_service, "verify_two_factor_code", _verify_code_false)
@@ -143,13 +143,13 @@ async def test_two_factor_disable_and_regenerate_branch_matrix(monkeypatch: pyte
         await auth_api.two_factor_disable(payload, request, user, SimpleNamespace())
 
     # Success disable branch
-    async def _verify_code_true(_session, _user, _code):
+    def _verify_code_true(_session, _user, _code):
         return True
 
-    async def _disable_two_factor(_session, _user):
+    def _disable_two_factor(_session, _user):
         return None
 
-    async def _record_event(*_args, **_kwargs):
+    def _record_event(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(auth_api.auth_service, "verify_two_factor_code", _verify_code_true)
@@ -159,7 +159,7 @@ async def test_two_factor_disable_and_regenerate_branch_matrix(monkeypatch: pyte
     assert disable_result.enabled is False
 
     # Success regenerate branch
-    async def _regenerate(_session, _user):
+    def _regenerate(_session, _user):
         return ["code-1", "code-2"]
 
     monkeypatch.setattr(auth_api.auth_service, "regenerate_recovery_codes", _regenerate)
@@ -175,7 +175,7 @@ async def test_request_secondary_email_verification_with_and_without_secondary(
     secondary_email_id = uuid4()
     token = SimpleNamespace(token=SECONDARY_HANDLE)
 
-    async def _request_verify(_session, _user, _email_id):
+    def _request_verify(_session, _user, _email_id):
         return token
 
     monkeypatch.setattr(auth_api.auth_service, "request_secondary_email_verification", _request_verify)
@@ -184,7 +184,7 @@ async def test_request_secondary_email_verification_with_and_without_secondary(
         def __init__(self, secondary):
             self.secondary = secondary
 
-        async def get(self, _model, _id):
+        def get(self, _model, _id):
             return self.secondary
 
     with_secondary = _Session(SimpleNamespace(email="secondary@example.test"))
@@ -240,7 +240,7 @@ async def test_google_link_start_and_google_link_branches(monkeypatch: pytest.Mo
     # Already-linked conflict branch
     monkeypatch.setattr(auth_api.security, "verify_password", lambda _raw, _hashed: True)
 
-    async def _exchange(_code):
+    def _exchange(_code):
         return {
             "sub": "google-sub",
             "email": "linked@example.test",
@@ -249,7 +249,7 @@ async def test_google_link_start_and_google_link_branches(monkeypatch: pytest.Mo
             "email_verified": True,
         }
 
-    async def _existing_sub(_session, _sub):
+    def _existing_sub(_session, _sub):
         return SimpleNamespace(id=uuid4())
 
     monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", _exchange)
@@ -269,7 +269,7 @@ async def test_revoke_other_sessions_invalid_current_and_success(monkeypatch: py
     monkeypatch.setattr(auth_api.security, "verify_password", lambda _raw, _hashed: True)
     monkeypatch.setattr(auth_api, "_extract_refresh_session_jti", lambda _request: "candidate-jti")
 
-    async def _resolve_none(*_args, **_kwargs):
+    def _resolve_none(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(auth_api, "_resolve_active_refresh_session_jti", _resolve_none)
@@ -283,7 +283,7 @@ async def test_revoke_other_sessions_invalid_current_and_success(monkeypatch: py
     active = SimpleNamespace(jti="active", user_id=user_id, revoked=False, expires_at=now + timedelta(hours=1))
     session = _SessionForRevocation([current, expired, active])
 
-    async def _resolve_current(*_args, **_kwargs):
+    def _resolve_current(*_args, **_kwargs):
         return "current"
 
     monkeypatch.setattr(auth_api, "_resolve_active_refresh_session_jti", _resolve_current)
@@ -361,7 +361,7 @@ async def test_admin_ip_bypass_missing_secret_invalid_token_and_success(monkeypa
     events: list[tuple[str, str | None]] = []
     monkeypatch.setattr(auth_api.security, 'create_admin_ip_bypass_token', lambda _uid: SIGNED_BYPASS_VALUE)
 
-    async def _record_event(_session, _uid, action, user_agent=None, ip_address=None):
+    def _record_event(_session, _uid, action, user_agent=None, ip_address=None):
         events.append((action, ip_address))
 
     monkeypatch.setattr(auth_api.auth_service, 'record_security_event', _record_event)
@@ -391,10 +391,10 @@ async def test_update_training_mode_role_guard_and_success() -> None:
         def add(self, obj):
             self.added.append(obj)
 
-        async def commit(self):
+        def commit(self):
             self.commits += 1
 
-        async def refresh(self, _obj):
+        def refresh(self, _obj):
             self.refreshes += 1
 
     payload = auth_api.TrainingModeUpdateRequest(enabled=True)

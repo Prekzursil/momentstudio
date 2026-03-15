@@ -14,13 +14,13 @@ class _Session:
     def __init__(self) -> None:
         self.commits = 0
 
-    async def commit(self):
+    def commit(self):
         self.commits += 1
 
 
 @pytest.mark.anyio
 async def test_content_media_asset_mutations_raise_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _missing_asset(*_args, **_kwargs):
+    def _missing_asset(*_args, **_kwargs):
         raise ValueError('missing asset')
 
     monkeypatch.setattr(content_api.media_dam, 'get_asset_or_404', _missing_asset)
@@ -65,7 +65,7 @@ async def test_content_media_preview_signature_and_variant_error_branches(monkey
     asset_id = uuid4()
     asset = SimpleNamespace(id=asset_id)
 
-    async def _asset_ok(*_args, **_kwargs):
+    def _asset_ok(*_args, **_kwargs):
         return asset
 
     monkeypatch.setattr(content_api.media_dam, 'get_asset_or_404', _asset_ok)
@@ -94,7 +94,7 @@ async def test_content_media_preview_success_path_returns_file(monkeypatch: pyte
     media_file = tmp_path / 'preview.jpg'
     media_file.write_bytes(b'jpeg-bytes')
 
-    async def _asset_ok(*_args, **_kwargs):
+    def _asset_ok(*_args, **_kwargs):
         return asset
 
     monkeypatch.setattr(content_api.media_dam, 'get_asset_or_404', _asset_ok)
@@ -114,15 +114,15 @@ async def test_content_media_preview_success_path_returns_file(monkeypatch: pyte
 @pytest.mark.anyio
 async def test_content_background_media_runner_swallows_processing_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Ctx:
-        async def __aenter__(self):
+        def __aenter__(self):
             return _Session()
 
-        async def __aexit__(self, exc_type, exc, tb):
+        def __aexit__(self, exc_type, exc, tb):
             return False
 
     monkeypatch.setattr('app.db.session.SessionLocal', lambda: _Ctx())
 
-    async def _missing_job(*_args, **_kwargs):
+    def _missing_job(*_args, **_kwargs):
         raise RuntimeError('job missing')
 
     monkeypatch.setattr(content_api.media_dam, 'get_job_or_404', _missing_job)

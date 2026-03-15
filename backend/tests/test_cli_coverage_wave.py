@@ -808,10 +808,10 @@ class _SessionContext:
     def __init__(self, session) -> None:
         self._session = session
 
-    async def __aenter__(self):
+    def __aenter__(self):
         return self._session
 
-    async def __aexit__(self, exc_type, exc, tb):
+    def __aexit__(self, exc_type, exc, tb):
         return False
 
 
@@ -887,31 +887,31 @@ async def test_import_data_runs_pipeline_and_commits(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(cli, '_load_import_payload', lambda _path: payload)
     monkeypatch.setattr(cli, 'SessionLocal', lambda: _SessionContext(session))
 
-    async def _load_user_ctx(_session):
+    def _load_user_ctx(_session):
         calls['user_ctx'] = calls.get('user_ctx', 0) + 1
         return {'taken'}, {'Display': 1}
 
-    async def _import_users(_session, **_kwargs):
+    def _import_users(_session, **_kwargs):
         calls['users'] = calls.get('users', 0) + 1
 
-    async def _import_categories(_session, **_kwargs):
+    def _import_categories(_session, **_kwargs):
         calls['categories'] = calls.get('categories', 0) + 1
 
-    async def _build_tag_cache(_session, **_kwargs):
+    def _build_tag_cache(_session, **_kwargs):
         calls['tag_cache'] = calls.get('tag_cache', 0) + 1
         return {}
 
-    async def _import_products(_session, **_kwargs):
+    def _import_products(_session, **_kwargs):
         calls['products'] = calls.get('products', 0) + 1
 
-    async def _import_addresses(_session, **_kwargs):
+    def _import_addresses(_session, **_kwargs):
         calls['addresses'] = calls.get('addresses', 0) + 1
 
-    async def _ensure_shipping_methods(_session, **_kwargs):
+    def _ensure_shipping_methods(_session, **_kwargs):
         calls['shipping_methods'] = calls.get('shipping_methods', 0) + 1
         return {}
 
-    async def _import_orders(_session, **_kwargs):
+    def _import_orders(_session, **_kwargs):
         calls['orders'] = calls.get('orders', 0) + 1
 
     monkeypatch.setattr(cli, '_load_user_import_context', _load_user_ctx)
@@ -950,14 +950,14 @@ async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(cli, 'SessionLocal', lambda: _SessionContext(session))
 
-    async def _load_candidates(_session, **_kwargs):
+    def _load_candidates(_session, **_kwargs):
         calls['candidates'] = calls.get('candidates', 0) + 1
         return None, None, None
 
-    async def _demote(_session, **_kwargs):
+    def _demote(_session, **_kwargs):
         calls['demote'] = calls.get('demote', 0) + 1
 
-    async def _create(_session, **_kwargs):
+    def _create(_session, **_kwargs):
         calls['create'] = calls.get('create', 0) + 1
         return user
 
@@ -967,17 +967,17 @@ async def test_bootstrap_and_repair_owner_wrappers(monkeypatch: pytest.MonkeyPat
 
     await cli.bootstrap_owner(email='owner@example.com', password=OWNER_BOOTSTRAP_VALUE, username='owner', display_name='Owner')
 
-    async def _require_owner(_session):
+    def _require_owner(_session):
         calls['require'] = calls.get('require', 0) + 1
         return user
 
-    async def _repair_email(_session, **_kwargs):
+    def _repair_email(_session, **_kwargs):
         calls['repair_email'] = calls.get('repair_email', 0) + 1
 
-    async def _repair_username(_session, **_kwargs):
+    def _repair_username(_session, **_kwargs):
         calls['repair_username'] = calls.get('repair_username', 0) + 1
 
-    async def _repair_display(_session, **_kwargs):
+    def _repair_display(_session, **_kwargs):
         calls['repair_display'] = calls.get('repair_display', 0) + 1
 
     monkeypatch.setattr(cli, '_require_owner', _require_owner)

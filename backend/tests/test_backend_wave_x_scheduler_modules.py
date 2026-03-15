@@ -14,10 +14,10 @@ class _SessionCtx:
     def __init__(self, payload: object = "session") -> None:
         self.payload = payload
 
-    async def __aenter__(self):
+    def __aenter__(self):
         return self.payload
 
-    async def __aexit__(self, exc_type, exc, tb):
+    def __aexit__(self, exc_type, exc, tb):
         return False
 
 
@@ -30,7 +30,7 @@ class _AwaitableTask:
         self.cancel_called = True
 
     def __await__(self):
-        async def _done():
+        def _done():
             if self.cancel_raises:
                 raise asyncio.CancelledError
             return None

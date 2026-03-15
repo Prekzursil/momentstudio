@@ -50,14 +50,14 @@ class _AsyncClientStub:
         self._error = error
         self._calls = calls if calls is not None else []
 
-    async def __aenter__(self) -> "_AsyncClientStub":
+    def __aenter__(self) -> "_AsyncClientStub":
         return self
 
-    async def __aexit__(self, exc_type, exc, tb) -> bool:
+    def __aexit__(self, exc_type, exc, tb) -> bool:
         del exc_type, exc, tb
         return False
 
-    async def post(self, url: str, **kwargs: Any) -> _DummyResponse:
+    def post(self, url: str, **kwargs: Any) -> _DummyResponse:
         self._calls.append({"url": url, **kwargs})
         if self._error is not None:
             raise self._error
@@ -73,7 +73,7 @@ async def test_paypal_get_access_token_and_create_itemized_branches(monkeypatch:
     monkeypatch.setattr(paypal_service.settings, "paypal_client_id", "")
     monkeypatch.setattr(paypal_service.settings, "paypal_client_secret", "")
 
-    async def _fetch_ok(*, client_id: str, client_secret: str) -> dict[str, Any]:
+    def _fetch_ok(*, client_id: str, client_secret: str) -> dict[str, Any]:
         assert client_id == "sandbox-id"
         assert client_secret == "sandbox-cred"
         return {"access_token": "access-value", "expires_in": 120}
@@ -82,7 +82,7 @@ async def test_paypal_get_access_token_and_create_itemized_branches(monkeypatch:
     token = await paypal_service._get_access_token()
     assert token == "access-value"
 
-    async def _fetch_missing(*, client_id: str, client_secret: str) -> dict[str, Any]:
+    def _fetch_missing(*, client_id: str, client_secret: str) -> dict[str, Any]:
         del client_id, client_secret
         return {"expires_in": 120}
 
@@ -91,13 +91,13 @@ async def test_paypal_get_access_token_and_create_itemized_branches(monkeypatch:
     with pytest.raises(HTTPException, match="PayPal token missing"):
         await paypal_service._get_access_token()
 
-    async def _token() -> str:
+    def _token() -> str:
         return "auth-value"
 
-    async def _fx(*_args: Any, **_kwargs: Any) -> Decimal:
+    def _fx(*_args: Any, **_kwargs: Any) -> Decimal:
         return Decimal("0.2")
 
-    async def _order_response(*, token: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _order_response(*, token: str, payload: dict[str, Any]) -> dict[str, Any]:
         assert token == "auth-value"
         assert payload["intent"] == "CAPTURE"
         return {"id": "ORDER-1234", "links": [{"rel": "approve", "href": "https://paypal.example/approve"}]}
@@ -120,7 +120,7 @@ async def test_paypal_get_access_token_and_create_itemized_branches(monkeypatch:
     assert order_id == "ORDER-1234"
     assert approval_url.startswith("https://paypal.example/")
 
-    async def _order_response_missing(*, token: str, payload: dict[str, Any]) -> dict[str, Any]:
+    def _order_response_missing(*, token: str, payload: dict[str, Any]) -> dict[str, Any]:
         del token, payload
         return {"id": "", "links": []}
 
@@ -144,7 +144,7 @@ async def test_paypal_capture_refund_and_webhook_branches(monkeypatch: pytest.Mo
     calls: list[dict[str, Any]] = []
     request_error = httpx.RequestError("network-failure", request=httpx.Request("POST", "https://paypal.test"))
 
-    async def _token() -> str:
+    def _token() -> str:
         return "auth-value"
 
     monkeypatch.setattr(paypal_service, "_get_access_token", _token)
@@ -182,7 +182,7 @@ async def test_paypal_capture_refund_and_webhook_branches(monkeypatch: pytest.Mo
 
     calls.clear()
 
-    async def _fx(*_args: Any, **_kwargs: Any) -> Decimal:
+    def _fx(*_args: Any, **_kwargs: Any) -> Decimal:
         return Decimal("0.2")
 
     monkeypatch.setattr(paypal_service, "_fx_per_ron", _fx)

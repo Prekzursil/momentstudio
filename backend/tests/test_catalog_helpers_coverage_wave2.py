@@ -35,24 +35,24 @@ class _QueueSession:
         self.deleted = []
         self.commits = 0
 
-    async def execute(self, *_args, **_kwargs):
+    def execute(self, *_args, **_kwargs):
         if self._results:
             return self._results.pop(0)
         return _ScalarsResult([])
 
-    async def get(self, *_args, **_kwargs):
+    def get(self, *_args, **_kwargs):
         return self._get_result
 
     def add(self, value):
         self.added.append(value)
 
-    async def delete(self, value):
+    def delete(self, value):
         self.deleted.append(value)
 
-    async def commit(self):
+    def commit(self):
         self.commits += 1
 
-    async def refresh(self, _value):
+    def refresh(self, _value):
         return None
 
 
@@ -90,7 +90,7 @@ async def test_catalog_create_category_and_relation_validators(monkeypatch: pyte
 
     seen = {'count': 0}
 
-    async def _get_by_slug(_session, slug: str):
+    def _get_by_slug(_session, slug: str):
         seen['count'] += 1
         return SimpleNamespace(slug='rings') if seen['count'] == 1 else None
 
@@ -112,11 +112,11 @@ async def test_catalog_create_category_and_relation_validators(monkeypatch: pyte
 async def test_catalog_update_helpers_and_import_parsing(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = {'parent': 0, 'tax': 0}
 
-    async def _parent(_session, *, category_id, parent_id):
+    def _parent(_session, *, category_id, parent_id):
         del category_id, parent_id
         calls['parent'] += 1
 
-    async def _tax(_session, tax_group_id):
+    def _tax(_session, tax_group_id):
         del tax_group_id
         calls['tax'] += 1
 

@@ -27,19 +27,19 @@ class _SessionStub:
         self.commits = 0
         self.rollbacks = 0
 
-    async def execute(self, _stmt):
+    def execute(self, _stmt):
         return _ExecuteResult(self._execute_values.pop(0) if self._execute_values else None)
 
     def add(self, obj):
         self.added.append(obj)
 
-    async def commit(self):
+    def commit(self):
         self.commits += 1
 
-    async def rollback(self):
+    def rollback(self):
         self.rollbacks += 1
 
-    async def refresh(self, _obj):
+    def refresh(self, _obj):
         return None
 
 
@@ -60,19 +60,19 @@ async def test_get_or_create_coupon_mapping_branches(monkeypatch: pytest.MonkeyP
 
     promo = SimpleNamespace(id='promo-1', currency='RON')
 
-    async def _promo_and_currency(_session, *, promo_code: str, currency: str):
+    def _promo_and_currency(_session, *, promo_code: str, currency: str):
         assert promo_code == 'SPRING'
         assert currency == 'RON'
         return promo, 'RON'
 
     monkeypatch.setattr(payments_service, '_promo_and_currency', _promo_and_currency)
-    async def _load_none(*_args, **_kwargs):
+    def _load_none(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(payments_service, '_load_existing_coupon_mapping', _load_none)
     monkeypatch.setattr(payments_service, '_create_stripe_discount_coupon_id', lambda **_k: 'coupon_123')
 
-    async def _persist(_session, **_kwargs):
+    def _persist(_session, **_kwargs):
         return 'coupon_saved'
 
     monkeypatch.setattr(payments_service, '_persist_coupon_mapping', _persist)
@@ -90,7 +90,7 @@ async def test_get_or_create_coupon_mapping_branches(monkeypatch: pytest.MonkeyP
 async def test_discounts_param_fallback_coupon_creation(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub()
 
-    async def _cached_none(*_args, **_kwargs):
+    def _cached_none(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(payments_service, '_get_or_create_cached_amount_off_coupon', _cached_none)
@@ -122,7 +122,7 @@ async def test_create_checkout_session_matrix(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(payments_service, 'is_stripe_configured', lambda: True)
     monkeypatch.setattr(payments_service, 'init_stripe', lambda: None)
 
-    async def _discounts_none(**_kwargs):
+    def _discounts_none(**_kwargs):
         return None
 
     monkeypatch.setattr(payments_service, '_discounts_param', _discounts_none)
@@ -187,7 +187,7 @@ async def test_capture_void_refund_and_mapping_integrity_recovery(monkeypatch: p
 
     session = _SessionStub(execute_values=[SimpleNamespace(stripe_coupon_id='recovered_coupon')])
 
-    async def _commit_fail_once():
+    def _commit_fail_once():
         if session.commits == 0:
             session.commits += 1
             raise IntegrityError('insert', params={}, orig=Exception('dup'))
@@ -223,7 +223,7 @@ def test_stripe_webhook_secret_env_selection(monkeypatch: pytest.MonkeyPatch) ->
 async def test_coupon_mapping_and_coupon_generation_error_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub(execute_values=[None])
 
-    async def _commit_fail_once_no_recovery():
+    def _commit_fail_once_no_recovery():
         if session.commits == 0:
             session.commits += 1
             raise IntegrityError('insert', params={}, orig=Exception('dup'))
@@ -251,7 +251,7 @@ async def test_coupon_mapping_and_coupon_generation_error_paths(monkeypatch: pyt
 async def test_get_or_create_coupon_short_circuit_branches(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub()
 
-    async def _promo_and_currency(_session, *, promo_code: str, currency: str):
+    def _promo_and_currency(_session, *, promo_code: str, currency: str):
         return SimpleNamespace(id='promo-1', currency=''), 'RON'
 
     monkeypatch.setattr(payments_service, '_promo_and_currency', _promo_and_currency)
@@ -349,7 +349,7 @@ async def test_discounts_and_checkout_session_missing_url(monkeypatch: pytest.Mo
 
     assert await payments_service._discounts_param(session=session, discount_value=0, promo_code=None) is None
 
-    async def _cached_coupon(*_args, **_kwargs):
+    def _cached_coupon(*_args, **_kwargs):
         return None
 
     monkeypatch.setattr(payments_service, '_get_or_create_cached_amount_off_coupon', _cached_coupon)
@@ -360,7 +360,7 @@ async def test_discounts_and_checkout_session_missing_url(monkeypatch: pytest.Mo
     monkeypatch.setattr(payments_service, 'is_stripe_configured', lambda: True)
     monkeypatch.setattr(payments_service, 'init_stripe', lambda: None)
 
-    async def _discounts_ok(**_kwargs):
+    def _discounts_ok(**_kwargs):
         return [{'coupon': 'cp_1'}]
 
     monkeypatch.setattr(payments_service, '_discounts_param', _discounts_ok)

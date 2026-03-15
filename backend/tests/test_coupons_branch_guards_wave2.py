@@ -25,7 +25,7 @@ class _Session:
         self.bind = bind
         self.added: list[object] = []
 
-    async def get(self, model, _id):
+    def get(self, model, _id):
         if model is coupons_api.Coupon:
             return self._coupon
         if model is coupons_api.Promotion:
@@ -34,13 +34,13 @@ class _Session:
             return self._job
         return None
 
-    async def execute(self, _stmt):
+    def execute(self, _stmt):
         return _ScalarResult(0)
 
-    async def commit(self):
+    def commit(self):
         return None
 
-    async def refresh(self, obj, attribute_names=None):
+    def refresh(self, obj, attribute_names=None):
         return obj
 
     def add(self, obj):
@@ -68,7 +68,7 @@ async def test_coupon_admin_not_found_and_generate_code_response(monkeypatch: py
         await coupons_api.admin_create_coupon(payload_create, missing, object())
     assert create_err.value.status_code == status.HTTP_404_NOT_FOUND
 
-    async def _gen_code(*_args, **_kwargs):
+    def _gen_code(*_args, **_kwargs):
         return 'SAVE-WAVE2'
 
     monkeypatch.setattr(coupons_api.coupons_service, 'generate_unique_coupon_code', _gen_code)
@@ -140,13 +140,13 @@ async def test_coupon_assign_revoke_noop_and_bulk_enqueue_guards(monkeypatch: py
     coupon = SimpleNamespace(id=uuid4(), promotion=SimpleNamespace(name='Promo', description='Desc'), code='SAVE10')
     user = SimpleNamespace(id=uuid4(), email='user@example.test', notify_marketing=True, preferred_language='en')
 
-    async def _coupon(_session, *, coupon_id):
+    def _coupon(_session, *, coupon_id):
         return coupon
 
-    async def _user_find(_session, *, user_id, email):
+    def _user_find(_session, *, user_id, email):
         return user
 
-    async def _assignment(_session, *, coupon_id, user_id):
+    def _assignment(_session, *, coupon_id, user_id):
         return SimpleNamespace(revoked_reason='cleanup')
 
     monkeypatch.setattr(coupons_api, '_get_coupon_with_promotion_or_404', _coupon)

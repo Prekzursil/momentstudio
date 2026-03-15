@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -61,16 +61,16 @@ class _Session:
         self._user = user
         self.added: list[object] = []
 
-    async def get(self, _model, _id):
+    def get(self, _model, _id):
         return self._user
 
     def add(self, obj):
         self.added.append(obj)
 
-    async def commit(self):
+    def commit(self):
         return None
 
-    async def refresh(self, _obj, **_kwargs):
+    def refresh(self, _obj, **_kwargs):
         return None
 
 
@@ -102,12 +102,12 @@ async def test_decode_and_passkey_login_guard_branches(monkeypatch: pytest.Monke
     with pytest.raises(HTTPException, match="Invalid two-factor token"):
         auth_api._decode_two_factor_login_token(INVALID_HANDLE)
 
-    async def _user_by_email(*_args, **_kwargs):
+    def _user_by_email(*_args, **_kwargs):
         return _user()
 
     monkeypatch.setattr(auth_api.auth_service, "get_user_by_login_email", _user_by_email)
 
-    async def _empty_challenge(*_args, **_kwargs):
+    def _empty_challenge(*_args, **_kwargs):
         return ({}, None)
 
     monkeypatch.setattr(auth_api.passkeys_service, "generate_authentication_options_for_user", _empty_challenge)
@@ -124,7 +124,7 @@ async def test_login_two_factor_invalid_user_not_enabled_and_bad_code(monkeypatc
     user_id = uuid4()
     monkeypatch.setattr(auth_api, "_decode_two_factor_login_token", lambda _token: (user_id, True, PASSWORD_METHOD))
 
-    async def _ensure_active(_session, _user):
+    def _ensure_active(_session, _user):
         return None
 
     monkeypatch.setattr(auth_api, "_ensure_user_account_active", _ensure_active)
@@ -141,7 +141,7 @@ async def test_login_two_factor_invalid_user_not_enabled_and_bad_code(monkeypatc
 
     user.two_factor_enabled = True
 
-    async def _verify_false(*_args, **_kwargs):
+    def _verify_false(*_args, **_kwargs):
         return False
 
     monkeypatch.setattr(auth_api.auth_service, "verify_two_factor_code", _verify_false)
@@ -151,7 +151,7 @@ async def test_login_two_factor_invalid_user_not_enabled_and_bad_code(monkeypatc
 
 @pytest.mark.anyio
 async def test_existing_google_user_callback_incomplete_and_two_factor(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _ensure_active(_session, _user):
+    def _ensure_active(_session, _user):
         return None
 
     monkeypatch.setattr(auth_api, "_ensure_user_account_active", _ensure_active)
@@ -229,7 +229,7 @@ async def test_export_download_and_google_avatar_branches(monkeypatch: pytest.Mo
     monkeypatch.setattr(auth_api, "_export_download_filename", lambda _job: "user-export.json")
 
     class _ExportSession(_Session):
-        async def get(self, _model, _id):
+        def get(self, _model, _id):
             return SimpleNamespace(id=uuid4(), user_id=uuid4(), status="succeeded", path=str(export_path), created_at=datetime.now(timezone.utc))
 
     response = await auth_api.download_export_job(uuid4(), _user(), _ExportSession())
