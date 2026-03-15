@@ -45,8 +45,10 @@ jobs:
 
       - name: Detect Chromatic token availability
         id: chromatic_token
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
         run: |
-          if [ -n "${{ secrets.CHROMATIC_PROJECT_TOKEN }}" ]; then
+          if [ -n "${CHROMATIC_PROJECT_TOKEN:-}" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.actor }}" = "dependabot[bot]" ]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
@@ -70,4 +72,6 @@ jobs:
 
       - name: Upload to Chromatic
         if: steps.chromatic_token.outputs.available == 'true'
-        run: npx chromatic --playwright --project-token=${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: npx chromatic --playwright --project-token="${CHROMATIC_PROJECT_TOKEN}"
