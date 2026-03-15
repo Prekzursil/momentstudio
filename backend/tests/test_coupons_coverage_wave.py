@@ -1556,3 +1556,185 @@ async def test_coupon_api_bulk_job_finish_and_notification_branches(monkeypatch:
     not_cancelled = SimpleNamespace(status=CouponBulkJobStatus.running, finished_at=None)
     done_not = await coupons_api._finish_bulk_job_if_cancelled(session_not, job=not_cancelled)
     assert done_not is False
+
+
+
+def test_coupon_api_predicate_redemption_and_bucket_helpers() -> None:
+    assert coupons_api._is_percent_discount_missing(discount_type='percent', percentage_off=None) is True
+    assert coupons_api._is_percent_discount_missing(discount_type='percent', percentage_off=Decimal('5.00')) is False
+
+    assert coupons_api._is_amount_discount_missing(discount_type='amount', amount_off=None) is True
+    assert coupons_api._is_amount_discount_missing(discount_type='amount', amount_off=Decimal('3.00')) is False
+
+    assert (
+        coupons_api._has_invalid_free_shipping_values(
+            discount_type='free_shipping',
+            percentage_off=Decimal('5.00'),
+            amount_off=None,
+        )
+        is True
+    )
+    assert (
+        coupons_api._has_invalid_free_shipping_values(
+            discount_type='free_shipping',
+            percentage_off=None,
+            amount_off=None,
+        )
+        is False
+    )
+    assert coupons_api._has_conflicting_discount_values(percentage_off=Decimal('1.00'), amount_off=Decimal('2.00')) is True
+    assert coupons_api._has_conflicting_discount_values(percentage_off=None, amount_off=Decimal('2.00')) is False
+
+    assert coupons_api._normalize_bulk_email_value('  USER@example.com ') == 'user@example.com'
+    assert coupons_api._normalize_bulk_email_value(123) is None  # type: ignore[arg-type]
+    assert coupons_api._is_valid_bulk_email('user@example.com') is True
+    assert coupons_api._is_valid_bulk_email('user@localhost') is False
+    assert coupons_api._is_valid_bulk_email('x' * 260 + '@example.com') is False
+
+    assert coupons_api._bucket_config_not_provided(bucket_total=None, bucket_index=None, seed='') is True
+    assert coupons_api._bucket_config_not_provided(bucket_total=2, bucket_index=0, seed='seed') is False
+    assert coupons_api._bucket_config_incomplete(bucket_total=2, bucket_index=None, seed='seed') is True
+    assert coupons_api._bucket_config_incomplete(bucket_total=2, bucket_index=0, seed='seed') is False
+
+    sample: list[str] = []
+    coupons_api._add_sample_email(sample, 'first@example.com', limit=1)
+    coupons_api._add_sample_email(sample, 'second@example.com', limit=1)
+    coupons_api._add_sample_email(sample, None, limit=1)
+    assert sample == ['first@example.com']
+
+    now = datetime(2026, 3, 1, tzinfo=timezone.utc)
+    promotion_id = uuid.uuid4()
+    coupon_id = uuid.uuid4()
+    filters_without_coupon = coupons_api._coupon_redemption_filters(
+        promotion_id=promotion_id,
+        coupon_id=None,
+        start=now - timedelta(days=7),
+        end=now,
+    )
+    filters_with_coupon = coupons_api._coupon_redemption_filters(
+        promotion_id=promotion_id,
+        coupon_id=coupon_id,
+        start=now - timedelta(days=7),
+        end=now,
+    )
+    assert len(filters_without_coupon) == 5
+    assert len(filters_with_coupon) == 6
+
+    assert (
+        coupons_api._allocated_discount(
+            order_discount=Decimal('12.00'),
+            subtotal=Decimal('25.00'),
+            order_subtotal=Decimal('100.00'),
+        )
+        == Decimal('3.00')
+    )
+    assert (
+        coupons_api._allocated_discount(
+            order_discount=Decimal('0.00'),
+            subtotal=Decimal('25.00'),
+            order_subtotal=Decimal('100.00'),
+        )
+        == Decimal('0.00')
+    )
+
+
+@pytest.mark.anyio
+async def test_coupon_service_reason_and_caps_helper_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    reasons: list[str] = []
+    promotion = SimpleNamespace(
+        discount_type=PromotionDiscountType.percent,
+        min_subtotal=Decimal('50.00'),
+        first_order_only=True,
+    )
+
+    coupons_service._append_scope_and_subtotal_reasons(
+        reasons=reasons,
+        promotion=promotion,
+        eligible_subtotal=Decimal('0.00'),
+        scope_subtotal=Decimal('0.00'),
+        has_includes=True,
+        has_excludes=False,
+    )
+    coupons_service._append_min_subtotal_reason(reasons=reasons, promotion=promotion, subtotal=Decimal('10.00'))
+
+    async def _has_delivered(*_args, **_kwargs) -> bool:
+        await asyncio.sleep(0)
+        return True
+
+    monkeypatch.setattr(coupons_service, '_user_has_delivered_orders', _has_delivered)
+    await coupons_service._maybe_append_first_order_reason(
+        _SessionStub(),
+        reasons=reasons,
+        promotion=promotion,
+        user_id=uuid.uuid4(),
+        user_has_delivered_orders=None,
+    )
+
+    coupons_service._append_shipping_coupon_reason(
+        reasons=reasons,
+        promotion=SimpleNamespace(discount_type=PromotionDiscountType.free_shipping),
+        savings=SimpleNamespace(shipping_discount_ron=Decimal('0.00')),
+    )
+
+    assigned_coupon = SimpleNamespace(id=uuid.uuid4(), visibility=CouponVisibility.assigned)
+    await coupons_service._append_assigned_coupon_reason(
+        _SessionStub(_Result(scalars=[])),
+        reasons=reasons,
+        coupon=assigned_coupon,
+        user_id=uuid.uuid4(),
+    )
+
+    neutral_reasons: list[str] = []
+    await coupons_service._append_assigned_coupon_reason(
+        _SessionStub(),
+        reasons=neutral_reasons,
+        coupon=SimpleNamespace(id=uuid.uuid4(), visibility=CouponVisibility.public),
+        user_id=uuid.uuid4(),
+    )
+    assert neutral_reasons == []
+
+    cap_reasons: list[str] = []
+
+    async def _count_redemptions(*_args, **_kwargs) -> int:
+        await asyncio.sleep(0)
+        return 2
+
+    async def _count_active(*_args, **_kwargs) -> int:
+        await asyncio.sleep(0)
+        return 1
+
+    async def _count_user_redemptions(*_args, **_kwargs) -> int:
+        await asyncio.sleep(0)
+        return 1
+
+    async def _count_user_active(*_args, **_kwargs) -> int:
+        await asyncio.sleep(0)
+        return 1
+
+    monkeypatch.setattr(coupons_service, '_count_redemptions', _count_redemptions)
+    monkeypatch.setattr(coupons_service, '_count_active_reservations', _count_active)
+    monkeypatch.setattr(coupons_service, '_count_user_redemptions', _count_user_redemptions)
+    monkeypatch.setattr(coupons_service, '_count_user_active_reservations', _count_user_active)
+
+    global_remaining, customer_remaining = await coupons_service._remaining_redemption_caps(
+        _SessionStub(_Result()),
+        coupon=SimpleNamespace(
+            id=uuid.uuid4(),
+            global_max_redemptions=3,
+            per_customer_max_redemptions=2,
+        ),
+        user_id=uuid.uuid4(),
+        now=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        reasons=cap_reasons,
+    )
+
+    assert global_remaining == 0
+    assert customer_remaining == 0
+    assert 'no_eligible_items' in reasons
+    assert 'scope_no_match' in reasons
+    assert 'min_subtotal_not_met' in reasons
+    assert 'first_order_only' in reasons
+    assert 'shipping_already_free' in reasons
+    assert 'not_assigned' in reasons
+    assert 'sold_out' in cap_reasons
+    assert 'per_customer_limit_reached' in cap_reasons

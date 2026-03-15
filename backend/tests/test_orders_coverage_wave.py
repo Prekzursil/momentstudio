@@ -1807,3 +1807,149 @@ def test_orders_admin_order_base_and_email_events_stmt_helpers(monkeypatch: pyte
     compiled = str(stmt)
     assert 'email_delivery_events' in compiled.lower()
 
+
+
+def test_order_service_low_level_helper_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import order as order_service
+
+    valid_id = uuid4()
+    variant_id = uuid4()
+
+    assert order_service._try_uuid(None) is None
+    assert order_service._try_uuid('not-a-uuid') is None
+    assert order_service._try_uuid(str(valid_id)) == valid_id
+
+    assert order_service._restore_delta_from_row(None) is None
+    assert order_service._restore_delta_from_row({'product_id': 'bad', 'deducted_qty': 2}) is None
+    assert order_service._restore_delta_from_row({'product_id': str(valid_id), 'deducted_qty': 'bad'}) is None
+    assert order_service._restore_delta_from_row({'product_id': str(valid_id), 'deducted_qty': 0}) is None
+    assert order_service._restore_delta_from_row({'product_id': str(valid_id), 'variant_id': str(variant_id), 'deducted_qty': 3}) == (
+        valid_id,
+        variant_id,
+        3,
+    )
+
+    assert order_service._clean_optional_order_text('   ', max_length=10) is None
+    assert order_service._clean_optional_order_text(' alpha ', max_length=3) == 'alp'
+    assert order_service._clean_optional_order_text(' alpha ', max_length=5, upper=True) == 'ALPHA'
+
+    assert order_service._initial_order_status(' netopia ') == OrderStatus.pending_payment
+    assert order_service._initial_order_status('cod') == OrderStatus.pending_acceptance
+
+    product = SimpleNamespace(is_deleted=False, is_active=True, status=order_service.ProductStatus.published, stock_quantity=7)
+    assert order_service._product_is_orderable(product) is True
+    assert order_service._product_is_orderable(SimpleNamespace(is_deleted=True, is_active=True, status=order_service.ProductStatus.published)) is False
+    assert order_service._product_is_orderable(SimpleNamespace(is_deleted=False, is_active=False, status=order_service.ProductStatus.published)) is False
+
+    products = {valid_id: product}
+    variants = {variant_id: SimpleNamespace(product_id=valid_id, stock_quantity=4)}
+    assert (
+        order_service._stock_qty_for_order_key(
+            product_id=valid_id,
+            variant_id=None,
+            products_by_id=products,
+            variants_by_id=variants,
+        )
+        == 7
+    )
+    assert (
+        order_service._stock_qty_for_order_key(
+            product_id=valid_id,
+            variant_id=variant_id,
+            products_by_id=products,
+            variants_by_id=variants,
+        )
+        == 4
+    )
+    with pytest.raises(HTTPException, match='Invalid variant'):
+        order_service._stock_qty_for_order_key(
+            product_id=valid_id,
+            variant_id=uuid4(),
+            products_by_id=products,
+            variants_by_id=variants,
+        )
+
+    provided = order_service._provided_order_totals(
+        fee_amount=Decimal('1.00'),
+        tax_amount=Decimal('2.00'),
+        shipping_amount=Decimal('3.00'),
+        total_amount=Decimal('4.00'),
+    )
+    assert provided == (Decimal('1.00'), Decimal('2.00'), Decimal('3.00'), Decimal('4.00'))
+    assert (
+        order_service._provided_order_totals(
+            fee_amount=Decimal('1.00'),
+            tax_amount=None,
+            shipping_amount=Decimal('3.00'),
+            total_amount=Decimal('4.00'),
+        )
+        is None
+    )
+
+    monkeypatch.setattr(order_service, '_calculate_shipping', lambda *_args, **_kwargs: Decimal('7.00'))
+    threshold_settings = SimpleNamespace(shipping_fee_ron=None, free_shipping_threshold_ron=Decimal('50.00'))
+    assert (
+        order_service._checkout_shipping_amount(
+            subtotal=Decimal('60.00'),
+            discount=Decimal('20.00'),
+            shipping_method=None,
+            checkout_settings=threshold_settings,
+        )
+        == Decimal('7.00')
+    )
+    assert (
+        order_service._checkout_shipping_amount(
+            subtotal=Decimal('60.00'),
+            discount=Decimal('5.00'),
+            shipping_method=None,
+            checkout_settings=threshold_settings,
+        )
+        == Decimal('0.00')
+    )
+
+    fixed_settings = SimpleNamespace(shipping_fee_ron=Decimal('5.50'), free_shipping_threshold_ron=None)
+    assert (
+        order_service._checkout_shipping_amount(
+            subtotal=Decimal('10.00'),
+            discount=Decimal('50.00'),
+            shipping_method=None,
+            checkout_settings=fixed_settings,
+        )
+        == Decimal('5.50')
+    )
+
+
+@pytest.mark.anyio
+async def test_order_service_resolve_order_totals_prefers_provided_then_computed(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import order as order_service
+
+    async def _computed(_session, *, subtotal: Decimal, discount: Decimal, shipping_method: object) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+        await asyncio.sleep(0)
+        del _session, subtotal, discount, shipping_method
+        return (Decimal('0.50'), Decimal('1.50'), Decimal('2.50'), Decimal('3.50'))
+
+    monkeypatch.setattr(order_service, '_computed_order_totals', _computed)
+
+    provided = await order_service._resolve_order_totals(
+        SimpleNamespace(),
+        subtotal=Decimal('10.00'),
+        discount=Decimal('1.00'),
+        shipping_method=None,
+        fee_amount=Decimal('1.00'),
+        tax_amount=Decimal('2.00'),
+        shipping_amount=Decimal('3.00'),
+        total_amount=Decimal('4.00'),
+    )
+    assert provided == (Decimal('1.00'), Decimal('2.00'), Decimal('3.00'), Decimal('4.00'))
+
+    computed = await order_service._resolve_order_totals(
+        SimpleNamespace(),
+        subtotal=Decimal('10.00'),
+        discount=Decimal('1.00'),
+        shipping_method=None,
+        fee_amount=None,
+        tax_amount=None,
+        shipping_amount=None,
+        total_amount=None,
+    )
+    assert computed == (Decimal('0.50'), Decimal('1.50'), Decimal('2.50'), Decimal('3.50'))
