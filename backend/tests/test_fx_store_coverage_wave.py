@@ -206,16 +206,22 @@ async def test_get_effective_rates_paths_and_clear_override(monkeypatch: pytest.
         await asyncio.sleep(0)
         return None
 
-    class _Live:
-        base = 'RON'
-        eur_per_ron = 0.24
-        usd_per_ron = 0.25
-        as_of = date.today()
-        source = 'bnr'
-        fetched_at = datetime.now(timezone.utc)
+    def _live_rates_payload() -> SimpleNamespace:
+        return SimpleNamespace(
+            base='RON',
+            eur_per_ron=0.24,
+            usd_per_ron=0.25,
+            as_of=date.today(),
+            source='bnr',
+            fetched_at=datetime.now(timezone.utc),
+        )
 
     monkeypatch.setattr(fx_store, '_get_row', _get_row_none)
-    monkeypatch.setattr(fx_store.fx_rates, 'get_fx_rates', lambda **_kwargs: asyncio.sleep(0, result=_Live()))
+    monkeypatch.setattr(
+        fx_store.fx_rates,
+        'get_fx_rates',
+        lambda **_kwargs: asyncio.sleep(0, result=_live_rates_payload()),
+    )
 
     async def _upsert_fail(*_args, **_kwargs):
         await asyncio.sleep(0)
@@ -235,15 +241,21 @@ async def test_get_effective_rates_paths_and_clear_override(monkeypatch: pytest.
 async def test_refresh_last_known_error_and_success_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     session = _SessionStub(dialect_name='other')
 
-    class _Live:
-        base = 'RON'
-        eur_per_ron = 0.26
-        usd_per_ron = 0.27
-        as_of = date.today()
-        source = 'bnr'
-        fetched_at = datetime.now(timezone.utc)
+    def _live_refresh_payload() -> SimpleNamespace:
+        return SimpleNamespace(
+            base='RON',
+            eur_per_ron=0.26,
+            usd_per_ron=0.27,
+            as_of=date.today(),
+            source='bnr',
+            fetched_at=datetime.now(timezone.utc),
+        )
 
-    monkeypatch.setattr(fx_store.fx_rates, 'get_fx_rates', lambda **_kwargs: asyncio.sleep(0, result=_Live()))
+    monkeypatch.setattr(
+        fx_store.fx_rates,
+        'get_fx_rates',
+        lambda **_kwargs: asyncio.sleep(0, result=_live_refresh_payload()),
+    )
 
     async def _upsert_fail(*_args, **_kwargs):
         await asyncio.sleep(0)

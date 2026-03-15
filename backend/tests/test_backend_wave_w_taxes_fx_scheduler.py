@@ -223,17 +223,19 @@ def test_fx_store_helpers_and_effective_rates_paths(monkeypatch: pytest.MonkeyPa
             await asyncio.sleep(0)
             return None
 
-        class _Live:
-            base = "RON"
-            eur_per_ron = Decimal("0.22")
-            usd_per_ron = Decimal("0.23")
-            as_of = date.today()
-            source = "live"
-            fetched_at = now
+        def _live_rates_payload() -> SimpleNamespace:
+            return SimpleNamespace(
+                base="RON",
+                eur_per_ron=Decimal("0.22"),
+                usd_per_ron=Decimal("0.23"),
+                as_of=date.today(),
+                source="live",
+                fetched_at=now,
+            )
 
         async def _live(*_args, **_kwargs):
             await asyncio.sleep(0)
-            return _Live()
+            return _live_rates_payload()
 
         async def _upsert(*_args, **_kwargs):
             await asyncio.sleep(0)

@@ -53,6 +53,7 @@ def test_account_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     stop = asyncio.Event()
 
     async def _run_once_once() -> None:
+        await asyncio.sleep(0)
         stop.set()
         raise RuntimeError("boom")
 
@@ -73,6 +74,7 @@ def test_admin_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     stop = asyncio.Event()
 
     async def _run_once_cancel() -> None:
+        await asyncio.sleep(0)
         stop.set()
         raise asyncio.CancelledError()
 
@@ -93,6 +95,7 @@ def test_fx_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     stop = asyncio.Event()
 
     async def _refresh_once_fail() -> None:
+        await asyncio.sleep(0)
         stop.set()
         raise RuntimeError("err")
 
@@ -128,6 +131,7 @@ def test_sameday_scheduler_run_once_and_loop_paths(monkeypatch) -> None:
     stop = asyncio.Event()
 
     async def _run_once_stop() -> int:
+        await asyncio.sleep(0)
         stop.set()
         return 1
 
