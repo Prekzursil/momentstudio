@@ -7,7 +7,7 @@ on:
 
 jobs:
   backlog-sweep:
-    uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-backlog-sweep.yml@main
+    uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-backlog-sweep.yml@37a6db2c75dc6891eea39007c96e8f9cbde22579 # main
     with:
       repo_slug: ${{ github.repository }}
       tool: coverage
