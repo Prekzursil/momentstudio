@@ -8,6 +8,7 @@ from urllib.parse import ParseResult, urlparse
 
 DEFAULT_APPLITOOLS_SERVER = "https://eyesapi.applitools.com"
 RENDERINFO_PATH = "/api/sessions/renderinfo"
+DEFAULT_ALLOWED_HOSTS = frozenset({"eyesapi.applitools.com"})
 
 
 def is_dependabot_origin() -> bool:
@@ -26,8 +27,23 @@ def write_output(name: str, value: str) -> None:
     if not github_output:
         return
     path = Path(github_output)
+    if not is_safe_github_output_path(path):
+        return
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"{name}={value}\n")
+
+
+def is_safe_github_output_path(path: Path) -> bool:
+    runner_temp = os.environ.get("RUNNER_TEMP", "").strip()
+    if not runner_temp:
+        # Outside Actions, skip writing outputs entirely.
+        return False
+    try:
+        temp_root = Path(runner_temp).resolve(strict=True)
+        resolved = path.resolve(strict=False)
+    except OSError:
+        return False
+    return resolved == temp_root or temp_root in resolved.parents
 
 
 def normalize_scheme(parsed: ParseResult) -> Optional[str]:
@@ -62,8 +78,17 @@ def resolve_probe_target(server_url: str) -> Optional[Tuple[str, str, str]]:
     host = resolve_host(parsed)
     if not host:
         return None
+    if not is_allowed_host(host):
+        return None
 
     return scheme, host, build_request_path(resolve_base_path(parsed))
+
+
+def is_allowed_host(host: str) -> bool:
+    hostname = host.split(":", 1)[0].strip().lower()
+    if not hostname:
+        return False
+    return hostname in DEFAULT_ALLOWED_HOSTS
 
 
 def probe(server_url: str, api_key: str) -> str:

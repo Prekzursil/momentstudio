@@ -5,6 +5,9 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   backlog-sweep:
     uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-backlog-sweep.yml@main
