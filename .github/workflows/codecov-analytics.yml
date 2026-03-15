@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -71,11 +72,13 @@ jobs:
       - name: Run frontend tests with coverage + junit
         id: frontend_tests
         continue-on-error: true
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
         run: |
           set +e
           cd frontend
           mkdir -p test-results
-          export CHROME_BIN="${{ steps.chrome.outputs.chrome-path }}"
+          export CHROME_BIN="${CHROME_PATH}"
           export KARMA_JUNIT=1
           npm test -- --watch=false --browsers=ChromeHeadlessNoSandbox --code-coverage
           test_exit=$?
@@ -202,6 +205,16 @@ jobs:
 
       - name: Enforce test/build and bundle results
         if: ${{ !cancelled() }}
+        env:
+          BACKEND_TEST_EXIT_CODE: ${{ steps.backend_tests.outputs.test_exit_code }}
+          BACKEND_COVERAGE_EXIT_CODE: ${{ steps.backend_tests.outputs.coverage_exit_code }}
+          FRONTEND_TEST_EXIT_CODE: ${{ steps.frontend_tests.outputs.test_exit_code }}
+          ABSOLUTE_COVERAGE_EXIT_CODE: ${{ steps.absolute_coverage.outputs.coverage_exit_code }}
+          FRONTEND_BUILD_EXIT_CODE: ${{ steps.frontend_build.outputs.build_exit_code }}
+          BROWSER_BUNDLE_EXIT_CODE: ${{ steps.browser_bundle.outputs.bundle_exit_code }}
+          SSR_BUNDLE_EXIT_CODE: ${{ steps.ssr_bundle.outputs.bundle_exit_code }}
+          UPLOAD_COVERAGE_OUTCOME: ${{ steps.upload_coverage.outcome }}
+          UPLOAD_TEST_RESULTS_OUTCOME: ${{ steps.upload_test_results.outcome }}
         run: |
           set -euo pipefail
 
@@ -229,15 +242,15 @@ jobs:
             echo "$raw"
           }
 
-          backend_test_exit="$(normalize_int "${{ steps.backend_tests.outputs.test_exit_code }}")"
-          backend_coverage_exit="$(normalize_int "${{ steps.backend_tests.outputs.coverage_exit_code }}")"
-          frontend_test_exit="$(normalize_int "${{ steps.frontend_tests.outputs.test_exit_code }}")"
-          absolute_coverage_exit="$(normalize_int "${{ steps.absolute_coverage.outputs.coverage_exit_code }}")"
-          frontend_build_exit="$(normalize_int "${{ steps.frontend_build.outputs.build_exit_code }}")"
-          browser_bundle_exit="$(normalize_int "${{ steps.browser_bundle.outputs.bundle_exit_code }}")"
-          ssr_bundle_exit="$(normalize_int "${{ steps.ssr_bundle.outputs.bundle_exit_code }}")"
-          upload_coverage_outcome="$(normalize_outcome "${{ steps.upload_coverage.outcome }}")"
-          upload_test_results_outcome="$(normalize_outcome "${{ steps.upload_test_results.outcome }}")"
+          backend_test_exit="$(normalize_int "${BACKEND_TEST_EXIT_CODE:-}")"
+          backend_coverage_exit="$(normalize_int "${BACKEND_COVERAGE_EXIT_CODE:-}")"
+          frontend_test_exit="$(normalize_int "${FRONTEND_TEST_EXIT_CODE:-}")"
+          absolute_coverage_exit="$(normalize_int "${ABSOLUTE_COVERAGE_EXIT_CODE:-}")"
+          frontend_build_exit="$(normalize_int "${FRONTEND_BUILD_EXIT_CODE:-}")"
+          browser_bundle_exit="$(normalize_int "${BROWSER_BUNDLE_EXIT_CODE:-}")"
+          ssr_bundle_exit="$(normalize_int "${SSR_BUNDLE_EXIT_CODE:-}")"
+          upload_coverage_outcome="$(normalize_outcome "${UPLOAD_COVERAGE_OUTCOME:-}")"
+          upload_test_results_outcome="$(normalize_outcome "${UPLOAD_TEST_RESULTS_OUTCOME:-}")"
 
           fail=0
 
