@@ -50,11 +50,24 @@ cat > "${tmp_payload}" <<'JSON'
   "required_status_checks": {
     "strict": true,
     "contexts": [
-      "Backend CI / backend (pull_request)",
-      "Backend CI / backend-postgres (pull_request)",
-      "Frontend CI / frontend (pull_request)",
-      "Docker Compose Smoke / compose-smoke (pull_request)",
-      "Audit PR Evidence / audit-pr-evidence (pull_request)"
+      "backend",
+      "backend-postgres",
+      "frontend",
+      "compose-smoke",
+      "audit-pr-evidence",
+      "aggregate-gate / Quality Zero Gate",
+      "shared-scanner-matrix / Quality Secrets Preflight",
+      "shared-scanner-matrix / Coverage 100 Gate",
+      "shared-scanner-matrix / Codacy Zero",
+      "shared-scanner-matrix / Sonar Zero",
+      "shared-scanner-matrix / Sentry Zero",
+      "shared-scanner-matrix / DeepScan Zero",
+      "shared-scanner-matrix / Semgrep Zero",
+      "Codacy Static Code Analysis",
+      "qlty check",
+      "codecov-analytics",
+      "Applitools Visual",
+      "Chromatic Playwright"
     ]
   },
   "enforce_admins": false,
