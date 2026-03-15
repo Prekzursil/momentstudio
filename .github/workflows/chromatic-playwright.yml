@@ -31,6 +31,8 @@ jobs:
       CHROMATIC_ARCHIVE_LOCATION: test-results/chromatic-archives
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -41,21 +43,38 @@ jobs:
       - name: Upgrade npm
         run: npm i -g npm@11.7.0
 
-      - name: Validate Chromatic token
+      - name: Detect Chromatic token availability
+        id: chromatic_token
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          GITHUB_ACTOR_NAME: ${{ github.actor }}
+          PULL_REQUEST_AUTHOR: ${{ github.event.pull_request.user.login || '' }}
+          PULL_REQUEST_HEAD_REF: ${{ github.event.pull_request.head.ref || github.head_ref || '' }}
         run: |
-          if [ -z "${{ secrets.CHROMATIC_PROJECT_TOKEN }}" ]; then
+          if [ -n "${CHROMATIC_PROJECT_TOKEN:-}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          elif [ "${GITHUB_ACTOR_NAME:-}" = "dependabot[bot]" ] || [ "${PULL_REQUEST_AUTHOR:-}" = "dependabot[bot]" ] || [[ "${PULL_REQUEST_HEAD_REF:-}" == dependabot/* ]]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping Chromatic Playwright for Dependabot because CHROMATIC_PROJECT_TOKEN is unavailable in this context."
+          else
             echo "CHROMATIC_PROJECT_TOKEN is not configured for this repository."
             exit 1
           fi
 
       - name: Install dependencies
+        if: steps.chromatic_token.outputs.available == 'true'
         run: npm ci
 
       - name: Install Playwright browser
+        if: steps.chromatic_token.outputs.available == 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Generate Playwright archives
+        if: steps.chromatic_token.outputs.available == 'true'
         run: npm run e2e:chromatic
 
       - name: Upload to Chromatic
-        run: npx chromatic --playwright --project-token=${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        if: steps.chromatic_token.outputs.available == 'true'
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+        run: npx chromatic --playwright --project-token="${CHROMATIC_PROJECT_TOKEN}"
