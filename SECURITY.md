@@ -2,27 +2,32 @@
 
 ## Supported Versions
 
-Security fixes are applied to the `main` branch and the latest production deployment derived from it.
+Security fixes are applied to the `main` branch.
+
+| Version | Supported |
+| --- | --- |
+| `main` | :white_check_mark: |
+| Other branches/tags | :x: |
 
 ## Reporting a Vulnerability
 
-Do not open public issues for security vulnerabilities.
+Please do **not** open public GitHub issues for undisclosed security findings.
 
-Please report privately using one of these channels:
+Use GitHub Private Vulnerability Reporting for this repository:
+<https://github.com/Prekzursil/momentstudio/security/advisories/new>
 
-1. GitHub Security Advisory for this repository.
-2. Direct contact with the maintainer on GitHub (`@Prekzursil`) if advisory flow is unavailable.
+If private advisory reporting is unavailable, contact the maintainer privately on GitHub (`@Prekzursil`).
 
-Include, when possible:
+When reporting, include:
 
-- affected endpoint/feature/path
-- exact commit SHA or deployment version
-- reproduction steps
-- impact and scope
-- suggested mitigation
+- the affected component, file, workflow, or dependency
+- the exact commit, branch, or release if known
+- clear reproduction or proof-of-concept steps
+- impact details covering confidentiality, integrity, or availability
+- any suggested mitigation if known
 
-## Response Expectations
+## Disclosure Expectations
 
-- We will acknowledge receipt as quickly as possible.
-- We will triage severity and communicate status updates during remediation.
-- Public disclosure should wait until a fix is available and deployed.
+- Initial acknowledgment: best effort within 3 business days.
+- Triage update: best effort within 7 business days.
+- Coordinated disclosure is expected; please allow time to investigate and patch before public disclosure.

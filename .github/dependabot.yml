@@ -1,61 +1,62 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 3
-    groups:
-      backend-patch-minor:
-        patterns:
-          - "*"
-        update-types:
-          - "patch"
-          - "minor"
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - "version-update:semver-major"
-    labels:
-      - "dependencies"
-      - "type:chore"
-      - "area:ci"
-
-  - package-ecosystem: "npm"
-    directory: "/frontend"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 3
-    groups:
-      frontend-patch-minor:
-        patterns:
-          - "*"
-        update-types:
-          - "patch"
-          - "minor"
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - "version-update:semver-major"
-    labels:
-      - "dependencies"
-      - "type:chore"
-      - "area:ci"
-
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 3
-    groups:
-      actions-patch-minor:
-        patterns:
-          - "*"
-    ignore:
-      - dependency-name: "*"
-        update-types:
-          - "version-update:semver-major"
-    labels:
-      - "dependencies"
-      - "type:chore"
-      - "area:ci"
+- package-ecosystem: pip
+  directory: /backend
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
+  groups:
+    pip-backend-patch-minor:
+      patterns:
+      - '*'
+      update-types:
+      - patch
+      - minor
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  labels:
+  - dependencies
+  - type:chore
+  - area:ci
+- package-ecosystem: npm
+  directory: /frontend
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
+  groups:
+    npm-frontend-patch-minor:
+      patterns:
+      - '*'
+      update-types:
+      - patch
+      - minor
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  labels:
+  - dependencies
+  - type:chore
+  - area:ci
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
+  groups:
+    github-actions-root-patch-minor:
+      patterns:
+      - '*'
+      update-types:
+      - patch
+      - minor
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  labels:
+  - dependencies
+  - type:chore
+  - area:ci
