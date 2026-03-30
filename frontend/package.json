@@ -49,15 +49,13 @@
     "zone.js": "~0.16.1"
   },
   "devDependencies": {
-    "@codecov/bundle-analyzer": "^1.9.1",
     "@angular-devkit/build-angular": "^21.2.2",
     "@angular/cli": "^21.2.2",
     "@angular/compiler-cli": "^21.2.4",
     "@applitools/eyes-playwright": "^1.46.0",
     "@chromatic-com/playwright": "^0.12.8",
+    "@codecov/bundle-analyzer": "^1.9.1",
     "@eslint/js": "^9.39.4",
-    "@percy/cli": "^1.31.9",
-    "@percy/playwright": "^1.0.8",
     "@playwright/test": "^1.58.2",
     "@types/express": "^5.0.1",
     "@types/jasmine": "~5.1.15",
@@ -67,6 +65,7 @@
     "autoprefixer": "^10.4.27",
     "browser-sync": "^3.0.0",
     "chokidar": "^3.6.0",
+    "chromatic": "^13.3.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "glob-parent": "^5.1.2",
@@ -80,7 +79,6 @@
     "postcss": "^8.5.8",
     "prettier": "^3.8.1",
     "readdirp": "^3.6.0",
-    "chromatic": "^13.3.2",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.57.0"

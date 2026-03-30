@@ -159,13 +159,10 @@ CI sourcemap + release upload:
 - Release identifier: full git SHA (`GITHUB_SHA`), aligned with production `APP_VERSION` stamping.
 - If required Sentry secret/variables are missing, the workflow exits green with an explicit skip summary.
 
-Percy workflows:
+Chromatic workflows:
 
-- `Percy Visual` runs core snapshots on pull requests (non-blocking).
-- `Percy Visual` runs expanded snapshots on weekly schedule or manual dispatch (non-blocking).
-- Pull request runs auto-approve Percy build reviews by default to prevent external Percy review statuses from blocking merges.
-- If `PERCY_TOKEN` is not configured, Percy jobs are skipped with a summary note.
-- Optional variable: `PERCY_AUTO_APPROVE_PR=1` (default behavior). Set to `0` to keep manual Percy review approval.
+- `Chromatic Playwright` runs visual archive generation on pull requests and `main`.
+- If `CHROMATIC_PROJECT_TOKEN` is not configured, Chromatic jobs fail for maintained branches and only skip in restricted Dependabot contexts.
 
 Applitools workflows:
 
