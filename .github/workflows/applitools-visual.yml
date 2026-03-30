@@ -1,6 +1,8 @@
 name: Applitools Visual
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   schedule:
