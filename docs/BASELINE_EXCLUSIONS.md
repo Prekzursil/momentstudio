@@ -37,15 +37,14 @@ AdrianaArt has a comprehensive Phase 1/2 audit pipeline that is **intentionally 
 
 ## Excluded: Visual regression testing
 
-AdrianaArt uses Percy and Applitools for visual regression coverage. These are **intentionally excluded** from baseline-lite:
+AdrianaArt uses Chromatic and Applitools for visual regression coverage. These are **intentionally excluded** from baseline-lite:
 
 **Excluded workflows:**
-- `.github/workflows/percy-visual.yml` - Percy snapshot testing
+- `.github/workflows/chromatic-playwright.yml` - Chromatic Playwright archive generation
 - `.github/workflows/applitools-visual.yml` - Applitools Eyes testing
-- Scripts: `scripts/audit/percy_auto_approve.py`
 
 **Why excluded:**
-- Requires Percy and Applitools API keys and paid accounts
+- Requires external visual provider tokens and paid accounts
 - Configured as non-blocking observability (intentionally not in branch protection)
 - Specific to storefront visual consistency tracking
 
