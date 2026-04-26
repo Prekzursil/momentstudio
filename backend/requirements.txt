@@ -1,7 +1,7 @@
-fastapi==0.135.3
+fastapi==0.136.1
 jinja2==3.1.6
-uvicorn[standard]==0.44.0
-pydantic-settings==2.13.1
+uvicorn[standard]==0.46.0
+pydantic-settings==2.14.0
 sqlalchemy[asyncio]==2.0.49
 alembic==1.18.4
 asyncpg==0.31.0
@@ -18,5 +18,5 @@ stripe==14.4.1
 Pillow==12.2.0
 defusedxml==0.7.1
 reportlab==4.4.10
-sentry-sdk==2.57.0
+sentry-sdk==2.58.0
 webauthn==2.7.1
