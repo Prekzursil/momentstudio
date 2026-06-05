@@ -1,17 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-import hashlib
-import re
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
-from sqlalchemy import delete, func, or_, select
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import selectinload
-
+from app.api.v1 import cart as cart_api
 from app.core.dependencies import get_current_user, require_admin_section
 from app.db.session import get_session
 from app.models.catalog import Category, Product
@@ -31,52 +27,66 @@ from app.models.coupons_v2 import (
 from app.models.order import Order, OrderItem, OrderStatus, ShippingMethod
 from app.models.user import User
 from app.schemas.coupons_v2 import (
-    CouponAssignRequest,
-    CouponAssignmentRead,
     CouponAnalyticsDaily,
     CouponAnalyticsResponse,
     CouponAnalyticsSummary,
     CouponAnalyticsTopProduct,
-    CouponCreate,
-    CouponBulkJobRead,
+    CouponAssignmentRead,
+    CouponAssignRequest,
     CouponBulkAssignRequest,
-    CouponBulkRevokeRequest,
+    CouponBulkJobRead,
     CouponBulkResult,
+    CouponBulkRevokeRequest,
     CouponBulkSegmentAssignRequest,
     CouponBulkSegmentPreview,
     CouponBulkSegmentRevokeRequest,
-    CouponIssueToUserRequest,
     CouponCodeGenerateRequest,
     CouponCodeGenerateResponse,
-    CouponUpdate,
+    CouponCreate,
     CouponEligibilityResponse,
+    CouponIssueToUserRequest,
     CouponOffer,
     CouponRead,
     CouponRevokeRequest,
+    CouponUpdate,
     CouponValidateRequest,
     PromotionCreate,
     PromotionRead,
     PromotionUpdate,
 )
+from app.services import audit_chain as audit_chain_service
+from app.services import cart as cart_service
 from app.services import checkout_settings as checkout_settings_service
 from app.services import coupons_v2 as coupons_service
 from app.services import email as email_service
-from app.services import audit_chain as audit_chain_service
 from app.services import pricing
-from app.services import cart as cart_service
-from app.api.v1 import cart as cart_api
-
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
+from sqlalchemy import delete, func, or_, select
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/coupons", tags=["coupons"])
 _BULK_SEGMENT_BATCH_SIZE = 500
 
 
-async def _get_shipping_method(session: AsyncSession, shipping_method_id: UUID | None) -> ShippingMethod | None:
+async def _get_shipping_method(
+    session: AsyncSession, shipping_method_id: UUID | None
+) -> ShippingMethod | None:
     if not shipping_method_id:
         return None
     shipping_method = await session.get(ShippingMethod, shipping_method_id)
     if not shipping_method:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found"
+        )
     return shipping_method
 
 
@@ -116,19 +126,43 @@ async def _validate_scope_ids(
     category_ids: set[UUID],
 ) -> None:
     if product_ids:
-        found = (await session.execute(select(Product.id).where(Product.id.in_(product_ids)))).scalars().all()
+        found = (
+            (
+                await session.execute(
+                    select(Product.id).where(Product.id.in_(product_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
         missing = product_ids - set(found)
         if missing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more products in scope do not exist")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more products in scope do not exist",
+            )
 
     if category_ids:
-        found = (await session.execute(select(Category.id).where(Category.id.in_(category_ids)))).scalars().all()
+        found = (
+            (
+                await session.execute(
+                    select(Category.id).where(Category.id.in_(category_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
         missing = category_ids - set(found)
         if missing:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more categories in scope do not exist")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more categories in scope do not exist",
+            )
 
 
-def _scopes_from_promotion(promo: Promotion) -> tuple[set[UUID], set[UUID], set[UUID], set[UUID]]:
+def _scopes_from_promotion(
+    promo: Promotion,
+) -> tuple[set[UUID], set[UUID], set[UUID], set[UUID]]:
     include_products: set[UUID] = set()
     exclude_products: set[UUID] = set()
     include_categories: set[UUID] = set()
@@ -136,10 +170,18 @@ def _scopes_from_promotion(promo: Promotion) -> tuple[set[UUID], set[UUID], set[
 
     for scope in getattr(promo, "scopes", None) or []:
         if getattr(scope, "entity_type", None) == PromotionScopeEntityType.product:
-            target = include_products if getattr(scope, "mode", None) == PromotionScopeMode.include else exclude_products
+            target = (
+                include_products
+                if getattr(scope, "mode", None) == PromotionScopeMode.include
+                else exclude_products
+            )
             target.add(scope.entity_id)
         elif getattr(scope, "entity_type", None) == PromotionScopeEntityType.category:
-            target = include_categories if getattr(scope, "mode", None) == PromotionScopeMode.include else exclude_categories
+            target = (
+                include_categories
+                if getattr(scope, "mode", None) == PromotionScopeMode.include
+                else exclude_categories
+            )
             target.add(scope.entity_id)
 
     return include_products, exclude_products, include_categories, exclude_categories
@@ -157,9 +199,15 @@ async def _replace_promotion_scopes(
     overlap_products = include_product_ids & exclude_product_ids
     overlap_categories = include_category_ids & exclude_category_ids
     if overlap_products:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Products cannot be both included and excluded")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Products cannot be both included and excluded",
+        )
     if overlap_categories:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Categories cannot be both included and excluded")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Categories cannot be both included and excluded",
+        )
 
     await _validate_scope_ids(
         session,
@@ -167,7 +215,9 @@ async def _replace_promotion_scopes(
         category_ids=set(include_category_ids) | set(exclude_category_ids),
     )
 
-    await session.execute(delete(PromotionScope).where(PromotionScope.promotion_id == promotion_id))
+    await session.execute(
+        delete(PromotionScope).where(PromotionScope.promotion_id == promotion_id)
+    )
 
     for product_id in sorted(include_product_ids):
         session.add(
@@ -246,8 +296,16 @@ async def coupon_eligibility(
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
-    rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
-    rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+    rate_flat = (
+        Decimal(getattr(shipping_method, "rate_flat", None) or 0)
+        if shipping_method
+        else None
+    )
+    rate_per = (
+        Decimal(getattr(shipping_method, "rate_per_kg", None) or 0)
+        if shipping_method
+        else None
+    )
     results = await coupons_service.evaluate_coupons_for_user_cart(
         session,
         user=current_user,
@@ -272,12 +330,22 @@ async def validate_coupon(
     code = (payload.code or "").strip().upper()
     coupon = await coupons_service.get_coupon_by_code(session, code=code)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
     user_cart = await cart_service.get_cart(session, current_user.id, session_id)
     checkout = await checkout_settings_service.get_checkout_settings(session)
     shipping_method = await _get_shipping_method(session, shipping_method_id)
-    rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
-    rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+    rate_flat = (
+        Decimal(getattr(shipping_method, "rate_flat", None) or 0)
+        if shipping_method
+        else None
+    )
+    rate_per = (
+        Decimal(getattr(shipping_method, "rate_per_kg", None) or 0)
+        if shipping_method
+        else None
+    )
     result = await coupons_service.evaluate_coupon_for_cart(
         session,
         user_id=current_user.id,
@@ -295,10 +363,14 @@ async def my_coupons(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> list[CouponRead]:
-    coupons = await coupons_service.get_user_visible_coupons(session, user_id=current_user.id)
+    coupons = await coupons_service.get_user_visible_coupons(
+        session, user_id=current_user.id
+    )
     return [
         CouponRead.model_validate(c, from_attributes=True).model_copy(
-            update={"promotion": _to_promotion_read(c.promotion) if c.promotion else None}
+            update={
+                "promotion": _to_promotion_read(c.promotion) if c.promotion else None
+            }
         )
         for c in coupons
     ]
@@ -310,36 +382,59 @@ async def admin_list_promotions(
     _: User = Depends(require_admin_section("coupons")),
 ) -> list[PromotionRead]:
     result = await session.execute(
-        select(Promotion).options(selectinload(Promotion.scopes)).order_by(Promotion.created_at.desc())
+        select(Promotion)
+        .options(selectinload(Promotion.scopes))
+        .order_by(Promotion.created_at.desc())
     )
     promotions = list(result.scalars().all())
     return [_to_promotion_read(p) for p in promotions]
 
 
-@router.post("/admin/promotions", response_model=PromotionRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/promotions",
+    response_model=PromotionRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def admin_create_promotion(
     payload: PromotionCreate,
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("coupons")),
 ) -> PromotionRead:
     if payload.discount_type == "percent" and not payload.percentage_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="percentage_off is required for percent promotions",
+        )
     if payload.discount_type == "amount" and not payload.amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount_off is required for amount promotions")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="amount_off is required for amount promotions",
+        )
     if payload.discount_type == "free_shipping":
         if payload.percentage_off or payload.amount_off:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="free_shipping promotions cannot set percentage_off/amount_off")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="free_shipping promotions cannot set percentage_off/amount_off",
+            )
     if payload.percentage_off and payload.amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose percentage_off or amount_off, not both",
+        )
 
     key_clean = (payload.key or "").strip() or None
     if key_clean:
         key_clean = key_clean[:80]
         exists = (
-            (await session.execute(select(Promotion).where(Promotion.key == key_clean))).scalars().first()
+            (await session.execute(select(Promotion).where(Promotion.key == key_clean)))
+            .scalars()
+            .first()
         )
         if exists:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion key already exists")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Promotion key already exists",
+            )
 
     promo = Promotion(
         **payload.model_dump(
@@ -378,12 +473,20 @@ async def admin_update_promotion(
     _: User = Depends(require_admin_section("coupons")),
 ) -> PromotionRead:
     promo = (
-        (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == promotion_id)))
+        (
+            await session.execute(
+                select(Promotion)
+                .options(selectinload(Promotion.scopes))
+                .where(Promotion.id == promotion_id)
+            )
+        )
         .scalars()
         .first()
     )
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found"
+        )
 
     data = payload.model_dump(exclude_unset=True)
 
@@ -391,14 +494,26 @@ async def admin_update_promotion(
     percentage_off = data.get("percentage_off", promo.percentage_off)
     amount_off = data.get("amount_off", promo.amount_off)
     if discount_type == "percent" and not percentage_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="percentage_off is required for percent promotions")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="percentage_off is required for percent promotions",
+        )
     if discount_type == "amount" and not amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="amount_off is required for amount promotions")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="amount_off is required for amount promotions",
+        )
     if discount_type == "free_shipping":
         if percentage_off or amount_off:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="free_shipping promotions cannot set percentage_off/amount_off")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="free_shipping promotions cannot set percentage_off/amount_off",
+            )
     if percentage_off and amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose percentage_off or amount_off, not both",
+        )
 
     if "key" in data:
         key_clean = (data.get("key") or "").strip() or None
@@ -406,12 +521,21 @@ async def admin_update_promotion(
             key_clean = key_clean[:80]
             if key_clean != promo.key:
                 exists = (
-                    (await session.execute(select(Promotion).where(Promotion.key == key_clean, Promotion.id != promo.id)))
+                    (
+                        await session.execute(
+                            select(Promotion).where(
+                                Promotion.key == key_clean, Promotion.id != promo.id
+                            )
+                        )
+                    )
                     .scalars()
                     .first()
                 )
                 if exists:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promotion key already exists")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Promotion key already exists",
+                    )
         promo.key = key_clean
 
     for attr in [
@@ -439,11 +563,32 @@ async def admin_update_promotion(
         "excluded_category_ids",
     }
     if scope_fields & set(data.keys()):
-        current_in_products, current_ex_products, current_in_categories, current_ex_categories = _scopes_from_promotion(promo)
-        include_products = set(data.get("included_product_ids")) if "included_product_ids" in data else current_in_products
-        exclude_products = set(data.get("excluded_product_ids")) if "excluded_product_ids" in data else current_ex_products
-        include_categories = set(data.get("included_category_ids")) if "included_category_ids" in data else current_in_categories
-        exclude_categories = set(data.get("excluded_category_ids")) if "excluded_category_ids" in data else current_ex_categories
+        (
+            current_in_products,
+            current_ex_products,
+            current_in_categories,
+            current_ex_categories,
+        ) = _scopes_from_promotion(promo)
+        include_products = (
+            set(data.get("included_product_ids"))
+            if "included_product_ids" in data
+            else current_in_products
+        )
+        exclude_products = (
+            set(data.get("excluded_product_ids"))
+            if "excluded_product_ids" in data
+            else current_ex_products
+        )
+        include_categories = (
+            set(data.get("included_category_ids"))
+            if "included_category_ids" in data
+            else current_in_categories
+        )
+        exclude_categories = (
+            set(data.get("excluded_category_ids"))
+            if "excluded_category_ids" in data
+            else current_ex_categories
+        )
 
         await _replace_promotion_scopes(
             session,
@@ -467,7 +612,9 @@ async def admin_list_coupons(
     promotion_id: UUID | None = Query(default=None),
     q: str | None = Query(default=None),
 ) -> list[CouponRead]:
-    query = select(Coupon).options(selectinload(Coupon.promotion).selectinload(Promotion.scopes))
+    query = select(Coupon).options(
+        selectinload(Coupon.promotion).selectinload(Promotion.scopes)
+    )
     if promotion_id:
         query = query.where(Coupon.promotion_id == promotion_id)
     if q:
@@ -476,7 +623,9 @@ async def admin_list_coupons(
     coupons = list(result.scalars().all())
     return [
         CouponRead.model_validate(c, from_attributes=True).model_copy(
-            update={"promotion": _to_promotion_read(c.promotion) if c.promotion else None}
+            update={
+                "promotion": _to_promotion_read(c.promotion) if c.promotion else None
+            }
         )
         for c in coupons
     ]
@@ -501,7 +650,9 @@ async def admin_update_coupon(
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
     data = payload.model_dump(exclude_unset=True)
     for attr in [
@@ -518,11 +669,15 @@ async def admin_update_coupon(
     await session.commit()
     await session.refresh(coupon, attribute_names=["promotion"])
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
-    coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    coupon_read.promotion = (
+        _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    )
     return coupon_read
 
 
-@router.get("/admin/coupons/{coupon_id}/assignments", response_model=list[CouponAssignmentRead])
+@router.get(
+    "/admin/coupons/{coupon_id}/assignments", response_model=list[CouponAssignmentRead]
+)
 async def admin_list_coupon_assignments(
     coupon_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -530,7 +685,9 @@ async def admin_list_coupon_assignments(
 ) -> list[CouponAssignmentRead]:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
     result = await session.execute(
         select(CouponAssignment)
@@ -553,7 +710,9 @@ async def admin_list_coupon_assignments(
     return out
 
 
-@router.post("/admin/coupons", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/coupons", response_model=CouponRead, status_code=status.HTTP_201_CREATED
+)
 async def admin_create_coupon(
     payload: CouponCreate,
     session: AsyncSession = Depends(get_session),
@@ -561,16 +720,26 @@ async def admin_create_coupon(
 ) -> CouponRead:
     promotion = await session.get(Promotion, payload.promotion_id)
     if not promotion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found"
+        )
 
     code = (payload.code or "").strip().upper()
     if not code:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon code is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon code is required"
+        )
     if len(code) > 40:
         code = code[:40]
-    existing = (await session.execute(select(Coupon).where(Coupon.code == code))).scalars().first()
+    existing = (
+        (await session.execute(select(Coupon).where(Coupon.code == code)))
+        .scalars()
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon code already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon code already exists"
+        )
 
     coupon = Coupon(
         promotion_id=promotion.id,
@@ -589,7 +758,9 @@ async def admin_create_coupon(
     if coupon.promotion:
         await session.refresh(coupon.promotion, attribute_names=["scopes"])
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
-    coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    coupon_read.promotion = (
+        _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    )
     return coupon_read
 
 
@@ -612,7 +783,11 @@ async def admin_generate_coupon_code(
     return CouponCodeGenerateResponse(code=code)
 
 
-@router.post("/admin/coupons/issue", response_model=CouponRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/coupons/issue",
+    response_model=CouponRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def admin_issue_coupon_to_user(
     payload: CouponIssueToUserRequest,
     background_tasks: BackgroundTasks,
@@ -621,19 +796,31 @@ async def admin_issue_coupon_to_user(
 ) -> CouponRead:
     user = await session.get(User, payload.user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     promotion = (
-        (await session.execute(select(Promotion).options(selectinload(Promotion.scopes)).where(Promotion.id == payload.promotion_id)))
+        (
+            await session.execute(
+                select(Promotion)
+                .options(selectinload(Promotion.scopes))
+                .where(Promotion.id == payload.promotion_id)
+            )
+        )
         .scalars()
         .first()
     )
     if not promotion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found"
+        )
 
     prefix_source = payload.prefix or promotion.key or promotion.name or "COUPON"
     prefix = _sanitize_coupon_prefix(prefix_source) or "COUPON"
-    code = await coupons_service.generate_unique_coupon_code(session, prefix=prefix, length=12)
+    code = await coupons_service.generate_unique_coupon_code(
+        session, prefix=prefix, length=12
+    )
 
     starts_at = datetime.now(timezone.utc)
     ends_at = payload.ends_at
@@ -642,7 +829,10 @@ async def admin_issue_coupon_to_user(
     if ends_at is None and payload.validity_days is not None:
         ends_at = starts_at + timedelta(days=int(payload.validity_days))
     if ends_at and ends_at < starts_at:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon ends_at must be in the future")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Coupon ends_at must be in the future",
+        )
 
     coupon = Coupon(
         promotion_id=promotion.id,
@@ -671,7 +861,10 @@ async def admin_issue_coupon_to_user(
 
     should_email = bool(payload.send_email and user.email)
     if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User has not opted in to marketing emails.",
+        )
     await session.commit()
 
     if should_email:
@@ -689,7 +882,9 @@ async def admin_issue_coupon_to_user(
     if coupon.promotion:
         await session.refresh(coupon.promotion, attribute_names=["scopes"])
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
-    coupon_read.promotion = _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    coupon_read.promotion = (
+        _to_promotion_read(coupon.promotion) if coupon.promotion else None
+    )
     return coupon_read
 
 
@@ -714,12 +909,16 @@ async def admin_coupon_analytics(
 
     promotion = await session.get(Promotion, promotion_id)
     if not promotion:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Promotion not found"
+        )
 
     if coupon_id:
         coupon = await session.get(Coupon, coupon_id)
         if not coupon or coupon.promotion_id != promotion_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+            )
 
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=int(days))
@@ -729,7 +928,9 @@ async def admin_coupon_analytics(
         CouponRedemption.redeemed_at >= start,
         CouponRedemption.redeemed_at <= end,
         Coupon.promotion_id == promotion_id,
-        Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
+        Order.status.notin_(
+            [OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]
+        ),
     ]
     if coupon_id:
         redemption_filters.append(Coupon.id == coupon_id)
@@ -753,20 +954,41 @@ async def admin_coupon_analytics(
     total_discount = pricing.quantize_money(_to_decimal(summary_row[1]))
     total_shipping_discount = pricing.quantize_money(_to_decimal(summary_row[2]))
     avg_with_val = summary_row[3]
-    avg_with = pricing.quantize_money(_to_decimal(avg_with_val)) if avg_with_val is not None else None
+    avg_with = (
+        pricing.quantize_money(_to_decimal(avg_with_val))
+        if avg_with_val is not None
+        else None
+    )
 
     baseline_avg_val = (
         await session.execute(
             select(func.avg(Order.total_amount)).where(
                 Order.created_at >= start,
                 Order.created_at <= end,
-                Order.status.notin_([OrderStatus.pending_payment, OrderStatus.cancelled, OrderStatus.refunded]),
-                or_(Order.promo_code.is_(None), func.length(func.trim(Order.promo_code)) == 0),
+                Order.status.notin_(
+                    [
+                        OrderStatus.pending_payment,
+                        OrderStatus.cancelled,
+                        OrderStatus.refunded,
+                    ]
+                ),
+                or_(
+                    Order.promo_code.is_(None),
+                    func.length(func.trim(Order.promo_code)) == 0,
+                ),
             )
         )
     ).scalar_one()
-    avg_without = pricing.quantize_money(_to_decimal(baseline_avg_val)) if baseline_avg_val is not None else None
-    aov_lift = pricing.quantize_money(avg_with - avg_without) if avg_with is not None and avg_without is not None else None
+    avg_without = (
+        pricing.quantize_money(_to_decimal(baseline_avg_val))
+        if baseline_avg_val is not None
+        else None
+    )
+    aov_lift = (
+        pricing.quantize_money(avg_with - avg_without)
+        if avg_with is not None and avg_without is not None
+        else None
+    )
 
     daily_rows = (
         await session.execute(
@@ -806,7 +1028,9 @@ async def admin_coupon_analytics(
         )
     ).all()
     order_discount_by_id: dict[UUID, Decimal] = {
-        order_id: _to_decimal(discount_val) for order_id, discount_val in redemption_orders if order_id
+        order_id: _to_decimal(discount_val)
+        for order_id, discount_val in redemption_orders
+        if order_id
     }
     order_ids = list(order_discount_by_id.keys())
 
@@ -832,7 +1056,9 @@ async def admin_coupon_analytics(
         for order_id, _, _, _, _, subtotal_val in item_rows:
             if not order_id:
                 continue
-            order_subtotals[order_id] = order_subtotals.get(order_id, Decimal("0.00")) + _to_decimal(subtotal_val)
+            order_subtotals[order_id] = order_subtotals.get(
+                order_id, Decimal("0.00")
+            ) + _to_decimal(subtotal_val)
 
         for order_id, product_id, slug, name, qty, subtotal_val in item_rows:
             if not order_id or not product_id:
@@ -864,7 +1090,9 @@ async def admin_coupon_analytics(
 
     top_products: list[CouponAnalyticsTopProduct] = []
     if aggregates:
-        items_sorted = sorted(aggregates.values(), key=lambda item: item.allocated, reverse=True)
+        items_sorted = sorted(
+            aggregates.values(), key=lambda item: item.allocated, reverse=True
+        )
         for bucket in items_sorted[: int(top_limit)]:
             top_products.append(
                 CouponAnalyticsTopProduct(
@@ -892,19 +1120,31 @@ async def admin_coupon_analytics(
     )
 
 
-async def _find_user(session: AsyncSession, *, user_id: UUID | None, email: str | None) -> User:
+async def _find_user(
+    session: AsyncSession, *, user_id: UUID | None, email: str | None
+) -> User:
     if user_id:
         user = await session.get(User, user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
         return user
     if email:
         email_clean = email.strip().lower()
-        user = (await session.execute(select(User).where(User.email == email_clean))).scalars().first()
+        user = (
+            (await session.execute(select(User).where(User.email == email_clean)))
+            .scalars()
+            .first()
+        )
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+            )
         return user
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide user_id or email")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, detail="Provide user_id or email"
+    )
 
 
 def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
@@ -936,7 +1176,9 @@ def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
 
 def _segment_user_filters(payload: object) -> list[object]:
     filters: list[object] = [User.deleted_at.is_(None)]
-    require_marketing = bool(getattr(payload, "require_marketing_opt_in", False)) or bool(getattr(payload, "send_email", False))
+    require_marketing = bool(
+        getattr(payload, "require_marketing_opt_in", False)
+    ) or bool(getattr(payload, "send_email", False))
     require_verified = bool(getattr(payload, "require_email_verified", False))
     if require_marketing:
         filters.append(User.notify_marketing.is_(True))
@@ -952,12 +1194,16 @@ class _BucketConfig:
     seed: str
 
 
-def _parse_bucket_config(*, bucket_total: object, bucket_index: object, bucket_seed: object) -> _BucketConfig | None:
+def _parse_bucket_config(
+    *, bucket_total: object, bucket_index: object, bucket_seed: object
+) -> _BucketConfig | None:
     seed = (str(bucket_seed) if bucket_seed is not None else "").strip()
     if bucket_total is None and bucket_index is None and not seed:
         return None
     if bucket_total is None or bucket_index is None or not seed:
-        raise ValueError("Bucket config requires bucket_total, bucket_index, and bucket_seed")
+        raise ValueError(
+            "Bucket config requires bucket_total, bucket_index, and bucket_seed"
+        )
     total = int(bucket_total)
     index = int(bucket_index)
     if total < 2 or total > 100:
@@ -974,8 +1220,21 @@ def _bucket_index_for_user(*, user_id: UUID, seed: str, total: int) -> int:
     return int(value % total)
 
 
-async def _segment_sample_emails(session: AsyncSession, *, filters: list[object], limit: int = 10) -> list[str]:
-    rows = (await session.execute(select(User.email).where(*filters).order_by(User.created_at.desc()).limit(limit))).scalars().all()
+async def _segment_sample_emails(
+    session: AsyncSession, *, filters: list[object], limit: int = 10
+) -> list[str]:
+    rows = (
+        (
+            await session.execute(
+                select(User.email)
+                .where(*filters)
+                .order_by(User.created_at.desc())
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return [str(e) for e in rows if e]
 
 
@@ -994,7 +1253,12 @@ async def _preview_segment_assign(
 
         last_id: UUID | None = None
         while True:
-            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+            q = (
+                select(User.id, User.email)
+                .where(*filters)
+                .order_by(User.id)
+                .limit(_BULK_SEGMENT_BATCH_SIZE)
+            )
             if last_id is not None:
                 q = q.where(User.id > last_id)
             rows = (await session.execute(q)).all()
@@ -1005,24 +1269,26 @@ async def _preview_segment_assign(
             bucketed = [
                 (user_id, email)
                 for user_id, email in rows
-                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+                if _bucket_index_for_user(
+                    user_id=user_id, seed=bucket.seed, total=bucket.total
+                )
+                == bucket.index
             ]
             if not bucketed:
                 continue
 
             user_ids = [user_id for user_id, _ in bucketed]
             existing = (
-                (
-                    await session.execute(
-                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
-                            CouponAssignment.coupon_id == coupon_id,
-                            CouponAssignment.user_id.in_(user_ids),
-                        )
+                await session.execute(
+                    select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
+                        CouponAssignment.coupon_id == coupon_id,
+                        CouponAssignment.user_id.in_(user_ids),
                     )
                 )
-                .all()
-            )
-            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
+            ).all()
+            status_by_user_id = {
+                user_id: revoked_at for user_id, revoked_at in existing
+            }
 
             for user_id, email in bucketed:
                 total += 1
@@ -1043,14 +1309,24 @@ async def _preview_segment_assign(
             already_active=already_active,
         )
 
-    total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+    total = int(
+        (
+            await session.execute(
+                select(func.count()).select_from(User).where(*filters)
+            )
+        ).scalar_one()
+    )
     already_active = int(
         (
             await session.execute(
                 select(func.count())
                 .select_from(CouponAssignment)
                 .join(User, CouponAssignment.user_id == User.id)
-                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_(None), *filters)
+                .where(
+                    CouponAssignment.coupon_id == coupon_id,
+                    CouponAssignment.revoked_at.is_(None),
+                    *filters,
+                )
             )
         ).scalar_one()
     )
@@ -1060,7 +1336,11 @@ async def _preview_segment_assign(
                 select(func.count())
                 .select_from(CouponAssignment)
                 .join(User, CouponAssignment.user_id == User.id)
-                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_not(None), *filters)
+                .where(
+                    CouponAssignment.coupon_id == coupon_id,
+                    CouponAssignment.revoked_at.is_not(None),
+                    *filters,
+                )
             )
         ).scalar_one()
     )
@@ -1091,7 +1371,12 @@ async def _preview_segment_revoke(
 
         last_id: UUID | None = None
         while True:
-            q = select(User.id, User.email).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+            q = (
+                select(User.id, User.email)
+                .where(*filters)
+                .order_by(User.id)
+                .limit(_BULK_SEGMENT_BATCH_SIZE)
+            )
             if last_id is not None:
                 q = q.where(User.id > last_id)
             rows = (await session.execute(q)).all()
@@ -1102,24 +1387,26 @@ async def _preview_segment_revoke(
             bucketed = [
                 (user_id, email)
                 for user_id, email in rows
-                if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+                if _bucket_index_for_user(
+                    user_id=user_id, seed=bucket.seed, total=bucket.total
+                )
+                == bucket.index
             ]
             if not bucketed:
                 continue
 
             user_ids = [user_id for user_id, _ in bucketed]
             existing = (
-                (
-                    await session.execute(
-                        select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
-                            CouponAssignment.coupon_id == coupon_id,
-                            CouponAssignment.user_id.in_(user_ids),
-                        )
+                await session.execute(
+                    select(CouponAssignment.user_id, CouponAssignment.revoked_at).where(
+                        CouponAssignment.coupon_id == coupon_id,
+                        CouponAssignment.user_id.in_(user_ids),
                     )
                 )
-                .all()
-            )
-            status_by_user_id = {user_id: revoked_at for user_id, revoked_at in existing}
+            ).all()
+            status_by_user_id = {
+                user_id: revoked_at for user_id, revoked_at in existing
+            }
 
             for user_id, email in bucketed:
                 total += 1
@@ -1142,14 +1429,24 @@ async def _preview_segment_revoke(
             not_assigned=not_assigned,
         )
 
-    total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+    total = int(
+        (
+            await session.execute(
+                select(func.count()).select_from(User).where(*filters)
+            )
+        ).scalar_one()
+    )
     revoked = int(
         (
             await session.execute(
                 select(func.count())
                 .select_from(CouponAssignment)
                 .join(User, CouponAssignment.user_id == User.id)
-                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_(None), *filters)
+                .where(
+                    CouponAssignment.coupon_id == coupon_id,
+                    CouponAssignment.revoked_at.is_(None),
+                    *filters,
+                )
             )
         ).scalar_one()
     )
@@ -1159,7 +1456,11 @@ async def _preview_segment_revoke(
                 select(func.count())
                 .select_from(CouponAssignment)
                 .join(User, CouponAssignment.user_id == User.id)
-                .where(CouponAssignment.coupon_id == coupon_id, CouponAssignment.revoked_at.is_not(None), *filters)
+                .where(
+                    CouponAssignment.coupon_id == coupon_id,
+                    CouponAssignment.revoked_at.is_not(None),
+                    *filters,
+                )
             )
         ).scalar_one()
     )
@@ -1175,13 +1476,19 @@ async def _preview_segment_revoke(
 
 
 async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
-    SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
+    SessionLocal = async_sessionmaker(
+        engine, expire_on_commit=False, autoflush=False, class_=AsyncSession
+    )
     async with SessionLocal() as session:
         job = (
             (
                 await session.execute(
                     select(CouponBulkJob)
-                    .options(selectinload(CouponBulkJob.coupon).selectinload(Coupon.promotion))
+                    .options(
+                        selectinload(CouponBulkJob.coupon).selectinload(
+                            Coupon.promotion
+                        )
+                    )
                     .where(CouponBulkJob.id == job_id)
                 )
             )
@@ -1206,7 +1513,13 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             )
             filters = _segment_user_filters(job)
             if bucket is None:
-                total = int((await session.execute(select(func.count()).select_from(User).where(*filters))).scalar_one())
+                total = int(
+                    (
+                        await session.execute(
+                            select(func.count()).select_from(User).where(*filters)
+                        )
+                    ).scalar_one()
+                )
                 job.total_candidates = total
             job.processed = 0
             job.created = 0
@@ -1234,7 +1547,12 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                     await session.commit()
                     return
 
-                q = select(User.id, User.email, User.preferred_language).where(*filters).order_by(User.id).limit(_BULK_SEGMENT_BATCH_SIZE)
+                q = (
+                    select(User.id, User.email, User.preferred_language)
+                    .where(*filters)
+                    .order_by(User.id)
+                    .limit(_BULK_SEGMENT_BATCH_SIZE)
+                )
                 if last_id is not None:
                     q = q.where(User.id > last_id)
                 rows = (await session.execute(q)).all()
@@ -1247,7 +1565,10 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                     bucketed_rows = [
                         (user_id, email, preferred_language)
                         for user_id, email, preferred_language in rows
-                        if _bucket_index_for_user(user_id=user_id, seed=bucket.seed, total=bucket.total) == bucket.index
+                        if _bucket_index_for_user(
+                            user_id=user_id, seed=bucket.seed, total=bucket.total
+                        )
+                        == bucket.index
                     ]
 
                 if not bucketed_rows:
@@ -1284,7 +1605,11 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                             if job.send_email and email:
                                 notify.append((email, preferred_language))
                         else:
-                            session.add(CouponAssignment(coupon_id=job.coupon_id, user_id=user_id))
+                            session.add(
+                                CouponAssignment(
+                                    coupon_id=job.coupon_id, user_id=user_id
+                                )
+                            )
                             job.created += 1
                             if job.send_email and email:
                                 notify.append((email, preferred_language))
@@ -1295,7 +1620,9 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                             job.already_revoked += 1
                         else:
                             assignment.revoked_at = now
-                            assignment.revoked_reason = (job.revoke_reason or "").strip()[:255] or None
+                            assignment.revoked_reason = (
+                                job.revoke_reason or ""
+                            ).strip()[:255] or None
                             session.add(assignment)
                             job.revoked += 1
                             if job.send_email and email:
@@ -1355,7 +1682,9 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             await session.commit()
 
 
-@router.post("/admin/coupons/{coupon_id}/assign", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/admin/coupons/{coupon_id}/assign", status_code=status.HTTP_204_NO_CONTENT
+)
 async def admin_assign_coupon(
     coupon_id: UUID,
     payload: CouponAssignRequest,
@@ -1365,20 +1694,29 @@ async def admin_assign_coupon(
 ) -> Response:
     coupon = (
         (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
+            await session.execute(
+                select(Coupon)
+                .options(selectinload(Coupon.promotion))
+                .where(Coupon.id == coupon_id)
+            )
         )
         .scalars()
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
     user = await _find_user(session, user_id=payload.user_id, email=payload.email)
 
     assignment = (
         (
             await session.execute(
-                select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id == user.id)
+                select(CouponAssignment).where(
+                    CouponAssignment.coupon_id == coupon.id,
+                    CouponAssignment.user_id == user.id,
+                )
             )
         )
         .scalars()
@@ -1395,7 +1733,10 @@ async def admin_assign_coupon(
 
     should_email = bool(payload.send_email and user.email)
     if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User has not opted in to marketing emails.",
+        )
     await session.commit()
 
     if should_email:
@@ -1405,7 +1746,9 @@ async def admin_assign_coupon(
             user.email,
             coupon_code=coupon.code,
             promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
-            promotion_description=coupon.promotion.description if coupon.promotion else None,
+            promotion_description=(
+                coupon.promotion.description if coupon.promotion else None
+            ),
             ends_at=ends_at,
             lang=user.preferred_language,
         )
@@ -1425,19 +1768,31 @@ async def admin_bulk_assign_coupon(
     if not emails:
         return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
     if len(emails) > 500:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)"
+        )
 
     coupon = (
         (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
+            await session.execute(
+                select(Coupon)
+                .options(selectinload(Coupon.promotion))
+                .where(Coupon.id == coupon_id)
+            )
         )
         .scalars()
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
-    users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
+    users = (
+        (await session.execute(select(User).where(User.email.in_(emails))))
+        .scalars()
+        .all()
+    )
     users_by_email = {u.email: u for u in users if u.email}
     not_found = [e for e in emails if e not in users_by_email]
     user_ids = [u.id for u in users_by_email.values()]
@@ -1447,7 +1802,10 @@ async def admin_bulk_assign_coupon(
         existing = (
             (
                 await session.execute(
-                    select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id.in_(user_ids))
+                    select(CouponAssignment).where(
+                        CouponAssignment.coupon_id == coupon.id,
+                        CouponAssignment.user_id.in_(user_ids),
+                    )
                 )
             )
             .scalars()
@@ -1483,14 +1841,20 @@ async def admin_bulk_assign_coupon(
     if payload.send_email and notify_user_ids:
         ends_at = getattr(coupon, "ends_at", None)
         for user in users_by_email.values():
-            if user.id not in notify_user_ids or not user.email or not bool(getattr(user, "notify_marketing", False)):
+            if (
+                user.id not in notify_user_ids
+                or not user.email
+                or not bool(getattr(user, "notify_marketing", False))
+            ):
                 continue
             background_tasks.add_task(
                 email_service.send_coupon_assigned,
                 user.email,
                 coupon_code=coupon.code,
                 promotion_name=coupon.promotion.name if coupon.promotion else "Coupon",
-                promotion_description=coupon.promotion.description if coupon.promotion else None,
+                promotion_description=(
+                    coupon.promotion.description if coupon.promotion else None
+                ),
                 ends_at=ends_at,
                 lang=user.preferred_language,
             )
@@ -1506,7 +1870,9 @@ async def admin_bulk_assign_coupon(
     )
 
 
-@router.post("/admin/coupons/{coupon_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/admin/coupons/{coupon_id}/revoke", status_code=status.HTTP_204_NO_CONTENT
+)
 async def admin_revoke_coupon(
     coupon_id: UUID,
     payload: CouponRevokeRequest,
@@ -1516,19 +1882,28 @@ async def admin_revoke_coupon(
 ) -> Response:
     coupon = (
         (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
+            await session.execute(
+                select(Coupon)
+                .options(selectinload(Coupon.promotion))
+                .where(Coupon.id == coupon_id)
+            )
         )
         .scalars()
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
     user = await _find_user(session, user_id=payload.user_id, email=payload.email)
     assignment = (
         (
             await session.execute(
-                select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id == user.id)
+                select(CouponAssignment).where(
+                    CouponAssignment.coupon_id == coupon.id,
+                    CouponAssignment.user_id == user.id,
+                )
             )
         )
         .scalars()
@@ -1543,7 +1918,10 @@ async def admin_revoke_coupon(
 
     should_email = bool(payload.send_email and user.email)
     if should_email and not bool(getattr(user, "notify_marketing", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User has not opted in to marketing emails.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User has not opted in to marketing emails.",
+        )
     await session.commit()
 
     if should_email:
@@ -1571,19 +1949,31 @@ async def admin_bulk_revoke_coupon(
     if not emails:
         return CouponBulkResult(requested=requested, unique=0, invalid_emails=invalid)
     if len(emails) > 500:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Too many emails (max 500)"
+        )
 
     coupon = (
         (
-            await session.execute(select(Coupon).options(selectinload(Coupon.promotion)).where(Coupon.id == coupon_id))
+            await session.execute(
+                select(Coupon)
+                .options(selectinload(Coupon.promotion))
+                .where(Coupon.id == coupon_id)
+            )
         )
         .scalars()
         .first()
     )
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
-    users = (await session.execute(select(User).where(User.email.in_(emails)))).scalars().all()
+    users = (
+        (await session.execute(select(User).where(User.email.in_(emails))))
+        .scalars()
+        .all()
+    )
     users_by_email = {u.email: u for u in users if u.email}
     not_found = [e for e in emails if e not in users_by_email]
     user_ids = [u.id for u in users_by_email.values()]
@@ -1593,7 +1983,10 @@ async def admin_bulk_revoke_coupon(
         existing = (
             (
                 await session.execute(
-                    select(CouponAssignment).where(CouponAssignment.coupon_id == coupon.id, CouponAssignment.user_id.in_(user_ids))
+                    select(CouponAssignment).where(
+                        CouponAssignment.coupon_id == coupon.id,
+                        CouponAssignment.user_id.in_(user_ids),
+                    )
                 )
             )
             .scalars()
@@ -1628,7 +2021,11 @@ async def admin_bulk_revoke_coupon(
 
     if payload.send_email and revoked_user_ids:
         for user in users_by_email.values():
-            if user.id not in revoked_user_ids or not user.email or not bool(getattr(user, "notify_marketing", False)):
+            if (
+                user.id not in revoked_user_ids
+                or not user.email
+                or not bool(getattr(user, "notify_marketing", False))
+            ):
                 continue
             background_tasks.add_task(
                 email_service.send_coupon_revoked,
@@ -1650,7 +2047,10 @@ async def admin_bulk_revoke_coupon(
     )
 
 
-@router.post("/admin/coupons/{coupon_id}/assign/segment/preview", response_model=CouponBulkSegmentPreview)
+@router.post(
+    "/admin/coupons/{coupon_id}/assign/segment/preview",
+    response_model=CouponBulkSegmentPreview,
+)
 async def admin_preview_segment_assign(
     coupon_id: UUID,
     payload: CouponBulkSegmentAssignRequest,
@@ -1659,7 +2059,9 @@ async def admin_preview_segment_assign(
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
     try:
         bucket = _parse_bucket_config(
             bucket_total=payload.bucket_total,
@@ -1667,12 +2069,19 @@ async def admin_preview_segment_assign(
             bucket_seed=payload.bucket_seed,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     filters = _segment_user_filters(payload)
-    return await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
+    return await _preview_segment_assign(
+        session, coupon_id=coupon_id, filters=filters, bucket=bucket
+    )
 
 
-@router.post("/admin/coupons/{coupon_id}/revoke/segment/preview", response_model=CouponBulkSegmentPreview)
+@router.post(
+    "/admin/coupons/{coupon_id}/revoke/segment/preview",
+    response_model=CouponBulkSegmentPreview,
+)
 async def admin_preview_segment_revoke(
     coupon_id: UUID,
     payload: CouponBulkSegmentRevokeRequest,
@@ -1681,7 +2090,9 @@ async def admin_preview_segment_revoke(
 ) -> CouponBulkSegmentPreview:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
     try:
         bucket = _parse_bucket_config(
             bucket_total=payload.bucket_total,
@@ -1689,12 +2100,20 @@ async def admin_preview_segment_revoke(
             bucket_seed=payload.bucket_seed,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     filters = _segment_user_filters(payload)
-    return await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
+    return await _preview_segment_revoke(
+        session, coupon_id=coupon_id, filters=filters, bucket=bucket
+    )
 
 
-@router.post("/admin/coupons/{coupon_id}/assign/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/coupons/{coupon_id}/assign/segment",
+    response_model=CouponBulkJobRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def admin_start_segment_assign_job(
     coupon_id: UUID,
     payload: CouponBulkSegmentAssignRequest,
@@ -1704,7 +2123,9 @@ async def admin_start_segment_assign_job(
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
     try:
         bucket = _parse_bucket_config(
@@ -1713,9 +2134,13 @@ async def admin_start_segment_assign_job(
             bucket_seed=payload.bucket_seed,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     filters = _segment_user_filters(payload)
-    preview = await _preview_segment_assign(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
+    preview = await _preview_segment_assign(
+        session, coupon_id=coupon_id, filters=filters, bucket=bucket
+    )
 
     job = CouponBulkJob(
         coupon_id=coupon_id,
@@ -1736,12 +2161,19 @@ async def admin_start_segment_assign_job(
 
     engine = session.bind
     if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database engine unavailable",
+        )
     background_tasks.add_task(_run_bulk_segment_job, engine, job_id=job.id)
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
 
 
-@router.post("/admin/coupons/{coupon_id}/revoke/segment", response_model=CouponBulkJobRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/coupons/{coupon_id}/revoke/segment",
+    response_model=CouponBulkJobRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def admin_start_segment_revoke_job(
     coupon_id: UUID,
     payload: CouponBulkSegmentRevokeRequest,
@@ -1751,7 +2183,9 @@ async def admin_start_segment_revoke_job(
 ) -> CouponBulkJobRead:
     coupon = await session.get(Coupon, coupon_id)
     if not coupon:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Coupon not found"
+        )
 
     try:
         bucket = _parse_bucket_config(
@@ -1760,9 +2194,13 @@ async def admin_start_segment_revoke_job(
             bucket_seed=payload.bucket_seed,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     filters = _segment_user_filters(payload)
-    preview = await _preview_segment_revoke(session, coupon_id=coupon_id, filters=filters, bucket=bucket)
+    preview = await _preview_segment_revoke(
+        session, coupon_id=coupon_id, filters=filters, bucket=bucket
+    )
 
     job = CouponBulkJob(
         coupon_id=coupon_id,
@@ -1784,7 +2222,10 @@ async def admin_start_segment_revoke_job(
 
     engine = session.bind
     if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database engine unavailable",
+        )
     background_tasks.add_task(_run_bulk_segment_job, engine, job_id=job.id)
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
 
@@ -1797,7 +2238,9 @@ async def admin_get_bulk_job(
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
     return CouponBulkJobRead.model_validate(job, from_attributes=True)
 
 
@@ -1821,7 +2264,9 @@ async def admin_list_bulk_jobs_global(
     return [CouponBulkJobRead.model_validate(job, from_attributes=True) for job in jobs]
 
 
-@router.get("/admin/coupons/{coupon_id}/bulk-jobs", response_model=list[CouponBulkJobRead])
+@router.get(
+    "/admin/coupons/{coupon_id}/bulk-jobs", response_model=list[CouponBulkJobRead]
+)
 async def admin_list_bulk_jobs(
     coupon_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -1843,7 +2288,9 @@ async def admin_list_bulk_jobs(
     return [CouponBulkJobRead.model_validate(job, from_attributes=True) for job in jobs]
 
 
-@router.post("/admin/coupons/bulk-jobs/{job_id}/cancel", response_model=CouponBulkJobRead)
+@router.post(
+    "/admin/coupons/bulk-jobs/{job_id}/cancel", response_model=CouponBulkJobRead
+)
 async def admin_cancel_bulk_job(
     job_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -1851,8 +2298,14 @@ async def admin_cancel_bulk_job(
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
-    if job.status in (CouponBulkJobStatus.succeeded, CouponBulkJobStatus.failed, CouponBulkJobStatus.cancelled):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
+    if job.status in (
+        CouponBulkJobStatus.succeeded,
+        CouponBulkJobStatus.failed,
+        CouponBulkJobStatus.cancelled,
+    ):
         return CouponBulkJobRead.model_validate(job, from_attributes=True)
     job.status = CouponBulkJobStatus.cancelled
     job.finished_at = datetime.now(timezone.utc)
@@ -1874,9 +2327,13 @@ async def admin_retry_bulk_job(
 ) -> CouponBulkJobRead:
     job = await session.get(CouponBulkJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
+        )
     if job.status in (CouponBulkJobStatus.pending, CouponBulkJobStatus.running):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Job is still in progress")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Job is still in progress"
+        )
 
     try:
         bucket = _parse_bucket_config(
@@ -1885,13 +2342,19 @@ async def admin_retry_bulk_job(
             bucket_seed=getattr(job, "bucket_seed", None),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
     filters = _segment_user_filters(job)
     if job.action == CouponBulkJobAction.assign:
-        preview = await _preview_segment_assign(session, coupon_id=job.coupon_id, filters=filters, bucket=bucket)
+        preview = await _preview_segment_assign(
+            session, coupon_id=job.coupon_id, filters=filters, bucket=bucket
+        )
     else:
-        preview = await _preview_segment_revoke(session, coupon_id=job.coupon_id, filters=filters, bucket=bucket)
+        preview = await _preview_segment_revoke(
+            session, coupon_id=job.coupon_id, filters=filters, bucket=bucket
+        )
 
     new_job = CouponBulkJob(
         coupon_id=job.coupon_id,
@@ -1913,6 +2376,9 @@ async def admin_retry_bulk_job(
 
     engine = session.bind
     if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database engine unavailable",
+        )
     background_tasks.add_task(_run_bulk_segment_job, engine, job_id=new_job.id)
     return CouponBulkJobRead.model_validate(new_job, from_attributes=True)

@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-
 SEVERITY_TO_IMPACT = {"s1": 5, "s2": 4, "s3": 2, "s4": 1}
 SEO_SNAPSHOT_FILE = "seo-snapshot.json"
 CONSOLE_ERRORS_FILE = "console-errors.json"
@@ -38,7 +37,9 @@ def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
         rel = candidate.relative_to(root).as_posix()
     except ValueError as exc:
         raise ValueError(f"Path must stay inside repository: {raw}") from exc
-    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
+    if not any(
+        rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes
+    ):
         raise ValueError(f"Path is outside allowed audit roots: {raw}")
     return candidate
 
@@ -69,7 +70,9 @@ def _fingerprint(route: str, rule_id: str, primary_file: str, surface: str) -> s
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _run_python(args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_python(
+    args: list[str], *, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     cmd = [sys.executable, *args]
     return subprocess.run(
         cmd,
@@ -80,7 +83,9 @@ def _run_python(args: list[str], *, cwd: Path | None = None) -> subprocess.Compl
     )
 
 
-def _run_node(args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_node(
+    args: list[str], *, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     cmd = ["node", *args]
     return subprocess.run(
         cmd,
@@ -102,7 +107,9 @@ def _load_json(path: Path, default: Any) -> Any:
 
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def _normalize_whitespace_lower(value: str) -> str:
@@ -137,9 +144,13 @@ def _has_unexpected_token_lt(text: str) -> bool:
 def _has_benign_source_context(row: dict[str, Any]) -> bool:
     source_url = str(row.get("source_url") or "").strip().lower()
     source_looks_like_bundle = source_url.endswith(".js") or any(
-        token in source_url for token in ("/main.", "/polyfills.", "/runtime.", "/vendor.")
+        token in source_url
+        for token in ("/main.", "/polyfills.", "/runtime.", "/vendor.")
     )
-    has_source_position = _parse_optional_int(row.get("line")) is not None and _parse_optional_int(row.get("column")) is not None
+    has_source_position = (
+        _parse_optional_int(row.get("line")) is not None
+        and _parse_optional_int(row.get("column")) is not None
+    )
     return source_looks_like_bundle or has_source_position
 
 
@@ -164,7 +175,9 @@ def _is_benign_storefront_unexpected_token(row: dict[str, Any]) -> bool:
     return status_code is None or status_code >= 400
 
 
-def _build_console_noise_telemetry(console_errors: list[dict[str, Any]]) -> dict[str, Any]:
+def _build_console_noise_telemetry(
+    console_errors: list[dict[str, Any]],
+) -> dict[str, Any]:
     clusters: dict[str, dict[str, Any]] = {}
     for row in console_errors:
         if not _is_benign_storefront_unexpected_token(row):
@@ -191,11 +204,18 @@ def _build_console_noise_telemetry(console_errors: list[dict[str, Any]]) -> dict
             },
         )
         route = str(row.get("route") or "").strip()
-        if route and route not in cluster["sample_routes"] and len(cluster["sample_routes"]) < 8:
+        if (
+            route
+            and route not in cluster["sample_routes"]
+            and len(cluster["sample_routes"]) < 8
+        ):
             cluster["sample_routes"].append(route)
         cluster["cluster_count"] += 1
 
-    ordered = sorted(clusters.values(), key=lambda item: (-int(item["cluster_count"]), str(item["signature"])))
+    ordered = sorted(
+        clusters.values(),
+        key=lambda item: (-int(item["cluster_count"]), str(item["signature"])),
+    )
     suppressed_count = sum(int(item["cluster_count"]) for item in ordered)
     return {
         "suppressed_finding_rule": "browser_console_noise_cluster",
@@ -208,7 +228,11 @@ def _build_console_noise_telemetry(console_errors: list[dict[str, Any]]) -> dict
 def _load_changed_files(path: Path | None) -> list[str]:
     if not path or not path.exists():
         return []
-    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def _infer_surfaces_from_changes(changed_files: list[str]) -> set[str]:
@@ -218,11 +242,24 @@ def _infer_surfaces_from_changes(changed_files: list[str]) -> set[str]:
     surfaces: set[str] = set()
     for file in changed_files:
         f = file.replace("\\", "/")
-        if "/pages/admin/" in f or "/app/api/v1/content.py" in f or "/services/media_" in f:
+        if (
+            "/pages/admin/" in f
+            or "/app/api/v1/content.py" in f
+            or "/services/media_" in f
+        ):
             surfaces.add("admin")
-        if "/pages/account/" in f or "/app/api/v1/account" in f or "/services/account" in f:
+        if (
+            "/pages/account/" in f
+            or "/app/api/v1/account" in f
+            or "/services/account" in f
+        ):
             surfaces.add("account")
-        if "/pages/blog/" in f or "/pages/shop/" in f or "/layout/" in f or "/pages/home/" in f:
+        if (
+            "/pages/blog/" in f
+            or "/pages/shop/" in f
+            or "/layout/" in f
+            or "/pages/home/" in f
+        ):
             surfaces.add("storefront")
 
     if not surfaces:
@@ -230,7 +267,9 @@ def _infer_surfaces_from_changes(changed_files: list[str]) -> set[str]:
     return surfaces
 
 
-def _routes_for_mode(route_map: dict[str, Any], *, changed_files: list[str], max_routes: int) -> list[dict[str, Any]]:
+def _routes_for_mode(
+    route_map: dict[str, Any], *, changed_files: list[str], max_routes: int
+) -> list[dict[str, Any]]:
     routes = list(route_map.get("routes") or [])
     if not routes:
         return []
@@ -331,7 +370,9 @@ def _build_deterministic_findings(
     indexable_rows: list[dict[str, str]] = []
     noisy_routes: set[str] = set()
     url_scheme_pattern = re.compile(r"(?i)^[a-z][a-z0-9+.-]*://")
-    url_token_pattern = re.compile(r"(?:[a-zA-Z][a-zA-Z0-9+.-]*://[^\s|)]+|/api/[^\s|)]+)")
+    url_token_pattern = re.compile(
+        r"(?:[a-zA-Z][a-zA-Z0-9+.-]*://[^\s|)]+|/api/[^\s|)]+)"
+    )
 
     def _normalize_console_noise_signature(message: str) -> str:
         text = " ".join(str(message or "").split()).lower()
@@ -339,9 +380,16 @@ def _build_deterministic_findings(
             return ""
         if _has_unexpected_token_lt(text):
             return "unexpected_token_lt_json_parse"
-        if "executing inline script violates the following content security policy directive" in text:
+        if (
+            "executing inline script violates the following content security policy directive"
+            in text
+        ):
             return "csp_inline_script_blocked"
-        if "private access token challenge" in text or "turnstile" in text or "cloudflare challenge" in text:
+        if (
+            "private access token challenge" in text
+            or "turnstile" in text
+            or "cloudflare challenge" in text
+        ):
             return "cloudflare_challenge_noise"
         if "was preloaded using link preload but not used within a few seconds" in text:
             return "unused_preload_warning"
@@ -458,7 +506,10 @@ def _build_deterministic_findings(
         ):
             return True
 
-        if normalized_surface == "admin" and normalized_route in {"/admin/content/pages", "/admin/content/settings"}:
+        if normalized_surface == "admin" and normalized_route in {
+            "/admin/content/pages",
+            "/admin/content/settings",
+        }:
             if endpoint_class == "admin_site_content" and status_code in {403, 404}:
                 return True
             if (
@@ -482,7 +533,11 @@ def _build_deterministic_findings(
         ):
             return True
 
-        if endpoint_path.startswith("/api/v1/orders/receipt/") and status_code in {401, 403, 404}:
+        if endpoint_path.startswith("/api/v1/orders/receipt/") and status_code in {
+            401,
+            403,
+            404,
+        }:
             return True
 
         if "err_blocked_by_orb" in normalized_message:
@@ -513,7 +568,9 @@ def _build_deterministic_findings(
 
     def _has_lang_query(url: str, lang: str) -> bool:
         parsed = urlparse(url)
-        values = [value.strip().lower() for value in parse_qs(parsed.query).get("lang", [])]
+        values = [
+            value.strip().lower() for value in parse_qs(parsed.query).get("lang", [])
+        ]
         return lang.strip().lower() in values
 
     for row in seo_snapshot:
@@ -532,10 +589,17 @@ def _build_deterministic_findings(
         render_error = str(row.get("error") or "").strip()
         unresolved_placeholder = bool(row.get("unresolved_placeholder"))
         noindex_route = "noindex" in robots
-        indexable = bool(row.get("indexable")) if isinstance(row.get("indexable"), bool) else not noindex_route
-        route_is_ro = _has_lang_query(route, "ro") or _has_lang_query(resolved_route, "ro")
+        indexable = (
+            bool(row.get("indexable"))
+            if isinstance(row.get("indexable"), bool)
+            else not noindex_route
+        )
+        route_is_ro = _has_lang_query(route, "ro") or _has_lang_query(
+            resolved_route, "ro"
+        )
         route_has_console_noise = any(
-            candidate in noisy_routes for candidate in (route, route_template, resolved_route)
+            candidate in noisy_routes
+            for candidate in (route, route_template, resolved_route)
         )
 
         if render_error:
@@ -556,7 +620,12 @@ def _build_deterministic_findings(
             )
             continue
 
-        if surface == "storefront" and not title and indexable and not unresolved_placeholder:
+        if (
+            surface == "storefront"
+            and not title
+            and indexable
+            and not unresolved_placeholder
+        ):
             findings.append(
                 _finding(
                     title=f"Missing title on indexable route `{route_template}`",
@@ -573,7 +642,12 @@ def _build_deterministic_findings(
                 )
             )
 
-        if surface == "storefront" and h1_count == 0 and indexable and not unresolved_placeholder:
+        if (
+            surface == "storefront"
+            and h1_count == 0
+            and indexable
+            and not unresolved_placeholder
+        ):
             findings.append(
                 _finding(
                     title=f"Missing H1 on storefront route `{route_template}`",
@@ -589,7 +663,12 @@ def _build_deterministic_findings(
                     indexable=indexable,
                 )
             )
-        elif surface == "storefront" and h1_count > 1 and indexable and not unresolved_placeholder:
+        elif (
+            surface == "storefront"
+            and h1_count > 1
+            and indexable
+            and not unresolved_placeholder
+        ):
             findings.append(
                 _finding(
                     title=f"Multiple H1 headings on `{route_template}`",
@@ -601,12 +680,19 @@ def _build_deterministic_findings(
                     primary_file="frontend/src/app/app.routes.ts",
                     evidence_files=[SEO_SNAPSHOT_FILE],
                     effort="M",
-                    audit_label="audit:seo" if surface == "storefront" else "audit:correctness",
+                    audit_label=(
+                        "audit:seo" if surface == "storefront" else "audit:correctness"
+                    ),
                     indexable=indexable if surface == "storefront" else None,
                 )
             )
 
-        if surface == "storefront" and not canonical and indexable and not unresolved_placeholder:
+        if (
+            surface == "storefront"
+            and not canonical
+            and indexable
+            and not unresolved_placeholder
+        ):
             findings.append(
                 _finding(
                     title=f"Missing canonical link on `{route_template}`",
@@ -626,14 +712,21 @@ def _build_deterministic_findings(
                 )
             )
 
-        if surface == "storefront" and canonical and indexable and not unresolved_placeholder:
+        if (
+            surface == "storefront"
+            and canonical
+            and indexable
+            and not unresolved_placeholder
+        ):
             canonical_has_en = _has_lang_query(canonical, "en")
             canonical_has_ro = _has_lang_query(canonical, "ro")
             canonical_violation = False
             canonical_reason = ""
             if route_is_ro and not canonical_has_ro:
                 canonical_violation = True
-                canonical_reason = "Romanian route is missing `?lang=ro` in canonical URL."
+                canonical_reason = (
+                    "Romanian route is missing `?lang=ro` in canonical URL."
+                )
             elif not route_is_ro and (canonical_has_en or canonical_has_ro):
                 canonical_violation = True
                 canonical_reason = "English canonical must be a clean URL without language query parameters."
@@ -654,7 +747,12 @@ def _build_deterministic_findings(
                     )
                 )
 
-        if surface == "storefront" and indexable and not unresolved_placeholder and not route_has_console_noise:
+        if (
+            surface == "storefront"
+            and indexable
+            and not unresolved_placeholder
+            and not route_has_console_noise
+        ):
             if not description_meta:
                 findings.append(
                     _finding(
@@ -757,7 +855,10 @@ def _build_deterministic_findings(
                 )
             )
 
-    for normalized_description, routes_for_description in duplicate_descriptions.items():
+    for (
+        normalized_description,
+        routes_for_description,
+    ) in duplicate_descriptions.items():
         if len(routes_for_description) < 2:
             continue
         sorted_routes = sorted(set(routes_for_description))
@@ -859,27 +960,38 @@ def _build_deterministic_findings(
             )
         )
 
-    for (surface, severity, normalized_text, status_token, endpoint_class), cluster in sorted(console_noise_clusters.items()):
-        routes = sorted(str(route) for route in cluster.get("routes", set()) if str(route).strip())
+    for (
+        surface,
+        severity,
+        normalized_text,
+        status_token,
+        endpoint_class,
+    ), cluster in sorted(console_noise_clusters.items()):
+        routes = sorted(
+            str(route) for route in cluster.get("routes", set()) if str(route).strip()
+        )
         if not routes:
             continue
         sample_routes = routes[:8]
         signature = hashlib.sha256(
-            f"{surface}|{severity}|{normalized_text}|{status_token}|{endpoint_class}".encode("utf-8")
-        ).hexdigest()[:12]
-        status_note = f"HTTP status: `{status_token}`" if status_token != "none" else "HTTP status: `unknown`"
-        endpoint_note = (
-            f"Endpoint class: `{endpoint_class}`"
-            + (
-                f"; sample endpoint: `{cluster.get('endpoint_path')}`"
-                if str(cluster.get("endpoint_path") or "").strip()
-                else ""
+            f"{surface}|{severity}|{normalized_text}|{status_token}|{endpoint_class}".encode(
+                "utf-8"
             )
+        ).hexdigest()[:12]
+        status_note = (
+            f"HTTP status: `{status_token}`"
+            if status_token != "none"
+            else "HTTP status: `unknown`"
+        )
+        endpoint_note = f"Endpoint class: `{endpoint_class}`" + (
+            f"; sample endpoint: `{cluster.get('endpoint_path')}`"
+            if str(cluster.get("endpoint_path") or "").strip()
+            else ""
         )
         noise_finding = _finding(
             title=f"Browser console noise cluster on `{surface}` ({len(routes)} routes)",
             description=(
-                f"Representative console message: {cluster.get('message','')}\n\n"
+                f"Representative console message: {cluster.get('message', '')}\n\n"
                 f"{status_note}\n"
                 f"{endpoint_note}\n\n"
                 f"Affected routes (sample): {', '.join(f'`{route}`' for route in sample_routes)}"
@@ -945,7 +1057,11 @@ def _build_deterministic_findings(
             continue
         route = str(row.get("route_template") or row.get("route") or "/")
         surface = str(row.get("surface") or "storefront")
-        reasons = [str(reason) for reason in (row.get("issue_reasons") or []) if str(reason).strip()]
+        reasons = [
+            str(reason)
+            for reason in (row.get("issue_reasons") or [])
+            if str(reason).strip()
+        ]
         if not reasons:
             continue
         severity = "s2" if surface in {"account", "admin"} else "s3"
@@ -1034,8 +1150,12 @@ def _write_evidence_index(
         "- `screenshots/`",
     ]
     if browser_message:
-        lines.extend(["", "## Browser collector output", "", "```text", browser_message, "```"])
-    (output_dir / "evidence-index.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        lines.extend(
+            ["", "## Browser collector output", "", "```text", browser_message, "```"]
+        )
+    (output_dir / "evidence-index.md").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )
 
 
 def _parse_args() -> argparse.Namespace:
@@ -1057,23 +1177,39 @@ def _as_rows(payload: Any) -> list[dict[str, Any]]:
 
 
 def _ensure_browser_artifacts(output_dir: Path) -> None:
-    for file_name in (SEO_SNAPSHOT_FILE, CONSOLE_ERRORS_FILE, LAYOUT_SIGNALS_FILE, VISIBILITY_SIGNALS_FILE):
+    for file_name in (
+        SEO_SNAPSHOT_FILE,
+        CONSOLE_ERRORS_FILE,
+        LAYOUT_SIGNALS_FILE,
+        VISIBILITY_SIGNALS_FILE,
+    ):
         path = output_dir / file_name
         if not path.exists():
             _write_json(path, [])
     (output_dir / "screenshots").mkdir(parents=True, exist_ok=True)
 
 
-def _load_browser_artifacts(output_dir: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+def _load_browser_artifacts(
+    output_dir: Path,
+) -> tuple[
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
     seo_snapshot = _as_rows(_load_json(output_dir / SEO_SNAPSHOT_FILE, default=[]))
     console_errors = _as_rows(_load_json(output_dir / CONSOLE_ERRORS_FILE, default=[]))
     layout_signals = _as_rows(_load_json(output_dir / LAYOUT_SIGNALS_FILE, default=[]))
-    visibility_signals = _as_rows(_load_json(output_dir / VISIBILITY_SIGNALS_FILE, default=[]))
+    visibility_signals = _as_rows(
+        _load_json(output_dir / VISIBILITY_SIGNALS_FILE, default=[])
+    )
     return seo_snapshot, console_errors, layout_signals, visibility_signals
 
 
 def _collect_findings(output_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    seo_snapshot, console_errors, layout_signals, visibility_signals = _load_browser_artifacts(output_dir)
+    seo_snapshot, console_errors, layout_signals, visibility_signals = (
+        _load_browser_artifacts(output_dir)
+    )
     findings = _build_deterministic_findings(
         seo_snapshot=seo_snapshot,
         console_errors=console_errors,
@@ -1087,7 +1223,9 @@ def _collect_findings(output_dir: Path) -> tuple[list[dict[str, Any]], dict[str,
 
 
 def _auth_profile(owner_identifier: str, owner_password: str) -> str:
-    return "owner" if owner_identifier.strip() and owner_password.strip() else "anonymous"
+    return (
+        "owner" if owner_identifier.strip() and owner_password.strip() else "anonymous"
+    )
 
 
 def main() -> int:
@@ -1111,16 +1249,22 @@ def main() -> int:
     route_map = _load_json(route_map_path, default={"routes": [], "summary": {}})
 
     changed_files_path = (
-        _resolve_repo_path(args.changed_files_file, allowed_prefixes=("artifacts",)) if args.changed_files_file else None
+        _resolve_repo_path(args.changed_files_file, allowed_prefixes=("artifacts",))
+        if args.changed_files_file
+        else None
     )
     changed_files = _load_changed_files(changed_files_path)
-    selected_routes = _routes_for_mode(route_map, changed_files=changed_files, max_routes=max(1, int(args.max_routes)))
+    selected_routes = _routes_for_mode(
+        route_map, changed_files=changed_files, max_routes=max(1, int(args.max_routes))
+    )
     _write_json(
         output_dir / "surface-map.json",
         {
             "generated_at": _now_iso(),
             "mode": args.mode,
-            "selected_surfaces": sorted({row.get("surface") for row in selected_routes}),
+            "selected_surfaces": sorted(
+                {row.get("surface") for row in selected_routes}
+            ),
             "selected_route_count": len(selected_routes),
             "selected_routes": selected_routes,
         },
@@ -1130,7 +1274,9 @@ def main() -> int:
     browser_ok = False
     browser_message = ""
     base_url = _validate_base_url(args.base_url)
-    api_base_url = _validate_base_url(args.api_base_url) if args.api_base_url else base_url
+    api_base_url = (
+        _validate_base_url(args.api_base_url) if args.api_base_url else base_url
+    )
     if base_url:
         browser_ok, browser_message = _browser_collect(
             repo_root=repo_root,
@@ -1151,7 +1297,9 @@ def main() -> int:
         mode=args.mode,
         base_url=base_url or None,
         api_base_url=api_base_url or None,
-        auth_profile=_auth_profile(str(args.owner_identifier or ""), str(args.owner_password or "")),
+        auth_profile=_auth_profile(
+            str(args.owner_identifier or ""), str(args.owner_password or "")
+        ),
         route_map=route_map if isinstance(route_map, dict) else {},
         selected_routes=selected_routes,
         findings=findings,
