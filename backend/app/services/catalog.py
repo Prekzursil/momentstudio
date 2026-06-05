@@ -2461,8 +2461,6 @@ async def import_categories_csv(session: AsyncSession, content: str, dry_run: bo
         existing_slugs = set(existing_slug_result.scalars().all())
         created = len(file_slugs - existing_slugs)
         updated = len(file_slugs & existing_slugs)
-    else:
-        existing_slugs = set()
 
     if rows:
         parent_candidates = {r["parent_slug"] for r in rows if r["parent_slug"] and r["parent_slug"] not in file_slugs}

@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -495,6 +494,9 @@ def _build_deterministic_findings(
                 ):
                     return True
             except Exception:
+                # Best-effort URL parsing: a malformed request URL simply means
+                # this entry is not the known example.com image ORB noise, so we
+                # fall through and let the caller treat it as a real error.
                 pass
 
         return False
