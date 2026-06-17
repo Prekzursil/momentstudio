@@ -17,38 +17,68 @@ def _localized_url(base: str, path: str, lang: str) -> str:
     return f"{base}{normalized_path}?lang={lang}"
 
 
-async def build_sitemap_urls(session: AsyncSession, *, langs: list[str] | None = None) -> dict[str, list[str]]:
+async def build_sitemap_urls(
+    session: AsyncSession, *, langs: list[str] | None = None
+) -> dict[str, list[str]]:
     base = settings.frontend_origin.rstrip("/")
     now = datetime.now(timezone.utc)
     languages = langs or ["en", "ro"]
 
-    categories = (await session.execute(select(Category.slug).where(Category.is_visible.is_(True)))).scalars().all()
+    categories = (
+        (
+            await session.execute(
+                select(Category.slug).where(Category.is_visible.is_(True))
+            )
+        )
+        .scalars()
+        .all()
+    )
     products = (
-        await session.execute(
-            select(Product.slug).where(
-                Product.status == ProductStatus.published,
-                Product.is_deleted.is_(False),
-                Product.is_active.is_(True),
+        (
+            await session.execute(
+                select(Product.slug).where(
+                    Product.status == ProductStatus.published,
+                    Product.is_deleted.is_(False),
+                    Product.is_active.is_(True),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     blog_keys = (
-        await session.execute(
-            select(ContentBlock.key).where(
-                ContentBlock.key.like("blog.%"),
-                ContentBlock.status == ContentStatus.published,
-                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+        (
+            await session.execute(
+                select(ContentBlock.key).where(
+                    ContentBlock.key.like("blog.%"),
+                    ContentBlock.status == ContentStatus.published,
+                    or_(
+                        ContentBlock.published_at.is_(None),
+                        ContentBlock.published_at <= now,
+                    ),
+                    or_(
+                        ContentBlock.published_until.is_(None),
+                        ContentBlock.published_until > now,
+                    ),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     page_rows = (
         await session.execute(
             select(ContentBlock.key, ContentBlock.meta).where(
                 ContentBlock.key.like("page.%"),
                 ContentBlock.status == ContentStatus.published,
-                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+                or_(
+                    ContentBlock.published_at.is_(None),
+                    ContentBlock.published_at <= now,
+                ),
+                or_(
+                    ContentBlock.published_until.is_(None),
+                    ContentBlock.published_until > now,
+                ),
             )
         )
     ).all()

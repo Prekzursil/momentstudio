@@ -10,7 +10,7 @@ describe('BlogService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [ApiService, BlogService]
+      providers: [ApiService, BlogService],
     });
     service = TestBed.inject(BlogService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -21,10 +21,12 @@ describe('BlogService', () => {
   });
 
   it('listPosts forwards query params', () => {
-    service.listPosts({ lang: 'en', page: 2, limit: 5, q: 'hello', tag: 'news' }).subscribe((resp) => {
-      expect(resp.items.length).toBe(0);
-      expect(resp.meta.page).toBe(2);
-    });
+    service
+      .listPosts({ lang: 'en', page: 2, limit: 5, q: 'hello', tag: 'news' })
+      .subscribe((resp) => {
+        expect(resp.items.length).toBe(0);
+        expect(resp.meta.page).toBe(2);
+      });
 
     const req = httpMock.expectOne((r) => r.url === '/api/v1/blog/posts');
     expect(req.request.method).toBe('GET');
@@ -37,17 +39,21 @@ describe('BlogService', () => {
   });
 
   it('createPreviewToken encodes lang and expiry in the URL', () => {
-    service.createPreviewToken('hello-world', { lang: 'ro', expires_minutes: 15 }).subscribe((resp) => {
-      expect(resp.token).toBe('t');
-      expect(resp.url).toContain('preview=t');
-    });
+    service
+      .createPreviewToken('hello-world', { lang: 'ro', expires_minutes: 15 })
+      .subscribe((resp) => {
+        expect(resp.token).toBe('t');
+        expect(resp.url).toContain('preview=t');
+      });
 
-    const req = httpMock.expectOne('/api/v1/blog/posts/hello-world/preview-token?lang=ro&expires_minutes=15');
+    const req = httpMock.expectOne(
+      '/api/v1/blog/posts/hello-world/preview-token?lang=ro&expires_minutes=15',
+    );
     expect(req.request.method).toBe('POST');
     req.flush({
       token: 't',
       expires_at: '2000-01-01T00:00:00+00:00',
-      url: 'http://localhost:4200/blog/hello-world?preview=t&lang=ro'
+      url: 'http://localhost:4200/blog/hello-world?preview=t&lang=ro',
     });
   });
 

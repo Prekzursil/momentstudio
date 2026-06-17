@@ -8,7 +8,9 @@ router = APIRouter(prefix="/email-preview", tags=["email"])
 
 @router.get("", response_model=dict[str, str])
 async def preview_email(
-    template: str = Query(..., description="Template filename e.g. cart_abandonment.txt.j2"),
+    template: str = Query(
+        ..., description="Template filename e.g. cart_abandonment.txt.j2"
+    ),
     context: str = Query("{}", description="JSON string for context"),
     _: str = Depends(require_admin),
 ) -> dict[str, str]:

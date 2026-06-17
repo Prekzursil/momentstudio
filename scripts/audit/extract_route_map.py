@@ -22,7 +22,9 @@ def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
         rel = candidate.relative_to(root).as_posix()
     except ValueError as exc:
         raise ValueError(f"Path must stay inside repository: {raw}") from exc
-    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
+    if not any(
+        rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes
+    ):
         raise ValueError(f"Path is outside allowed audit roots: {raw}")
     return candidate
 
@@ -325,7 +327,9 @@ def main() -> int:
         raise ValueError("Output file must be a JSON file.")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     route_map = extract_route_map(routes_file)
-    out_path.write_text(json.dumps(route_map, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    out_path.write_text(
+        json.dumps(route_map, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
     print(f"Wrote route map to {out_path}")
     return 0
 

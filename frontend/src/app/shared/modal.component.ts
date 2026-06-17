@@ -9,7 +9,7 @@ import {
   OnDestroy,
   Output,
   SimpleChanges,
-  ViewChild
+  ViewChild,
 } from '@angular/core';
 import { NgIf } from '@angular/common';
 import { ButtonComponent } from './button.component';
@@ -26,7 +26,10 @@ export type ModalBodyScrollEvent = {
   standalone: true,
   imports: [NgIf, ButtonComponent],
   template: `
-    <div *ngIf="open" class="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 backdrop-blur-sm p-4">
+    <div
+      *ngIf="open"
+      class="fixed inset-0 z-50 grid place-items-center bg-slate-900/50 backdrop-blur-sm p-4"
+    >
       <div
         #dialogRef
         role="dialog"
@@ -37,26 +40,40 @@ export type ModalBodyScrollEvent = {
       >
         <div class="flex items-start justify-between gap-4 p-4 sm:p-6 pb-3 sm:pb-4 shrink-0">
           <div class="grid gap-1 min-w-0">
-          <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ title }}</div>
-          <div class="text-slate-600 text-sm dark:text-slate-300" *ngIf="subtitle">{{ subtitle }}</div>
+            <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ title }}</div>
+            <div class="text-slate-600 text-sm dark:text-slate-300" *ngIf="subtitle">
+              {{ subtitle }}
+            </div>
+          </div>
+          <app-button
+            variant="ghost"
+            size="sm"
+            [label]="closeLabel"
+            (action)="close()"
+          ></app-button>
         </div>
-        <app-button variant="ghost" size="sm" [label]="closeLabel" (action)="close()"></app-button>
-      </div>
-      <div
-        #bodyRef
-        class="min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-4 sm:pb-6 text-sm text-slate-700 dark:text-slate-200"
-        (scroll)="emitBodyScroll()"
-      >
-        <ng-content></ng-content>
-        <div #bodyEndSentinel aria-hidden="true" class="h-px w-full"></div>
-      </div>
-      <div class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 shrink-0" *ngIf="showActions">
-        <app-button variant="ghost" [label]="cancelLabel" (action)="close()"></app-button>
-        <app-button [label]="confirmLabel" [disabled]="effectiveConfirmDisabled()" (action)="confirm.emit()"></app-button>
+        <div
+          #bodyRef
+          class="min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-4 sm:pb-6 text-sm text-slate-700 dark:text-slate-200"
+          (scroll)="emitBodyScroll()"
+        >
+          <ng-content></ng-content>
+          <div #bodyEndSentinel aria-hidden="true" class="h-px w-full"></div>
+        </div>
+        <div
+          class="flex justify-end gap-3 px-4 sm:px-6 py-3 sm:py-4 border-t border-slate-200 dark:border-slate-800 shrink-0"
+          *ngIf="showActions"
+        >
+          <app-button variant="ghost" [label]="cancelLabel" (action)="close()"></app-button>
+          <app-button
+            [label]="confirmLabel"
+            [disabled]="effectiveConfirmDisabled()"
+            (action)="confirm.emit()"
+          ></app-button>
+        </div>
       </div>
     </div>
-  </div>
-  `
+  `,
 })
 export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() open = false;
@@ -181,7 +198,9 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
     const el = this.dialogRef.nativeElement;
     setTimeout(() => {
       const focusable =
-        el.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') || el;
+        el.querySelector<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ) || el;
       focusable.focus();
     });
   }
@@ -275,7 +294,7 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
       () => {
         this.emitBodyScroll();
       },
-      { root, threshold: [0, 1], rootMargin: '0px 0px 8px 0px' }
+      { root, threshold: [0, 1], rootMargin: '0px 0px 8px 0px' },
     );
     this.scrollGateObserver.observe(sentinel);
 
@@ -311,7 +330,9 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
     this.scrollGateSettled = true;
   }
 
-  private updateScrollGate(measure: Pick<ModalBodyScrollEvent, 'clientHeight' | 'scrollHeight' | 'atBottom'>): void {
+  private updateScrollGate(
+    measure: Pick<ModalBodyScrollEvent, 'clientHeight' | 'scrollHeight' | 'atBottom'>,
+  ): void {
     if (!this.open || !this.requireScrollToConfirm) {
       this.scrollGateReady = true;
       return;

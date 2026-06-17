@@ -1,5 +1,12 @@
 from collections.abc import Awaitable, Callable
-from ipaddress import ip_address, ip_network, IPv4Address, IPv4Network, IPv6Address, IPv6Network
+from ipaddress import (
+    ip_address,
+    ip_network,
+    IPv4Address,
+    IPv4Network,
+    IPv6Address,
+    IPv6Network,
+)
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
@@ -45,7 +52,9 @@ _SECTION_ROLES: dict[str, set[UserRole]] = {
     "ops": {UserRole.owner, UserRole.admin},
 }
 
-_ADMIN_MFA_REQUIRED_DETAIL = "Two-factor authentication or passkey required for admin access"
+_ADMIN_MFA_REQUIRED_DETAIL = (
+    "Two-factor authentication or passkey required for admin access"
+)
 _ADMIN_IP_BYPASS_COOKIE = "admin_ip_bypass"
 _ADMIN_IP_BYPASS_HEADER = "x-admin-ip-bypass"
 _ADMIN_IP_DENIED_DETAIL = "Admin access is blocked from this IP address"
@@ -57,7 +66,9 @@ _IPNetwork = IPv4Network | IPv6Network
 
 
 async def _has_passkey(session: AsyncSession, user_id: UUID) -> bool:
-    result = await session.execute(select(UserPasskey.id).where(UserPasskey.user_id == user_id).limit(1))
+    result = await session.execute(
+        select(UserPasskey.id).where(UserPasskey.user_id == user_id).limit(1)
+    )
     return result.scalar_one_or_none() is not None
 
 
@@ -177,39 +188,60 @@ async def get_current_user(
     session: AsyncSession = Depends(get_session),
 ) -> User:
     if credentials is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
 
     payload = decode_token(credentials.credentials)
     if not payload or payload.get("type") != "access":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
 
     try:
         user_id = UUID(str(payload.get("sub")))
     except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
     if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
 
     impersonator = payload.get("impersonator")
     if impersonator:
         try:
             impersonator_id = UUID(str(impersonator))
         except Exception:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+            )
         if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Impersonation is read-only",
+            )
         request.state.impersonator_user_id = impersonator_id
 
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
 
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(
+        user
+    ):
         await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
     if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
 
     return user
 
@@ -237,14 +269,19 @@ async def get_current_user_optional(
         except Exception:
             return None
         if request.method.upper() not in _IMPERSONATION_SAFE_METHODS:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Impersonation is read-only")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Impersonation is read-only",
+            )
         request.state.impersonator_user_id = impersonator_id
 
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         return None
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(
+        user
+    ):
         await self_service.execute_account_deletion(session, user)
         return None
     if getattr(user, "deleted_at", None) is not None:
@@ -257,32 +294,50 @@ async def get_google_completion_user(
     session: AsyncSession = Depends(get_session),
 ) -> User:
     if credentials is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
 
     payload = decode_token(credentials.credentials)
     if not payload or payload.get("type") != "google_completion":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        )
 
     try:
         user_id = UUID(str(payload.get("sub")))
     except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
 
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
 
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(
+        user
+    ):
         await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
     if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
 
     if not getattr(user, "google_sub", None):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google account required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Google account required"
+        )
     if auth_service.is_profile_complete(user):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Profile already complete")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Profile already complete"
+        )
 
     return user
 
@@ -293,7 +348,9 @@ async def require_admin(
     user: User = Depends(get_current_user),
 ) -> User:
     if user.role not in (UserRole.admin, UserRole.owner):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
     await _require_admin_mfa(session, user)
     _require_training_mode_writes_allowed(request, user)
     return user
@@ -301,7 +358,9 @@ async def require_admin(
 
 async def require_staff(user: User = Depends(get_current_user)) -> User:
     if user.role not in _STAFF_ROLES:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required"
+        )
     return user
 
 
@@ -315,7 +374,10 @@ def require_admin_section(section: str) -> Callable[..., Awaitable[User]]:
         user: User = Depends(get_current_user),
     ) -> User:
         if user.role not in allowed:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role for this section")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient role for this section",
+            )
         await _require_admin_mfa(session, user)
         _require_admin_ip_access(request, user)
         _require_training_mode_writes_allowed(request, user)
@@ -330,7 +392,9 @@ async def require_owner(
     user: User = Depends(get_current_user),
 ) -> User:
     if user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required"
+        )
     await _require_admin_mfa(session, user)
     _require_training_mode_writes_allowed(request, user)
     return user
@@ -338,11 +402,17 @@ async def require_owner(
 
 async def require_complete_profile(user: User = Depends(get_current_user)) -> User:
     if getattr(user, "google_sub", None) and not auth_service.is_profile_complete(user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Profile incomplete")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Profile incomplete"
+        )
     return user
 
 
-async def require_verified_email(user: User = Depends(require_complete_profile)) -> User:
+async def require_verified_email(
+    user: User = Depends(require_complete_profile),
+) -> User:
     if not getattr(user, "email_verified", False):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Email verification required"
+        )
     return user

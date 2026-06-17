@@ -18,7 +18,7 @@ function extractErrorCode(err: HttpErrorResponse): string {
   if (typeof body === 'string') {
     try {
       const data = JSON.parse(body || '{}');
-      return String((data)?.code || '');
+      return String(data?.code || '');
     } catch {
       // ignore
     }
@@ -33,12 +33,12 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
       map((text) => {
         try {
           const data = JSON.parse(text || '{}');
-          return String((data)?.code || '');
+          return String(data?.code || '');
         } catch {
           return '';
         }
       }),
-      catchError(() => of(''))
+      catchError(() => of('')),
     );
   }
 
@@ -47,7 +47,7 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
       const decoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
       const text = decoder ? decoder.decode(new Uint8Array(body)) : '';
       const data = JSON.parse(text || '{}');
-      return of(String((data)?.code || ''));
+      return of(String(data?.code || ''));
     } catch {
       return of('');
     }
@@ -59,7 +59,9 @@ function extractErrorCodeFromBinary(err: HttpErrorResponse) {
 export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const apiBase = getApiBaseUrl();
   const absoluteApiBase =
-    apiBase.startsWith('/') && typeof location !== 'undefined' ? `${location.origin}${apiBase}` : apiBase;
+    apiBase.startsWith('/') && typeof location !== 'undefined'
+      ? `${location.origin}${apiBase}`
+      : apiBase;
   const isApiRequest = req.url.startsWith(apiBase) || req.url.startsWith(absoluteApiBase);
   const silent = req.headers.has('X-Silent');
 
@@ -91,7 +93,7 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
     withCredentials: true,
     // Allow callers to explicitly set Authorization (e.g. Google completion token)
     // without it being overwritten by the normal access token.
-    setHeaders
+    setHeaders,
   });
 
   return next(authReq).pipe(
@@ -124,18 +126,26 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
             const nextToken = auth.getAccessToken();
             const retryReq = req.clone({
               withCredentials: true,
-              setHeaders: nextToken ? { Authorization: `Bearer ${nextToken}` } : {}
-              });
+              setHeaders: nextToken ? { Authorization: `Bearer ${nextToken}` } : {},
+            });
             return next(retryReq);
           }),
-          catchError(() => throwError(() => err))
+          catchError(() => throwError(() => err)),
         );
       }
 
       const canAttemptStepUpRetry =
-        err instanceof HttpErrorResponse && err.status === 403 && isApiRequest && !isStepUp && !silent && !req.headers.has('X-Step-Up-Retry');
+        err instanceof HttpErrorResponse &&
+        err.status === 403 &&
+        isApiRequest &&
+        !isStepUp &&
+        !silent &&
+        !req.headers.has('X-Step-Up-Retry');
 
-      if (canAttemptStepUpRetry && (auth.getRefreshToken() || auth.getAccessToken() || auth.user())) {
+      if (
+        canAttemptStepUpRetry &&
+        (auth.getRefreshToken() || auth.getAccessToken() || auth.user())
+      ) {
         const syncErrorCode = extractErrorCode(err);
         const code$ = syncErrorCode ? of(syncErrorCode) : extractErrorCodeFromBinary(err);
         return code$.pipe(
@@ -151,19 +161,22 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
                   return throwError(() => err);
                 }
                 const nextToken = auth.getAccessToken();
-                const retryHeaders: Record<string, string> = { 'X-Admin-Step-Up': nextStepUp, 'X-Step-Up-Retry': '1' };
+                const retryHeaders: Record<string, string> = {
+                  'X-Admin-Step-Up': nextStepUp,
+                  'X-Step-Up-Retry': '1',
+                };
                 if (nextToken && !hasAuthHeader) {
                   retryHeaders['Authorization'] = `Bearer ${nextToken}`;
                 }
                 const retryReq = req.clone({
                   withCredentials: true,
-                  setHeaders: retryHeaders
+                  setHeaders: retryHeaders,
                 });
                 return next(retryReq);
               }),
-              catchError(() => throwError(() => err))
+              catchError(() => throwError(() => err)),
             );
-          })
+          }),
         );
       }
 
@@ -178,7 +191,6 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
       }
 
       return throwError(() => err);
-    })
+    }),
   );
 };
-

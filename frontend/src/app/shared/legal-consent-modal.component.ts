@@ -1,12 +1,28 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SecurityContext, SimpleChanges, ViewChild } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SecurityContext,
+  SimpleChanges,
+  ViewChild,
+} from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { MarkdownService } from '../core/markdown.service';
 import { ModalBodyScrollEvent, ModalComponent } from './modal.component';
-import { PageBlock, pageBlockInnerClasses, pageBlockOuterClasses, parsePageBlocks, type UiLang } from './page-blocks';
+import {
+  PageBlock,
+  pageBlockInnerClasses,
+  pageBlockOuterClasses,
+  parsePageBlocks,
+  type UiLang,
+} from './page-blocks';
 
 interface ContentImage {
   url: string;
@@ -57,7 +73,12 @@ interface ContentBlock {
               <div [ngClass]="pageBlockInnerClasses(b.layout)">
                 <ng-container [ngSwitch]="b.type">
                   <div *ngSwitchCase="'text'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
+                    <h2
+                      *ngIf="b.title"
+                      class="text-lg font-semibold text-slate-900 dark:text-slate-50"
+                    >
+                      {{ b.title }}
+                    </h2>
                     <div
                       class="markdown text-slate-700 leading-relaxed dark:text-slate-200"
                       [innerHTML]="sanitizeHtml(b.body_html)"
@@ -65,8 +86,19 @@ interface ContentBlock {
                   </div>
 
                   <div *ngSwitchCase="'image'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
-                    <a *ngIf="b.link_url; else plainImage" class="block" [href]="b.link_url" target="_blank" rel="noopener noreferrer">
+                    <h2
+                      *ngIf="b.title"
+                      class="text-lg font-semibold text-slate-900 dark:text-slate-50"
+                    >
+                      {{ b.title }}
+                    </h2>
+                    <a
+                      *ngIf="b.link_url; else plainImage"
+                      class="block"
+                      [href]="b.link_url"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <img
                         [src]="b.url"
                         [alt]="b.alt || b.title || ''"
@@ -84,11 +116,18 @@ interface ContentBlock {
                         loading="lazy"
                       />
                     </ng-template>
-                    <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
+                    <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ b.caption }}
+                    </p>
                   </div>
 
                   <div *ngSwitchCase="'gallery'" class="grid gap-2">
-                    <h2 *ngIf="b.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ b.title }}</h2>
+                    <h2
+                      *ngIf="b.title"
+                      class="text-lg font-semibold text-slate-900 dark:text-slate-50"
+                    >
+                      {{ b.title }}
+                    </h2>
                     <div class="grid gap-3 sm:grid-cols-2">
                       <div *ngFor="let img of b.images" class="grid gap-1">
                         <img
@@ -98,7 +137,9 @@ interface ContentBlock {
                           [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
                           loading="lazy"
                         />
-                        <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                        <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">
+                          {{ img.caption }}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -117,11 +158,14 @@ interface ContentBlock {
             [style.object-position]="firstImageFocal()"
             loading="lazy"
           />
-          <div class="markdown text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="sanitizeHtml(bodyHtml)"></div>
+          <div
+            class="markdown text-slate-700 leading-relaxed dark:text-slate-200"
+            [innerHTML]="sanitizeHtml(bodyHtml)"
+          ></div>
         </ng-template>
       </div>
     </app-modal>
-  `
+  `,
 })
 export class LegalConsentModalComponent implements OnChanges, OnDestroy {
   @Input() open = false;
@@ -146,7 +190,7 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
     private readonly api: ApiService,
     private readonly translate: TranslateService,
     private readonly markdown: MarkdownService,
-    private readonly sanitizer: DomSanitizer
+    private readonly sanitizer: DomSanitizer,
   ) {
     this.langSub = this.translate.onLangChange.subscribe(() => {
       if (this.open) this.load();
@@ -184,7 +228,8 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
 
   onBodyScroll(evt: ModalBodyScrollEvent): void {
     this.needsScroll = evt.scrollHeight > evt.clientHeight + 8;
-    this.subtitle = !this.needsScroll || evt.atBottom ? '' : this.translate.instant('legal.modal.scrollToAccept');
+    this.subtitle =
+      !this.needsScroll || evt.atBottom ? '' : this.translate.instant('legal.modal.scrollToAccept');
   }
 
   confirmDisabled(): boolean {
@@ -247,7 +292,9 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
         this.title = block?.title || this.translate.instant('legal.modal.title');
         this.images = Array.isArray(block?.images) ? block.images : [];
         this.bodyHtml = this.markdown.render(String(block?.body_markdown || ''));
-        this.pageBlocks = parsePageBlocks((block?.meta) || null, lang, (md) => this.markdown.render(md));
+        this.pageBlocks = parsePageBlocks(block?.meta || null, lang, (md) =>
+          this.markdown.render(md),
+        );
         this.subtitle = this.translate.instant('legal.modal.scrollToAccept');
         setTimeout(() => this.modal?.emitBodyScroll());
       },
@@ -260,8 +307,7 @@ export class LegalConsentModalComponent implements OnChanges, OnDestroy {
         this.needsScroll = false;
         this.subtitle = '';
         this.error = err?.error?.detail || this.translate.instant('legal.modal.loadError');
-      }
+      },
     });
   }
 }
-

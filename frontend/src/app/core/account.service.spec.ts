@@ -10,7 +10,7 @@ describe('AccountService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [ApiService, AccountService]
+      providers: [ApiService, AccountService],
     });
     service = TestBed.inject(AccountService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -39,7 +39,12 @@ describe('AccountService', () => {
     const req = httpMock.expectOne('/api/v1/auth/me/delete');
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({ confirm: 'DELETE', password: 'supersecret' });
-    req.flush({ requested_at: null, scheduled_for: '2030-01-01T00:00:00+00:00', deleted_at: null, cooldown_hours: 24 });
+    req.flush({
+      requested_at: null,
+      scheduled_for: '2030-01-01T00:00:00+00:00',
+      deleted_at: null,
+      cooldown_hours: 24,
+    });
   });
 
   it('getDeletionStatus fetches current deletion status', () => {

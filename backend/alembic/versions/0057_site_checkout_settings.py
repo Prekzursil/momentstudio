@@ -28,8 +28,12 @@ def upgrade() -> None:
     now = datetime.now(timezone.utc)
     is_postgres = conn.dialect.name == "postgresql"
 
-    content_status = postgresql.ENUM("draft", "published", name="contentstatus", create_type=False)
-    published_status = sa.text("'published'::contentstatus") if is_postgres else "published"
+    content_status = postgresql.ENUM(
+        "draft", "published", name="contentstatus", create_type=False
+    )
+    published_status = (
+        sa.text("'published'::contentstatus") if is_postgres else "published"
+    )
 
     content_blocks = sa.table(
         "content_blocks",
@@ -70,12 +74,18 @@ def upgrade() -> None:
         sa.column("created_at", sa.DateTime(timezone=True)),
     )
 
-    exists = conn.execute(sa.select(content_blocks.c.id).where(content_blocks.c.key == "site.checkout")).first()
+    exists = conn.execute(
+        sa.select(content_blocks.c.id).where(content_blocks.c.key == "site.checkout")
+    ).first()
     if exists:
         return
 
     block_id = uuid.uuid4()
-    meta = {"version": 1, "shipping_fee_ron": 20.0, "free_shipping_threshold_ron": 300.0}
+    meta = {
+        "version": 1,
+        "shipping_fee_ron": 20.0,
+        "free_shipping_threshold_ron": 300.0,
+    }
 
     conn.execute(
         sa.insert(content_blocks).values(
@@ -123,4 +133,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing seeded CMS content can delete user edits.
     return
-

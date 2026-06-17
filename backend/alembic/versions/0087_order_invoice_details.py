@@ -19,11 +19,14 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("orders", sa.Column("invoice_company", sa.String(length=200), nullable=True))
-    op.add_column("orders", sa.Column("invoice_vat_id", sa.String(length=64), nullable=True))
+    op.add_column(
+        "orders", sa.Column("invoice_company", sa.String(length=200), nullable=True)
+    )
+    op.add_column(
+        "orders", sa.Column("invoice_vat_id", sa.String(length=64), nullable=True)
+    )
 
 
 def downgrade() -> None:
     op.drop_column("orders", "invoice_vat_id")
     op.drop_column("orders", "invoice_company")
-

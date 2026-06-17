@@ -35,7 +35,7 @@ export type PageHeaderCrumb = {
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class PageHeaderComponent {
   @Input() title = '';

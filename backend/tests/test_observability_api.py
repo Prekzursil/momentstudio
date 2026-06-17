@@ -46,7 +46,11 @@ def create_admin_token(session_factory) -> str:
         async with session_factory() as session:
             user = await create_user(
                 session,
-                UserCreate(email="admin-observability@example.com", password="password123", name="Admin"),
+                UserCreate(
+                    email="admin-observability@example.com",
+                    password="password123",
+                    name="Admin",
+                ),
             )
             user.role = UserRole.admin
             session.add(

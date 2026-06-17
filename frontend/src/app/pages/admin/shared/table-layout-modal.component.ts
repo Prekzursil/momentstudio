@@ -31,22 +31,32 @@ export type AdminTableLayoutColumnDef = AdminTableColumn & {
     >
       <div class="grid gap-4">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-          <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.tableLayout.densityLabel' | translate }}</span>
+          <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+            'adminUi.tableLayout.densityLabel' | translate
+          }}</span>
           <select
             class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
             [(ngModel)]="draftDensity"
           >
-            <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="comfortable">
+            <option
+              class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+              value="comfortable"
+            >
               {{ 'adminUi.tableLayout.density.comfortable' | translate }}
             </option>
-            <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="compact">
+            <option
+              class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+              value="compact"
+            >
               {{ 'adminUi.tableLayout.density.compact' | translate }}
             </option>
           </select>
         </label>
 
         <div class="grid gap-2">
-          <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+          <div
+            class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+          >
             {{ 'adminUi.tableLayout.columnsLabel' | translate }}
           </div>
           <div class="grid gap-2">
@@ -62,13 +72,24 @@ export type AdminTableLayoutColumnDef = AdminTableColumn & {
                   [disabled]="isRequired(colId)"
                   (change)="toggleColumn(colId)"
                 />
-                <span class="truncate text-slate-800 dark:text-slate-100">{{ labelKey(colId) | translate }}</span>
-                <span *ngIf="isRequired(colId)" class="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                <span class="truncate text-slate-800 dark:text-slate-100">{{
+                  labelKey(colId) | translate
+                }}</span>
+                <span
+                  *ngIf="isRequired(colId)"
+                  class="text-[10px] font-semibold text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.tableLayout.required' | translate }}
                 </span>
               </label>
               <div class="flex items-center gap-2">
-                <app-button size="sm" variant="ghost" [disabled]="i === 0" [label]="'adminUi.actions.up' | translate" (action)="move(i, -1)"></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [disabled]="i === 0"
+                  [label]="'adminUi.actions.up' | translate"
+                  (action)="move(i, -1)"
+                ></app-button>
                 <app-button
                   size="sm"
                   variant="ghost"
@@ -82,10 +103,24 @@ export type AdminTableLayoutColumnDef = AdminTableColumn & {
         </div>
 
         <div class="flex items-center justify-between gap-2 pt-1">
-          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.reset' | translate" (action)="resetToDefaults()"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.tableLayout.reset' | translate"
+            (action)="resetToDefaults()"
+          ></app-button>
           <div class="flex items-center gap-2">
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="closed.emit()"></app-button>
-            <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="applyDraft()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.cancel' | translate"
+              (action)="closed.emit()"
+            ></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.actions.save' | translate"
+              (action)="applyDraft()"
+            ></app-button>
           </div>
         </div>
       </div>
@@ -112,7 +147,9 @@ export class TableLayoutModalComponent implements OnChanges {
   }
 
   resetToDefaults(): void {
-    const next = this.defaults ? sanitizeAdminTableLayout(this.defaults, this.columns) : defaultAdminTableLayout(this.columns);
+    const next = this.defaults
+      ? sanitizeAdminTableLayout(this.defaults, this.columns)
+      : defaultAdminTableLayout(this.columns);
     this.draftOrder = [...next.order];
     this.draftHidden = new Set<string>(next.hidden || []);
     this.draftDensity = next.density;

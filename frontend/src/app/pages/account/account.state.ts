@@ -21,7 +21,7 @@ import {
   TwoFactorStatusResponse,
   UserCooldownsResponse,
   UserAliasesResponse,
-  UserSecurityEventInfo
+  UserSecurityEventInfo,
 } from '../../core/auth.service';
 import {
   AccountDeletionStatus,
@@ -31,7 +31,7 @@ import {
   Order,
   OrderPaginationMeta,
   ReceiptShareToken,
-  UserDataExportJob
+  UserDataExportJob,
 } from '../../core/account.service';
 import { BlogMyComment, BlogService, PaginationMeta } from '../../core/blog.service';
 import { CartStore } from '../../core/cart.store';
@@ -42,19 +42,29 @@ import { ToastService } from '../../core/toast.service';
 import { TicketListItem, TicketsService } from '../../core/tickets.service';
 import { WishlistService } from '../../core/wishlist.service';
 import { CouponsService, type CouponRead } from '../../core/coupons.service';
-import { GoogleLinkPendingService, PendingGoogleLink } from '../../core/google-link-pending.service';
+import {
+  GoogleLinkPendingService,
+  PendingGoogleLink,
+} from '../../core/google-link-pending.service';
 import { orderStatusChipClass } from '../../shared/order-status';
-import { missingRequiredProfileFields as computeMissingRequiredProfileFields, type RequiredProfileField } from '../../shared/profile-requirements';
-  import {
-    buildE164,
-    formatInternationalPreview,
-    formatNationalAsYouType,
-    listPhoneCountries,
-    splitE164,
-    type PhoneCountryOption
-  } from '../../shared/phone';
+import {
+  missingRequiredProfileFields as computeMissingRequiredProfileFields,
+  type RequiredProfileField,
+} from '../../shared/profile-requirements';
+import {
+  buildE164,
+  formatInternationalPreview,
+  formatNationalAsYouType,
+  listPhoneCountries,
+  splitE164,
+  type PhoneCountryOption,
+} from '../../shared/phone';
 import { formatIdentity } from '../../shared/user-identity';
-import { isWebAuthnSupported, serializePublicKeyCredential, toPublicKeyCredentialCreationOptions } from '../../shared/webauthn';
+import {
+  isWebAuthnSupported,
+  serializePublicKeyCredential,
+  toPublicKeyCredentialCreationOptions,
+} from '../../shared/webauthn';
 
 import { type CountryCode } from 'libphonenumber-js';
 
@@ -141,7 +151,7 @@ export class AccountState implements OnInit, OnDestroy {
     line1: '',
     city: '',
     postal_code: '',
-    country: 'US'
+    country: 'US',
   };
   private idleTimer?: any;
   private readonly handleUserActivity = () => this.resetIdleTimer();
@@ -313,7 +323,7 @@ export class AccountState implements OnInit, OnDestroy {
     private readonly theme: ThemeService,
     private readonly lang: LanguageService,
     private readonly translate: TranslateService,
-    private readonly googleLinkPendingService: GoogleLinkPendingService
+    private readonly googleLinkPendingService: GoogleLinkPendingService,
   ) {
     this.phoneCountriesEffect = effect(() => {
       this.phoneCountries = listPhoneCountries(this.lang.language());
@@ -342,7 +352,7 @@ export class AccountState implements OnInit, OnDestroy {
       void this.router.navigate([target === 'overview' ? 'overview' : target], {
         relativeTo: this.route,
         queryParamsHandling: 'preserve',
-        replaceUrl: true
+        replaceUrl: true,
       });
     } else {
       const initialSection = this.activeSectionFromUrl(initialUrl);
@@ -355,7 +365,6 @@ export class AccountState implements OnInit, OnDestroy {
     window.addEventListener('keydown', this.handleUserActivity);
     window.addEventListener('beforeunload', this.handleBeforeUnload);
   }
-
 
   retryAccountLoad(): void {
     this.profileLoaded = false;
@@ -394,7 +403,7 @@ export class AccountState implements OnInit, OnDestroy {
         'notifications',
         'security',
         'comments',
-        'privacy'
+        'privacy',
       ];
       if (allowed.includes(normalized)) return normalized;
     } catch {
@@ -420,7 +429,9 @@ export class AccountState implements OnInit, OnDestroy {
   navigateToSection(raw: string): void {
     const section = (raw || '').trim() as AccountSection;
     if (!section || section === 'password') return;
-    void this.router.navigate([section === 'overview' ? 'overview' : section], { relativeTo: this.route });
+    void this.router.navigate([section === 'overview' ? 'overview' : section], {
+      relativeTo: this.route,
+    });
   }
 
   private ensureLoadedForSection(section: AccountSection): void {
@@ -498,7 +509,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.couponsCountLoaded.set(true);
         this.couponsCountLoading.set(false);
       },
-      complete: () => this.couponsCountLoading.set(false)
+      complete: () => this.couponsCountLoading.set(false),
     });
   }
 
@@ -556,7 +567,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.error.set('account.loadError');
         this.loading.set(false);
       },
-      complete: () => this.loading.set(false)
+      complete: () => this.loading.set(false),
     });
   }
 
@@ -581,7 +592,7 @@ export class AccountState implements OnInit, OnDestroy {
         from,
         to,
         page: requestPage,
-        limit: this.pageSize
+        limit: this.pageSize,
       })
       .subscribe({
         next: (resp) => {
@@ -596,19 +607,23 @@ export class AccountState implements OnInit, OnDestroy {
         },
         error: (err) => {
           const detail = (err?.error?.detail || '').toString();
-          this.ordersError.set(detail === 'Invalid date range' ? 'account.orders.invalidDateRange' : 'account.orders.loadError');
+          this.ordersError.set(
+            detail === 'Invalid date range'
+              ? 'account.orders.invalidDateRange'
+              : 'account.orders.loadError',
+          );
           this.ordersLoading.set(false);
         },
-        complete: () => this.ordersLoading.set(false)
+        complete: () => this.ordersLoading.set(false),
       });
   }
 
   ordersFiltersActive(): boolean {
     return Boolean(
       (this.orderFilter || '').trim() ||
-        this.ordersQuery.trim() ||
-        (this.ordersFrom || '').trim() ||
-        (this.ordersTo || '').trim()
+      this.ordersQuery.trim() ||
+      (this.ordersFrom || '').trim() ||
+      (this.ordersTo || '').trim(),
     );
   }
 
@@ -669,7 +684,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.addressesError.set('account.addresses.loadError');
         this.addressesLoading.set(false);
       },
-      complete: () => this.addressesLoading.set(false)
+      complete: () => this.addressesLoading.set(false),
     });
   }
 
@@ -693,7 +708,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.ticketsError.set('account.overview.support.loadError');
         this.ticketsLoading.set(false);
       },
-      complete: () => this.ticketsLoading.set(false)
+      complete: () => this.ticketsLoading.set(false),
     });
   }
 
@@ -776,10 +791,14 @@ export class AccountState implements OnInit, OnDestroy {
     if (!['stripe', 'paypal'].includes(method)) return false;
 
     const events = Array.isArray(order.events) ? order.events : [];
-    const captured = events.some((evt) => (evt?.event || '').trim().toLowerCase() === 'payment_captured');
+    const captured = events.some(
+      (evt) => (evt?.event || '').trim().toLowerCase() === 'payment_captured',
+    );
     if (!captured) return false;
 
-    const refunded = events.some((evt) => (evt?.event || '').trim().toLowerCase() === 'payment_refunded');
+    const refunded = events.some(
+      (evt) => (evt?.event || '').trim().toLowerCase() === 'payment_refunded',
+    );
     return !refunded;
   }
 
@@ -796,7 +815,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.orders.reorderError');
         this.toast.error(message);
       },
-      complete: () => (this.reorderingOrderId = null)
+      complete: () => (this.reorderingOrderId = null),
     });
   }
 
@@ -807,7 +826,7 @@ export class AccountState implements OnInit, OnDestroy {
       .post('/cart/items', {
         product_id: item.product_id,
         variant_id: item.variant_id,
-        quantity: 1
+        quantity: 1,
       })
       .subscribe({
         next: () => {
@@ -818,7 +837,7 @@ export class AccountState implements OnInit, OnDestroy {
           const message = err?.error?.detail || this.t('account.orders.reorderError');
           this.toast.error(message);
         },
-        complete: () => (this.reorderingOrderItemId = null)
+        complete: () => (this.reorderingOrderItemId = null),
       });
   }
 
@@ -827,7 +846,9 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   canRequestReturn(order: Order): boolean {
-    return (order.status || '').trim().toLowerCase() === 'delivered' && !this.hasReturnRequested(order);
+    return (
+      (order.status || '').trim().toLowerCase() === 'delivered' && !this.hasReturnRequested(order)
+    );
   }
 
   hasCancelRequested(order: Order): boolean {
@@ -902,7 +923,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.cancelRequestError = this.t(key);
         this.toast.error(this.cancelRequestError);
       },
-      complete: () => (this.requestingCancel = false)
+      complete: () => (this.requestingCancel = false),
     });
   }
 
@@ -966,7 +987,7 @@ export class AccountState implements OnInit, OnDestroy {
         order_id: order.id,
         reason,
         customer_message: this.returnCustomerMessage.trim() || null,
-        items
+        items,
       })
       .subscribe({
         next: () => {
@@ -985,7 +1006,7 @@ export class AccountState implements OnInit, OnDestroy {
           this.returnCreateError = this.t(key);
           this.toast.error(this.returnCreateError);
         },
-        complete: () => (this.creatingReturn = false)
+        complete: () => (this.creatingReturn = false),
       });
   }
 
@@ -1009,7 +1030,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.orders.receiptDownloadError');
         this.toast.error(message);
       },
-      complete: () => (this.downloadingReceiptId = null)
+      complete: () => (this.downloadingReceiptId = null),
     });
   }
 
@@ -1058,7 +1079,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.orders.receiptGenerateError');
         this.toast.error(message);
       },
-      complete: () => (this.sharingReceiptId = null)
+      complete: () => (this.sharingReceiptId = null),
     });
   }
 
@@ -1077,7 +1098,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.orders.receiptRevokeError');
         this.toast.error(message);
       },
-      complete: () => (this.revokingReceiptId = null)
+      complete: () => (this.revokingReceiptId = null),
     });
   }
 
@@ -1121,7 +1142,7 @@ export class AccountState implements OnInit, OnDestroy {
       phone: existing?.phone || null,
       label,
       is_default_shipping: existing?.is_default_shipping,
-      is_default_billing: existing?.is_default_billing
+      is_default_billing: existing?.is_default_billing,
     };
     this.addressFormBaseline = { ...this.addressModel };
   }
@@ -1140,7 +1161,7 @@ export class AccountState implements OnInit, OnDestroy {
       phone: existing?.phone || null,
       label,
       is_default_shipping: false,
-      is_default_billing: false
+      is_default_billing: false,
     };
     this.addressFormBaseline = { ...this.addressModel };
   }
@@ -1159,7 +1180,8 @@ export class AccountState implements OnInit, OnDestroy {
           this.upsertAddress(addr);
           this.closeAddressForm();
         },
-        error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.update'))
+        error: (err) =>
+          this.toast.error(err?.error?.detail || this.t('account.addresses.errors.update')),
       });
     } else {
       this.account.createAddress(payload).subscribe({
@@ -1168,7 +1190,8 @@ export class AccountState implements OnInit, OnDestroy {
           this.upsertAddress(addr);
           this.closeAddressForm();
         },
-        error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.add'))
+        error: (err) =>
+          this.toast.error(err?.error?.detail || this.t('account.addresses.errors.add')),
       });
     }
   }
@@ -1185,7 +1208,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.addresses.set(this.addresses().filter((a) => a.id !== id));
         this.addressesLoaded.set(true);
       },
-      error: () => this.toast.error(this.t('account.addresses.errors.remove'))
+      error: () => this.toast.error(this.t('account.addresses.errors.remove')),
     });
   }
 
@@ -1195,7 +1218,8 @@ export class AccountState implements OnInit, OnDestroy {
         this.upsertAddress(updated);
         this.toast.success(this.t('account.addresses.messages.defaultShippingUpdated'));
       },
-      error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.defaultShipping'))
+      error: (err) =>
+        this.toast.error(err?.error?.detail || this.t('account.addresses.errors.defaultShipping')),
     });
   }
 
@@ -1205,7 +1229,8 @@ export class AccountState implements OnInit, OnDestroy {
         this.upsertAddress(updated);
         this.toast.success(this.t('account.addresses.messages.defaultBillingUpdated'));
       },
-      error: (err) => this.toast.error(err?.error?.detail || this.t('account.addresses.errors.defaultBilling'))
+      error: (err) =>
+        this.toast.error(err?.error?.detail || this.t('account.addresses.errors.defaultBilling')),
     });
   }
 
@@ -1217,7 +1242,7 @@ export class AccountState implements OnInit, OnDestroy {
     const normalized = merged.map((a) => ({
       ...a,
       is_default_shipping: next.is_default_shipping ? a.id === next.id : a.is_default_shipping,
-      is_default_billing: next.is_default_billing ? a.id === next.id : a.is_default_billing
+      is_default_billing: next.is_default_billing ? a.id === next.id : a.is_default_billing,
     }));
 
     this.addresses.set(normalized);
@@ -1230,9 +1255,23 @@ export class AccountState implements OnInit, OnDestroy {
     const normalized = raw.toLowerCase();
     if (['home', 'work', 'other'].includes(normalized)) return normalized;
 
-    const homeKeys = new Set(['home', 'acasa', 'acasă', this.t('account.addresses.labels.home').toLowerCase()]);
-    const workKeys = new Set(['work', 'serviciu', this.t('account.addresses.labels.work').toLowerCase()]);
-    const otherKeys = new Set(['other', 'altul', 'altele', this.t('account.addresses.labels.other').toLowerCase()]);
+    const homeKeys = new Set([
+      'home',
+      'acasa',
+      'acasă',
+      this.t('account.addresses.labels.home').toLowerCase(),
+    ]);
+    const workKeys = new Set([
+      'work',
+      'serviciu',
+      this.t('account.addresses.labels.work').toLowerCase(),
+    ]);
+    const otherKeys = new Set([
+      'other',
+      'altul',
+      'altele',
+      this.t('account.addresses.labels.other').toLowerCase(),
+    ]);
 
     if (homeKeys.has(normalized)) return 'home';
     if (workKeys.has(normalized)) return 'work';
@@ -1254,7 +1293,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.primaryVerificationResendUntil.set(Date.now() + 60_000);
         this.toast.success(this.t('account.verification.sentToast'));
       },
-      error: () => this.toast.error(this.t('account.verification.sendError'))
+      error: () => this.toast.error(this.t('account.verification.sendError')),
     });
   }
 
@@ -1282,7 +1321,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.avatarBusy = false;
-      }
+      },
     });
   }
 
@@ -1301,7 +1340,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.avatarBusy = false;
-      }
+      },
     });
   }
 
@@ -1321,7 +1360,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.avatarBusy = false;
-      }
+      },
     });
   }
 
@@ -1335,7 +1374,7 @@ export class AccountState implements OnInit, OnDestroy {
           this.toast.error(this.t('account.security.session.expired'));
         }
       },
-      error: () => this.toast.error(this.t('account.security.session.refreshError'))
+      error: () => this.toast.error(this.t('account.security.session.refreshError')),
     });
   }
 
@@ -1371,7 +1410,7 @@ export class AccountState implements OnInit, OnDestroy {
     return {
       completed,
       total,
-      percent: Math.round((completed / total) * 100)
+      percent: Math.round((completed / total) * 100),
     };
   }
 
@@ -1504,7 +1543,7 @@ export class AccountState implements OnInit, OnDestroy {
       middle_name: middleName ? middleName : null,
       last_name: lastName ? lastName : null,
       date_of_birth: dob ? dob : null,
-      preferred_language: this.profileLanguage
+      preferred_language: this.profileLanguage,
     };
 
     this.theme.setPreference(this.profileThemePreference);
@@ -1526,48 +1565,46 @@ export class AccountState implements OnInit, OnDestroy {
       ? this.auth.updateUsername(username, this.profileUsernamePassword).pipe(map(() => null))
       : of(null);
 
-    maybeUpdateUsername$
-      .pipe(switchMap(() => this.auth.updateProfile(payload)))
-      .subscribe({
-        next: (user) => {
-          this.profile.set(user);
-          this.profileName = user.name ?? '';
-          this.profileUsername = (user.username ?? '').trim();
-          this.profileFirstName = user.first_name ?? '';
-          this.profileMiddleName = user.middle_name ?? '';
-          this.profileLastName = user.last_name ?? '';
-          this.profileDateOfBirth = user.date_of_birth ?? '';
-          this.profilePhone = user.phone ?? '';
-          const phoneSplit = splitE164(this.profilePhone);
-          this.profilePhoneCountry = phoneSplit.country ?? 'RO';
-          this.profilePhoneNational = phoneSplit.nationalNumber || '';
-          this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
-          this.avatar = user.avatar_url ?? this.avatar;
-          this.profileUsernamePassword = '';
-          this.profileBaseline = this.captureProfileSnapshot();
-          this.profileSaved = true;
-          this.toast.success(this.t('account.profile.savedToast'));
-          this.loadAliases(true);
-          this.loadCooldowns(true);
+    maybeUpdateUsername$.pipe(switchMap(() => this.auth.updateProfile(payload))).subscribe({
+      next: (user) => {
+        this.profile.set(user);
+        this.profileName = user.name ?? '';
+        this.profileUsername = (user.username ?? '').trim();
+        this.profileFirstName = user.first_name ?? '';
+        this.profileMiddleName = user.middle_name ?? '';
+        this.profileLastName = user.last_name ?? '';
+        this.profileDateOfBirth = user.date_of_birth ?? '';
+        this.profilePhone = user.phone ?? '';
+        const phoneSplit = splitE164(this.profilePhone);
+        this.profilePhoneCountry = phoneSplit.country ?? 'RO';
+        this.profilePhoneNational = phoneSplit.nationalNumber || '';
+        this.profileLanguage = (user.preferred_language === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
+        this.avatar = user.avatar_url ?? this.avatar;
+        this.profileUsernamePassword = '';
+        this.profileBaseline = this.captureProfileSnapshot();
+        this.profileSaved = true;
+        this.toast.success(this.t('account.profile.savedToast'));
+        this.loadAliases(true);
+        this.loadCooldowns(true);
 
-          if (this.forceProfileCompletion && computeMissingRequiredProfileFields(user).length === 0) {
-            this.forceProfileCompletion = false;
-            void this.router.navigate([], {
-              relativeTo: this.route,
-              queryParams: { complete: null },
-              queryParamsHandling: 'merge',
-              replaceUrl: true,
-              fragment: 'profile'
-            });
-          }
-        },
-        error: (err) => {
-          const message = err?.error?.detail || this.t('account.profile.errors.saveError');
-          this.profileError = message;
-          this.toast.error(message);
-        },
-        complete: () => (this.savingProfile = false)
-      });
+        if (this.forceProfileCompletion && computeMissingRequiredProfileFields(user).length === 0) {
+          this.forceProfileCompletion = false;
+          void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: { complete: null },
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+            fragment: 'profile',
+          });
+        }
+      },
+      error: (err) => {
+        const message = err?.error?.detail || this.t('account.profile.errors.saveError');
+        this.profileError = message;
+        this.toast.error(message);
+      },
+      complete: () => (this.savingProfile = false),
+    });
   }
 
   loadAliases(force: boolean = false): void {
@@ -1582,7 +1619,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.aliasesError.set(this.t('account.profile.aliases.loadError'));
         this.aliasesLoading.set(false);
       },
-      complete: () => this.aliasesLoading.set(false)
+      complete: () => this.aliasesLoading.set(false),
     });
   }
 
@@ -1602,7 +1639,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.cooldownsError.set(this.t('account.cooldowns.loadError'));
         this.cooldownsLoading.set(false);
       },
-      complete: () => this.cooldownsLoading.set(false)
+      complete: () => this.cooldownsLoading.set(false),
     });
   }
 
@@ -1656,9 +1693,9 @@ export class AccountState implements OnInit, OnDestroy {
         username: this.profileUsername.trim() || u?.username,
         name_tag: u?.name_tag,
         email: u?.email,
-        id: u?.id
+        id: u?.id,
       },
-      '...'
+      '...',
     );
   }
 
@@ -1681,7 +1718,10 @@ export class AccountState implements OnInit, OnDestroy {
     const statusKey = `adminUi.orders.${order.status}`;
     const statusTranslated = this.translate.instant(statusKey);
     const status = statusTranslated !== statusKey ? statusTranslated : order.status;
-    return this.t('account.overview.lastOrderLabel', { ref: order.reference_code || order.id, status });
+    return this.t('account.overview.lastOrderLabel', {
+      ref: order.reference_code || order.id,
+      status,
+    });
   }
 
   lastOrderSubcopy(): string {
@@ -1719,15 +1759,23 @@ export class AccountState implements OnInit, OnDestroy {
 
   notificationsLabel(): string {
     if (!this.profile()) return this.t('notifications.loading');
-    const enabled = [this.notifyBlogCommentReplies, this.notifyBlogComments, this.notifyMarketing].filter(Boolean).length;
+    const enabled = [
+      this.notifyBlogCommentReplies,
+      this.notifyBlogComments,
+      this.notifyMarketing,
+    ].filter(Boolean).length;
     if (!enabled) return this.t('account.overview.notificationsAllOff');
     return this.t('account.overview.notificationsEnabled', { count: enabled });
   }
 
   securityLabel(): string {
     if (!this.profile()) return this.t('notifications.loading');
-    const verified = this.emailVerified() ? this.t('account.overview.security.emailVerified') : this.t('account.overview.security.emailUnverified');
-    const google = this.googleEmail() ? this.t('account.overview.security.googleLinked') : this.t('account.overview.security.googleUnlinked');
+    const verified = this.emailVerified()
+      ? this.t('account.overview.security.emailVerified')
+      : this.t('account.overview.security.emailUnverified');
+    const google = this.googleEmail()
+      ? this.t('account.overview.security.googleLinked')
+      : this.t('account.overview.security.googleUnlinked');
     return `${verified} · ${google}`;
   }
 
@@ -1762,7 +1810,7 @@ export class AccountState implements OnInit, OnDestroy {
       .updateNotificationPreferences({
         notify_blog_comments: this.notifyBlogComments,
         notify_blog_comment_replies: this.notifyBlogCommentReplies,
-        notify_marketing: this.notifyMarketing
+        notify_marketing: this.notifyMarketing,
       })
       .subscribe({
         next: (user) => {
@@ -1778,7 +1826,7 @@ export class AccountState implements OnInit, OnDestroy {
           this.notificationsError = 'account.notifications.saveError';
           this.savingNotifications = false;
         },
-        complete: () => (this.savingNotifications = false)
+        complete: () => (this.savingNotifications = false),
       });
   }
 
@@ -1794,7 +1842,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.deletionError.set(this.t('account.privacy.deletion.loadError'));
         this.deletionLoading.set(false);
       },
-      complete: () => this.deletionLoading.set(false)
+      complete: () => this.deletionLoading.set(false),
     });
   }
 
@@ -1821,7 +1869,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.toast.error(message);
         this.exportJobLoading.set(false);
       },
-      complete: () => this.exportJobLoading.set(false)
+      complete: () => this.exportJobLoading.set(false),
     });
   }
 
@@ -1838,7 +1886,11 @@ export class AccountState implements OnInit, OnDestroy {
           this.exportJob.set(job);
           if (job.status === 'succeeded' || job.status === 'failed') {
             this.stopExportJobPolling();
-            if (job.status === 'succeeded' && job.id && this.exportReadyToastShownForJobId !== job.id) {
+            if (
+              job.status === 'succeeded' &&
+              job.id &&
+              this.exportReadyToastShownForJobId !== job.id
+            ) {
               this.exportReadyToastShownForJobId = job.id;
               this.toast.success(this.t('account.privacy.export.readyToast'));
               this.notificationsService.refreshUnreadCount();
@@ -1852,7 +1904,7 @@ export class AccountState implements OnInit, OnDestroy {
         },
         complete: () => {
           this.exportJobPollInFlight = false;
-        }
+        },
       });
     }, 2_000);
   }
@@ -1886,13 +1938,19 @@ export class AccountState implements OnInit, OnDestroy {
         this.toast.error(message);
         this.exportJobLoading.set(false);
       },
-      complete: () => this.exportJobLoading.set(false)
+      complete: () => this.exportJobLoading.set(false),
     });
   }
 
   downloadExportJob(): void {
     const job = this.exportJob();
-    if (this.exportingData || !this.auth.isAuthenticated() || !job?.id || job.status !== 'succeeded') return;
+    if (
+      this.exportingData ||
+      !this.auth.isAuthenticated() ||
+      !job?.id ||
+      job.status !== 'succeeded'
+    )
+      return;
     this.exportingData = true;
     this.exportError = null;
     this.account.downloadExportJob(job.id).subscribe({
@@ -1913,7 +1971,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.exportingData = false;
-      }
+      },
     });
   }
 
@@ -1930,7 +1988,10 @@ export class AccountState implements OnInit, OnDestroy {
     const job = this.exportJob();
     if (this.exportJobLoading()) return 'account.privacy.export.actionWorking';
     if (!job) return 'account.privacy.export.actionGenerate';
-    if (job.status === 'succeeded') return this.exportingData ? 'account.privacy.export.actionDownloading' : 'account.privacy.export.actionDownload';
+    if (job.status === 'succeeded')
+      return this.exportingData
+        ? 'account.privacy.export.actionDownloading'
+        : 'account.privacy.export.actionDownload';
     if (job.status === 'failed') return 'account.privacy.export.actionRetry';
     return 'account.privacy.export.actionGenerating';
   }
@@ -1966,7 +2027,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.requestingDeletion = false;
-      }
+      },
     });
   }
 
@@ -1986,7 +2047,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.cancellingDeletion = false;
-      }
+      },
     });
   }
 
@@ -2039,7 +2100,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.myCommentsError.set(this.t('account.comments.loadError'));
         this.myCommentsLoading.set(false);
       },
-      complete: () => this.myCommentsLoading.set(false)
+      complete: () => this.myCommentsLoading.set(false),
     });
   }
 
@@ -2086,10 +2147,13 @@ export class AccountState implements OnInit, OnDestroy {
       clearTimeout(this.idleTimer);
     }
     this.idleWarning.set(null);
-    this.idleTimer = setTimeout(() => {
-      this.idleWarning.set(this.t('account.security.session.idleLogout'));
-      this.signOut();
-    }, 30 * 60 * 1000); // 30 minutes
+    this.idleTimer = setTimeout(
+      () => {
+        this.idleWarning.set(this.t('account.security.session.idleLogout'));
+        this.signOut();
+      },
+      30 * 60 * 1000,
+    ); // 30 minutes
   }
 
   ngOnDestroy(): void {
@@ -2122,7 +2186,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.secondaryEmailsError.set(this.t('account.security.emails.loadError'));
         this.secondaryEmailsLoading.set(false);
       },
-      complete: () => this.secondaryEmailsLoading.set(false)
+      complete: () => this.secondaryEmailsLoading.set(false),
     });
   }
 
@@ -2142,7 +2206,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.sessionsError.set(this.t('account.security.devices.loadError'));
         this.sessionsLoading.set(false);
       },
-      complete: () => this.sessionsLoading.set(false)
+      complete: () => this.sessionsLoading.set(false),
     });
   }
 
@@ -2162,7 +2226,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.securityEventsError.set(this.t('account.security.activity.loadError'));
         this.securityEventsLoading.set(false);
       },
-      complete: () => this.securityEventsLoading.set(false)
+      complete: () => this.securityEventsLoading.set(false),
     });
   }
 
@@ -2183,7 +2247,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.twoFactorError.set(this.t('account.security.twoFactor.loadError'));
         this.twoFactorLoading.set(false);
       },
-      complete: () => this.twoFactorLoading.set(false)
+      complete: () => this.twoFactorLoading.set(false),
     });
   }
 
@@ -2213,7 +2277,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.passkeysError.set(this.t('account.security.passkeys.loadError'));
         this.passkeysLoading.set(false);
       },
-      complete: () => this.passkeysLoading.set(false)
+      complete: () => this.passkeysLoading.set(false),
     });
   }
 
@@ -2236,7 +2300,9 @@ export class AccountState implements OnInit, OnDestroy {
       next: async (res) => {
         try {
           const publicKey = toPublicKeyCredentialCreationOptions(res.options);
-          const credential = (await navigator.credentials.create({ publicKey })) as PublicKeyCredential | null;
+          const credential = (await navigator.credentials.create({
+            publicKey,
+          })) as PublicKeyCredential | null;
           if (!credential) {
             this.registeringPasskey = false;
             return;
@@ -2258,7 +2324,7 @@ export class AccountState implements OnInit, OnDestroy {
             },
             complete: () => {
               this.registeringPasskey = false;
-            }
+            },
           });
         } catch (err: any) {
           const name = err?.name || '';
@@ -2276,7 +2342,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.passkeysError.set(message);
         this.toast.error(message);
         this.registeringPasskey = false;
-      }
+      },
     });
   }
 
@@ -2322,7 +2388,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.removingPasskeyId = null;
-      }
+      },
     });
   }
 
@@ -2352,7 +2418,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.startingTwoFactor = false;
-      }
+      },
     });
   }
 
@@ -2384,20 +2450,28 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.enablingTwoFactor = false;
-      }
+      },
     });
   }
 
   async copyTwoFactorSecret(): Promise<void> {
     if (!this.twoFactorSetupSecret) return;
     const ok = await this.copyToClipboard(this.twoFactorSetupSecret);
-    this.toast.success(ok ? this.t('account.security.twoFactor.copied') : this.t('account.security.twoFactor.copySecret'));
+    this.toast.success(
+      ok
+        ? this.t('account.security.twoFactor.copied')
+        : this.t('account.security.twoFactor.copySecret'),
+    );
   }
 
   async copyTwoFactorSetupUrl(): Promise<void> {
     if (!this.twoFactorSetupUrl) return;
     const ok = await this.copyToClipboard(this.twoFactorSetupUrl);
-    this.toast.success(ok ? this.t('account.security.twoFactor.copied') : this.t('account.security.twoFactor.copyUrl'));
+    this.toast.success(
+      ok
+        ? this.t('account.security.twoFactor.copied')
+        : this.t('account.security.twoFactor.copyUrl'),
+    );
   }
 
   private async updateTwoFactorSetupQr(): Promise<void> {
@@ -2423,7 +2497,11 @@ export class AccountState implements OnInit, OnDestroy {
   async copyTwoFactorRecoveryCodes(): Promise<void> {
     if (!this.twoFactorRecoveryCodes?.length) return;
     const ok = await this.copyToClipboard(this.twoFactorRecoveryCodes.join('\n'));
-    this.toast.success(ok ? this.t('account.security.twoFactor.copied') : this.t('account.security.twoFactor.copyCodes'));
+    this.toast.success(
+      ok
+        ? this.t('account.security.twoFactor.copied')
+        : this.t('account.security.twoFactor.copyCodes'),
+    );
   }
 
   regenerateTwoFactorRecoveryCodes(): void {
@@ -2452,7 +2530,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.regeneratingTwoFactorCodes = false;
-      }
+      },
     });
   }
 
@@ -2485,7 +2563,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.disablingTwoFactor = false;
-      }
+      },
     });
   }
 
@@ -2542,7 +2620,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.revokingOtherSessions = false;
         this.revokeOtherSessionsConfirming = false;
         this.revokeOtherSessionsPassword = '';
-      }
+      },
     });
   }
 
@@ -2607,7 +2685,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.addingSecondaryEmail = false;
-      }
+      },
     });
   }
 
@@ -2626,7 +2704,7 @@ export class AccountState implements OnInit, OnDestroy {
         const message = err?.error?.detail || this.t('account.security.emails.resendError');
         this.secondaryEmailMessage = message;
         this.toast.error(message);
-      }
+      },
     });
   }
 
@@ -2646,8 +2724,14 @@ export class AccountState implements OnInit, OnDestroy {
       next: (verified) => {
         this.secondaryEmails.set(
           this.secondaryEmails().map((e) =>
-            e.id === verified.id ? { ...e, verified: true, verified_at: verified.verified_at ?? new Date().toISOString() } : e
-          )
+            e.id === verified.id
+              ? {
+                  ...e,
+                  verified: true,
+                  verified_at: verified.verified_at ?? new Date().toISOString(),
+                }
+              : e,
+          ),
         );
         this.secondaryVerificationToken = '';
         this.secondaryVerificationEmailId = null;
@@ -2663,7 +2747,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.verifyingSecondaryEmail = false;
-      }
+      },
     });
   }
 
@@ -2716,7 +2800,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.removingSecondaryEmail = false;
-      }
+      },
     });
   }
 
@@ -2771,7 +2855,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.makingPrimaryEmail = false;
-      }
+      },
     });
   }
 
@@ -2804,7 +2888,7 @@ export class AccountState implements OnInit, OnDestroy {
         },
         complete: () => {
           this.googleBusy = false;
-        }
+        },
       });
       return;
     }
@@ -2826,7 +2910,7 @@ export class AccountState implements OnInit, OnDestroy {
         this.googleError = message;
         this.toast.error(message);
         this.googleBusy = false;
-      }
+      },
     });
   }
 
@@ -2853,7 +2937,7 @@ export class AccountState implements OnInit, OnDestroy {
       },
       complete: () => {
         this.googleBusy = false;
-      }
+      },
     });
   }
 
@@ -2873,7 +2957,10 @@ export class AccountState implements OnInit, OnDestroy {
 
   private formatMoney(amount: number, currency: string): string {
     try {
-      return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'RON' }).format(amount);
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: currency || 'RON',
+      }).format(amount);
     } catch {
       return `${amount.toFixed(2)} ${currency || ''}`.trim();
     }
@@ -2933,7 +3020,11 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   private hasUnsavedChanges(): boolean {
-    return this.profileHasUnsavedChanges() || this.addressesHasUnsavedChanges() || this.notificationsHasUnsavedChanges();
+    return (
+      this.profileHasUnsavedChanges() ||
+      this.addressesHasUnsavedChanges() ||
+      this.notificationsHasUnsavedChanges()
+    );
   }
 
   private captureProfileSnapshot(): ProfileFormSnapshot {
@@ -2947,7 +3038,7 @@ export class AccountState implements OnInit, OnDestroy {
       phoneCountry: this.profilePhoneCountry,
       phoneNational: this.profilePhoneNational.trim(),
       preferredLanguage: this.profileLanguage,
-      themePreference: this.profileThemePreference
+      themePreference: this.profileThemePreference,
     };
   }
 
@@ -2970,11 +3061,14 @@ export class AccountState implements OnInit, OnDestroy {
     return {
       notifyBlogComments: Boolean(this.notifyBlogComments),
       notifyBlogCommentReplies: Boolean(this.notifyBlogCommentReplies),
-      notifyMarketing: Boolean(this.notifyMarketing)
+      notifyMarketing: Boolean(this.notifyMarketing),
     };
   }
 
-  private sameNotificationSnapshot(a: NotificationPrefsSnapshot, b: NotificationPrefsSnapshot): boolean {
+  private sameNotificationSnapshot(
+    a: NotificationPrefsSnapshot,
+    b: NotificationPrefsSnapshot,
+  ): boolean {
     return (
       a.notifyBlogComments === b.notifyBlogComments &&
       a.notifyBlogCommentReplies === b.notifyBlogCommentReplies &&
@@ -2994,7 +3088,7 @@ export class AccountState implements OnInit, OnDestroy {
       country: (model.country ?? '').trim(),
       phone: phoneRaw || null,
       is_default_shipping: Boolean(model.is_default_shipping),
-      is_default_billing: Boolean(model.is_default_billing)
+      is_default_billing: Boolean(model.is_default_billing),
     };
   }
 
@@ -3019,4 +3113,3 @@ export class AccountState implements OnInit, OnDestroy {
     return this.translate.instant(key, params);
   }
 }
-

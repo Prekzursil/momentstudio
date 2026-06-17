@@ -33,7 +33,15 @@ interface ContentBlock {
 @Component({
   selector: 'app-about',
   standalone: true,
-  imports: [CommonModule, ContainerComponent, BreadcrumbComponent, CardComponent, TranslateModule, CmsPageBlocksComponent, ButtonComponent],
+  imports: [
+    CommonModule,
+    ContainerComponent,
+    BreadcrumbComponent,
+    CardComponent,
+    TranslateModule,
+    CmsPageBlocksComponent,
+    ButtonComponent,
+  ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
@@ -62,8 +70,12 @@ interface ContentBlock {
         </div>
 
         <div *ngIf="!loading() && hasError()" class="grid gap-2">
-          <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'about.errorTitle' | translate }}</p>
-          <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'about.errorCopy' | translate }}</p>
+          <p class="font-semibold text-amber-900 dark:text-amber-100">
+            {{ 'about.errorTitle' | translate }}
+          </p>
+          <p class="text-sm text-amber-800 dark:text-amber-200">
+            {{ 'about.errorCopy' | translate }}
+          </p>
         </div>
 
         <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
@@ -77,21 +89,23 @@ interface ContentBlock {
               [src]="block()!.images[0].url"
               [alt]="block()!.images[0].alt_text || block()!.title"
               class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-              [style.object-position]="focalPosition(block()!.images[0].focal_x, block()!.images[0].focal_y)"
+              [style.object-position]="
+                focalPosition(block()!.images[0].focal_x, block()!.images[0].focal_y)
+              "
               loading="lazy"
             />
-            <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+            <div
+              class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+              [innerHTML]="bodyHtml()"
+            ></div>
           </ng-template>
         </div>
       </app-card>
     </app-container>
-  `
+  `,
 })
 export class AboutComponent implements OnInit, OnDestroy {
-  crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'nav.about' }
-  ];
+  crumbs = [{ label: 'nav.home', url: '/' }, { label: 'nav.about' }];
 
   block = signal<ContentBlock | null>(null);
   loading = signal<boolean>(true);
@@ -112,7 +126,7 @@ export class AboutComponent implements OnInit, OnDestroy {
     private readonly title: Title,
     private readonly meta: Meta,
     private readonly markdown: MarkdownService,
-    private readonly seoHeadLinks: SeoHeadLinksService
+    private readonly seoHeadLinks: SeoHeadLinksService,
   ) {}
 
   ngOnInit(): void {
@@ -148,7 +162,10 @@ export class AboutComponent implements OnInit, OnDestroy {
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = (this.previewToken || '').trim()
-      ? this.api.get<ContentBlock>('/content/pages/about/preview', { token: this.previewToken, lang })
+      ? this.api.get<ContentBlock>('/content/pages/about/preview', {
+          token: this.previewToken,
+          lang,
+        })
       : this.api.get<ContentBlock>('/content/pages/about', { lang });
     req.subscribe({
       next: (block) => {
@@ -157,7 +174,9 @@ export class AboutComponent implements OnInit, OnDestroy {
         this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
         this.loading.set(false);
         this.hasError.set(false);
-        const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : block.body_markdown;
+        const metaBody = this.pageBlocks().length
+          ? pageBlocksToPlainText(this.pageBlocks())
+          : block.body_markdown;
         this.setMetaTags(block.title, metaBody);
       },
       error: () => {
@@ -166,8 +185,11 @@ export class AboutComponent implements OnInit, OnDestroy {
         this.pageBlocks.set([]);
         this.loading.set(false);
         this.hasError.set(true);
-        this.setMetaTags(this.translate.instant('about.metaTitle'), this.translate.instant('about.metaDescription'));
-      }
+        this.setMetaTags(
+          this.translate.instant('about.metaTitle'),
+          this.translate.instant('about.metaDescription'),
+        );
+      },
     });
   }
 
@@ -179,7 +201,7 @@ export class AboutComponent implements OnInit, OnDestroy {
       lang,
       (body || '').replace(/\s+/g, ' ').trim().slice(0, 160),
       this.translate.instant('meta.descriptions.about'),
-      this.translate.instant('about.metaDescription')
+      this.translate.instant('about.metaDescription'),
     );
     const canonical = this.seoHeadLinks.setLocalizedCanonical('/about', lang, {});
     this.title.setTitle(pageTitle);
@@ -189,4 +211,3 @@ export class AboutComponent implements OnInit, OnDestroy {
     this.meta.updateTag({ property: 'og:url', content: canonical });
   }
 }
-

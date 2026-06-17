@@ -18,10 +18,16 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column("orders", sa.Column("courier", sa.String(length=30), nullable=True))
-    op.add_column("orders", sa.Column("delivery_type", sa.String(length=20), nullable=True))
+    op.add_column(
+        "orders", sa.Column("delivery_type", sa.String(length=20), nullable=True)
+    )
     op.add_column("orders", sa.Column("locker_id", sa.String(length=80), nullable=True))
-    op.add_column("orders", sa.Column("locker_name", sa.String(length=255), nullable=True))
-    op.add_column("orders", sa.Column("locker_address", sa.String(length=255), nullable=True))
+    op.add_column(
+        "orders", sa.Column("locker_name", sa.String(length=255), nullable=True)
+    )
+    op.add_column(
+        "orders", sa.Column("locker_address", sa.String(length=255), nullable=True)
+    )
     op.add_column("orders", sa.Column("locker_lat", sa.Numeric(9, 6), nullable=True))
     op.add_column("orders", sa.Column("locker_lng", sa.Numeric(9, 6), nullable=True))
 
@@ -34,4 +40,3 @@ def downgrade() -> None:
     op.drop_column("orders", "locker_id")
     op.drop_column("orders", "delivery_type")
     op.drop_column("orders", "courier")
-

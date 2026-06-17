@@ -1,4 +1,16 @@
-import { Component, EffectRef, EventEmitter, Input, Output, computed, effect, inject, OnDestroy, PLATFORM_ID, signal } from '@angular/core';
+import {
+  Component,
+  EffectRef,
+  EventEmitter,
+  Input,
+  Output,
+  computed,
+  effect,
+  inject,
+  OnDestroy,
+  PLATFORM_ID,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { NavDrawerComponent, NavLink } from '../shared/nav-drawer.component';
 import { DatePipe, isPlatformBrowser, NgClass, NgForOf, NgIf } from '@angular/common';
@@ -30,12 +42,20 @@ import { Subscription } from 'rxjs';
     FormsModule,
     TranslateModule,
     ThemeSegmentedControlComponent,
-    CmsAnnouncementBarComponent
+    CmsAnnouncementBarComponent,
   ],
   template: `
-    <header class="sticky top-0 z-[100] isolate border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
-      <div *ngIf="bannerText() as bannerMessage" class="border-b border-slate-200 dark:border-slate-800" [ngClass]="bannerClasses()">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-sm">
+    <header
+      class="sticky top-0 z-[100] isolate border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70"
+    >
+      <div
+        *ngIf="bannerText() as bannerMessage"
+        class="border-b border-slate-200 dark:border-slate-800"
+        [ngClass]="bannerClasses()"
+      >
+        <div
+          class="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-3 text-sm"
+        >
           <div class="whitespace-pre-line">{{ bannerMessage }}</div>
           <a
             *ngIf="bannerLinkUrl() as href"
@@ -50,21 +70,28 @@ import { Subscription } from 'rxjs';
       </div>
       <app-cms-announcement-bar></app-cms-announcement-bar>
       <div class="max-w-7xl mx-auto px-4 sm:px-6">
-        <nav class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4" aria-label="Header controls">
+        <nav
+          class="py-4 grid grid-cols-[auto,1fr,auto] items-center gap-4"
+          aria-label="Header controls"
+        >
           <a routerLink="/" class="flex items-center gap-3 min-w-0">
-          <img
-            class="h-8 sm:h-10 w-auto shrink-0"
-            src="assets/brand/momentstudio-flower.png"
-            [alt]="'app.brandMarkAlt' | translate"
-            loading="eager"
-          />
-            <span class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 truncate">
+            <img
+              class="h-8 sm:h-10 w-auto shrink-0"
+              src="assets/brand/momentstudio-flower.png"
+              [alt]="'app.brandMarkAlt' | translate"
+              loading="eager"
+            />
+            <span
+              class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 truncate"
+            >
               {{ 'app.name' | translate }}
             </span>
           </a>
           <form class="hidden lg:flex min-w-0" (submit)="submitSearch($event)">
             <div class="relative w-full max-w-2xl xl:max-w-3xl min-w-0 mx-auto">
-              <label class="sr-only" for="header-search-input">{{ 'shop.searchPlaceholder' | translate }}</label>
+              <label class="sr-only" for="header-search-input">{{
+                'shop.searchPlaceholder' | translate
+              }}</label>
               <input
                 id="header-search-input"
                 name="q"
@@ -144,61 +171,61 @@ import { Subscription } from 'rxjs';
                 <span class="truncate max-w-[160px]">{{ currentUser()?.username }}</span>
                 <span class="text-slate-500 dark:text-slate-300">▾</span>
               </button>
-                <div
-                  *ngIf="userMenuOpen"
-                  class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-[110]"
-                  role="menu"
+              <div
+                *ngIf="userMenuOpen"
+                class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-[110]"
+                role="menu"
+              >
+                <a
+                  routerLink="/account/profile"
+                  role="menuitem"
+                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="closeUserMenu()"
                 >
-                  <a
-                    routerLink="/account/profile"
-                    role="menuitem"
-                    class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                    (click)="closeUserMenu()"
-                  >
-                    {{ 'nav.myProfile' | translate }}
-                  </a>
-                  <a
-                    routerLink="/account/orders"
-                    role="menuitem"
-                    class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                    (click)="closeUserMenu()"
-                  >
-                    {{ 'nav.myOrders' | translate }}
-                  </a>
-                    <a
-                      routerLink="/account/wishlist"
-                      role="menuitem"
-                      class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                      (click)="closeUserMenu()"
-                    >
-                      {{ 'nav.myWishlist' | translate }}
-                    </a>
-                    <a
-                      routerLink="/account/coupons"
-                      role="menuitem"
-                      class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                      (click)="closeUserMenu()"
-                    >
-                      {{ 'nav.myCoupons' | translate }}
-                    </a>
-                    <a
-                      routerLink="/tickets"
-                      role="menuitem"
-                      class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                      (click)="closeUserMenu()"
-                  >
-                    {{ 'nav.helpCenter' | translate }}
-                  </a>
-                  <div class="my-1 border-t border-slate-200 dark:border-slate-800"></div>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
-                    (click)="signOut()"
-                  >
-                    {{ (isImpersonating() ? 'nav.exitImpersonation' : 'nav.signOut') | translate }}
-                  </button>
-                </div>
+                  {{ 'nav.myProfile' | translate }}
+                </a>
+                <a
+                  routerLink="/account/orders"
+                  role="menuitem"
+                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="closeUserMenu()"
+                >
+                  {{ 'nav.myOrders' | translate }}
+                </a>
+                <a
+                  routerLink="/account/wishlist"
+                  role="menuitem"
+                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="closeUserMenu()"
+                >
+                  {{ 'nav.myWishlist' | translate }}
+                </a>
+                <a
+                  routerLink="/account/coupons"
+                  role="menuitem"
+                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="closeUserMenu()"
+                >
+                  {{ 'nav.myCoupons' | translate }}
+                </a>
+                <a
+                  routerLink="/tickets"
+                  role="menuitem"
+                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="closeUserMenu()"
+                >
+                  {{ 'nav.helpCenter' | translate }}
+                </a>
+                <div class="my-1 border-t border-slate-200 dark:border-slate-800"></div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  (click)="signOut()"
+                >
+                  {{ (isImpersonating() ? 'nav.exitImpersonation' : 'nav.signOut') | translate }}
+                </button>
+              </div>
             </div>
             <div *ngIf="isAuthenticated()" class="relative">
               <button
@@ -223,8 +250,12 @@ import { Subscription } from 'rxjs';
                 class="absolute right-0 mt-2 w-[min(92vw,360px)] rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 z-50 overflow-hidden"
                 role="menu"
               >
-                <div class="px-4 py-3 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'notifications.title' | translate }}</p>
+                <div
+                  class="px-4 py-3 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between"
+                >
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'notifications.title' | translate }}
+                  </p>
                   <button
                     type="button"
                     class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
@@ -235,17 +266,30 @@ import { Subscription } from 'rxjs';
                   </button>
                 </div>
                 <div class="max-h-[360px] overflow-auto">
-                  <div *ngIf="notificationsLoading()" class="p-4 text-sm text-slate-600 dark:text-slate-300">
+                  <div
+                    *ngIf="notificationsLoading()"
+                    class="p-4 text-sm text-slate-600 dark:text-slate-300"
+                  >
                     {{ 'notifications.loading' | translate }}
                   </div>
-                  <div *ngIf="!notificationsLoading() && notifications().length === 0" class="p-4 text-sm text-slate-600 dark:text-slate-300">
+                  <div
+                    *ngIf="!notificationsLoading() && notifications().length === 0"
+                    class="p-4 text-sm text-slate-600 dark:text-slate-300"
+                  >
                     {{ 'notifications.empty' | translate }}
                   </div>
-                  <ul *ngIf="!notificationsLoading() && notifications().length" class="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                  <ul
+                    *ngIf="!notificationsLoading() && notifications().length"
+                    class="divide-y divide-slate-200/60 dark:divide-slate-800/60"
+                  >
                     <li *ngFor="let n of notifications()" class="p-4">
                       <div
                         class="rounded-xl p-3 border border-slate-200 dark:border-slate-800"
-                        [ngClass]="n.read_at || n.dismissed_at ? 'bg-white dark:bg-slate-900' : 'bg-amber-50/70 dark:bg-amber-950/25'"
+                        [ngClass]="
+                          n.read_at || n.dismissed_at
+                            ? 'bg-white dark:bg-slate-900'
+                            : 'bg-amber-50/70 dark:bg-amber-950/25'
+                        "
                       >
                         <button
                           type="button"
@@ -254,10 +298,21 @@ import { Subscription } from 'rxjs';
                         >
                           <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ n.title }}</p>
-                              <p *ngIf="n.body" class="mt-1 text-sm text-slate-700 dark:text-slate-200 break-words">{{ n.body }}</p>
+                              <p
+                                class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate"
+                              >
+                                {{ n.title }}
+                              </p>
+                              <p
+                                *ngIf="n.body"
+                                class="mt-1 text-sm text-slate-700 dark:text-slate-200 break-words"
+                              >
+                                {{ n.body }}
+                              </p>
                             </div>
-                            <p class="shrink-0 text-xs text-slate-500 dark:text-slate-400">{{ n.created_at | date: 'short' }}</p>
+                            <p class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                              {{ n.created_at | date: 'short' }}
+                            </p>
                           </div>
                         </button>
                         <div class="mt-3 flex items-center justify-end gap-2">
@@ -279,9 +334,11 @@ import { Subscription } from 'rxjs';
                         </div>
                       </div>
                     </li>
-                    </ul>
-                  </div>
-                <div class="px-4 py-3 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-3">
+                  </ul>
+                </div>
+                <div
+                  class="px-4 py-3 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-3"
+                >
                   <a
                     routerLink="/account/notifications"
                     class="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
@@ -297,9 +354,11 @@ import { Subscription } from 'rxjs';
                     {{ 'notifications.settings' | translate }}
                   </a>
                 </div>
-                </div>
               </div>
-            <div class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70">
+            </div>
+            <div
+              class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
+            >
               <app-theme-segmented-control
                 [preference]="themePreference"
                 (preferenceChange)="onThemeChange($event)"
@@ -317,53 +376,75 @@ import { Subscription } from 'rxjs';
                   (ngModelChange)="onLanguageChange($event)"
                   [attr.aria-label]="'nav.language' | translate"
                 >
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="en"
+                  >
+                    EN
+                  </option>
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="ro"
+                  >
+                    RO
+                  </option>
                 </select>
               </label>
             </div>
           </div>
         </nav>
-          <nav
-            class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap"
-            aria-label="Primary storefront navigation"
-          >
-            <ng-container *ngFor="let link of storefrontLinks(); trackBy: trackNavLink">
-              <a *ngIf="!link.external; else externalStorefrontLink" [routerLink]="link.path" class="hover:text-slate-900 dark:hover:text-white">
+        <nav
+          class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap"
+          aria-label="Primary storefront navigation"
+        >
+          <ng-container *ngFor="let link of storefrontLinks(); trackBy: trackNavLink">
+            <a
+              *ngIf="!link.external; else externalStorefrontLink"
+              [routerLink]="link.path"
+              class="hover:text-slate-900 dark:hover:text-white"
+            >
+              {{ link.translate === false ? link.label : (link.label | translate) }}
+            </a>
+            <ng-template #externalStorefrontLink>
+              <a
+                [href]="link.path"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="hover:text-slate-900 dark:hover:text-white"
+              >
                 {{ link.translate === false ? link.label : (link.label | translate) }}
               </a>
-              <ng-template #externalStorefrontLink>
-                <a
-                  [href]="link.path"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hover:text-slate-900 dark:hover:text-white"
-                >
-                  {{ link.translate === false ? link.label : (link.label | translate) }}
-                </a>
-              </ng-template>
-            </ng-container>
-            <button
-              *ngIf="isAdmin() && !isImpersonating()"
-              type="button"
-              class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition"
-              [ngClass]="storefrontEditMode() ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'"
-              (click)="toggleStorefrontEditMode()"
-              [attr.aria-pressed]="storefrontEditMode()"
-            >
-              {{ 'nav.editMode' | translate }}
-            </button>
-            <a
-              *ngIf="isStaff()"
-              routerLink="/admin"
-              class="hover:text-slate-900 dark:hover:text-white"
+            </ng-template>
+          </ng-container>
+          <button
+            *ngIf="isAdmin() && !isImpersonating()"
+            type="button"
+            class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition"
+            [ngClass]="
+              storefrontEditMode()
+                ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100'
+                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+            "
+            (click)="toggleStorefrontEditMode()"
+            [attr.aria-pressed]="storefrontEditMode()"
+          >
+            {{ 'nav.editMode' | translate }}
+          </button>
+          <a
+            *ngIf="isStaff()"
+            routerLink="/admin"
+            class="hover:text-slate-900 dark:hover:text-white"
           >
             {{ 'nav.viewAdmin' | translate }}
           </a>
         </nav>
       </div>
-      </header>
-    <div *ngIf="userMenuOpen || notificationsOpen" class="fixed inset-0 z-40" (click)="closeOverlays()"></div>
+    </header>
+    <div
+      *ngIf="userMenuOpen || notificationsOpen"
+      class="fixed inset-0 z-40"
+      (click)="closeOverlays()"
+    ></div>
     <div *ngIf="searchOpen" class="fixed inset-0 z-50" (click)="closeSearch()">
       <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm dark:bg-black/60"></div>
       <div
@@ -373,7 +454,9 @@ import { Subscription } from 'rxjs';
         aria-modal="true"
       >
         <form class="flex gap-2" (submit)="submitSearch($event); closeSearch()">
-          <label class="sr-only" for="mobile-search-input">{{ 'shop.searchPlaceholder' | translate }}</label>
+          <label class="sr-only" for="mobile-search-input">{{
+            'shop.searchPlaceholder' | translate
+          }}</label>
           <input
             id="mobile-search-input"
             name="q"
@@ -404,7 +487,7 @@ import { Subscription } from 'rxjs';
       (languageChange)="onLanguageChange($event)"
       (closed)="drawerOpen = false"
     ></app-nav-drawer>
-  `
+  `,
 })
 export class HeaderComponent implements OnDestroy {
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
@@ -431,16 +514,16 @@ export class HeaderComponent implements OnDestroy {
   banner = signal<MaintenanceBannerPublic | null>(null);
   private readonly cmsNavigation = signal<SiteNavigationData | null>(null);
 
-    readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
-    readonly currentUser = computed(() => this.auth.user());
-    readonly isStaff = computed(() => this.auth.isStaff());
-    readonly isAdmin = computed(() => this.auth.isAdmin());
-    readonly isImpersonating = computed(() => this.auth.isImpersonating());
-      readonly storefrontEditMode = this.storefrontAdminMode.enabled;
-      readonly notifications = computed(() => this.notificationsService.items());
-      readonly notificationsLoading = computed(() => this.notificationsService.loading());
-      readonly unreadCount = computed(() => this.notificationsService.unreadCount());
-      readonly pwaOnline = computed(() => this.pwa.isOnline());
+  readonly isAuthenticated = computed(() => this.auth.isAuthenticated());
+  readonly currentUser = computed(() => this.auth.user());
+  readonly isStaff = computed(() => this.auth.isStaff());
+  readonly isAdmin = computed(() => this.auth.isAdmin());
+  readonly isImpersonating = computed(() => this.auth.isImpersonating());
+  readonly storefrontEditMode = this.storefrontAdminMode.enabled;
+  readonly notifications = computed(() => this.notificationsService.items());
+  readonly notificationsLoading = computed(() => this.notificationsService.loading());
+  readonly unreadCount = computed(() => this.notificationsService.unreadCount());
+  readonly pwaOnline = computed(() => this.pwa.isOnline());
 
   private readonly fallbackStorefrontLinks: NavLink[] = [
     { label: 'nav.home', path: '/' },
@@ -448,7 +531,7 @@ export class HeaderComponent implements OnDestroy {
     { label: 'nav.shop', path: '/shop' },
     { label: 'nav.about', path: '/about' },
     { label: 'nav.contact', path: '/contact' },
-    { label: 'nav.terms', path: '/pages/terms' }
+    { label: 'nav.terms', path: '/pages/terms' },
   ];
 
   readonly storefrontLinks = computed<NavLink[]>(() => {
@@ -482,18 +565,18 @@ export class HeaderComponent implements OnDestroy {
     return links;
   });
 
-    constructor(
-      private readonly cart: CartStore,
-      private readonly router: Router,
-      private readonly auth: AuthService,
-      private readonly navigation: SiteNavigationService,
-      private readonly storefrontAdminMode: StorefrontAdminModeService,
-      private readonly notificationsService: NotificationsService,
-      private readonly ops: OpsService,
-        private readonly pwa: PwaService,
-        private readonly toast: ToastService,
-        private readonly translate: TranslateService
-      ) {
+  constructor(
+    private readonly cart: CartStore,
+    private readonly router: Router,
+    private readonly auth: AuthService,
+    private readonly navigation: SiteNavigationService,
+    private readonly storefrontAdminMode: StorefrontAdminModeService,
+    private readonly notificationsService: NotificationsService,
+    private readonly ops: OpsService,
+    private readonly pwa: PwaService,
+    private readonly toast: ToastService,
+    private readonly translate: TranslateService,
+  ) {
     if (!this.isBrowser) {
       return;
     }
@@ -518,47 +601,47 @@ export class HeaderComponent implements OnDestroy {
 
   cartCount = this.cart.count;
 
-    onThemeChange(pref: ThemePreference): void {
-      this.themeChange.emit(pref);
+  onThemeChange(pref: ThemePreference): void {
+    this.themeChange.emit(pref);
+  }
+
+  toggleStorefrontEditMode(): void {
+    if (this.storefrontEditMode()) {
+      this.storefrontAdminMode.setEnabled(false);
+      return;
     }
+    if (!this.auth.isAdmin() || this.auth.isImpersonating()) return;
 
-    toggleStorefrontEditMode(): void {
-      if (this.storefrontEditMode()) {
-        this.storefrontAdminMode.setEnabled(false);
-        return;
-      }
-      if (!this.auth.isAdmin() || this.auth.isImpersonating()) return;
-
-      this.auth.checkAdminAccess({ silent: true }).subscribe({
-        next: () => {
-          this.storefrontAdminMode.setEnabled(true);
-        },
-        error: (err) => {
-          const detail = err?.error?.detail;
-          if (detail === 'Two-factor authentication or passkey required for admin access') {
-            this.toast.error(this.translate.instant('adminUi.security.mfaRequired'));
-            void this.router.navigateByUrl('/account/security');
-            return;
-          }
-          if (
-            detail === 'Admin access is blocked from this IP address' ||
-            detail === 'Admin access is restricted to approved IP addresses'
-          ) {
-            this.toast.error(this.translate.instant('adminUi.ipBypass.restricted'));
-            const nextUrl = encodeURIComponent(this.router.url || '/admin/dashboard');
-            void this.router.navigateByUrl(`/admin/ip-bypass?returnUrl=${nextUrl}`);
-            return;
-          }
-          this.toast.error(detail || this.translate.instant('adminUi.errors.generic'));
+    this.auth.checkAdminAccess({ silent: true }).subscribe({
+      next: () => {
+        this.storefrontAdminMode.setEnabled(true);
+      },
+      error: (err) => {
+        const detail = err?.error?.detail;
+        if (detail === 'Two-factor authentication or passkey required for admin access') {
+          this.toast.error(this.translate.instant('adminUi.security.mfaRequired'));
+          void this.router.navigateByUrl('/account/security');
+          return;
         }
-      });
-    }
+        if (
+          detail === 'Admin access is blocked from this IP address' ||
+          detail === 'Admin access is restricted to approved IP addresses'
+        ) {
+          this.toast.error(this.translate.instant('adminUi.ipBypass.restricted'));
+          const nextUrl = encodeURIComponent(this.router.url || '/admin/dashboard');
+          void this.router.navigateByUrl(`/admin/ip-bypass?returnUrl=${nextUrl}`);
+          return;
+        }
+        this.toast.error(detail || this.translate.instant('adminUi.errors.generic'));
+      },
+    });
+  }
 
-      toggleDrawer(): void {
-        this.drawerOpen = !this.drawerOpen;
-        if (this.drawerOpen) {
-          this.searchOpen = false;
-        this.userMenuOpen = false;
+  toggleDrawer(): void {
+    this.drawerOpen = !this.drawerOpen;
+    if (this.drawerOpen) {
+      this.searchOpen = false;
+      this.userMenuOpen = false;
       this.notificationsOpen = false;
     }
   }
@@ -708,7 +791,10 @@ export class HeaderComponent implements OnDestroy {
   private startUnreadPolling(): void {
     if (!this.isBrowser) return;
     if (this.unreadPoll) return;
-    this.unreadPoll = window.setInterval(() => this.notificationsService.refreshUnreadCount(), 60_000);
+    this.unreadPoll = window.setInterval(
+      () => this.notificationsService.refreshUnreadCount(),
+      60_000,
+    );
   }
 
   private stopUnreadPolling(): void {
@@ -721,8 +807,7 @@ export class HeaderComponent implements OnDestroy {
   private refreshBanner(): void {
     this.ops.getActiveBanner().subscribe({
       next: (banner) => this.banner.set(banner),
-      error: () => this.banner.set(null)
+      error: () => this.banner.set(null),
     });
   }
 }
-

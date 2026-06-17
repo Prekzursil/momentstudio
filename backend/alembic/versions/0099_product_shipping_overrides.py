@@ -21,7 +21,12 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "products",
-        sa.Column("shipping_class", sa.String(length=20), nullable=False, server_default="standard"),
+        sa.Column(
+            "shipping_class",
+            sa.String(length=20),
+            nullable=False,
+            server_default="standard",
+        ),
     )
     op.add_column(
         "products",
@@ -47,4 +52,3 @@ def downgrade() -> None:
     op.drop_column("products", "shipping_disallowed_couriers")
     op.drop_column("products", "shipping_allow_locker")
     op.drop_column("products", "shipping_class")
-

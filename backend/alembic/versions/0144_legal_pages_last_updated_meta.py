@@ -61,9 +61,12 @@ def upgrade() -> None:
 
     rows = (
         conn.execute(
-            sa.select(content_blocks.c.id, content_blocks.c.key, content_blocks.c.version, content_blocks.c.meta).where(
-                content_blocks.c.key.in_(LEGAL_KEYS)
-            )
+            sa.select(
+                content_blocks.c.id,
+                content_blocks.c.key,
+                content_blocks.c.version,
+                content_blocks.c.meta,
+            ).where(content_blocks.c.key.in_(LEGAL_KEYS))
         )
         .mappings()
         .all()
@@ -78,12 +81,21 @@ def upgrade() -> None:
         meta.setdefault("version", 1)
         meta["last_updated"] = DEFAULT_LAST_UPDATED
 
-        conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta, updated_at=now))
+        conn.execute(
+            sa.update(content_blocks)
+            .where(content_blocks.c.id == row["id"])
+            .values(meta=meta, updated_at=now)
+        )
 
         current_version = int(row.get("version") or 1)
         conn.execute(
             sa.update(versions)
-            .where(sa.and_(versions.c.content_block_id == row["id"], versions.c.version == current_version))
+            .where(
+                sa.and_(
+                    versions.c.content_block_id == row["id"],
+                    versions.c.version == current_version,
+                )
+            )
             .values(meta=meta)
         )
 
@@ -91,4 +103,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing last_updated would overwrite user edits.
     return
-

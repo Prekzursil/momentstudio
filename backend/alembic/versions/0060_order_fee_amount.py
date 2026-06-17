@@ -19,10 +19,12 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("orders", sa.Column("fee_amount", sa.Numeric(10, 2), nullable=False, server_default="0"))
+    op.add_column(
+        "orders",
+        sa.Column("fee_amount", sa.Numeric(10, 2), nullable=False, server_default="0"),
+    )
     op.alter_column("orders", "fee_amount", server_default=None)
 
 
 def downgrade() -> None:
     op.drop_column("orders", "fee_amount")
-

@@ -11,7 +11,12 @@ import { ClarityService } from './core/clarity.service';
 describe('AppComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [RouterTestingModule, HttpClientTestingModule, TranslateModule.forRoot(), AppComponent],
+      imports: [
+        RouterTestingModule,
+        HttpClientTestingModule,
+        TranslateModule.forRoot(),
+        AppComponent,
+      ],
       providers: [
         {
           provide: AuthService,
@@ -25,18 +30,18 @@ describe('AppComponent', () => {
             loadCurrentUser: () => of(null),
             updatePreferredLanguage: () => of(null),
             checkAdminAccess: () => of(null),
-            logout: () => of(null)
-          }
+            logout: () => of(null),
+          },
         },
         {
           provide: RouteRobotsService,
-          useValue: { start: () => void 0 }
+          useValue: { start: () => void 0 },
         },
         {
           provide: ClarityService,
-          useValue: { start: () => void 0 }
+          useValue: { start: () => void 0 },
         },
-      ]
+      ],
     }).compileComponents();
   });
 

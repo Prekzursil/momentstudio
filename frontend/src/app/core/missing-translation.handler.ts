@@ -17,7 +17,7 @@ const CRITICAL_FALLBACK_LABELS: Record<string, string> = {
   'checkout.retry': 'Retry',
   'checkout.backToCheckout': 'Back to checkout',
   'cart.title': 'Your cart',
-  'auth.loginTitle': 'Sign in'
+  'auth.loginTitle': 'Sign in',
 };
 
 @Injectable()

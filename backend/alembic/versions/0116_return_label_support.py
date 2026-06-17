@@ -19,9 +19,20 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("return_requests", sa.Column("return_label_path", sa.String(length=255), nullable=True))
-    op.add_column("return_requests", sa.Column("return_label_filename", sa.String(length=255), nullable=True))
-    op.add_column("return_requests", sa.Column("return_label_uploaded_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "return_requests",
+        sa.Column("return_label_path", sa.String(length=255), nullable=True),
+    )
+    op.add_column(
+        "return_requests",
+        sa.Column("return_label_filename", sa.String(length=255), nullable=True),
+    )
+    op.add_column(
+        "return_requests",
+        sa.Column(
+            "return_label_uploaded_at", sa.DateTime(timezone=True), nullable=True
+        ),
+    )
 
 
 def downgrade() -> None:

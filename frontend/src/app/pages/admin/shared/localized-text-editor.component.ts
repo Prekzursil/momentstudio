@@ -13,7 +13,9 @@ type LocalizedText = { en: string; ro: string };
   template: `
     <div class="grid gap-1">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <span *ngIf="label" class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ label }}</span>
+        <span *ngIf="label" class="text-sm font-medium text-slate-700 dark:text-slate-200">{{
+          label
+        }}</span>
         <div *ngIf="showCopy" class="flex items-center gap-3">
           <button
             type="button"
@@ -78,7 +80,7 @@ type LocalizedText = { en: string; ro: string };
 
       <span *ngIf="hint" class="text-xs text-slate-500 dark:text-slate-400">{{ hint }}</span>
     </div>
-  `
+  `,
 })
 export class LocalizedTextEditorComponent {
   @Input() label = '';
@@ -95,4 +97,3 @@ export class LocalizedTextEditorComponent {
     this.value[to] = this.value[from] || '';
   }
 }
-

@@ -66,27 +66,27 @@ export class CmsEditorPrefsService {
       const raw = localStorage.getItem(this.storageKey());
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const mode = (parsed)?.mode;
+      const mode = parsed?.mode;
       if (mode === 'simple' || mode === 'advanced') {
         this.mode.set(mode);
       }
-      const previewDevice = (parsed)?.previewDevice;
+      const previewDevice = parsed?.previewDevice;
       if (previewDevice === 'desktop' || previewDevice === 'tablet' || previewDevice === 'mobile') {
         this.previewDevice.set(previewDevice);
       }
-      const previewLayout = (parsed)?.previewLayout;
+      const previewLayout = parsed?.previewLayout;
       if (previewLayout === 'stacked' || previewLayout === 'split') {
         this.previewLayout.set(previewLayout);
       }
-      const previewLang = (parsed)?.previewLang;
+      const previewLang = parsed?.previewLang;
       if (previewLang === 'en' || previewLang === 'ro') {
         this.previewLang.set(previewLang);
       }
-      const previewTheme = (parsed)?.previewTheme;
+      const previewTheme = parsed?.previewTheme;
       if (previewTheme === 'light' || previewTheme === 'dark') {
         this.previewTheme.set(previewTheme);
       }
-      const translationLayout = (parsed)?.translationLayout;
+      const translationLayout = parsed?.translationLayout;
       if (translationLayout === 'single' || translationLayout === 'sideBySide') {
         this.translationLayout.set(translationLayout);
       }
@@ -106,12 +106,11 @@ export class CmsEditorPrefsService {
           previewLayout: this.previewLayout(),
           previewLang: this.previewLang(),
           previewTheme: this.previewTheme(),
-          translationLayout: this.translationLayout()
-        })
+          translationLayout: this.translationLayout(),
+        }),
       );
     } catch {
       // ignore
     }
   }
 }
-

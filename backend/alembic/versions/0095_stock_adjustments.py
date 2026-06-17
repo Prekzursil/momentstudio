@@ -53,18 +53,50 @@ def upgrade() -> None:
         sa.Column("before_quantity", sa.Integer(), nullable=False),
         sa.Column("after_quantity", sa.Integer(), nullable=False),
         sa.Column("note", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
-    op.create_index(op.f("ix_stock_adjustments_product_id"), "stock_adjustments", ["product_id"], unique=False)
-    op.create_index(op.f("ix_stock_adjustments_variant_id"), "stock_adjustments", ["variant_id"], unique=False)
-    op.create_index(op.f("ix_stock_adjustments_actor_user_id"), "stock_adjustments", ["actor_user_id"], unique=False)
-    op.create_index(op.f("ix_stock_adjustments_created_at"), "stock_adjustments", ["created_at"], unique=False)
+    op.create_index(
+        op.f("ix_stock_adjustments_product_id"),
+        "stock_adjustments",
+        ["product_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_stock_adjustments_variant_id"),
+        "stock_adjustments",
+        ["variant_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_stock_adjustments_actor_user_id"),
+        "stock_adjustments",
+        ["actor_user_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_stock_adjustments_created_at"),
+        "stock_adjustments",
+        ["created_at"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_stock_adjustments_created_at"), table_name="stock_adjustments")
-    op.drop_index(op.f("ix_stock_adjustments_actor_user_id"), table_name="stock_adjustments")
-    op.drop_index(op.f("ix_stock_adjustments_variant_id"), table_name="stock_adjustments")
-    op.drop_index(op.f("ix_stock_adjustments_product_id"), table_name="stock_adjustments")
+    op.drop_index(
+        op.f("ix_stock_adjustments_created_at"), table_name="stock_adjustments"
+    )
+    op.drop_index(
+        op.f("ix_stock_adjustments_actor_user_id"), table_name="stock_adjustments"
+    )
+    op.drop_index(
+        op.f("ix_stock_adjustments_variant_id"), table_name="stock_adjustments"
+    )
+    op.drop_index(
+        op.f("ix_stock_adjustments_product_id"), table_name="stock_adjustments"
+    )
     op.drop_table("stock_adjustments")
-

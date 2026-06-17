@@ -1,9 +1,23 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, computed, signal } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnInit,
+  Output,
+  SimpleChanges,
+  computed,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
-import { AdminService, ContentImageAssetRead, ContentImageEditRequest } from '../../../core/admin.service';
+import {
+  AdminService,
+  ContentImageAssetRead,
+  ContentImageEditRequest,
+} from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
 import { extractRequestId } from '../../../shared/http-error';
@@ -23,7 +37,9 @@ type AssetGroup = {
     <div class="grid gap-3">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="grid gap-1">
-          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ titleKey | translate }}</p>
+          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {{ titleKey | translate }}
+          </p>
           <p class="text-xs text-slate-500 dark:text-slate-400">
             {{ 'adminUi.site.assets.library.hint' | translate }}
           </p>
@@ -40,7 +56,9 @@ type AssetGroup = {
       </div>
 
       <div class="grid gap-2 md:grid-cols-6">
-        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
+        <label
+          class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
+        >
           {{ 'adminUi.site.assets.library.search' | translate }}
           <input
             class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -76,10 +94,18 @@ type AssetGroup = {
             [(ngModel)]="sort"
             (ngModelChange)="reload(true)"
           >
-            <option [ngValue]="'newest'">{{ 'adminUi.site.assets.library.sortNewest' | translate }}</option>
-            <option [ngValue]="'oldest'">{{ 'adminUi.site.assets.library.sortOldest' | translate }}</option>
-            <option [ngValue]="'key_asc'">{{ 'adminUi.site.assets.library.sortKeyAsc' | translate }}</option>
-            <option [ngValue]="'key_desc'">{{ 'adminUi.site.assets.library.sortKeyDesc' | translate }}</option>
+            <option [ngValue]="'newest'">
+              {{ 'adminUi.site.assets.library.sortNewest' | translate }}
+            </option>
+            <option [ngValue]="'oldest'">
+              {{ 'adminUi.site.assets.library.sortOldest' | translate }}
+            </option>
+            <option [ngValue]="'key_asc'">
+              {{ 'adminUi.site.assets.library.sortKeyAsc' | translate }}
+            </option>
+            <option [ngValue]="'key_desc'">
+              {{ 'adminUi.site.assets.library.sortKeyDesc' | translate }}
+            </option>
           </select>
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -102,9 +128,14 @@ type AssetGroup = {
         </label>
       </div>
 
-      <div *ngIf="allowUpload" class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+      <div
+        *ngIf="allowUpload"
+        class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+      >
         <div class="flex items-center justify-between gap-3">
-          <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.site.assets.library.upload' | translate }}</p>
+          <p class="font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'adminUi.site.assets.library.upload' | translate }}
+          </p>
           <input type="file" accept="image/*" (change)="upload($event)" />
         </div>
         <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -120,13 +151,21 @@ type AssetGroup = {
         (retry)="reload()"
       ></app-error-state>
 
-      <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.site.assets.library.loading' | translate }}</div>
+      <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">
+        {{ 'adminUi.site.assets.library.loading' | translate }}
+      </div>
 
-      <div *ngIf="!loading() && !error() && assetGroups().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
+      <div
+        *ngIf="!loading() && !error() && assetGroups().length === 0"
+        class="text-sm text-slate-500 dark:text-slate-400"
+      >
         {{ 'adminUi.site.assets.library.empty' | translate }}
       </div>
 
-      <div *ngIf="!loading() && assetGroups().length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        *ngIf="!loading() && assetGroups().length"
+        class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      >
         <div
           *ngFor="let group of assetGroups()"
           class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
@@ -141,7 +180,9 @@ type AssetGroup = {
               />
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
-                  <p class="text-xs font-semibold text-slate-900 dark:text-slate-50 truncate">{{ group.primary.content_key }}</p>
+                  <p class="text-xs font-semibold text-slate-900 dark:text-slate-50 truncate">
+                    {{ group.primary.content_key }}
+                  </p>
                   <span
                     *ngIf="group.primary.root_image_id"
                     class="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200"
@@ -156,25 +197,53 @@ type AssetGroup = {
             </div>
 
             <div class="flex flex-wrap items-center justify-end gap-2">
-              <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(group.primary.url)">
+              <button
+                type="button"
+                class="text-xs text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="copy(group.primary.url)"
+              >
                 {{ 'adminUi.actions.copy' | translate }}
               </button>
-              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openDetails(group.primary)">
+              <button
+                type="button"
+                class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                (click)="openDetails(group.primary)"
+              >
                 {{ 'adminUi.site.assets.library.details' | translate }}
               </button>
-              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editAltText(group.primary)">
+              <button
+                type="button"
+                class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                (click)="editAltText(group.primary)"
+              >
                 {{ 'adminUi.site.assets.library.rename' | translate }}
               </button>
-              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openImageEditor(group.primary)">
+              <button
+                type="button"
+                class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                (click)="openImageEditor(group.primary)"
+              >
                 {{ 'adminUi.site.assets.library.imageEdit' | translate }}
               </button>
-              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openUsage(group.primary)">
+              <button
+                type="button"
+                class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                (click)="openUsage(group.primary)"
+              >
                 {{ 'adminUi.site.assets.library.whereUsed' | translate }}
               </button>
-              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editTags(group.primary)">
+              <button
+                type="button"
+                class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                (click)="editTags(group.primary)"
+              >
                 {{ 'adminUi.site.assets.library.tagsEdit' | translate }}
               </button>
-              <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openFocalEditor(group.primary)">
+              <button
+                type="button"
+                class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                (click)="openFocalEditor(group.primary)"
+              >
                 {{ 'adminUi.site.assets.library.focalEdit' | translate }}
               </button>
               <button
@@ -196,7 +265,11 @@ type AssetGroup = {
           </div>
 
           <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-            {{ group.primary.created_at | date: 'short' }} · {{ 'adminUi.site.assets.library.focalLabel' | translate: { x: group.primary.focal_x, y: group.primary.focal_y } }}
+            {{ group.primary.created_at | date: 'short' }} ·
+            {{
+              'adminUi.site.assets.library.focalLabel'
+                | translate: { x: group.primary.focal_x, y: group.primary.focal_y }
+            }}
           </p>
 
           <div *ngIf="group.primary.tags?.length" class="mt-2 flex flex-wrap gap-1">
@@ -210,9 +283,15 @@ type AssetGroup = {
             </button>
           </div>
 
-          <div *ngIf="group.edits.length" class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div
+            *ngIf="group.edits.length"
+            class="mt-3 border-t border-slate-200 pt-3 dark:border-slate-800"
+          >
             <p class="text-xs font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.site.assets.library.versionsTitle' | translate: { count: group.edits.length } }}
+              {{
+                'adminUi.site.assets.library.versionsTitle'
+                  | translate: { count: group.edits.length }
+              }}
             </p>
             <div class="mt-2 grid gap-2">
               <div
@@ -230,24 +309,46 @@ type AssetGroup = {
                     <p class="text-[11px] font-semibold text-slate-800 dark:text-slate-100">
                       {{ edited.created_at | date: 'short' }}
                     </p>
-                    <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ edited.url }}</p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {{ edited.url }}
+                    </p>
                   </div>
                 </div>
 
                 <div class="flex flex-wrap items-center justify-end gap-2">
-                  <button type="button" class="text-xs text-indigo-600 hover:underline dark:text-indigo-300" (click)="copy(edited.url)">
+                  <button
+                    type="button"
+                    class="text-xs text-indigo-600 hover:underline dark:text-indigo-300"
+                    (click)="copy(edited.url)"
+                  >
                     {{ 'adminUi.actions.copy' | translate }}
                   </button>
-                  <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openDetails(edited)">
+                  <button
+                    type="button"
+                    class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                    (click)="openDetails(edited)"
+                  >
                     {{ 'adminUi.site.assets.library.details' | translate }}
                   </button>
-                  <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="editAltText(edited)">
+                  <button
+                    type="button"
+                    class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                    (click)="editAltText(edited)"
+                  >
                     {{ 'adminUi.site.assets.library.rename' | translate }}
                   </button>
-                  <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openImageEditor(edited)">
+                  <button
+                    type="button"
+                    class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                    (click)="openImageEditor(edited)"
+                  >
                     {{ 'adminUi.site.assets.library.imageEdit' | translate }}
                   </button>
-                  <button type="button" class="text-xs text-slate-700 hover:underline dark:text-slate-200" (click)="openUsage(edited)">
+                  <button
+                    type="button"
+                    class="text-xs text-slate-700 hover:underline dark:text-slate-200"
+                    (click)="openUsage(edited)"
+                  >
                     {{ 'adminUi.site.assets.library.whereUsed' | translate }}
                   </button>
                   <button
@@ -258,7 +359,11 @@ type AssetGroup = {
                   >
                     {{ 'adminUi.site.assets.library.revertToOriginal' | translate }}
                   </button>
-                  <button type="button" class="text-xs text-rose-700 hover:underline dark:text-rose-300" (click)="deleteAsset(edited)">
+                  <button
+                    type="button"
+                    class="text-xs text-rose-700 hover:underline dark:text-rose-300"
+                    (click)="deleteAsset(edited)"
+                  >
                     {{ 'adminUi.actions.delete' | translate }}
                   </button>
                   <button
@@ -276,91 +381,129 @@ type AssetGroup = {
         </div>
       </div>
 
-	      <div *ngIf="metaTotalPages() > 1" class="flex items-center justify-between gap-2 text-sm">
-	        <button
-	          type="button"
-	          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+      <div *ngIf="metaTotalPages() > 1" class="flex items-center justify-between gap-2 text-sm">
+        <button
+          type="button"
+          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           [disabled]="page <= 1"
           (click)="prev()"
         >
           {{ 'adminUi.actions.prev' | translate }}
         </button>
-        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.assets.library.pagination' | translate: { page: page, total: metaTotalPages() } }}</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">{{
+          'adminUi.site.assets.library.pagination'
+            | translate: { page: page, total: metaTotalPages() }
+        }}</span>
         <button
           type="button"
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           [disabled]="page >= metaTotalPages()"
           (click)="next()"
-	        >
-	          {{ 'adminUi.actions.next' | translate }}
-	        </button>
-	      </div>
+        >
+          {{ 'adminUi.actions.next' | translate }}
+        </button>
+      </div>
 
-	      <div *ngIf="usageImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-	        <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950">
-		          <div class="flex items-start justify-between gap-3">
-		            <div class="grid gap-1">
-		              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-		                {{ 'adminUi.site.assets.library.usageTitle' | translate }}
-		              </p>
-		              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ usageImage?.url }}</p>
-                  <p *ngIf="usageStoredInKey()" class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                    {{ 'adminUi.site.assets.library.usageStoredIn' | translate: { key: usageStoredInKey() } }}
-                  </p>
-		            </div>
-		            <button type="button" class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200" (click)="closeUsage()">
-		              {{ 'adminUi.common.close' | translate }}
-		            </button>
-		          </div>
+      <div
+        *ngIf="usageImage"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      >
+        <div
+          class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.site.assets.library.usageTitle' | translate }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                {{ usageImage?.url }}
+              </p>
+              <p
+                *ngIf="usageStoredInKey()"
+                class="text-[11px] text-slate-500 dark:text-slate-400 truncate"
+              >
+                {{
+                  'adminUi.site.assets.library.usageStoredIn'
+                    | translate: { key: usageStoredInKey() }
+                }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200"
+              (click)="closeUsage()"
+            >
+              {{ 'adminUi.common.close' | translate }}
+            </button>
+          </div>
 
-	          <div class="mt-3 grid gap-2">
-	            <app-error-state
-	              *ngIf="usageError()"
-	              [message]="usageError()!"
-	              [requestId]="usageRequestId()"
-	              [showRetry]="true"
-	              (retry)="loadUsage()"
-	            ></app-error-state>
+          <div class="mt-3 grid gap-2">
+            <app-error-state
+              *ngIf="usageError()"
+              [message]="usageError()!"
+              [requestId]="usageRequestId()"
+              [showRetry]="true"
+              (retry)="loadUsage()"
+            ></app-error-state>
 
-	            <div *ngIf="usageLoading()" class="text-sm text-slate-600 dark:text-slate-300">
-	              {{ 'adminUi.site.assets.library.usageLoading' | translate }}
-	            </div>
+            <div *ngIf="usageLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.site.assets.library.usageLoading' | translate }}
+            </div>
 
-	            <div *ngIf="!usageLoading() && !usageError() && usageKeys().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
-	              {{ 'adminUi.site.assets.library.usageEmpty' | translate }}
-	            </div>
+            <div
+              *ngIf="!usageLoading() && !usageError() && usageKeys().length === 0"
+              class="text-sm text-slate-500 dark:text-slate-400"
+            >
+              {{ 'adminUi.site.assets.library.usageEmpty' | translate }}
+            </div>
 
-	            <div *ngIf="!usageLoading() && !usageError() && usageKeys().length" class="grid gap-2">
-	              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.assets.library.usageHint' | translate }}</p>
-	              <button
-	                *ngFor="let usageKey of usageKeys()"
-	                type="button"
-	                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-	                (click)="jumpToKey(usageKey)"
-	              >
-	                {{ usageKey }}
-	              </button>
-	            </div>
-	          </div>
-	        </div>
-	      </div>
+            <div *ngIf="!usageLoading() && !usageError() && usageKeys().length" class="grid gap-2">
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.site.assets.library.usageHint' | translate }}
+              </p>
+              <button
+                *ngFor="let usageKey of usageKeys()"
+                type="button"
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                (click)="jumpToKey(usageKey)"
+              >
+                {{ usageKey }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <div *ngIf="detailsImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950">
+      <div
+        *ngIf="detailsImage"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      >
+        <div
+          class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950"
+        >
           <div class="flex items-start justify-between gap-3">
             <div class="grid gap-1">
               <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                 {{ 'adminUi.site.assets.library.detailsTitle' | translate }}
               </p>
-              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ detailsImage?.url }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                {{ detailsImage?.url }}
+              </p>
             </div>
-            <button type="button" class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200" (click)="closeDetails()">
+            <button
+              type="button"
+              class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200"
+              (click)="closeDetails()"
+            >
               {{ 'adminUi.common.close' | translate }}
             </button>
           </div>
 
           <div class="mt-3 grid gap-4 md:grid-cols-[220px_1fr]">
-            <div class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
+            <div
+              class="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+            >
               <img
                 [src]="detailsImage?.url"
                 [alt]="detailsImage?.alt_text || 'asset'"
@@ -370,281 +513,377 @@ type AssetGroup = {
 
             <div class="grid gap-2 text-sm">
               <div class="grid gap-1">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.site.assets.library.detailsName' | translate }}
                 </p>
-                <p class="text-slate-900 dark:text-slate-50 break-all">{{ detailsImage?.alt_text || '—' }}</p>
+                <p class="text-slate-900 dark:text-slate-50 break-all">
+                  {{ detailsImage?.alt_text || '—' }}
+                </p>
               </div>
 
               <div class="grid gap-1">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.site.assets.library.detailsContentKey' | translate }}
                 </p>
-                <p class="text-slate-700 dark:text-slate-200 break-all">{{ detailsImage?.content_key || '—' }}</p>
+                <p class="text-slate-700 dark:text-slate-200 break-all">
+                  {{ detailsImage?.content_key || '—' }}
+                </p>
               </div>
 
               <div class="grid gap-1">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.site.assets.library.detailsId' | translate }}
                 </p>
-                <p class="text-slate-700 dark:text-slate-200 break-all">{{ detailsImage?.id || '—' }}</p>
+                <p class="text-slate-700 dark:text-slate-200 break-all">
+                  {{ detailsImage?.id || '—' }}
+                </p>
               </div>
 
               <div class="grid gap-1">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.site.assets.library.detailsCreatedAt' | translate }}
                 </p>
-                <p class="text-slate-700 dark:text-slate-200">{{ detailsImage?.created_at | date: 'medium' }}</p>
+                <p class="text-slate-700 dark:text-slate-200">
+                  {{ detailsImage?.created_at | date: 'medium' }}
+                </p>
               </div>
 
               <div class="grid gap-1">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.site.assets.library.detailsFocal' | translate }}
                 </p>
                 <p class="text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.site.assets.library.focalLabel' | translate: { x: detailsImage?.focal_x ?? 50, y: detailsImage?.focal_y ?? 50 } }}
+                  {{
+                    'adminUi.site.assets.library.focalLabel'
+                      | translate
+                        : { x: detailsImage?.focal_x ?? 50, y: detailsImage?.focal_y ?? 50 }
+                  }}
                 </p>
               </div>
 
               <div class="grid gap-1">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.site.assets.library.detailsTags' | translate }}
                 </p>
-                <p class="text-slate-700 dark:text-slate-200 break-words">{{ detailsImage?.tags?.length ? detailsImage?.tags?.join(', ') : '—' }}</p>
+                <p class="text-slate-700 dark:text-slate-200 break-words">
+                  {{ detailsImage?.tags?.length ? detailsImage?.tags?.join(', ') : '—' }}
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-	      <div *ngIf="focalImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-	        <div class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950">
-	          <div class="flex items-start justify-between gap-3">
-	            <div class="grid gap-1">
-	              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-	                {{ 'adminUi.site.assets.library.focalTitle' | translate }}
-	              </p>
-	              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.assets.library.focalPreviewHint' | translate }}</p>
-	            </div>
-	            <button
-	              type="button"
-	              class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200"
-	              [disabled]="focalSaving()"
-	              (click)="closeFocalEditor()"
-	            >
-	              {{ 'adminUi.common.close' | translate }}
-	            </button>
-	          </div>
+      <div
+        *ngIf="focalImage"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      >
+        <div
+          class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.site.assets.library.focalTitle' | translate }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.site.assets.library.focalPreviewHint' | translate }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200"
+              [disabled]="focalSaving()"
+              (click)="closeFocalEditor()"
+            >
+              {{ 'adminUi.common.close' | translate }}
+            </button>
+          </div>
 
-	          <div class="mt-3 grid gap-3">
-	            <div
-	              class="relative w-full aspect-[16/9] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 cursor-crosshair dark:border-slate-800 dark:bg-slate-900"
-	              (click)="pickFocal($event)"
-	            >
-	              <img
-	                [src]="focalImage?.url"
-	                [alt]="focalImage?.alt_text || 'asset'"
-	                class="h-full w-full object-cover"
-	                [style.object-position]="focalObjectPosition()"
-	              />
-	              <div class="pointer-events-none absolute left-0 top-0 h-full w-full">
-	                <div
-	                  class="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-indigo-500 bg-indigo-500/10"
-	                  [style.left.%]="focalDraftX"
-	                  [style.top.%]="focalDraftY"
-	                ></div>
-	              </div>
-	            </div>
+          <div class="mt-3 grid gap-3">
+            <div
+              class="relative w-full aspect-[16/9] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 cursor-crosshair dark:border-slate-800 dark:bg-slate-900"
+              (click)="pickFocal($event)"
+            >
+              <img
+                [src]="focalImage?.url"
+                [alt]="focalImage?.alt_text || 'asset'"
+                class="h-full w-full object-cover"
+                [style.object-position]="focalObjectPosition()"
+              />
+              <div class="pointer-events-none absolute left-0 top-0 h-full w-full">
+                <div
+                  class="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-indigo-500 bg-indigo-500/10"
+                  [style.left.%]="focalDraftX"
+                  [style.top.%]="focalDraftY"
+                ></div>
+              </div>
+            </div>
 
-	            <p class="text-xs text-slate-500 dark:text-slate-400">
-	              {{ 'adminUi.site.assets.library.focalLabel' | translate: { x: focalDraftX, y: focalDraftY } }}
-	            </p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              {{
+                'adminUi.site.assets.library.focalLabel'
+                  | translate: { x: focalDraftX, y: focalDraftY }
+              }}
+            </p>
 
-	            <div class="grid gap-2 sm:grid-cols-3">
-	              <div class="grid gap-1">
-	                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.site.assets.library.cropHero' | translate }}</p>
-	                <div class="relative w-full aspect-[16/7] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
-	                  <img
-	                    [src]="focalImage?.url"
-	                    [alt]="focalImage?.alt_text || 'asset'"
-	                    class="h-full w-full object-cover"
-	                    [style.object-position]="focalObjectPosition()"
-	                  />
-	                </div>
-	              </div>
-	              <div class="grid gap-1">
-	                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.site.assets.library.cropCard' | translate }}</p>
-	                <div class="relative w-full aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
-	                  <img
-	                    [src]="focalImage?.url"
-	                    [alt]="focalImage?.alt_text || 'asset'"
-	                    class="h-full w-full object-cover"
-	                    [style.object-position]="focalObjectPosition()"
-	                  />
-	                </div>
-	              </div>
-	              <div class="grid gap-1">
-	                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.site.assets.library.cropMobile' | translate }}</p>
-	                <div class="relative w-full aspect-[9/16] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900">
-	                  <img
-	                    [src]="focalImage?.url"
-	                    [alt]="focalImage?.alt_text || 'asset'"
-	                    class="h-full w-full object-cover"
-	                    [style.object-position]="focalObjectPosition()"
-	                  />
-	                </div>
-	              </div>
-	            </div>
+            <div class="grid gap-2 sm:grid-cols-3">
+              <div class="grid gap-1">
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.assets.library.cropHero' | translate }}
+                </p>
+                <div
+                  class="relative w-full aspect-[16/7] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <img
+                    [src]="focalImage?.url"
+                    [alt]="focalImage?.alt_text || 'asset'"
+                    class="h-full w-full object-cover"
+                    [style.object-position]="focalObjectPosition()"
+                  />
+                </div>
+              </div>
+              <div class="grid gap-1">
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.assets.library.cropCard' | translate }}
+                </p>
+                <div
+                  class="relative w-full aspect-[4/3] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <img
+                    [src]="focalImage?.url"
+                    [alt]="focalImage?.alt_text || 'asset'"
+                    class="h-full w-full object-cover"
+                    [style.object-position]="focalObjectPosition()"
+                  />
+                </div>
+              </div>
+              <div class="grid gap-1">
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.site.assets.library.cropMobile' | translate }}
+                </p>
+                <div
+                  class="relative w-full aspect-[9/16] overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <img
+                    [src]="focalImage?.url"
+                    [alt]="focalImage?.alt_text || 'asset'"
+                    class="h-full w-full object-cover"
+                    [style.object-position]="focalObjectPosition()"
+                  />
+                </div>
+              </div>
+            </div>
 
-	            <div class="flex flex-wrap items-center justify-end gap-2">
-	              <button
-	                type="button"
-	                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-	                [disabled]="focalSaving()"
-	                (click)="closeFocalEditor()"
-	              >
-	                {{ 'adminUi.actions.cancel' | translate }}
-	              </button>
-	              <button
-	                type="button"
-	                class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
-	                [disabled]="focalSaving()"
-	                (click)="saveFocalEditor()"
-	              >
-	                {{ 'adminUi.actions.save' | translate }}
-	              </button>
-	            </div>
-	          </div>
-	        </div>
-	      </div>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                [disabled]="focalSaving()"
+                (click)="closeFocalEditor()"
+              >
+                {{ 'adminUi.actions.cancel' | translate }}
+              </button>
+              <button
+                type="button"
+                class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                [disabled]="focalSaving()"
+                (click)="saveFocalEditor()"
+              >
+                {{ 'adminUi.actions.save' | translate }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-	      <div *ngIf="editImage" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-	        <div class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950">
-	          <div class="flex items-start justify-between gap-3">
-	            <div class="grid gap-1">
-	              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-	                {{ 'adminUi.site.assets.library.editorTitle' | translate }}
-	              </p>
-	              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.site.assets.library.editorHint' | translate }}</p>
-	            </div>
-	            <button type="button" class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200" (click)="closeImageEditor()">
-	              {{ 'adminUi.common.close' | translate }}
-	            </button>
-	          </div>
+      <div
+        *ngIf="editImage"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      >
+        <div
+          class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-1">
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.site.assets.library.editorTitle' | translate }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.site.assets.library.editorHint' | translate }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="text-xs font-semibold text-slate-700 hover:underline dark:text-slate-200"
+              (click)="closeImageEditor()"
+            >
+              {{ 'adminUi.common.close' | translate }}
+            </button>
+          </div>
 
-	          <div class="mt-3 grid gap-4 lg:grid-cols-2">
-	            <div class="grid gap-3">
-	              <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-	                <div class="flex items-center gap-3">
-	                  <img
-	                    [src]="editImage?.url"
-	                    [alt]="editImage?.alt_text || 'asset'"
-	                    class="h-12 w-12 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
-	                    loading="lazy"
-	                  />
-	                  <div class="min-w-0 grid gap-1">
-	                    <p class="text-xs font-semibold text-slate-900 dark:text-slate-50 truncate">{{ editImage?.content_key }}</p>
-	                    <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ editImage?.url }}</p>
-	                  </div>
-	                </div>
+          <div class="mt-3 grid gap-4 lg:grid-cols-2">
+            <div class="grid gap-3">
+              <div
+                class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-center gap-3">
+                  <img
+                    [src]="editImage?.url"
+                    [alt]="editImage?.alt_text || 'asset'"
+                    class="h-12 w-12 rounded-lg border border-slate-200 object-cover dark:border-slate-800"
+                    loading="lazy"
+                  />
+                  <div class="min-w-0 grid gap-1">
+                    <p class="text-xs font-semibold text-slate-900 dark:text-slate-50 truncate">
+                      {{ editImage?.content_key }}
+                    </p>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                      {{ editImage?.url }}
+                    </p>
+                  </div>
+                </div>
 
-	                <div class="grid gap-2 sm:grid-cols-2">
-	                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                    {{ 'adminUi.site.assets.library.rotateLabel' | translate }}
-	                    <select
-	                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      [(ngModel)]="editRotateCw"
-	                    >
-	                      <option [ngValue]="0">{{ 'adminUi.site.assets.library.rotateNone' | translate }}</option>
-	                      <option [ngValue]="90">{{ 'adminUi.site.assets.library.rotate90' | translate }}</option>
-	                      <option [ngValue]="180">{{ 'adminUi.site.assets.library.rotate180' | translate }}</option>
-	                      <option [ngValue]="270">{{ 'adminUi.site.assets.library.rotate270' | translate }}</option>
-	                    </select>
-	                  </label>
-	                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                    {{ 'adminUi.site.assets.library.cropLabel' | translate }}
-	                    <select
-	                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      [(ngModel)]="editCropPreset"
-	                    >
-	                      <option [ngValue]="'none'">{{ 'adminUi.site.assets.library.cropNone' | translate }}</option>
-	                      <option [ngValue]="'square'">{{ 'adminUi.site.assets.library.cropSquare' | translate }}</option>
-	                      <option [ngValue]="'hero'">{{ 'adminUi.site.assets.library.cropHero' | translate }}</option>
-	                      <option [ngValue]="'card'">{{ 'adminUi.site.assets.library.cropCard' | translate }}</option>
-	                      <option [ngValue]="'mobile'">{{ 'adminUi.site.assets.library.cropMobile' | translate }}</option>
-	                    </select>
-	                  </label>
-	                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                    {{ 'adminUi.site.assets.library.resizeMaxWidth' | translate }}
-	                    <input
-	                      type="number"
-	                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      [(ngModel)]="editMaxWidth"
-	                      placeholder="e.g. 1600"
-	                    />
-	                  </label>
-	                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                    {{ 'adminUi.site.assets.library.resizeMaxHeight' | translate }}
-	                    <input
-	                      type="number"
-	                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                      [(ngModel)]="editMaxHeight"
-	                      placeholder="e.g. 1200"
-	                    />
-	                  </label>
-	                </div>
-	              </div>
+                <div class="grid gap-2 sm:grid-cols-2">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.assets.library.rotateLabel' | translate }}
+                    <select
+                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="editRotateCw"
+                    >
+                      <option [ngValue]="0">
+                        {{ 'adminUi.site.assets.library.rotateNone' | translate }}
+                      </option>
+                      <option [ngValue]="90">
+                        {{ 'adminUi.site.assets.library.rotate90' | translate }}
+                      </option>
+                      <option [ngValue]="180">
+                        {{ 'adminUi.site.assets.library.rotate180' | translate }}
+                      </option>
+                      <option [ngValue]="270">
+                        {{ 'adminUi.site.assets.library.rotate270' | translate }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.assets.library.cropLabel' | translate }}
+                    <select
+                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="editCropPreset"
+                    >
+                      <option [ngValue]="'none'">
+                        {{ 'adminUi.site.assets.library.cropNone' | translate }}
+                      </option>
+                      <option [ngValue]="'square'">
+                        {{ 'adminUi.site.assets.library.cropSquare' | translate }}
+                      </option>
+                      <option [ngValue]="'hero'">
+                        {{ 'adminUi.site.assets.library.cropHero' | translate }}
+                      </option>
+                      <option [ngValue]="'card'">
+                        {{ 'adminUi.site.assets.library.cropCard' | translate }}
+                      </option>
+                      <option [ngValue]="'mobile'">
+                        {{ 'adminUi.site.assets.library.cropMobile' | translate }}
+                      </option>
+                    </select>
+                  </label>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.assets.library.resizeMaxWidth' | translate }}
+                    <input
+                      type="number"
+                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="editMaxWidth"
+                      placeholder="e.g. 1600"
+                    />
+                  </label>
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.site.assets.library.resizeMaxHeight' | translate }}
+                    <input
+                      type="number"
+                      class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="editMaxHeight"
+                      placeholder="e.g. 1200"
+                    />
+                  </label>
+                </div>
+              </div>
 
-	              <div class="flex flex-wrap items-center justify-end gap-2">
-	                <button
-	                  type="button"
-	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-	                  [disabled]="editSaving()"
-	                  (click)="closeImageEditor()"
-	                >
-	                  {{ 'adminUi.actions.cancel' | translate }}
-	                </button>
-	                <button
-	                  type="button"
-	                  class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
-	                  [disabled]="editSaving()"
-	                  (click)="createEditedCopy()"
-	                >
-	                  {{ 'adminUi.site.assets.library.editorCreate' | translate }}
-	                </button>
-	              </div>
-	            </div>
+              <div class="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                  [disabled]="editSaving()"
+                  (click)="closeImageEditor()"
+                >
+                  {{ 'adminUi.actions.cancel' | translate }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50"
+                  [disabled]="editSaving()"
+                  (click)="createEditedCopy()"
+                >
+                  {{ 'adminUi.site.assets.library.editorCreate' | translate }}
+                </button>
+              </div>
+            </div>
 
-	            <div class="grid gap-2">
-	              <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ 'adminUi.site.assets.library.editorPreview' | translate }}</p>
-	              <div
-	                class="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
-	                [ngClass]="editPreviewAspectClass()"
-	              >
-	                <img
-	                  [src]="editImage?.url"
-	                  [alt]="editImage?.alt_text || 'asset'"
-	                  class="h-full w-full"
-	                  [ngClass]="{ 'object-cover': editCropPreset !== 'none', 'object-contain': editCropPreset === 'none' }"
-	                  [style.object-position]="(editImage?.focal_x ?? 50) + '% ' + (editImage?.focal_y ?? 50) + '%'"
-	                />
-	              </div>
-	              <p *ngIf="editRotateCw !== 0" class="text-[11px] text-slate-500 dark:text-slate-400">
-	                {{ 'adminUi.site.assets.library.editorRotationNote' | translate }}
-	              </p>
-	            </div>
-	          </div>
-	        </div>
-	      </div>
-	    </div>
-	  `
+            <div class="grid gap-2">
+              <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.site.assets.library.editorPreview' | translate }}
+              </p>
+              <div
+                class="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900"
+                [ngClass]="editPreviewAspectClass()"
+              >
+                <img
+                  [src]="editImage?.url"
+                  [alt]="editImage?.alt_text || 'asset'"
+                  class="h-full w-full"
+                  [ngClass]="{
+                    'object-cover': editCropPreset !== 'none',
+                    'object-contain': editCropPreset === 'none',
+                  }"
+                  [style.object-position]="
+                    (editImage?.focal_x ?? 50) + '% ' + (editImage?.focal_y ?? 50) + '%'
+                  "
+                />
+              </div>
+              <p *ngIf="editRotateCw !== 0" class="text-[11px] text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.site.assets.library.editorRotationNote' | translate }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `,
 })
 export class AssetLibraryComponent implements OnInit, OnChanges {
   @Input() titleKey = 'adminUi.site.assets.library.title';
   @Input() allowUpload = true;
   @Input() allowSelect = false;
   @Input() uploadKey = 'site.assets';
-  @Input() scopedKeys: string[] = ['site.assets', 'home.hero', 'home.story', 'page.about', 'page.contact'];
+  @Input() scopedKeys: string[] = [
+    'site.assets',
+    'home.hero',
+    'home.story',
+    'page.about',
+    'page.contact',
+  ];
   @Input() initialKey = '';
 
   @Output() select = new EventEmitter<string>();
@@ -660,18 +899,18 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
   limit = 24;
 
   loading = signal(false);
-	  error = signal<string | null>(null);
-	  errorRequestId = signal<string | null>(null);
-	  images = signal<ContentImageAssetRead[]>([]);
-	  assetGroups = computed<AssetGroup[]>(() => this.buildAssetGroups(this.images()));
-	  private readonly totalPages = signal(1);
+  error = signal<string | null>(null);
+  errorRequestId = signal<string | null>(null);
+  images = signal<ContentImageAssetRead[]>([]);
+  assetGroups = computed<AssetGroup[]>(() => this.buildAssetGroups(this.images()));
+  private readonly totalPages = signal(1);
 
-	  usageImage: ContentImageAssetRead | null = null;
-	  usageLoading = signal(false);
-	  usageError = signal<string | null>(null);
-	  usageRequestId = signal<string | null>(null);
-	  usageKeys = signal<string[]>([]);
-	  usageStoredInKey = signal<string | null>(null);
+  usageImage: ContentImageAssetRead | null = null;
+  usageLoading = signal(false);
+  usageError = signal<string | null>(null);
+  usageRequestId = signal<string | null>(null);
+  usageKeys = signal<string[]>([]);
+  usageStoredInKey = signal<string | null>(null);
 
   detailsImage: ContentImageAssetRead | null = null;
 
@@ -690,7 +929,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
   constructor(
     private readonly admin: AdminService,
     private readonly toast: ToastService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
@@ -733,20 +972,20 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
         created_from: createdFrom,
         created_to: createdTo,
         page: this.page,
-        limit: this.limit
+        limit: this.limit,
       })
       .subscribe({
-      next: (resp) => {
-        this.images.set(resp.items || []);
-        this.totalPages.set(resp.meta?.total_pages || 1);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.error.set(this.t('adminUi.site.assets.library.errors.load'));
-        this.errorRequestId.set(extractRequestId(err));
-        this.loading.set(false);
-      }
-    });
+        next: (resp) => {
+          this.images.set(resp.items || []);
+          this.totalPages.set(resp.meta?.total_pages || 1);
+          this.loading.set(false);
+        },
+        error: (err) => {
+          this.error.set(this.t('adminUi.site.assets.library.errors.load'));
+          this.errorRequestId.set(extractRequestId(err));
+          this.loading.set(false);
+        },
+      });
   }
 
   prev(): void {
@@ -772,7 +1011,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
         this.page = 1;
         this.reload();
       },
-      error: () => this.toast.error(this.t('adminUi.site.assets.library.errors.upload'))
+      error: () => this.toast.error(this.t('adminUi.site.assets.library.errors.upload')),
     });
     if (input) input.value = '';
   }
@@ -811,17 +1050,17 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
             item.id === id
               ? {
                   ...item,
-                  alt_text: updated.alt_text
+                  alt_text: updated.alt_text,
                 }
-              : item
-          )
+              : item,
+          ),
         );
         if (this.detailsImage?.id === id) {
           this.detailsImage = { ...this.detailsImage, alt_text: updated.alt_text };
         }
         this.toast.success(this.t('adminUi.site.assets.library.success.renamed'));
       },
-      error: () => this.toast.error(this.t('adminUi.site.assets.library.errors.rename'))
+      error: () => this.toast.error(this.t('adminUi.site.assets.library.errors.rename')),
     });
   }
 
@@ -851,127 +1090,131 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
     this.admin.updateContentImageTags(id, tags).subscribe({
       next: (updated) => {
         const updatedTags = updated?.tags || [];
-        this.images.set(this.images().map((item) => (item.id === id ? { ...item, tags: updatedTags } : item)));
+        this.images.set(
+          this.images().map((item) => (item.id === id ? { ...item, tags: updatedTags } : item)),
+        );
         this.toast.success(this.t('adminUi.site.assets.library.tagsSaved'));
       },
-      error: () => this.toast.error(this.t('adminUi.site.assets.library.tagsErrorsSave'))
+      error: () => this.toast.error(this.t('adminUi.site.assets.library.tagsErrorsSave')),
     });
   }
 
-	  openUsage(img: ContentImageAssetRead): void {
-	    const id = (img?.id || '').trim();
-	    if (!id) return;
-	    this.usageImage = img;
-	    this.detailsImage = null;
-	    this.focalImage = null;
-	    this.editImage = null;
-	    this.usageStoredInKey.set(null);
-	    this.loadUsage();
-	  }
+  openUsage(img: ContentImageAssetRead): void {
+    const id = (img?.id || '').trim();
+    if (!id) return;
+    this.usageImage = img;
+    this.detailsImage = null;
+    this.focalImage = null;
+    this.editImage = null;
+    this.usageStoredInKey.set(null);
+    this.loadUsage();
+  }
 
-    async deleteAssetGroup(group: AssetGroup): Promise<void> {
-      const original = group.original;
-      const edited = group.edits || [];
+  async deleteAssetGroup(group: AssetGroup): Promise<void> {
+    const original = group.original;
+    const edited = group.edits || [];
 
-      if (!original || edited.length === 0) {
-        this.deleteAsset(group.primary);
-        return;
-      }
+    if (!original || edited.length === 0) {
+      this.deleteAsset(group.primary);
+      return;
+    }
 
-      const imagesToCheck = [original, ...edited];
-      for (const img of imagesToCheck) {
-        const id = (img?.id || '').trim();
-        if (!id) continue;
-        try {
-          const resp = await firstValueFrom(this.admin.getContentImageUsage(id));
-          const keys = (resp?.keys || []).filter(Boolean);
-          if (keys.length) {
-            this.toast.error(this.t('adminUi.site.assets.library.errors.deleteInUse'));
-            this.openUsage(img);
-            return;
-          }
-        } catch {
-          this.toast.error(this.t('adminUi.site.assets.library.errors.usage'));
+    const imagesToCheck = [original, ...edited];
+    for (const img of imagesToCheck) {
+      const id = (img?.id || '').trim();
+      if (!id) continue;
+      try {
+        const resp = await firstValueFrom(this.admin.getContentImageUsage(id));
+        const keys = (resp?.keys || []).filter(Boolean);
+        if (keys.length) {
+          this.toast.error(this.t('adminUi.site.assets.library.errors.deleteInUse'));
+          this.openUsage(img);
           return;
         }
-      }
-
-      const confirmed = window.confirm(this.t('adminUi.site.assets.library.confirmDeleteWithVersions', { count: edited.length }));
-      if (!confirmed) return;
-
-      const id = (original?.id || '').trim();
-      if (!id) return;
-
-      try {
-        await firstValueFrom(this.admin.deleteContentImage(id, { delete_versions: true }));
-        this.toast.success(this.t('adminUi.site.assets.library.success.deleted'));
-        this.page = 1;
-        this.reload();
       } catch {
-        this.toast.error(this.t('adminUi.site.assets.library.errors.delete'));
+        this.toast.error(this.t('adminUi.site.assets.library.errors.usage'));
+        return;
       }
     }
 
-	  deleteAsset(img: ContentImageAssetRead): void {
-	    const id = (img?.id || '').trim();
-	    if (!id) return;
+    const confirmed = window.confirm(
+      this.t('adminUi.site.assets.library.confirmDeleteWithVersions', { count: edited.length }),
+    );
+    if (!confirmed) return;
 
-	    this.admin.getContentImageUsage(id).subscribe({
-	      next: (resp) => {
-	        const keys = (resp?.keys || []).filter(Boolean);
-	        if (keys.length) {
-	          this.toast.error(this.t('adminUi.site.assets.library.errors.deleteInUse'));
-	          this.openUsage(img);
-	          return;
-	        }
-	        const confirmed = window.confirm(this.t('adminUi.site.assets.library.confirmDelete'));
-	        if (!confirmed) return;
-	        this.admin.deleteContentImage(id).subscribe({
-	          next: () => {
-	            this.toast.success(this.t('adminUi.site.assets.library.success.deleted'));
-	            this.page = 1;
-	            this.reload();
-	          },
-	          error: () => this.toast.error(this.t('adminUi.site.assets.library.errors.delete'))
-	        });
-	      },
-	      error: () => {
-	        this.toast.error(this.t('adminUi.site.assets.library.errors.usage'));
-	      }
-	    });
-	  }
+    const id = (original?.id || '').trim();
+    if (!id) return;
 
-	  loadUsage(): void {
-	    const img = this.usageImage;
-	    const id = (img?.id || '').trim();
-	    if (!id) return;
-	    this.usageLoading.set(true);
-	    this.usageError.set(null);
-	    this.usageRequestId.set(null);
-	    this.usageKeys.set([]);
-	    this.usageStoredInKey.set(null);
-	    this.admin.getContentImageUsage(id).subscribe({
-	      next: (resp) => {
-	        this.usageKeys.set((resp?.keys || []).filter(Boolean));
-	        this.usageStoredInKey.set((resp?.stored_in_key || '').trim() || null);
-	        this.usageLoading.set(false);
-	      },
-	      error: (err) => {
-	        this.usageError.set(this.t('adminUi.site.assets.library.errors.usage'));
-	        this.usageRequestId.set(extractRequestId(err));
-        this.usageLoading.set(false);
-      }
+    try {
+      await firstValueFrom(this.admin.deleteContentImage(id, { delete_versions: true }));
+      this.toast.success(this.t('adminUi.site.assets.library.success.deleted'));
+      this.page = 1;
+      this.reload();
+    } catch {
+      this.toast.error(this.t('adminUi.site.assets.library.errors.delete'));
+    }
+  }
+
+  deleteAsset(img: ContentImageAssetRead): void {
+    const id = (img?.id || '').trim();
+    if (!id) return;
+
+    this.admin.getContentImageUsage(id).subscribe({
+      next: (resp) => {
+        const keys = (resp?.keys || []).filter(Boolean);
+        if (keys.length) {
+          this.toast.error(this.t('adminUi.site.assets.library.errors.deleteInUse'));
+          this.openUsage(img);
+          return;
+        }
+        const confirmed = window.confirm(this.t('adminUi.site.assets.library.confirmDelete'));
+        if (!confirmed) return;
+        this.admin.deleteContentImage(id).subscribe({
+          next: () => {
+            this.toast.success(this.t('adminUi.site.assets.library.success.deleted'));
+            this.page = 1;
+            this.reload();
+          },
+          error: () => this.toast.error(this.t('adminUi.site.assets.library.errors.delete')),
+        });
+      },
+      error: () => {
+        this.toast.error(this.t('adminUi.site.assets.library.errors.usage'));
+      },
     });
   }
 
-	  closeUsage(): void {
-	    this.usageImage = null;
-	    this.usageLoading.set(false);
-	    this.usageError.set(null);
-	    this.usageRequestId.set(null);
-	    this.usageKeys.set([]);
-	    this.usageStoredInKey.set(null);
-	  }
+  loadUsage(): void {
+    const img = this.usageImage;
+    const id = (img?.id || '').trim();
+    if (!id) return;
+    this.usageLoading.set(true);
+    this.usageError.set(null);
+    this.usageRequestId.set(null);
+    this.usageKeys.set([]);
+    this.usageStoredInKey.set(null);
+    this.admin.getContentImageUsage(id).subscribe({
+      next: (resp) => {
+        this.usageKeys.set((resp?.keys || []).filter(Boolean));
+        this.usageStoredInKey.set((resp?.stored_in_key || '').trim() || null);
+        this.usageLoading.set(false);
+      },
+      error: (err) => {
+        this.usageError.set(this.t('adminUi.site.assets.library.errors.usage'));
+        this.usageRequestId.set(extractRequestId(err));
+        this.usageLoading.set(false);
+      },
+    });
+  }
+
+  closeUsage(): void {
+    this.usageImage = null;
+    this.usageLoading.set(false);
+    this.usageError.set(null);
+    this.usageRequestId.set(null);
+    this.usageKeys.set([]);
+    this.usageStoredInKey.set(null);
+  }
 
   jumpToKey(key: string): void {
     const value = (key || '').trim();
@@ -1024,7 +1267,9 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
     this.admin.updateContentImageFocalPoint(id, focalX, focalY).subscribe({
       next: (updated) => {
         this.images.set(
-          this.images().map((item) => (item.id === id ? { ...item, focal_x: updated.focal_x, focal_y: updated.focal_y } : item))
+          this.images().map((item) =>
+            item.id === id ? { ...item, focal_x: updated.focal_x, focal_y: updated.focal_y } : item,
+          ),
         );
         this.toast.success(this.t('adminUi.site.assets.library.focalSaved'));
         this.focalSaving.set(false);
@@ -1033,7 +1278,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
       error: () => {
         this.toast.error(this.t('adminUi.site.assets.library.focalErrorsSave'));
         this.focalSaving.set(false);
-      }
+      },
     });
   }
 
@@ -1091,7 +1336,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
         square: { w: 1, h: 1 },
         hero: { w: 16, h: 7 },
         card: { w: 4, h: 3 },
-        mobile: { w: 9, h: 16 }
+        mobile: { w: 9, h: 16 },
       };
       const aspect = aspectMap[this.editCropPreset];
       if (aspect) {
@@ -1114,13 +1359,16 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
       error: () => {
         this.toast.error(this.t('adminUi.site.assets.library.errors.edit'));
         this.editSaving.set(false);
-      }
+      },
     });
   }
 
   private buildAssetGroups(items: ContentImageAssetRead[]): AssetGroup[] {
     const images = items || [];
-    const grouped = new Map<string, { original: ContentImageAssetRead | null; edits: ContentImageAssetRead[]; latestAt: number }>();
+    const grouped = new Map<
+      string,
+      { original: ContentImageAssetRead | null; edits: ContentImageAssetRead[]; latestAt: number }
+    >();
 
     for (const img of images) {
       const groupId = (img.root_image_id || img.id || '').trim();
@@ -1148,7 +1396,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
         primary,
         original: entry.original,
         edits: editsSorted.filter((img) => img.id !== primary.id),
-        latestAt: entry.latestAt
+        latestAt: entry.latestAt,
       });
     }
 
@@ -1181,4 +1429,3 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
     return this.translate.instant(key, params);
   }
 }
-

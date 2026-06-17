@@ -12,25 +12,45 @@ import { AccountComponent } from './account.component';
 @Component({
   selector: 'app-account-orders',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslateModule, ButtonComponent, LocalizedCurrencyPipe, SkeletonComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    TranslateModule,
+    ButtonComponent,
+    LocalizedCurrencyPipe,
+    SkeletonComponent,
+  ],
   template: `
-    <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.myOrders' | translate }}</h2>
-        <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'account.orders.shopNew' | translate }}</a>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'nav.myOrders' | translate }}
+        </h2>
+        <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{
+          'account.orders.shopNew' | translate
+        }}</a>
       </div>
 
       <div class="flex flex-wrap items-center gap-3 text-sm">
         <label class="flex items-center gap-2">
-          <span class="text-slate-600 dark:text-slate-300">{{ 'account.orders.statusLabel' | translate }}</span>
+          <span class="text-slate-600 dark:text-slate-300">{{
+            'account.orders.statusLabel' | translate
+          }}</span>
           <select
             class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             [(ngModel)]="account.orderFilter"
             (change)="account.filterOrders()"
           >
             <option value="">{{ 'adminUi.orders.all' | translate }}</option>
-            <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
-            <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
+            <option value="pending_payment">
+              {{ 'adminUi.orders.pending_payment' | translate }}
+            </option>
+            <option value="pending_acceptance">
+              {{ 'adminUi.orders.pending_acceptance' | translate }}
+            </option>
             <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
             <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
             <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
@@ -40,7 +60,9 @@ import { AccountComponent } from './account.component';
         </label>
 
         <label class="flex items-center gap-2 min-w-[14rem]">
-          <span class="text-slate-600 dark:text-slate-300">{{ 'account.orders.searchLabel' | translate }}</span>
+          <span class="text-slate-600 dark:text-slate-300">{{
+            'account.orders.searchLabel' | translate
+          }}</span>
           <input
             class="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             [(ngModel)]="account.ordersQuery"
@@ -52,7 +74,9 @@ import { AccountComponent } from './account.component';
         </label>
 
         <label class="flex items-center gap-2">
-          <span class="text-slate-600 dark:text-slate-300">{{ 'account.orders.fromLabel' | translate }}</span>
+          <span class="text-slate-600 dark:text-slate-300">{{
+            'account.orders.fromLabel' | translate
+          }}</span>
           <input
             class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             type="date"
@@ -62,7 +86,9 @@ import { AccountComponent } from './account.component';
         </label>
 
         <label class="flex items-center gap-2">
-          <span class="text-slate-600 dark:text-slate-300">{{ 'account.orders.toLabel' | translate }}</span>
+          <span class="text-slate-600 dark:text-slate-300">{{
+            'account.orders.toLabel' | translate
+          }}</span>
           <input
             class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             type="date"
@@ -71,7 +97,12 @@ import { AccountComponent } from './account.component';
           />
         </label>
 
-        <app-button size="sm" variant="ghost" [label]="'account.orders.applyFilters' | translate" (action)="account.applyOrderFilters()"></app-button>
+        <app-button
+          size="sm"
+          variant="ghost"
+          [label]="'account.orders.applyFilters' | translate"
+          (action)="account.applyOrderFilters()"
+        ></app-button>
         <app-button
           size="sm"
           variant="ghost"
@@ -104,11 +135,18 @@ import { AccountComponent } from './account.component';
       </div>
 
       <div
-        *ngIf="account.ordersLoaded() && !account.ordersLoading() && !account.ordersError() && account.pagedOrders().length === 0"
+        *ngIf="
+          account.ordersLoaded() &&
+          !account.ordersLoading() &&
+          !account.ordersError() &&
+          account.pagedOrders().length === 0
+        "
         class="border border-dashed border-slate-200 rounded-xl p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300 grid gap-2"
       >
         <p>{{ 'account.orders.empty' | translate }}</p>
-        <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{ 'account.orders.browse' | translate }}</a>
+        <a routerLink="/shop" class="text-indigo-600 dark:text-indigo-300 font-medium">{{
+          'account.orders.browse' | translate
+        }}</a>
       </div>
 
       <div *ngIf="account.ordersLoaded() && account.pagedOrders().length" class="grid gap-3">
@@ -116,14 +154,19 @@ import { AccountComponent } from './account.component';
           *ngFor="let order of account.pagedOrders()"
           class="rounded-lg border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
         >
-          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+          <summary
+            class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+          >
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <span class="font-semibold text-slate-900 dark:text-slate-50">{{
                   'account.orders.orderLabel' | translate: { ref: order.reference_code || order.id }
                 }}</span>
-                <span class="text-xs rounded-full px-2 py-1" [ngClass]="account.orderStatusChipClass(order.status)">
-                  {{ ('adminUi.orders.' + order.status) | translate }}
+                <span
+                  class="text-xs rounded-full px-2 py-1"
+                  [ngClass]="account.orderStatusChipClass(order.status)"
+                >
+                  {{ 'adminUi.orders.' + order.status | translate }}
                 </span>
                 <span
                   class="text-xs rounded-full px-2 py-1 bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -188,7 +231,10 @@ import { AccountComponent } from './account.component';
                 ></app-button>
               </div>
               <p class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'account.orders.updated' | translate: { date: (order.updated_at | date: 'mediumDate') } }}
+                {{
+                  'account.orders.updated'
+                    | translate: { date: (order.updated_at | date: 'mediumDate') }
+                }}
               </p>
             </div>
           </summary>
@@ -198,17 +244,27 @@ import { AccountComponent } from './account.component';
               *ngIf="account.manualRefundRequired(order)"
               class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
             >
-              <p class="font-semibold">{{ 'account.orders.refund.manualRequiredTitle' | translate }}</p>
-              <p class="mt-1 text-sm">{{ 'account.orders.refund.manualRequiredCopy' | translate }}</p>
-              <p class="mt-1 text-sm">{{ 'account.orders.refund.manualRequiredHint' | translate }}</p>
-              <a routerLink="/tickets" class="mt-2 inline-flex font-medium text-amber-900 underline dark:text-amber-100">{{
-                'account.orders.refund.contact' | translate
-              }}</a>
+              <p class="font-semibold">
+                {{ 'account.orders.refund.manualRequiredTitle' | translate }}
+              </p>
+              <p class="mt-1 text-sm">
+                {{ 'account.orders.refund.manualRequiredCopy' | translate }}
+              </p>
+              <p class="mt-1 text-sm">
+                {{ 'account.orders.refund.manualRequiredHint' | translate }}
+              </p>
+              <a
+                routerLink="/tickets"
+                class="mt-2 inline-flex font-medium text-amber-900 underline dark:text-amber-100"
+                >{{ 'account.orders.refund.contact' | translate }}</a
+              >
             </div>
             <div class="mt-4 grid gap-4">
               <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.trackingLabel' | translate }}</span>
+                  <span class="text-slate-500 dark:text-slate-400">{{
+                    'account.orders.trackingLabel' | translate
+                  }}</span>
                   <a
                     *ngIf="order.tracking_number"
                     class="text-indigo-600 dark:text-indigo-300 font-medium"
@@ -217,37 +273,62 @@ import { AccountComponent } from './account.component';
                     rel="noopener"
                     >{{ order.tracking_number }}</a
                   >
-                  <span *ngIf="!order.tracking_number" class="text-slate-600 dark:text-slate-300">{{ 'account.orders.trackingNotAvailable' | translate }}</span>
+                  <span *ngIf="!order.tracking_number" class="text-slate-600 dark:text-slate-300">{{
+                    'account.orders.trackingNotAvailable' | translate
+                  }}</span>
                 </div>
-                <div *ngIf="account.trackingStatusLabel(order) as trackingStatus" class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.trackingStatusLabel' | translate }}</span>
+                <div
+                  *ngIf="account.trackingStatusLabel(order) as trackingStatus"
+                  class="flex flex-wrap items-center justify-between gap-2"
+                >
+                  <span class="text-slate-500 dark:text-slate-400">{{
+                    'account.orders.trackingStatusLabel' | translate
+                  }}</span>
                   <span>{{ trackingStatus }}</span>
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.shippingLabel' | translate }}</span>
+                  <span class="text-slate-500 dark:text-slate-400">{{
+                    'account.orders.shippingLabel' | translate
+                  }}</span>
                   <span>{{ order.shipping_method?.name || '—' }}</span>
                 </div>
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.deliveryLabel' | translate }}</span>
+                  <span class="text-slate-500 dark:text-slate-400">{{
+                    'account.orders.deliveryLabel' | translate
+                  }}</span>
                   <span>{{ account.deliveryLabel(order) }}</span>
                 </div>
-                <div *ngIf="account.lockerLabel(order)" class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.lockerLabel' | translate }}</span>
+                <div
+                  *ngIf="account.lockerLabel(order)"
+                  class="flex flex-wrap items-center justify-between gap-2"
+                >
+                  <span class="text-slate-500 dark:text-slate-400">{{
+                    'account.orders.lockerLabel' | translate
+                  }}</span>
                   <span class="truncate">{{ account.lockerLabel(order) }}</span>
                 </div>
                 <div
                   *ngIf="order.status === 'cancelled' && order.cancel_reason"
                   class="flex flex-wrap items-start justify-between gap-2"
                 >
-                  <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.cancelReason' | translate }}</span>
-                  <span class="max-w-[520px] text-right whitespace-pre-wrap">{{ order.cancel_reason }}</span>
+                  <span class="text-slate-500 dark:text-slate-400">{{
+                    'adminUi.orders.cancelReason' | translate
+                  }}</span>
+                  <span class="max-w-[520px] text-right whitespace-pre-wrap">{{
+                    order.cancel_reason
+                  }}</span>
                 </div>
               </div>
 
               <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-                <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.orders.itemsTitle' | translate }}</p>
+                <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  {{ 'account.orders.itemsTitle' | translate }}
+                </p>
                 <div class="mt-2 grid gap-2">
-                  <div *ngFor="let item of order.items" class="flex items-start justify-between gap-4">
+                  <div
+                    *ngFor="let item of order.items"
+                    class="flex items-start justify-between gap-4"
+                  >
                     <div class="min-w-0">
                       <a
                         *ngIf="item.product?.slug"
@@ -255,7 +336,10 @@ import { AccountComponent } from './account.component';
                         class="font-medium text-slate-900 dark:text-slate-50 hover:underline"
                         >{{ item.product?.name }}</a
                       >
-                      <p *ngIf="!item.product?.slug" class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                      <p
+                        *ngIf="!item.product?.slug"
+                        class="font-medium text-slate-900 dark:text-slate-50 truncate"
+                      >
                         {{ item.product?.name || item.product_id }}
                       </p>
                       <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -270,7 +354,9 @@ import { AccountComponent } from './account.component';
                         size="sm"
                         variant="ghost"
                         [label]="'product.addToCart' | translate"
-                        [disabled]="account.reorderingOrderItemId === item.id || account.creatingReturn"
+                        [disabled]="
+                          account.reorderingOrderItemId === item.id || account.creatingReturn
+                        "
                         (action)="account.reorderItem(order, item)"
                       ></app-button>
                     </div>
@@ -280,29 +366,55 @@ import { AccountComponent } from './account.component';
 
               <div class="grid gap-4 sm:grid-cols-2">
                 <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
-                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.orders.totalsTitle' | translate }}</p>
+                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    {{ 'account.orders.totalsTitle' | translate }}
+                  </p>
                   <div class="mt-2 grid gap-1 text-slate-700 dark:text-slate-200">
-                    <div class="flex items-center justify-between" *ngIf="(order.tax_amount || 0) > 0">
-                      <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.vatLabel' | translate }}</span>
-                      <span>{{ (order.tax_amount || 0) | localizedCurrency: order.currency || 'RON' }}</span>
+                    <div
+                      class="flex items-center justify-between"
+                      *ngIf="(order.tax_amount || 0) > 0"
+                    >
+                      <span class="text-slate-500 dark:text-slate-400">{{
+                        'account.orders.vatLabel' | translate
+                      }}</span>
+                      <span>{{
+                        order.tax_amount || 0 | localizedCurrency: order.currency || 'RON'
+                      }}</span>
                     </div>
-                    <div class="flex items-center justify-between" *ngIf="(order.fee_amount || 0) > 0">
-                      <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.additionalLabel' | translate }}</span>
-                      <span>{{ (order.fee_amount || 0) | localizedCurrency: order.currency || 'RON' }}</span>
+                    <div
+                      class="flex items-center justify-between"
+                      *ngIf="(order.fee_amount || 0) > 0"
+                    >
+                      <span class="text-slate-500 dark:text-slate-400">{{
+                        'account.orders.additionalLabel' | translate
+                      }}</span>
+                      <span>{{
+                        order.fee_amount || 0 | localizedCurrency: order.currency || 'RON'
+                      }}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                      <span class="text-slate-500 dark:text-slate-400">{{ 'account.orders.shippingLabel' | translate }}</span>
-                      <span>{{ (order.shipping_amount || 0) | localizedCurrency: order.currency || 'RON' }}</span>
+                      <span class="text-slate-500 dark:text-slate-400">{{
+                        'account.orders.shippingLabel' | translate
+                      }}</span>
+                      <span>{{
+                        order.shipping_amount || 0 | localizedCurrency: order.currency || 'RON'
+                      }}</span>
                     </div>
-                    <div class="flex items-center justify-between font-semibold text-slate-900 dark:text-slate-50 pt-1">
+                    <div
+                      class="flex items-center justify-between font-semibold text-slate-900 dark:text-slate-50 pt-1"
+                    >
                       <span>{{ 'account.orders.totalLabel' | translate }}</span>
-                      <span>{{ order.total_amount | localizedCurrency: order.currency || 'RON' }}</span>
+                      <span>{{
+                        order.total_amount | localizedCurrency: order.currency || 'RON'
+                      }}</span>
                     </div>
                   </div>
                 </div>
 
                 <div class="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
-                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.orders.actionsTitle' | translate }}</p>
+                  <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    {{ 'account.orders.actionsTitle' | translate }}
+                  </p>
                   <div class="mt-2 flex flex-wrap gap-2">
                     <app-button
                       size="sm"
@@ -345,7 +457,9 @@ import { AccountComponent } from './account.component';
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="grid gap-1">
-                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    <p
+                      class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'account.orders.return.title' | translate }}
                     </p>
                     <p class="text-xs text-slate-600 dark:text-slate-300">
@@ -381,7 +495,9 @@ import { AccountComponent } from './account.component';
                   </label>
 
                   <div class="grid gap-2">
-                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <div
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'account.orders.return.itemsLabel' | translate }}
                     </div>
                     <div class="grid gap-2">
@@ -390,8 +506,12 @@ import { AccountComponent } from './account.component';
                         class="grid grid-cols-[1fr_120px] gap-3 items-center rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
                       >
                         <div class="min-w-0">
-                          <div class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.product?.name || item.product_id }}</div>
-                          <div class="text-xs text-slate-500 dark:text-slate-400">×{{ item.quantity }}</div>
+                          <div class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                            {{ item.product?.name || item.product_id }}
+                          </div>
+                          <div class="text-xs text-slate-500 dark:text-slate-400">
+                            ×{{ item.quantity }}
+                          </div>
                         </div>
                         <input
                           class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -430,7 +550,9 @@ import { AccountComponent } from './account.component';
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="grid gap-1">
-                    <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    <p
+                      class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'account.orders.cancel.title' | translate }}
                     </p>
                     <p class="text-xs text-slate-600 dark:text-slate-300">
@@ -478,7 +600,10 @@ import { AccountComponent } from './account.component';
         </details>
 
         <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
-          <span>{{ 'account.orders.pageLabel' | translate: { page: account.page, total: account.totalPages } }}</span>
+          <span>{{
+            'account.orders.pageLabel'
+              | translate: { page: account.page, total: account.totalPages }
+          }}</span>
           <div class="flex gap-2">
             <app-button
               size="sm"
@@ -498,7 +623,7 @@ import { AccountComponent } from './account.component';
         </div>
       </div>
     </section>
-  `
+  `,
 })
 export class AccountOrdersComponent implements OnInit {
   protected readonly account = inject(AccountComponent);

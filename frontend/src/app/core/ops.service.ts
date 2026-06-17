@@ -204,7 +204,7 @@ export class OpsService {
   getActiveBanner(): Observable<MaintenanceBannerPublic | null> {
     return this.api.get<MaintenanceBannerPublic | null>('/ops/banner').pipe(
       map((res) => res || null),
-      catchError(() => of(null))
+      catchError(() => of(null)),
     );
   }
 
@@ -216,7 +216,10 @@ export class OpsService {
     return this.api.post<MaintenanceBannerRead>('/ops/admin/banners', payload);
   }
 
-  updateBanner(bannerId: string, payload: MaintenanceBannerUpdatePayload): Observable<MaintenanceBannerRead> {
+  updateBanner(
+    bannerId: string,
+    payload: MaintenanceBannerUpdatePayload,
+  ): Observable<MaintenanceBannerRead> {
     return this.api.patch<MaintenanceBannerRead>(`/ops/admin/banners/${bannerId}`, payload);
   }
 
@@ -251,18 +254,27 @@ export class OpsService {
   }
 
   getWebhookDetail(provider: WebhookProvider, eventId: string): Observable<WebhookEventDetail> {
-    return this.api.get<WebhookEventDetail>(`/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}`);
+    return this.api.get<WebhookEventDetail>(
+      `/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}`,
+    );
   }
 
   retryWebhook(provider: WebhookProvider, eventId: string): Observable<WebhookEventRead> {
-    return this.api.post<WebhookEventRead>(`/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}/retry`, {});
+    return this.api.post<WebhookEventRead>(
+      `/ops/admin/webhooks/${provider}/${encodeURIComponent(eventId)}/retry`,
+      {},
+    );
   }
 
   getEmailFailureStats(params?: { since_hours?: number }): Observable<FailureCount> {
     return this.api.get<FailureCount>('/ops/admin/email-failures/stats', params as any);
   }
 
-  listEmailFailures(params?: { limit?: number; since_hours?: number; to_email?: string }): Observable<EmailFailureRead[]> {
+  listEmailFailures(params?: {
+    limit?: number;
+    since_hours?: number;
+    to_email?: string;
+  }): Observable<EmailFailureRead[]> {
     return this.api.get<EmailFailureRead[]>('/ops/admin/email-failures', params as any);
   }
 
@@ -283,8 +295,14 @@ export class OpsService {
     return this.api.get<SamedaySyncStatusRead>('/admin/shipping/sameday-sync/status');
   }
 
-  listSamedaySyncRuns(params?: { page?: number; limit?: number }): Observable<SamedaySyncRunListResponse> {
-    return this.api.get<SamedaySyncRunListResponse>('/admin/shipping/sameday-sync/runs', params as any);
+  listSamedaySyncRuns(params?: {
+    page?: number;
+    limit?: number;
+  }): Observable<SamedaySyncRunListResponse> {
+    return this.api.get<SamedaySyncRunListResponse>(
+      '/admin/shipping/sameday-sync/runs',
+      params as any,
+    );
   }
 
   runSamedaySyncNow(): Observable<SamedaySyncRunRead> {

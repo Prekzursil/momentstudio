@@ -56,9 +56,15 @@ def upgrade() -> None:
         sa.column("created_at", sa.DateTime(timezone=True)),
     )
 
-    sections_row = conn.execute(
-        sa.select(content_blocks.c.id, content_blocks.c.meta).where(content_blocks.c.key == "home.sections")
-    ).mappings().first()
+    sections_row = (
+        conn.execute(
+            sa.select(content_blocks.c.id, content_blocks.c.meta).where(
+                content_blocks.c.key == "home.sections"
+            )
+        )
+        .mappings()
+        .first()
+    )
     if not sections_row:
         return
 
@@ -71,22 +77,32 @@ def upgrade() -> None:
         for b in blocks
         if not (
             isinstance(b, dict)
-            and (_as_str(b.get("type")).lower() == "hero" or _as_str(b.get("key")).lower() == "hero")
+            and (
+                _as_str(b.get("type")).lower() == "hero"
+                or _as_str(b.get("key")).lower() == "hero"
+            )
         )
     ]
 
-    has_hero_like = any(isinstance(b, dict) and _as_str(b.get("type")).lower() in {"banner", "carousel"} for b in blocks)
+    has_hero_like = any(
+        isinstance(b, dict) and _as_str(b.get("type")).lower() in {"banner", "carousel"}
+        for b in blocks
+    )
 
     if not has_hero_like:
-        hero_row = conn.execute(
-            sa.select(
-                content_blocks.c.id,
-                content_blocks.c.title,
-                content_blocks.c.body_markdown,
-                content_blocks.c.meta,
-                content_blocks.c.lang,
-            ).where(content_blocks.c.key == "home.hero")
-        ).mappings().first()
+        hero_row = (
+            conn.execute(
+                sa.select(
+                    content_blocks.c.id,
+                    content_blocks.c.title,
+                    content_blocks.c.body_markdown,
+                    content_blocks.c.meta,
+                    content_blocks.c.lang,
+                ).where(content_blocks.c.key == "home.hero")
+            )
+            .mappings()
+            .first()
+        )
 
         headline_en = ""
         headline_ro = ""
@@ -123,11 +139,17 @@ def upgrade() -> None:
                 if isinstance(img, str) and img.strip():
                     image_url = image_url or img.strip()
 
-                rows = conn.execute(
-                    sa.select(translations.c.lang, translations.c.title, translations.c.body_markdown).where(
-                        translations.c.content_block_id == hero_id
+                rows = (
+                    conn.execute(
+                        sa.select(
+                            translations.c.lang,
+                            translations.c.title,
+                            translations.c.body_markdown,
+                        ).where(translations.c.content_block_id == hero_id)
                     )
-                ).mappings().all()
+                    .mappings()
+                    .all()
+                )
                 for t in rows:
                     lang = _as_str(t.get("lang")).lower()
                     if lang == "en":
@@ -166,7 +188,9 @@ def upgrade() -> None:
     # Keep legacy lists consistent (even if unused).
     sections = _as_list(sections_meta.get("sections"))
     sections_meta["sections"] = [
-        s for s in sections if not (isinstance(s, dict) and _as_str(s.get("id")).lower() == "hero")
+        s
+        for s in sections
+        if not (isinstance(s, dict) and _as_str(s.get("id")).lower() == "hero")
     ]
     order = _as_list(sections_meta.get("order"))
     sections_meta["order"] = [o for o in order if _as_str(o).lower() != "hero"]
@@ -187,17 +211,29 @@ def downgrade() -> None:
         sa.column("key", sa.String()),
         sa.column("meta", sa.JSON()),
     )
-    row = conn.execute(
-        sa.select(content_blocks.c.id, content_blocks.c.meta).where(content_blocks.c.key == "home.sections")
-    ).mappings().first()
+    row = (
+        conn.execute(
+            sa.select(content_blocks.c.id, content_blocks.c.meta).where(
+                content_blocks.c.key == "home.sections"
+            )
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         return
     meta = _as_dict(row["meta"])
     blocks = _as_list(meta.get("blocks"))
     next_blocks = [
-        b for b in blocks if not (isinstance(b, dict) and _as_str(b.get("key")).lower() == "hero_banner")
+        b
+        for b in blocks
+        if not (isinstance(b, dict) and _as_str(b.get("key")).lower() == "hero_banner")
     ]
     if next_blocks == blocks:
         return
     meta["blocks"] = next_blocks
-    conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta))
+    conn.execute(
+        sa.update(content_blocks)
+        .where(content_blocks.c.id == row["id"])
+        .values(meta=meta)
+    )

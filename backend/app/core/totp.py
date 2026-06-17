@@ -106,7 +106,7 @@ def _totp(key: bytes, counter: int, *, digits: int) -> str:
     offset = digest[-1] & 0x0F
     chunk = digest[offset : offset + 4]
     value = int.from_bytes(chunk, "big") & 0x7FFFFFFF
-    mod = 10 ** digits
+    mod = 10**digits
     code = value % mod
     return f"{code:0{digits}d}"
 

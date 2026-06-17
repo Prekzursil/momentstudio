@@ -22,9 +22,18 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "maintenance_banners",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False),
-        sa.Column("level", sa.String(length=20), nullable=False, server_default=sa.text("'info'")),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "is_active", sa.Boolean(), server_default=sa.text("true"), nullable=False
+        ),
+        sa.Column(
+            "level",
+            sa.String(length=20),
+            nullable=False,
+            server_default=sa.text("'info'"),
+        ),
         sa.Column("message_en", sa.Text(), nullable=False),
         sa.Column("message_ro", sa.Text(), nullable=False),
         sa.Column("link_url", sa.String(length=500), nullable=True),
@@ -32,13 +41,29 @@ def upgrade() -> None:
         sa.Column("link_label_ro", sa.String(length=120), nullable=True),
         sa.Column("starts_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("ends_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
-    op.create_index("ix_maintenance_banners_is_active", "maintenance_banners", ["is_active"])
+    op.create_index(
+        "ix_maintenance_banners_is_active", "maintenance_banners", ["is_active"]
+    )
     op.create_index("ix_maintenance_banners_level", "maintenance_banners", ["level"])
-    op.create_index("ix_maintenance_banners_starts_at", "maintenance_banners", ["starts_at"])
-    op.create_index("ix_maintenance_banners_ends_at", "maintenance_banners", ["ends_at"])
+    op.create_index(
+        "ix_maintenance_banners_starts_at", "maintenance_banners", ["starts_at"]
+    )
+    op.create_index(
+        "ix_maintenance_banners_ends_at", "maintenance_banners", ["ends_at"]
+    )
 
 
 def downgrade() -> None:

@@ -5,7 +5,7 @@ import { ModalComponent } from './modal.component';
 describe('ModalComponent accessibility behavior', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [ModalComponent]
+      imports: [ModalComponent],
     });
   });
 
@@ -22,8 +22,8 @@ describe('ModalComponent accessibility behavior', () => {
 
     const focusable = Array.from(
       dialog.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      )
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
     );
     expect(focusable.length).toBeGreaterThan(1);
 
@@ -32,12 +32,16 @@ describe('ModalComponent accessibility behavior', () => {
 
     first.focus();
     expect(document.activeElement).toBe(first);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }));
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }),
+    );
     expect(document.activeElement).toBe(last);
 
     last.focus();
     expect(document.activeElement).toBe(last);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+    );
     expect(document.activeElement).toBe(first);
   }));
 });

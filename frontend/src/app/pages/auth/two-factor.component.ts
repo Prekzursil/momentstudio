@@ -14,12 +14,21 @@ import { ButtonComponent } from '../../shared/button.component';
 @Component({
   selector: 'app-two-factor',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, ContainerComponent, BreadcrumbComponent, ButtonComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslateModule,
+    ContainerComponent,
+    BreadcrumbComponent,
+    ButtonComponent,
+  ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
       <div class="grid gap-1">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.twoFactorTitle' | translate }}</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'auth.twoFactorTitle' | translate }}
+        </h1>
         <p class="text-sm text-slate-600 dark:text-slate-300">
           {{ 'auth.twoFactorCopy' | translate }}<span *ngIf="userEmail"> ({{ userEmail }})</span>
         </p>
@@ -42,17 +51,21 @@ import { ButtonComponent } from '../../shared/button.component';
 
         <div class="flex flex-col sm:flex-row gap-2">
           <app-button [label]="'auth.twoFactorSubmit' | translate" type="submit"></app-button>
-          <app-button variant="ghost" [label]="'auth.twoFactorBack' | translate" (action)="cancel()"></app-button>
+          <app-button
+            variant="ghost"
+            [label]="'auth.twoFactorBack' | translate"
+            (action)="cancel()"
+          ></app-button>
         </div>
       </form>
     </app-container>
-  `
+  `,
 })
 export class TwoFactorComponent implements OnInit {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'auth.loginTitle', url: '/login' },
-    { label: 'auth.twoFactorTitle' }
+    { label: 'auth.twoFactorTitle' },
   ];
 
   code = '';
@@ -63,7 +76,12 @@ export class TwoFactorComponent implements OnInit {
   private token: string | null = null;
   private remember = false;
 
-  constructor(private readonly auth: AuthService, private toast: ToastService, private router: Router, private translate: TranslateService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private toast: ToastService,
+    private router: Router,
+    private translate: TranslateService,
+  ) {}
 
   ngOnInit(): void {
     if (typeof sessionStorage === 'undefined') {
@@ -115,7 +133,7 @@ export class TwoFactorComponent implements OnInit {
       .pipe(
         finalize(() => {
           this.loading = false;
-        })
+        }),
       )
       .subscribe({
         next: (res) => {
@@ -131,8 +149,7 @@ export class TwoFactorComponent implements OnInit {
           const message = err?.error?.detail || this.translate.instant('auth.twoFactorInvalid');
           this.error = message;
           this.toast.error(message);
-        }
+        },
       });
   }
 }
-

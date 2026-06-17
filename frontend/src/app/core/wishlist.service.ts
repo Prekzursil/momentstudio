@@ -28,7 +28,7 @@ export class WishlistService {
 
   constructor(
     private readonly api: ApiService,
-    private readonly auth: AuthService
+    private readonly auth: AuthService,
   ) {
     this.authEffect = effect(() => {
       const userId = this.auth.user()?.id ?? null;
@@ -62,7 +62,7 @@ export class WishlistService {
         this.itemsSignal.set([]);
         this.loadedSignal.set(false);
         this.loadingSignal.set(false);
-      }
+      },
     });
   }
 
@@ -82,7 +82,9 @@ export class WishlistService {
   }
 
   add(productId: string): Observable<Product> {
-    return this.api.post<Product>(`/wishlist/${productId}`, {}).pipe(map((item: any) => this.normalizeProduct(item)));
+    return this.api
+      .post<Product>(`/wishlist/${productId}`, {})
+      .pipe(map((item: any) => this.normalizeProduct(item)));
   }
 
   remove(productId: string): Observable<void> {
@@ -118,7 +120,7 @@ export class WishlistService {
       ...(raw ?? {}),
       base_price: parseMoney(raw?.base_price),
       sale_price: raw?.sale_price == null ? null : parseMoney(raw.sale_price),
-      sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value)
+      sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value),
     } as Product;
   }
 
@@ -164,7 +166,7 @@ export class WishlistService {
       next[product.id] = {
         saved_at: now,
         price: this.effectivePrice(product),
-        stock_quantity: product.stock_quantity ?? null
+        stock_quantity: product.stock_quantity ?? null,
       };
       changed = true;
     }
@@ -185,8 +187,8 @@ export class WishlistService {
       [product.id]: {
         saved_at: new Date().toISOString(),
         price: this.effectivePrice(product),
-        stock_quantity: product.stock_quantity ?? null
-      }
+        stock_quantity: product.stock_quantity ?? null,
+      },
     };
     this.snapshotSignal.set(next);
     this.persistSnapshots(next);
@@ -203,4 +205,3 @@ export class WishlistService {
     this.persistSnapshots(next);
   }
 }
-

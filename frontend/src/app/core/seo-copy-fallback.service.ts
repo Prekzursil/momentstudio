@@ -35,15 +35,22 @@ export class SeoCopyFallbackService {
     return `${safeName} includes clear details on materials, availability, and practical use so customers can decide quickly.`;
   }
 
-  blogListIntro(lang: SeoLanguage, contextTag?: string | null, contextSeries?: string | null): string {
+  blogListIntro(
+    lang: SeoLanguage,
+    contextTag?: string | null,
+    contextSeries?: string | null,
+  ): string {
     const tag = cleanText(contextTag, 50);
     const series = cleanText(contextSeries, 50);
     if (lang === 'ro') {
-      if (series) return `Exploreaza articolele din seria ${series}, cu exemple practice si recomandari aplicabile imediat.`;
-      if (tag) return `Exploreaza articolele etichetate ${tag}, organizate pentru cautare rapida si context clar.`;
+      if (series)
+        return `Exploreaza articolele din seria ${series}, cu exemple practice si recomandari aplicabile imediat.`;
+      if (tag)
+        return `Exploreaza articolele etichetate ${tag}, organizate pentru cautare rapida si context clar.`;
       return 'Exploreaza articole noi, organizate pe teme, cu exemple practice si recomandari aplicabile imediat.';
     }
-    if (series) return `Browse posts from the ${series} series with practical examples and actionable guidance.`;
+    if (series)
+      return `Browse posts from the ${series} series with practical examples and actionable guidance.`;
     if (tag) return `Browse posts tagged ${tag}, organized for quick discovery and clear context.`;
     return 'Browse recent posts organized by topic with practical examples and actionable guidance.';
   }

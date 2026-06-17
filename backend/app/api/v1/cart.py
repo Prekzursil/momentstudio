@@ -33,22 +33,39 @@ async def get_cart(
 ):
     if not current_user and not session_id:
         session_id = f"guest-{uuid.uuid4()}"
-    cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
+    cart = await cart_service.get_cart(
+        session, getattr(current_user, "id", None) if current_user else None, session_id
+    )
     await session.refresh(cart)
     shipping_method = None
     if shipping_method_id:
-        shipping_method = await order_service.get_shipping_method(session, shipping_method_id)
+        shipping_method = await order_service.get_shipping_method(
+            session, shipping_method_id
+        )
         if not shipping_method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Shipping method not found",
+            )
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
 
     promo = None
     totals_override = None
     if promo_code:
         if not current_user:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons.")
-        rate_flat = Decimal(getattr(shipping_method, "rate_flat", None) or 0) if shipping_method else None
-        rate_per = Decimal(getattr(shipping_method, "rate_per_kg", None) or 0) if shipping_method else None
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Sign in to use coupons."
+            )
+        rate_flat = (
+            Decimal(getattr(shipping_method, "rate_flat", None) or 0)
+            if shipping_method
+            else None
+        )
+        rate_per = (
+            Decimal(getattr(shipping_method, "rate_per_kg", None) or 0)
+            if shipping_method
+            else None
+        )
         try:
             applied = await coupons_service.apply_discount_code_to_cart(
                 session,
@@ -63,7 +80,9 @@ async def get_cart(
             totals_override = applied.totals
         except HTTPException as exc:
             if exc.status_code == status.HTTP_404_NOT_FOUND:
-                promo = await cart_service.validate_promo(session, promo_code, currency=None)
+                promo = await cart_service.validate_promo(
+                    session, promo_code, currency=None
+                )
             else:
                 raise
 
@@ -87,7 +106,9 @@ async def add_item(
 ):
     if not current_user and not session_id:
         session_id = f"guest-{uuid.uuid4()}"
-    cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
+    cart = await cart_service.get_cart(
+        session, getattr(current_user, "id", None) if current_user else None, session_id
+    )
     item = await cart_service.add_item(session, cart, payload)
     return CartItemRead(
         id=item.id,
@@ -107,7 +128,9 @@ async def update_item(
     current_user=Depends(get_current_user_optional),
     session_id: str | None = Depends(session_header),
 ):
-    cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
+    cart = await cart_service.get_cart(
+        session, getattr(current_user, "id", None) if current_user else None, session_id
+    )
     item = await cart_service.update_item(session, cart, item_id, payload)
     return CartItemRead(
         id=item.id,
@@ -126,7 +149,9 @@ async def delete_item(
     current_user=Depends(get_current_user_optional),
     session_id: str | None = Depends(session_header),
 ):
-    cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
+    cart = await cart_service.get_cart(
+        session, getattr(current_user, "id", None) if current_user else None, session_id
+    )
     await cart_service.delete_item(session, cart, item_id)
     return None
 
@@ -138,7 +163,10 @@ async def merge_guest_cart(
     session_id: str | None = Depends(session_header),
 ):
     if not current_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Auth required to merge guest cart")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Auth required to merge guest cart",
+        )
     user_cart = await cart_service.get_cart(session, current_user.id, None)
     merged_cart = await cart_service.merge_guest_cart(session, user_cart, session_id)
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
@@ -166,7 +194,9 @@ async def sync_cart(
 ):
     if not current_user and not session_id:
         session_id = f"guest-{uuid.uuid4()}"
-    cart = await cart_service.get_cart(session, getattr(current_user, "id", None) if current_user else None, session_id)
+    cart = await cart_service.get_cart(
+        session, getattr(current_user, "id", None) if current_user else None, session_id
+    )
     await cart_service.sync_cart(session, cart, payload.items)
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
     return await cart_service.serialize_cart(

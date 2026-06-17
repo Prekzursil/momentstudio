@@ -22,16 +22,23 @@ import { finalize } from 'rxjs';
     ButtonComponent,
     BreadcrumbComponent,
     PasswordStrengthComponent,
-    TranslateModule
+    TranslateModule,
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.resetTitle' | translate }}</h1>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        {{ 'auth.resetTitle' | translate }}
+      </h1>
       <form #resetForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(resetForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.resetCode' | translate }}
-          <input name="token" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400" required [(ngModel)]="token" />
+          <input
+            name="token"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            required
+            [(ngModel)]="token"
+          />
         </label>
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'auth.password' | translate }}
@@ -49,7 +56,9 @@ import { finalize } from 'rxjs';
               type="button"
               class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
               (click)="showPassword = !showPassword"
-              [attr.aria-label]="(showPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              [attr.aria-label]="
+                (showPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate
+              "
             >
               {{ (showPassword ? 'auth.hide' : 'auth.show') | translate }}
             </button>
@@ -71,24 +80,29 @@ import { finalize } from 'rxjs';
               type="button"
               class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
               (click)="showConfirmPassword = !showConfirmPassword"
-              [attr.aria-label]="(showConfirmPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              [attr.aria-label]="
+                (showConfirmPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate
+              "
             >
               {{ (showConfirmPassword ? 'auth.hide' : 'auth.show') | translate }}
             </button>
           </div>
         </label>
         <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error }}</p>
-        <app-button [label]="'auth.setPassword' | translate" type="submit" [disabled]="loading"></app-button>
-        <a routerLink="/login" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'auth.backToLogin' | translate }}</a>
+        <app-button
+          [label]="'auth.setPassword' | translate"
+          type="submit"
+          [disabled]="loading"
+        ></app-button>
+        <a routerLink="/login" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{
+          'auth.backToLogin' | translate
+        }}</a>
       </form>
     </app-container>
-  `
+  `,
 })
 export class PasswordResetComponent implements OnInit {
-  crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'auth.resetTitle' }
-  ];
+  crumbs = [{ label: 'nav.home', url: '/' }, { label: 'auth.resetTitle' }];
   token = '';
   password = '';
   confirmPassword = '';
@@ -101,7 +115,7 @@ export class PasswordResetComponent implements OnInit {
     private readonly toast: ToastService,
     private readonly auth: AuthService,
     private readonly translate: TranslateService,
-    private readonly route: ActivatedRoute
+    private readonly route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
@@ -125,17 +139,19 @@ export class PasswordResetComponent implements OnInit {
       .pipe(
         finalize(() => {
           this.loading = false;
-        })
+        }),
       )
       .subscribe({
         next: () => {
-          this.toast.success(this.translate.instant('auth.successReset'), this.translate.instant('auth.backToLogin'));
+          this.toast.success(
+            this.translate.instant('auth.successReset'),
+            this.translate.instant('auth.backToLogin'),
+          );
         },
         error: (err) => {
           const message = err?.error?.detail || this.translate.instant('auth.errorReset');
           this.toast.error(message);
-        }
+        },
       });
   }
 }
-

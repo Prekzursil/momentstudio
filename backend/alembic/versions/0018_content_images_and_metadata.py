@@ -19,17 +19,35 @@ depends_on: Sequence[str] | None = None
 
 def upgrade() -> None:
     op.add_column("content_blocks", sa.Column("meta", sa.JSON(), nullable=True))
-    op.add_column("content_blocks", sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column(
+        "content_blocks",
+        sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
+    )
     op.alter_column("content_blocks", "sort_order", server_default=None)
 
     op.create_table(
         "content_images",
-        sa.Column("id", sa.dialects.postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("content_block_id", sa.dialects.postgresql.UUID(as_uuid=True), sa.ForeignKey("content_blocks.id"), nullable=False),
+        sa.Column(
+            "id",
+            sa.dialects.postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            nullable=False,
+        ),
+        sa.Column(
+            "content_block_id",
+            sa.dialects.postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("content_blocks.id"),
+            nullable=False,
+        ),
         sa.Column("url", sa.String(length=255), nullable=False),
         sa.Column("alt_text", sa.String(length=255), nullable=True),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
     op.alter_column("content_images", "sort_order", server_default=None)
 
@@ -42,13 +60,24 @@ def upgrade() -> None:
         sa.column("sort_order", sa.Integer()),
     )
     defaults = [
-        ("home.hero", {"headline": "Welcome to momentstudio", "cta": "Shop now", "cta_link": "/shop"}),
+        (
+            "home.hero",
+            {
+                "headline": "Welcome to momentstudio",
+                "cta": "Shop now",
+                "cta_link": "/shop",
+            },
+        ),
         ("home.grid", {"sections": ["featured", "new", "bestsellers"]}),
         ("home.testimonials", {"quotes": []}),
         ("page.faq", {"priority": 1}),
     ]
     for key, meta in defaults:
-        connection.execute(sa.update(content_blocks).where(content_blocks.c.key == key).values(meta=meta, sort_order=0))
+        connection.execute(
+            sa.update(content_blocks)
+            .where(content_blocks.c.key == key)
+            .values(meta=meta, sort_order=0)
+        )
 
 
 def downgrade() -> None:

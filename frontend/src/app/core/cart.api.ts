@@ -70,19 +70,23 @@ export class CartApi {
   }
 
   sync(items: CartApiItem[]): Observable<CartResponse> {
-    return this.api.post<CartResponse>('/cart/sync', { items }, this.headers()).pipe(
-      map((res) => res)
-    );
+    return this.api
+      .post<CartResponse>('/cart/sync', { items }, this.headers())
+      .pipe(map((res) => res));
   }
 
   get(
-    params?: Record<string, string | number | boolean | string[] | number[] | undefined>
+    params?: Record<string, string | number | boolean | string[] | number[] | undefined>,
   ): Observable<CartResponse> {
     return this.api.get<CartResponse>('/cart', params, this.headers());
   }
 
   paymentIntent(): Observable<{ client_secret: string; intent_id: string }> {
-    return this.api.post<{ client_secret: string; intent_id: string }>('/payments/intent', {}, this.headers());
+    return this.api.post<{ client_secret: string; intent_id: string }>(
+      '/payments/intent',
+      {},
+      this.headers(),
+    );
   }
 
   addItem(body: CartItemAddRequest): Observable<CartItemResponse> {
@@ -93,4 +97,3 @@ export class CartApi {
     return this.api.delete<void>(`/cart/items/${itemId}`, this.headers());
   }
 }
-

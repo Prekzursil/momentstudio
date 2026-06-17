@@ -14,14 +14,32 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductAuditLog, ProductTranslation
+from app.models.catalog import (
+    Category,
+    Product,
+    ProductImage,
+    ProductStatus,
+    ProductAuditLog,
+    ProductTranslation,
+)
 from app.models.content import ContentBlock, ContentStatus, ContentAuditLog
-from app.models.order import Order, OrderEvent, OrderItem, OrderRefund, OrderStatus, OrderTag
+from app.models.order import (
+    Order,
+    OrderEvent,
+    OrderItem,
+    OrderRefund,
+    OrderStatus,
+    OrderTag,
+)
 from app.models.address import Address
 from app.models.cart import Cart, CartItem
 from app.models.promo import PromoCode, StripeCouponMapping
 from app.models.returns import ReturnRequest, ReturnRequestStatus
-from app.models.support import ContactSubmission, ContactSubmissionTopic, ContactSubmissionStatus
+from app.models.support import (
+    ContactSubmission,
+    ContactSubmissionTopic,
+    ContactSubmissionStatus,
+)
 from app.models.passkeys import UserPasskey
 from app.models.user import PasswordResetToken, User, UserRole
 from app.models.user import UserSecurityEvent
@@ -32,7 +50,9 @@ from app.models.analytics_event import AnalyticsEvent
 @pytest.fixture(scope="module")
 def test_app() -> Dict[str, object]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
-    SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    SessionLocal = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+    )
 
     async def init_models() -> None:
         async with engine.begin() as conn:
@@ -113,7 +133,9 @@ async def seed(session_factory):
         await session.flush()
         image = ProductImage(product_id=product.id, url="img.jpg", sort_order=0)
         session.add(image)
-        session.add(ProductAuditLog(product_id=product.id, action="create", user_id=admin.id))
+        session.add(
+            ProductAuditLog(product_id=product.id, action="create", user_id=admin.id)
+        )
 
         order = Order(
             user_id=customer.id,
@@ -127,7 +149,9 @@ async def seed(session_factory):
         )
         session.add(order)
 
-        promo = PromoCode(code="SAVE5", percentage_off=5, currency="RON", active=True, max_uses=10)
+        promo = PromoCode(
+            code="SAVE5", percentage_off=5, currency="RON", active=True, max_uses=10
+        )
         session.add(promo)
 
         block = ContentBlock(
@@ -139,7 +163,11 @@ async def seed(session_factory):
         )
         session.add(block)
         await session.flush()
-        session.add(ContentAuditLog(content_block_id=block.id, action="publish", version=1, user_id=admin.id))
+        session.add(
+            ContentAuditLog(
+                content_block_id=block.id, action="publish", version=1, user_id=admin.id
+            )
+        )
 
         await session.commit()
         return {
@@ -158,7 +186,10 @@ def auth_headers(client: TestClient) -> dict:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    headers = {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
     payload = security.decode_token(token)
     if payload and payload.get("sub"):
         headers["X-Admin-Step-Up"] = security.create_step_up_token(str(payload["sub"]))
@@ -173,7 +204,9 @@ def test_admin_filters_and_low_stock(test_app: Dict[str, object]) -> None:
     asyncio.run(seed(session_factory))
     headers = auth_headers(client)
 
-    orders = client.get("/api/v1/orders/admin", params={"status": "pending_acceptance"}, headers=headers)
+    orders = client.get(
+        "/api/v1/orders/admin", params={"status": "pending_acceptance"}, headers=headers
+    )
     assert orders.status_code == 200
     assert orders.json()[0]["status"] == "pending_acceptance"
 
@@ -182,7 +215,9 @@ def test_admin_filters_and_low_stock(test_app: Dict[str, object]) -> None:
     assert low_stock.json()[0]["stock_quantity"] == 2
 
 
-def test_admin_summary_sales_excludes_cancelled_and_pending(test_app: Dict[str, object]) -> None:
+def test_admin_summary_sales_excludes_cancelled_and_pending(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
     session_factory = test_app["session_factory"]
@@ -193,7 +228,9 @@ def test_admin_summary_sales_excludes_cancelled_and_pending(test_app: Dict[str, 
     async def add_orders() -> None:
         async with session_factory() as session:
             customer = (
-                await session.execute(select(User).where(User.email == "customer@example.com"))
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
             ).scalar_one()
             now = datetime.now(timezone.utc)
             email = customer.email
@@ -294,7 +331,9 @@ def test_admin_summary_sales_excludes_cancelled_and_pending(test_app: Dict[str, 
     assert data["net_today_sales"] == pytest.approx(175.0)
 
 
-def test_admin_summary_net_sales_subtracts_partial_refunds(test_app: Dict[str, object]) -> None:
+def test_admin_summary_net_sales_subtracts_partial_refunds(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
     session_factory = test_app["session_factory"]
@@ -305,7 +344,9 @@ def test_admin_summary_net_sales_subtracts_partial_refunds(test_app: Dict[str, o
     async def add_order_and_refund() -> None:
         async with session_factory() as session:
             customer = (
-                await session.execute(select(User).where(User.email == "customer@example.com"))
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
             ).scalar_one()
             now = datetime.now(timezone.utc)
             email = customer.email
@@ -346,7 +387,9 @@ def test_admin_summary_net_sales_subtracts_partial_refunds(test_app: Dict[str, o
     assert data["net_today_sales"] == pytest.approx(70.0)
 
 
-def test_admin_summary_excludes_test_orders_from_kpis(test_app: Dict[str, object]) -> None:
+def test_admin_summary_excludes_test_orders_from_kpis(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
     session_factory = test_app["session_factory"]
@@ -357,7 +400,9 @@ def test_admin_summary_excludes_test_orders_from_kpis(test_app: Dict[str, object
     async def add_orders() -> None:
         async with session_factory() as session:
             customer = (
-                await session.execute(select(User).where(User.email == "customer@example.com"))
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
             ).scalar_one()
             now = datetime.now(timezone.utc)
             email = customer.email
@@ -389,7 +434,9 @@ def test_admin_summary_excludes_test_orders_from_kpis(test_app: Dict[str, object
             )
             session.add_all([live_order, test_order])
             await session.flush()
-            session.add(OrderTag(order_id=test_order.id, tag="test", actor_user_id=None))
+            session.add(
+                OrderTag(order_id=test_order.id, tag="test", actor_user_id=None)
+            )
             await session.commit()
 
     asyncio.run(add_orders())
@@ -401,7 +448,9 @@ def test_admin_summary_excludes_test_orders_from_kpis(test_app: Dict[str, object
     assert data["net_today_sales"] == pytest.approx(100.0)
 
 
-def test_admin_channel_breakdown_groups_and_excludes_test_orders(test_app: Dict[str, object]) -> None:
+def test_admin_channel_breakdown_groups_and_excludes_test_orders(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
     session_factory = test_app["session_factory"]
@@ -412,7 +461,9 @@ def test_admin_channel_breakdown_groups_and_excludes_test_orders(test_app: Dict[
     async def add_orders() -> None:
         async with session_factory() as session:
             customer = (
-                await session.execute(select(User).where(User.email == "customer@example.com"))
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
             ).scalar_one()
             now = datetime.now(timezone.utc)
             email = customer.email
@@ -482,7 +533,9 @@ def test_admin_channel_breakdown_groups_and_excludes_test_orders(test_app: Dict[
             session.add_all([stripe_paid, paypal_paid, stripe_refunded, stripe_test])
             await session.flush()
 
-            session.add(OrderTag(order_id=stripe_test.id, tag="test", actor_user_id=None))
+            session.add(
+                OrderTag(order_id=stripe_test.id, tag="test", actor_user_id=None)
+            )
             session.add(
                 OrderRefund(
                     order_id=stripe_paid.id,
@@ -530,7 +583,11 @@ def test_admin_payments_health_widget(test_app: Dict[str, object]) -> None:
 
     async def add_data() -> None:
         async with session_factory() as session:
-            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            customer = (
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
+            ).scalar_one()
             now = datetime.now(timezone.utc)
             email = customer.email
             name = customer.name or customer.email
@@ -633,7 +690,11 @@ def test_admin_refunds_breakdown_widget(test_app: Dict[str, object]) -> None:
 
     async def add_data() -> None:
         async with session_factory() as session:
-            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            customer = (
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
+            ).scalar_one()
             now = datetime.now(timezone.utc)
             current_time = now - timedelta(hours=2)
             previous_time = now - timedelta(hours=36)
@@ -693,7 +754,9 @@ def test_admin_refunds_breakdown_widget(test_app: Dict[str, object]) -> None:
                 updated_at=previous_time,
             )
 
-            session.add_all([missing_order, refund_order, manual_order, previous_refund_order])
+            session.add_all(
+                [missing_order, refund_order, manual_order, previous_refund_order]
+            )
             await session.flush()
 
             session.add(
@@ -748,7 +811,11 @@ def test_admin_refunds_breakdown_widget(test_app: Dict[str, object]) -> None:
 
     asyncio.run(add_data())
 
-    resp = client.get("/api/v1/admin/dashboard/refunds-breakdown", params={"window_days": 1}, headers=headers)
+    resp = client.get(
+        "/api/v1/admin/dashboard/refunds-breakdown",
+        params={"window_days": 1},
+        headers=headers,
+    )
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["window_days"] == 1
@@ -775,7 +842,11 @@ def test_admin_shipping_performance_widget(test_app: Dict[str, object]) -> None:
 
     async def add_data() -> None:
         async with session_factory() as session:
-            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            customer = (
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
+            ).scalar_one()
             now = datetime.now(timezone.utc)
             email = customer.email
             name = customer.name or customer.email
@@ -843,7 +914,11 @@ def test_admin_shipping_performance_widget(test_app: Dict[str, object]) -> None:
 
     asyncio.run(add_data())
 
-    resp = client.get("/api/v1/admin/dashboard/shipping-performance", params={"window_days": 1}, headers=headers)
+    resp = client.get(
+        "/api/v1/admin/dashboard/shipping-performance",
+        params={"window_days": 1},
+        headers=headers,
+    )
     assert resp.status_code == 200, resp.text
     data = resp.json()
 
@@ -866,8 +941,14 @@ def test_admin_stockout_impact_widget(test_app: Dict[str, object]) -> None:
 
     async def add_data() -> None:
         async with session_factory() as session:
-            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
-            category = (await session.execute(select(Category).where(Category.slug == "art"))).scalar_one()
+            customer = (
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
+            ).scalar_one()
+            category = (
+                await session.execute(select(Category).where(Category.slug == "art"))
+            ).scalar_one()
             now = datetime.now(timezone.utc)
 
             product = Product(
@@ -924,7 +1005,11 @@ def test_admin_stockout_impact_widget(test_app: Dict[str, object]) -> None:
 
     asyncio.run(add_data())
 
-    resp = client.get("/api/v1/admin/dashboard/stockout-impact", params={"window_days": 30, "limit": 5}, headers=headers)
+    resp = client.get(
+        "/api/v1/admin/dashboard/stockout-impact",
+        params={"window_days": 30, "limit": 5},
+        headers=headers,
+    )
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["items"], "Expected stockout items"
@@ -946,7 +1031,11 @@ def test_admin_channel_attribution_widget(test_app: Dict[str, object]) -> None:
 
     async def add_data() -> None:
         async with session_factory() as session:
-            customer = (await session.execute(select(User).where(User.email == "customer@example.com"))).scalar_one()
+            customer = (
+                await session.execute(
+                    select(User).where(User.email == "customer@example.com")
+                )
+            ).scalar_one()
             now = datetime.now(timezone.utc)
 
             order = Order(
@@ -971,7 +1060,11 @@ def test_admin_channel_attribution_widget(test_app: Dict[str, object]) -> None:
                     session_id=session_id,
                     event="session_start",
                     path="/",
-                    payload={"utm_source": "google", "utm_medium": "cpc", "utm_campaign": "spring"},
+                    payload={
+                        "utm_source": "google",
+                        "utm_medium": "cpc",
+                        "utm_campaign": "spring",
+                    },
                     created_at=now - timedelta(days=2),
                 )
             )
@@ -989,7 +1082,11 @@ def test_admin_channel_attribution_widget(test_app: Dict[str, object]) -> None:
 
     asyncio.run(add_data())
 
-    resp = client.get("/api/v1/admin/dashboard/channel-attribution", params={"range_days": 30}, headers=headers)
+    resp = client.get(
+        "/api/v1/admin/dashboard/channel-attribution",
+        params={"range_days": 30},
+        headers=headers,
+    )
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["tracked_orders"] == 1
@@ -1007,7 +1104,11 @@ def test_coupon_lifecycle_and_audit(test_app: Dict[str, object]) -> None:
     asyncio.run(seed(session_factory))
     headers = auth_headers(client)
 
-    created = client.post("/api/v1/admin/dashboard/coupons", headers=headers, json={"code": "NEW", "active": True})
+    created = client.post(
+        "/api/v1/admin/dashboard/coupons",
+        headers=headers,
+        json={"code": "NEW", "active": True},
+    )
     assert created.status_code == 201
     updated = client.patch(
         f"/api/v1/admin/dashboard/coupons/{created.json()['id']}",
@@ -1029,7 +1130,11 @@ def test_coupon_stripe_mapping_invalidation(test_app: Dict[str, object]) -> None
     asyncio.run(seed(session_factory))
     headers = auth_headers(client)
 
-    created = client.post("/api/v1/admin/dashboard/coupons", headers=headers, json={"code": "NEW", "percentage_off": 10, "active": True})
+    created = client.post(
+        "/api/v1/admin/dashboard/coupons",
+        headers=headers,
+        json={"code": "NEW", "percentage_off": 10, "active": True},
+    )
     assert created.status_code == 201, created.text
     coupon_id = created.json()["id"]
     coupon_uuid = UUID(coupon_id)
@@ -1058,14 +1163,22 @@ def test_coupon_stripe_mapping_invalidation(test_app: Dict[str, object]) -> None
     asyncio.run(add_mapping("stripe-coupon-1"))
     assert asyncio.run(count_mappings()) == 1
 
-    updated = client.patch(f"/api/v1/admin/dashboard/coupons/{coupon_id}", headers=headers, json={"percentage_off": 15})
+    updated = client.patch(
+        f"/api/v1/admin/dashboard/coupons/{coupon_id}",
+        headers=headers,
+        json={"percentage_off": 15},
+    )
     assert updated.status_code == 200, updated.text
     assert asyncio.run(count_mappings()) == 0
 
     asyncio.run(add_mapping("stripe-coupon-2"))
     assert asyncio.run(count_mappings()) == 1
 
-    invalidated = client.post(f"/api/v1/admin/dashboard/coupons/{coupon_id}/stripe/invalidate", headers=headers, json={})
+    invalidated = client.post(
+        f"/api/v1/admin/dashboard/coupons/{coupon_id}/stripe/invalidate",
+        headers=headers,
+        json={},
+    )
     assert invalidated.status_code == 200, invalidated.text
     assert invalidated.json()["deleted_mappings"] == 1
     assert asyncio.run(count_mappings()) == 0
@@ -1099,34 +1212,60 @@ def test_product_trash_and_image_restore(test_app: Dict[str, object]) -> None:
     product_slug = seeded["product_slug"]
     image_id = seeded["image_id"]
 
-    deleted_image = client.delete(f"/api/v1/catalog/products/{product_slug}/images/{image_id}", headers=headers)
+    deleted_image = client.delete(
+        f"/api/v1/catalog/products/{product_slug}/images/{image_id}", headers=headers
+    )
     assert deleted_image.status_code == 200, deleted_image.text
     assert all(img["id"] != image_id for img in deleted_image.json().get("images", []))
 
-    deleted_list = client.get(f"/api/v1/catalog/products/{product_slug}/images/deleted", headers=headers)
+    deleted_list = client.get(
+        f"/api/v1/catalog/products/{product_slug}/images/deleted", headers=headers
+    )
     assert deleted_list.status_code == 200, deleted_list.text
     assert any(img["id"] == image_id for img in deleted_list.json())
 
-    restored_image = client.post(f"/api/v1/catalog/products/{product_slug}/images/{image_id}/restore", headers=headers)
+    restored_image = client.post(
+        f"/api/v1/catalog/products/{product_slug}/images/{image_id}/restore",
+        headers=headers,
+    )
     assert restored_image.status_code == 200, restored_image.text
     assert any(img["id"] == image_id for img in restored_image.json().get("images", []))
 
-    delete_product = client.delete(f"/api/v1/catalog/products/{product_slug}", headers=headers)
+    delete_product = client.delete(
+        f"/api/v1/catalog/products/{product_slug}", headers=headers
+    )
     assert delete_product.status_code == 204, delete_product.text
 
-    deleted_products = client.get("/api/v1/admin/dashboard/products/search", params={"deleted": True}, headers=headers)
+    deleted_products = client.get(
+        "/api/v1/admin/dashboard/products/search",
+        params={"deleted": True},
+        headers=headers,
+    )
     assert deleted_products.status_code == 200, deleted_products.text
-    match = next((item for item in deleted_products.json().get("items", []) if item["deleted_slug"] == product_slug), None)
+    match = next(
+        (
+            item
+            for item in deleted_products.json().get("items", [])
+            if item["deleted_slug"] == product_slug
+        ),
+        None,
+    )
     assert match is not None
     product_id = match["id"]
 
-    restored_product = client.post(f"/api/v1/admin/dashboard/products/{product_id}/restore", headers=headers)
+    restored_product = client.post(
+        f"/api/v1/admin/dashboard/products/{product_id}/restore", headers=headers
+    )
     assert restored_product.status_code == 200, restored_product.text
     assert restored_product.json()["slug"] == product_slug
 
-    active_products = client.get("/api/v1/admin/dashboard/products/search", headers=headers)
+    active_products = client.get(
+        "/api/v1/admin/dashboard/products/search", headers=headers
+    )
     assert active_products.status_code == 200, active_products.text
-    assert any(item["id"] == product_id for item in active_products.json().get("items", []))
+    assert any(
+        item["id"] == product_id for item in active_products.json().get("items", [])
+    )
 
 
 def test_admin_products_search_translation_filters(test_app: Dict[str, object]) -> None:
@@ -1139,9 +1278,17 @@ def test_admin_products_search_translation_filters(test_app: Dict[str, object]) 
 
     async def add_translation_data() -> None:
         async with session_factory() as session:
-            category = (await session.execute(select(Category).where(Category.slug == "art"))).scalar_one()
-            painting = (await session.execute(select(Product).where(Product.slug == "painting"))).scalar_one()
-            session.add(ProductTranslation(product_id=painting.id, lang="en", name="Painting EN"))
+            category = (
+                await session.execute(select(Category).where(Category.slug == "art"))
+            ).scalar_one()
+            painting = (
+                await session.execute(select(Product).where(Product.slug == "painting"))
+            ).scalar_one()
+            session.add(
+                ProductTranslation(
+                    product_id=painting.id, lang="en", name="Painting EN"
+                )
+            )
 
             session.add(
                 Product(
@@ -1209,7 +1356,9 @@ def test_product_audit_trail_records_field_changes(test_app: Dict[str, object]) 
     )
     assert patched.status_code == 200, patched.text
 
-    audit = client.get(f"/api/v1/catalog/products/{product_slug}/audit", headers=headers)
+    audit = client.get(
+        f"/api/v1/catalog/products/{product_slug}/audit", headers=headers
+    )
     assert audit.status_code == 200, audit.text
     entries = audit.json()
     update_entry = next((e for e in entries if e.get("action") == "update"), None)
@@ -1351,7 +1500,9 @@ def test_admin_user_impersonation_is_read_only(test_app: Dict[str, object]) -> N
     audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
     assert audit.status_code == 200, audit.text
     security_logs = audit.json().get("security", [])
-    assert any(item.get("action") == "user.impersonation.start" for item in security_logs)
+    assert any(
+        item.get("action") == "user.impersonation.start" for item in security_logs
+    )
 
 
 def test_admin_user_security_update_blocks_login(test_app: Dict[str, object]) -> None:
@@ -1366,26 +1517,40 @@ def test_admin_user_security_update_blocks_login(test_app: Dict[str, object]) ->
     updated = client.patch(
         f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/security",
         headers=headers,
-        json={"locked_until": locked_until, "locked_reason": "fraud review", "password_reset_required": True},
+        json={
+            "locked_until": locked_until,
+            "locked_reason": "fraud review",
+            "password_reset_required": True,
+        },
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["password_reset_required"] is True
     assert updated.json()["locked_until"]
 
-    blocked = client.post("/api/v1/auth/login", json={"email": "customer@example.com", "password": "Password123"})
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={"email": "customer@example.com", "password": "Password123"},
+    )
     assert blocked.status_code == 403, blocked.text
 
     unlocked = client.patch(
         f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/security",
         headers=headers,
-        json={"locked_until": None, "locked_reason": None, "password_reset_required": False},
+        json={
+            "locked_until": None,
+            "locked_reason": None,
+            "password_reset_required": False,
+        },
     )
     assert unlocked.status_code == 200, unlocked.text
     assert unlocked.json()["locked_until"] is None
     assert unlocked.json()["locked_reason"] is None
     assert unlocked.json()["password_reset_required"] is False
 
-    ok = client.post("/api/v1/auth/login", json={"email": "customer@example.com", "password": "Password123"})
+    ok = client.post(
+        "/api/v1/auth/login",
+        json={"email": "customer@example.com", "password": "Password123"},
+    )
     assert ok.status_code == 200, ok.text
 
     audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
@@ -1402,7 +1567,10 @@ def test_admin_user_email_verification_controls(test_app: Dict[str, object]) -> 
     seeded = asyncio.run(seed(session_factory))
     headers = auth_headers(client)
 
-    before = client.get(f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification", headers=headers)
+    before = client.get(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification",
+        headers=headers,
+    )
     assert before.status_code == 200, before.text
     assert before.json()["tokens"] == []
 
@@ -1412,7 +1580,10 @@ def test_admin_user_email_verification_controls(test_app: Dict[str, object]) -> 
     )
     assert resend.status_code == 202, resend.text
 
-    after = client.get(f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification", headers=headers)
+    after = client.get(
+        f"/api/v1/admin/dashboard/users/{seeded['customer_id']}/email/verification",
+        headers=headers,
+    )
     assert after.status_code == 200, after.text
     assert len(after.json()["tokens"]) == 1
 
@@ -1427,11 +1598,18 @@ def test_admin_user_email_verification_controls(test_app: Dict[str, object]) -> 
     audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
     assert audit.status_code == 200, audit.text
     security_logs = audit.json().get("security", [])
-    assert any(item.get("action") == "user.email_verification.resend" for item in security_logs)
-    assert any(item.get("action") == "user.email_verification.override" for item in security_logs)
+    assert any(
+        item.get("action") == "user.email_verification.resend" for item in security_logs
+    )
+    assert any(
+        item.get("action") == "user.email_verification.override"
+        for item in security_logs
+    )
 
 
-def test_admin_user_password_reset_resend_creates_token_and_audit(test_app: Dict[str, object]) -> None:
+def test_admin_user_password_reset_resend_creates_token_and_audit(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
     session_factory = test_app["session_factory"]
@@ -1449,12 +1627,16 @@ def test_admin_user_password_reset_resend_creates_token_and_audit(test_app: Dict
     async def _count_tokens() -> int:
         async with session_factory() as session:
             rows = (
-                await session.execute(
-                    select(PasswordResetToken).where(
-                        PasswordResetToken.user_id == seeded["customer_id"]
+                (
+                    await session.execute(
+                        select(PasswordResetToken).where(
+                            PasswordResetToken.user_id == seeded["customer_id"]
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return len(rows)
 
     assert asyncio.run(_count_tokens()) == 1
@@ -1462,4 +1644,6 @@ def test_admin_user_password_reset_resend_creates_token_and_audit(test_app: Dict
     audit = client.get("/api/v1/admin/dashboard/audit", headers=headers)
     assert audit.status_code == 200, audit.text
     security_logs = audit.json().get("security", [])
-    assert any(item.get("action") == "user.password_reset.resend" for item in security_logs)
+    assert any(
+        item.get("action") == "user.password_reset.resend" for item in security_logs
+    )

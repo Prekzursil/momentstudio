@@ -14,12 +14,18 @@ type SeoSnapshot = {
 
 function snapshotSeo(page): Promise<SeoSnapshot> {
   return page.evaluate(() => {
-    const canonicalLinks = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]'));
+    const canonicalLinks = Array.from(
+      document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]'),
+    );
     const canonicalHref = canonicalLinks[0]?.href || '';
-    const robots = document.querySelector<HTMLMetaElement>("meta[name='robots']")?.content?.trim() || '';
-    const description = document.querySelector<HTMLMetaElement>("meta[name='description']")?.content?.trim() || '';
+    const robots =
+      document.querySelector<HTMLMetaElement>("meta[name='robots']")?.content?.trim() || '';
+    const description =
+      document.querySelector<HTMLMetaElement>("meta[name='description']")?.content?.trim() || '';
     const h1s = Array.from(document.querySelectorAll('h1'));
-    const h1Texts = h1s.map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const h1Texts = h1s
+      .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
     return {
       title: (document.title || '').trim(),
       description,
@@ -73,7 +79,10 @@ async function firstPublishedProductSlug(page): Promise<string | null> {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
-    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
+    localStorage.setItem(
+      'admin.onboarding.v1',
+      JSON.stringify({ completed_at: new Date().toISOString() }),
+    );
   });
 });
 

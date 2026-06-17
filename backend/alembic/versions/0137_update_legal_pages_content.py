@@ -46,8 +46,12 @@ def upgrade() -> None:
     now = datetime.now(timezone.utc)
     is_postgres = conn.dialect.name == "postgresql"
 
-    content_status = postgresql.ENUM("draft", "review", "published", name="contentstatus", create_type=False)
-    published_status = sa.text("'published'::contentstatus") if is_postgres else "published"
+    content_status = postgresql.ENUM(
+        "draft", "review", "published", name="contentstatus", create_type=False
+    )
+    published_status = (
+        sa.text("'published'::contentstatus") if is_postgres else "published"
+    )
 
     content_blocks = sa.table(
         "content_blocks",
@@ -151,18 +155,31 @@ def upgrade() -> None:
                     lang="en",
                     published_at=now,
                     published_until=None,
-                    translations=[{"lang": "ro", "title": ro_title, "body_markdown": ro_body}],
+                    translations=[
+                        {"lang": "ro", "title": ro_title, "body_markdown": ro_body}
+                    ],
                     created_at=now,
                 )
             )
             return
 
-        block_id, current_version, current_title, current_body, current_meta, current_lang = row
+        (
+            block_id,
+            current_version,
+            current_title,
+            current_body,
+            current_meta,
+            current_lang,
+        ) = row
         current_body = current_body or ""
         current_title = current_title or ""
 
-        looks_like_template = "(template)" in current_title.lower() or "șablon" in current_title.lower()
-        looks_like_template = looks_like_template or any(s in current_body for s in template_sentinels)
+        looks_like_template = (
+            "(template)" in current_title.lower() or "șablon" in current_title.lower()
+        )
+        looks_like_template = looks_like_template or any(
+            s in current_body for s in template_sentinels
+        )
 
         if not looks_like_template:
             return
@@ -219,7 +236,9 @@ def upgrade() -> None:
                 lang=current_lang,
                 published_at=now,
                 published_until=None,
-                translations=[{"lang": "ro", "title": ro_title, "body_markdown": ro_body}],
+                translations=[
+                    {"lang": "ro", "title": ro_title, "body_markdown": ro_body}
+                ],
                 created_at=now,
             )
         )

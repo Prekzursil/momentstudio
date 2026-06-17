@@ -26,8 +26,15 @@ def upgrade() -> None:
         sa.Column("code", sa.String(length=40), nullable=False),
         sa.Column("name", sa.String(length=120), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "is_default", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -38,17 +45,27 @@ def upgrade() -> None:
         sa.UniqueConstraint("code", name="uq_tax_groups_code"),
     )
     op.create_index(op.f("ix_tax_groups_code"), "tax_groups", ["code"], unique=False)
-    op.create_index(op.f("ix_tax_groups_is_default"), "tax_groups", ["is_default"], unique=False)
+    op.create_index(
+        op.f("ix_tax_groups_is_default"), "tax_groups", ["is_default"], unique=False
+    )
 
     op.create_table(
         "tax_rates",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column(
-            "group_id", sa.UUID(as_uuid=True), sa.ForeignKey("tax_groups.id", ondelete="CASCADE"), nullable=False
+            "group_id",
+            sa.UUID(as_uuid=True),
+            sa.ForeignKey("tax_groups.id", ondelete="CASCADE"),
+            nullable=False,
         ),
         sa.Column("country_code", sa.String(length=2), nullable=False),
         sa.Column("vat_rate_percent", sa.Numeric(5, 2), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -56,10 +73,16 @@ def upgrade() -> None:
             onupdate=sa.func.now(),
             nullable=False,
         ),
-        sa.UniqueConstraint("group_id", "country_code", name="uq_tax_rates_group_country"),
+        sa.UniqueConstraint(
+            "group_id", "country_code", name="uq_tax_rates_group_country"
+        ),
     )
-    op.create_index(op.f("ix_tax_rates_country_code"), "tax_rates", ["country_code"], unique=False)
-    op.create_index(op.f("ix_tax_rates_group_id"), "tax_rates", ["group_id"], unique=False)
+    op.create_index(
+        op.f("ix_tax_rates_country_code"), "tax_rates", ["country_code"], unique=False
+    )
+    op.create_index(
+        op.f("ix_tax_rates_group_id"), "tax_rates", ["group_id"], unique=False
+    )
 
     op.add_column(
         "categories",
@@ -70,7 +93,9 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
-    op.create_index(op.f("ix_categories_tax_group_id"), "categories", ["tax_group_id"], unique=False)
+    op.create_index(
+        op.f("ix_categories_tax_group_id"), "categories", ["tax_group_id"], unique=False
+    )
 
     default_id = uuid.uuid4()
     op.execute(
@@ -98,4 +123,3 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_tax_groups_is_default"), table_name="tax_groups")
     op.drop_index(op.f("ix_tax_groups_code"), table_name="tax_groups")
     op.drop_table("tax_groups")
-

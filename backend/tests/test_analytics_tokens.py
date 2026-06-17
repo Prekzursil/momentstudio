@@ -32,13 +32,20 @@ def test_client() -> TestClient:
     app.dependency_overrides.clear()
 
 
-def test_analytics_ingest_allows_missing_token_by_default(test_client: TestClient) -> None:
+def test_analytics_ingest_allows_missing_token_by_default(
+    test_client: TestClient,
+) -> None:
     previous_require_token = settings.analytics_require_token
     settings.analytics_require_token = False
     try:
         resp = test_client.post(
             "/api/v1/analytics/events",
-            json={"event": "session_start", "session_id": "test-session", "path": "/", "payload": None},
+            json={
+                "event": "session_start",
+                "session_id": "test-session",
+                "path": "/",
+                "payload": None,
+            },
         )
         assert resp.status_code == 200, resp.text
         assert resp.json().get("received") is True
@@ -54,13 +61,20 @@ def test_analytics_token_required_flow(test_client: TestClient) -> None:
     try:
         missing = test_client.post(
             "/api/v1/analytics/events",
-            json={"event": "session_start", "session_id": "secure-session", "path": "/", "payload": None},
+            json={
+                "event": "session_start",
+                "session_id": "secure-session",
+                "path": "/",
+                "payload": None,
+            },
         )
         assert missing.status_code == 401, missing.text
         payload = missing.json()
         assert payload.get("code") == "analytics_token_required"
 
-        minted = test_client.post("/api/v1/analytics/token", json={"session_id": "secure-session"})
+        minted = test_client.post(
+            "/api/v1/analytics/token", json={"session_id": "secure-session"}
+        )
         assert minted.status_code == 200, minted.text
         token = minted.json().get("token")
         assert isinstance(token, str) and token
@@ -68,14 +82,24 @@ def test_analytics_token_required_flow(test_client: TestClient) -> None:
         ok = test_client.post(
             "/api/v1/analytics/events",
             headers={"X-Analytics-Token": token},
-            json={"event": "session_start", "session_id": "secure-session", "path": "/", "payload": None},
+            json={
+                "event": "session_start",
+                "session_id": "secure-session",
+                "path": "/",
+                "payload": None,
+            },
         )
         assert ok.status_code == 200, ok.text
 
         mismatch = test_client.post(
             "/api/v1/analytics/events",
             headers={"X-Analytics-Token": token},
-            json={"event": "session_start", "session_id": "other-session", "path": "/", "payload": None},
+            json={
+                "event": "session_start",
+                "session_id": "other-session",
+                "path": "/",
+                "payload": None,
+            },
         )
         assert mismatch.status_code == 401, mismatch.text
         mismatch_payload = mismatch.json()
@@ -83,4 +107,3 @@ def test_analytics_token_required_flow(test_client: TestClient) -> None:
     finally:
         settings.analytics_require_token = previous_require_token
         settings.analytics_token_ttl_seconds = previous_ttl
-

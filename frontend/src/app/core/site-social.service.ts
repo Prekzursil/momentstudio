@@ -31,10 +31,10 @@ export interface SiteSocialData {
 const DEFAULT_SOCIAL: SiteSocialData = {
   contact: {
     phone: appConfig.siteProfile.contact.phone,
-    email: appConfig.siteProfile.contact.email
+    email: appConfig.siteProfile.contact.email,
   },
   instagramPages: appConfig.siteProfile.instagramPages.map((link) => ({ ...link })),
-  facebookPages: appConfig.siteProfile.facebookPages.map((link) => ({ ...link }))
+  facebookPages: appConfig.siteProfile.facebookPages.map((link) => ({ ...link })),
 };
 
 interface ContentBlockRead {
@@ -52,7 +52,7 @@ export class SiteSocialService {
     this.cached$ = this.api.get<ContentBlockRead>('/content/site.social').pipe(
       map((block) => this.parseBlock(block)),
       catchError(() => of(DEFAULT_SOCIAL)),
-      shareReplay({ bufferSize: 1, refCount: false })
+      shareReplay({ bufferSize: 1, refCount: false }),
     );
     return this.cached$;
   }
@@ -74,9 +74,9 @@ export class SiteSocialService {
     const items: SiteSocialLink[] = [];
     for (const raw of value) {
       if (!raw || typeof raw !== 'object') continue;
-      const label = String((raw).label ?? '').trim();
-      const url = String((raw).url ?? '').trim();
-      const thumbnail_url = (raw).thumbnail_url;
+      const label = String(raw.label ?? '').trim();
+      const url = String(raw.url ?? '').trim();
+      const thumbnail_url = raw.thumbnail_url;
       const thumb = typeof thumbnail_url === 'string' ? thumbnail_url.trim() : null;
       if (!label || !url) continue;
       items.push({ label, url, thumbnail_url: thumb || null });
@@ -92,4 +92,3 @@ export class SiteSocialService {
     return { phone: phone || null, email: email || null };
   }
 }
-

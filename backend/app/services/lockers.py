@@ -69,11 +69,16 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     r = 6371.0
     dlat = radians(lat2 - lat1)
     dlng = radians(lng2 - lng1)
-    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    a = (
+        sin(dlat / 2) ** 2
+        + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    )
     return float(2 * r * asin(sqrt(a)))
 
 
-def _build_query(provider: LockerProvider, *, lat: float, lng: float, radius_m: int) -> str:
+def _build_query(
+    provider: LockerProvider, *, lat: float, lng: float, radius_m: int
+) -> str:
     common = f'(around:{radius_m},{lat},{lng})["amenity"="parcel_locker"]'
     if provider == LockerProvider.sameday:
         tag_filters = (
@@ -128,9 +133,11 @@ def _format_name(tags: dict[str, str], provider: LockerProvider) -> str:
     return "Easybox" if provider == LockerProvider.sameday else "FANbox"
 
 
-def _parse_overpass_json(data: dict, *, provider: LockerProvider, lat: float, lng: float) -> list[LockerRead]:
+def _parse_overpass_json(
+    data: dict, *, provider: LockerProvider, lat: float, lng: float
+) -> list[LockerRead]:
     items: list[LockerRead] = []
-    for el in (data.get("elements") or []):
+    for el in data.get("elements") or []:
         el_type = (el.get("type") or "").strip()
         el_id = el.get("id")
         if el_type not in {"node", "way", "relation"} or el_id is None:
@@ -166,11 +173,19 @@ def _parse_overpass_json(data: dict, *, provider: LockerProvider, lat: float, ln
 
 
 def _sameday_configured() -> bool:
-    return bool(settings.sameday_api_base_url and settings.sameday_api_username and settings.sameday_api_password)
+    return bool(
+        settings.sameday_api_base_url
+        and settings.sameday_api_username
+        and settings.sameday_api_password
+    )
 
 
 def _fan_configured() -> bool:
-    return bool(settings.fan_api_base_url and settings.fan_api_username and settings.fan_api_password)
+    return bool(
+        settings.fan_api_base_url
+        and settings.fan_api_username
+        and settings.fan_api_password
+    )
 
 
 def _sameday_base_url() -> str:
@@ -225,7 +240,9 @@ async def _sameday_get_token() -> str:
         "X-Auth-Password": settings.sameday_api_password,
     }
     timeout = httpx.Timeout(15.0, connect=5.0)
-    async with httpx.AsyncClient(base_url=_sameday_base_url(), timeout=timeout, headers=headers) as client:
+    async with httpx.AsyncClient(
+        base_url=_sameday_base_url(), timeout=timeout, headers=headers
+    ) as client:
         resp = await client.post("/api/authenticate", data={"remember_me": "1"})
         resp.raise_for_status()
         data = resp.json()
@@ -246,9 +263,14 @@ async def _load_sameday_lockers() -> list[_LockerPoint]:
     page = 1
     count_per_page = 200
     items: list[_LockerPoint] = []
-    async with httpx.AsyncClient(base_url=_sameday_base_url(), timeout=timeout, headers=headers) as client:
+    async with httpx.AsyncClient(
+        base_url=_sameday_base_url(), timeout=timeout, headers=headers
+    ) as client:
         while True:
-            resp = await client.get("/api/client/lockers", params={"page": page, "countPerPage": count_per_page})
+            resp = await client.get(
+                "/api/client/lockers",
+                params={"page": page, "countPerPage": count_per_page},
+            )
             resp.raise_for_status()
             data = resp.json() or {}
             for row in data.get("data") or []:
@@ -257,7 +279,7 @@ async def _load_sameday_lockers() -> list[_LockerPoint]:
                     lat_val = float(row.get("lat"))
                     lng_val = float(row.get("lng"))
                     name = str(row.get("name") or "").strip()[:255]
-                    address = (str(row.get("address") or "").strip() or None)
+                    address = str(row.get("address") or "").strip() or None
                     if not locker_id or not name:
                         continue
                 except Exception:
@@ -291,23 +313,39 @@ async def _fan_get_token() -> str:
 
     headers = {"User-Agent": _UA, "Accept": "application/json"}
     timeout = httpx.Timeout(15.0, connect=5.0)
-    async with httpx.AsyncClient(base_url=_fan_base_url(), timeout=timeout, headers=headers) as client:
-        resp = await client.post("/login", params={"username": settings.fan_api_username, "password": settings.fan_api_password})
+    async with httpx.AsyncClient(
+        base_url=_fan_base_url(), timeout=timeout, headers=headers
+    ) as client:
+        resp = await client.post(
+            "/login",
+            params={
+                "username": settings.fan_api_username,
+                "password": settings.fan_api_password,
+            },
+        )
         resp.raise_for_status()
         payload = resp.json() or {}
 
     data = payload.get("data") if isinstance(payload, dict) else None
-    data_obj = data if isinstance(data, dict) else (payload if isinstance(payload, dict) else {})
+    data_obj = (
+        data
+        if isinstance(data, dict)
+        else (payload if isinstance(payload, dict) else {})
+    )
     token = str(data_obj.get("token") or "").strip()
     if not token:
         raise RuntimeError("FAN Courier authentication returned an empty token")
-    expires_at = _parse_fan_expires_at(data_obj.get("expiresAt") or data_obj.get("expires_at"), now=now)
+    expires_at = _parse_fan_expires_at(
+        data_obj.get("expiresAt") or data_obj.get("expires_at"), now=now
+    )
     _fan_auth = _AuthToken(token=token, expires_at=expires_at)
     return token
 
 
 def _format_fan_address(addr: dict) -> str | None:
-    street = " ".join([(addr.get("street") or "").strip(), (addr.get("streetNo") or "").strip()]).strip()
+    street = " ".join(
+        [(addr.get("street") or "").strip(), (addr.get("streetNo") or "").strip()]
+    ).strip()
     locality = (addr.get("locality") or "").strip()
     county = (addr.get("county") or "").strip()
     parts = [p for p in [street, locality, county] if p]
@@ -318,9 +356,15 @@ def _format_fan_address(addr: dict) -> str | None:
 
 async def _load_fan_lockers() -> list[_LockerPoint]:
     token = await _fan_get_token()
-    headers = {"User-Agent": _UA, "Accept": "application/json", "Authorization": f"Bearer {token}"}
+    headers = {
+        "User-Agent": _UA,
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
     timeout = httpx.Timeout(20.0, connect=5.0)
-    async with httpx.AsyncClient(base_url=_fan_base_url(), timeout=timeout, headers=headers) as client:
+    async with httpx.AsyncClient(
+        base_url=_fan_base_url(), timeout=timeout, headers=headers
+    ) as client:
         resp = await client.get("/reports/pickup-points", params={"type": "fanbox"})
         resp.raise_for_status()
         data = resp.json() or {}
@@ -363,10 +407,14 @@ async def _get_all_lockers(provider: LockerProvider) -> list[_LockerPoint]:
             items = await _load_sameday_lockers()
         else:
             if not _fan_configured():
-                raise LockersNotConfiguredError("FAN Courier locker API is not configured")
+                raise LockersNotConfiguredError(
+                    "FAN Courier locker API is not configured"
+                )
             items = await _load_fan_lockers()
 
-        _all_lockers[provider] = _AllLockersEntry(expires_at=now + _OFFICIAL_CACHE_TTL, items=items)
+        _all_lockers[provider] = _AllLockersEntry(
+            expires_at=now + _OFFICIAL_CACHE_TTL, items=items
+        )
         return items
     except Exception:
         # If refresh fails, return any stale cache instead of hard failing.
@@ -376,7 +424,13 @@ async def _get_all_lockers(provider: LockerProvider) -> list[_LockerPoint]:
 
 
 def _select_nearby_lockers(
-    points: list[_LockerPoint], *, lat: float, lng: float, radius_km: float, limit: int, provider: LockerProvider
+    points: list[_LockerPoint],
+    *,
+    lat: float,
+    lng: float,
+    radius_km: float,
+    limit: int,
+    provider: LockerProvider,
 ) -> list[LockerRead]:
     radius = max(1.0, min(50.0, float(radius_km)))
     cap = max(1, min(200, int(limit)))
@@ -413,7 +467,8 @@ async def list_lockers(
     now = datetime.now(timezone.utc)
     source = (
         "mirror"
-        if provider == LockerProvider.sameday and bool(getattr(settings, "sameday_mirror_enabled", True))
+        if provider == LockerProvider.sameday
+        and bool(getattr(settings, "sameday_mirror_enabled", True))
         else (
             "official"
             if (
@@ -430,6 +485,7 @@ async def list_lockers(
 
     try:
         if source == "mirror":
+
             async def _query(mirror_session: AsyncSession) -> list[LockerRead]:
                 try:
                     return await sameday_easybox_mirror.list_nearby_lockers(
@@ -452,7 +508,14 @@ async def list_lockers(
 
         if source == "official":
             points = await _get_all_lockers(provider)
-            items = _select_nearby_lockers(points, lat=float(lat), lng=float(lng), radius_km=radius_km, limit=limit, provider=provider)
+            items = _select_nearby_lockers(
+                points,
+                lat=float(lat),
+                lng=float(lng),
+                radius_km=radius_km,
+                limit=limit,
+                provider=provider,
+            )
             _cache[key] = _CacheEntry(expires_at=now + _CACHE_TTL, items=items)
             return items
 
@@ -461,7 +524,9 @@ async def list_lockers(
 
         radius_m = max(1000, min(50_000, int(float(radius_km) * 1000)))
         limit = max(1, min(200, int(limit)))
-        query = _build_query(provider, lat=float(lat), lng=float(lng), radius_m=radius_m)
+        query = _build_query(
+            provider, lat=float(lat), lng=float(lng), radius_m=radius_m
+        )
 
         headers = {"User-Agent": _UA, "Accept": "application/json"}
         timeout = httpx.Timeout(10.0, connect=5.0)
@@ -469,7 +534,9 @@ async def list_lockers(
             resp = await client.post(_OVERPASS_URL, content=query.encode("utf-8"))
             resp.raise_for_status()
             data = resp.json()
-        items = _parse_overpass_json(data, provider=provider, lat=float(lat), lng=float(lng))[:limit]
+        items = _parse_overpass_json(
+            data, provider=provider, lat=float(lat), lng=float(lng)
+        )[:limit]
         _cache[key] = _CacheEntry(expires_at=now + _CACHE_TTL, items=items)
         return items
     except Exception:

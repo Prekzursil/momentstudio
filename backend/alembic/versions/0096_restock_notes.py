@@ -44,7 +44,12 @@ def upgrade() -> None:
         sa.Column("supplier", sa.String(length=200), nullable=True),
         sa.Column("desired_quantity", sa.Integer(), nullable=True),
         sa.Column("note", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -54,11 +59,36 @@ def upgrade() -> None:
         ),
         sa.UniqueConstraint("target_key", name="uq_restock_notes_target_key"),
     )
-    op.create_index(op.f("ix_restock_notes_target_key"), "restock_notes", ["target_key"], unique=False)
-    op.create_index(op.f("ix_restock_notes_product_id"), "restock_notes", ["product_id"], unique=False)
-    op.create_index(op.f("ix_restock_notes_variant_id"), "restock_notes", ["variant_id"], unique=False)
-    op.create_index(op.f("ix_restock_notes_actor_user_id"), "restock_notes", ["actor_user_id"], unique=False)
-    op.create_index(op.f("ix_restock_notes_updated_at"), "restock_notes", ["updated_at"], unique=False)
+    op.create_index(
+        op.f("ix_restock_notes_target_key"),
+        "restock_notes",
+        ["target_key"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_restock_notes_product_id"),
+        "restock_notes",
+        ["product_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_restock_notes_variant_id"),
+        "restock_notes",
+        ["variant_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_restock_notes_actor_user_id"),
+        "restock_notes",
+        ["actor_user_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_restock_notes_updated_at"),
+        "restock_notes",
+        ["updated_at"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
@@ -68,4 +98,3 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_restock_notes_product_id"), table_name="restock_notes")
     op.drop_index(op.f("ix_restock_notes_target_key"), table_name="restock_notes")
     op.drop_table("restock_notes")
-

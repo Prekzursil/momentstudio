@@ -10,9 +10,7 @@ module.exports = function (config) {
   }
 
   const enableJUnitReporter = process.env.KARMA_JUNIT === '1' || process.env.CI === 'true';
-  const reporters = enableJUnitReporter
-    ? ['progress', 'kjhtml', 'junit']
-    : ['progress', 'kjhtml'];
+  const reporters = enableJUnitReporter ? ['progress', 'kjhtml', 'junit'] : ['progress', 'kjhtml'];
 
   config.set({
     basePath: '',
@@ -23,16 +21,16 @@ module.exports = function (config) {
       require('karma-jasmine-html-reporter'),
       require('karma-coverage'),
       require('karma-junit-reporter'),
-      require('@angular-devkit/build-angular/plugins/karma')
+      require('@angular-devkit/build-angular/plugins/karma'),
     ],
     client: {
-      clearContext: false
+      clearContext: false,
     },
     reporters,
     junitReporter: {
       outputDir: 'test-results',
       outputFile: 'karma.junit.xml',
-      useBrowserName: false
+      useBrowserName: false,
     },
     port: 9876,
     listenAddress: '127.0.0.1',
@@ -42,11 +40,11 @@ module.exports = function (config) {
     customLaunchers: {
       ChromeHeadlessNoSandbox: {
         base: 'ChromeHeadless',
-        flags: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
-      }
+        flags: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+      },
     },
     browsers: ['ChromeHeadlessNoSandbox'],
     singleRun: false,
-    restartOnFileChange: true
+    restartOnFileChange: true,
   });
 };

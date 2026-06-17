@@ -38,7 +38,9 @@ def _stream_copy(file: UploadFile, dest: Path, *, max_bytes: int) -> int:
                 break
             written += len(chunk)
             if written > max_bytes:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="File too large"
+                )
             out.write(chunk)
     return written
 
@@ -54,7 +56,12 @@ def save_private_upload(
     *,
     subdir: str,
     root: str | Path | None = None,
-    allowed_content_types: tuple[str, ...] = ("application/pdf", "image/png", "image/jpeg", "image/webp"),
+    allowed_content_types: tuple[str, ...] = (
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+    ),
     max_bytes: int | None = 10 * 1024 * 1024,
 ) -> tuple[str, str]:
     private_root = Path(root or settings.private_media_root).resolve()
@@ -64,7 +71,9 @@ def save_private_upload(
     try:
         dest_dir.relative_to(private_root)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
+        )
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     effective_max_bytes = _effective_max_bytes(max_bytes)
@@ -79,11 +88,15 @@ def save_private_upload(
         _stream_copy(file, destination, max_bytes=effective_max_bytes)
 
         if not file.content_type or file.content_type not in allowed_content_types:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type"
+            )
 
         sniff = _detect_mime_path(destination)
         if not sniff or sniff not in allowed_content_types:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type"
+            )
 
         suffix = _suffix_for_mime(sniff, original_name)
         if suffix and destination.suffix.lower() != suffix.lower():
@@ -97,7 +110,9 @@ def save_private_upload(
         raise
     except Exception as exc:
         _cleanup_upload(final_path)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed"
+        ) from exc
 
 
 def save_private_bytes(
@@ -114,7 +129,9 @@ def save_private_bytes(
     try:
         dest_dir.relative_to(private_root)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
+        )
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     safe_name = Path(filename).name
@@ -122,7 +139,9 @@ def save_private_bytes(
     try:
         destination.relative_to(dest_dir)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
+        )
     destination.write_bytes(content)
     return destination.relative_to(private_root).as_posix()
 
@@ -132,13 +151,17 @@ def resolve_private_path(rel_path: str, *, root: str | Path | None = None) -> Pa
     private_root.mkdir(parents=True, exist_ok=True)
     cleaned = str(rel_path or "").strip()
     if not cleaned or cleaned.startswith(("/", "\\")) or "\\" in cleaned:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path"
+        )
 
     candidate = (private_root / cleaned).resolve()
     try:
         candidate.relative_to(private_root)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file path"
+        )
     return candidate
 
 
@@ -148,7 +171,10 @@ def delete_private_file(rel_path: str, *, root: str | Path | None = None) -> Non
         try:
             path.unlink()
         except Exception as exc:  # pragma: no cover
-            logger.warning("private_file_delete_failed", extra={"path": str(path), "error": str(exc)})
+            logger.warning(
+                "private_file_delete_failed",
+                extra={"path": str(path), "error": str(exc)},
+            )
 
 
 def _detect_mime(content: bytes) -> str | None:

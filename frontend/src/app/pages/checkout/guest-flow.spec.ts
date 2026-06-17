@@ -23,8 +23,8 @@ describe('Checkout auth gating', () => {
       currency: 'RON',
       quantity: 2,
       stock: 5,
-      image: '/img.png'
-    }
+      image: '/img.png',
+    },
   ]);
   const subtotalSignal = signal(60);
 
@@ -39,7 +39,9 @@ describe('Checkout auth gating', () => {
     cartApi.headers.and.returnValue({});
 
     apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
-    apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', payment_method: 'cod' }));
+    apiService.post.and.returnValue(
+      of({ order_id: 'order1', reference_code: 'REF', payment_method: 'cod' }),
+    );
     apiService.get.and.returnValue(of({ email: null, verified: false }));
 
     accountService = jasmine.createSpyObj('AccountService', ['getAddresses']);
@@ -54,13 +56,27 @@ describe('Checkout auth gating', () => {
     TestBed.configureTestingModule({
       imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
+        {
+          provide: CartStore,
+          useValue: {
+            items: itemsSignal,
+            subtotal: subtotalSignal,
+            clear: jasmine.createSpy('clear'),
+            hydrateFromBackend: jasmine.createSpy('hydrateFromBackend'),
+          },
+        },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AccountService, useValue: accountService },
         { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
-      ]
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { params: {}, queryParamMap: emptyQueryParamMap },
+            queryParamMap: of(emptyQueryParamMap),
+          },
+        },
+      ],
     });
   });
 
@@ -70,9 +86,7 @@ describe('Checkout auth gating', () => {
     tick();
 
     const links = Array.from(fixture.nativeElement.querySelectorAll('a')) as HTMLAnchorElement[];
-    const hrefs = links
-      .map((el) => el.getAttribute('href'))
-      .filter((v): v is string => Boolean(v));
+    const hrefs = links.map((el) => el.getAttribute('href')).filter((v): v is string => Boolean(v));
     expect(hrefs.some((h) => h.includes('/login'))).toBeTrue();
     expect(hrefs.some((h) => h.includes('/register'))).toBeTrue();
     expect(apiService.post).not.toHaveBeenCalled();
@@ -92,7 +106,7 @@ describe('Checkout auth gating', () => {
       postal: '12345',
       country: 'RO',
       region: '',
-      line2: ''
+      line2: '',
     } as any;
     cmp.guestEmailVerified = true;
 

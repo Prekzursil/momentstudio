@@ -5,7 +5,10 @@ import { loginUi, seedCartWithFirstProduct, uniqueSessionId } from './checkout-h
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
-    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
+    localStorage.setItem(
+      'admin.onboarding.v1',
+      JSON.stringify({ completed_at: new Date().toISOString() }),
+    );
   });
 });
 
@@ -48,7 +51,10 @@ test('guest checkout prompts for email verification', async ({ page, request: ap
   if (!seeded) return;
 
   const cartLoad = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/cart') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
   );
   await page.goto('/cart');
   await cartLoad;
@@ -61,7 +67,7 @@ test('guest checkout prompts for email verification', async ({ page, request: ap
   await page.getByLabel('Email').fill(email);
 
   const emailRequest = page.waitForResponse((res) =>
-    res.url().includes('/api/v1/orders/guest-checkout/email/request')
+    res.url().includes('/api/v1/orders/guest-checkout/email/request'),
   );
   const sendLink = page.getByRole('button', { name: 'Send verification link' });
   await expect(sendLink).toBeVisible();
@@ -69,7 +75,9 @@ test('guest checkout prompts for email verification', async ({ page, request: ap
   const response = await emailRequest;
   expect([200, 204]).toContain(response.status());
 
-  await expect(page.getByText('We sent a verification link to your email. Open it to continue.')).toBeVisible();
+  await expect(
+    page.getByText('We sent a verification link to your email. Open it to continue.'),
+  ).toBeVisible();
 });
 
 test('owner can sign in and reach admin dashboard', async ({ page }) => {

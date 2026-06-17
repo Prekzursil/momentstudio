@@ -24,7 +24,9 @@ def upgrade() -> None:
 
     op.create_table(
         "order_admin_notes",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column(
             "order_id",
             postgresql.UUID(as_uuid=True),
@@ -38,13 +40,22 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("note", sa.String(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
-    op.create_index(op.f("ix_order_admin_notes_order_id"), "order_admin_notes", ["order_id"], unique=False)
+    op.create_index(
+        op.f("ix_order_admin_notes_order_id"),
+        "order_admin_notes",
+        ["order_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
     op.drop_index(op.f("ix_order_admin_notes_order_id"), table_name="order_admin_notes")
     op.drop_table("order_admin_notes")
     op.drop_column("order_events", "data")
-

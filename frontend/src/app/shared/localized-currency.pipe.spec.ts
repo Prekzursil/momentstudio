@@ -15,7 +15,7 @@ describe('LocalizedCurrencyPipe', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [TranslateModule.forRoot()],
-      providers: [{ provide: FxRatesService, useClass: FxRatesServiceStub }]
+      providers: [{ provide: FxRatesService, useClass: FxRatesServiceStub }],
     });
   });
 
@@ -23,7 +23,9 @@ describe('LocalizedCurrencyPipe', () => {
     const translate = TestBed.inject(TranslateService);
     translate.use('en');
 
-    const result = TestBed.runInInjectionContext(() => new LocalizedCurrencyPipe().transform(100, 'RON', 'en-US'));
+    const result = TestBed.runInInjectionContext(() =>
+      new LocalizedCurrencyPipe().transform(100, 'RON', 'en-US'),
+    );
     expect(result).toContain('RON');
     expect(result).toContain('≈');
     expect(result).toContain('€');
@@ -35,7 +37,9 @@ describe('LocalizedCurrencyPipe', () => {
     const translate = TestBed.inject(TranslateService);
     translate.use('ro');
 
-    const result = TestBed.runInInjectionContext(() => new LocalizedCurrencyPipe().transform(100, 'RON', 'ro-RO'));
+    const result = TestBed.runInInjectionContext(() =>
+      new LocalizedCurrencyPipe().transform(100, 'RON', 'ro-RO'),
+    );
     expect(result).toContain('RON');
     expect(result).not.toContain('≈');
   });
@@ -44,7 +48,9 @@ describe('LocalizedCurrencyPipe', () => {
     const translate = TestBed.inject(TranslateService);
     translate.use('en');
 
-    const result = TestBed.runInInjectionContext(() => new LocalizedCurrencyPipe().transform(100, 'USD', 'en-US'));
+    const result = TestBed.runInInjectionContext(() =>
+      new LocalizedCurrencyPipe().transform(100, 'USD', 'en-US'),
+    );
     expect(result).toContain('$');
     expect(result).not.toContain('≈');
   });

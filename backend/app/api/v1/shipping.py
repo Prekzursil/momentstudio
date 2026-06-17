@@ -28,9 +28,13 @@ async def list_lockers(
             session=session,
         )
     except lockers_service.LockersNotConfiguredError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to load lockers") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to load lockers"
+        ) from exc
 
 
 @router.get("/lockers/cities", response_model=LockerCitySearchResponse)
@@ -44,8 +48,13 @@ async def list_locker_cities(
         return LockerCitySearchResponse(items=[], snapshot=None)
 
     try:
-        items = await sameday_easybox_mirror.list_city_suggestions(session, q=q, limit=limit)
+        items = await sameday_easybox_mirror.list_city_suggestions(
+            session, q=q, limit=limit
+        )
         snapshot = await sameday_easybox_mirror.get_snapshot_status(session)
         return LockerCitySearchResponse(items=items, snapshot=snapshot)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to load locker city suggestions") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to load locker city suggestions",
+        ) from exc

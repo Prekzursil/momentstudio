@@ -24,7 +24,9 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "user_notifications",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column(
             "user_id",
             postgresql.UUID(as_uuid=True),
@@ -35,15 +37,24 @@ def upgrade() -> None:
         sa.Column("title", sa.String(length=255), nullable=False),
         sa.Column("body", sa.Text(), nullable=True),
         sa.Column("url", sa.String(length=500), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("read_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("dismissed_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_user_notifications_user_id", "user_notifications", ["user_id"])
     op.create_index("ix_user_notifications_type", "user_notifications", ["type"])
-    op.create_index("ix_user_notifications_created_at", "user_notifications", ["created_at"])
+    op.create_index(
+        "ix_user_notifications_created_at", "user_notifications", ["created_at"]
+    )
     op.create_index("ix_user_notifications_read_at", "user_notifications", ["read_at"])
-    op.create_index("ix_user_notifications_dismissed_at", "user_notifications", ["dismissed_at"])
+    op.create_index(
+        "ix_user_notifications_dismissed_at", "user_notifications", ["dismissed_at"]
+    )
 
 
 def downgrade() -> None:
@@ -53,4 +64,3 @@ def downgrade() -> None:
     op.drop_index("ix_user_notifications_type", table_name="user_notifications")
     op.drop_index("ix_user_notifications_user_id", table_name="user_notifications")
     op.drop_table("user_notifications")
-

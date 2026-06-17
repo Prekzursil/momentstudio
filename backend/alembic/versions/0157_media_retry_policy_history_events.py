@@ -55,10 +55,25 @@ def upgrade() -> None:
         sa.Column("action", sa.String(length=40), nullable=False),
         sa.Column("actor_user_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("preset_key", sa.String(length=32), nullable=True),
-        sa.Column("before_policy_json", sa.Text(), nullable=False, server_default=sa.text("'{}'")),
-        sa.Column("after_policy_json", sa.Text(), nullable=False, server_default=sa.text("'{}'")),
+        sa.Column(
+            "before_policy_json",
+            sa.Text(),
+            nullable=False,
+            server_default=sa.text("'{}'"),
+        ),
+        sa.Column(
+            "after_policy_json",
+            sa.Text(),
+            nullable=False,
+            server_default=sa.text("'{}'"),
+        ),
         sa.Column("note", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["actor_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -99,8 +114,20 @@ def downgrade() -> None:
         "ix_media_job_retry_policy_events_job_type_created_at",
         table_name="media_job_retry_policy_events",
     )
-    op.drop_index("ix_media_job_retry_policy_events_created_at", table_name="media_job_retry_policy_events")
-    op.drop_index("ix_media_job_retry_policy_events_actor_user_id", table_name="media_job_retry_policy_events")
-    op.drop_index("ix_media_job_retry_policy_events_action", table_name="media_job_retry_policy_events")
-    op.drop_index("ix_media_job_retry_policy_events_job_type", table_name="media_job_retry_policy_events")
+    op.drop_index(
+        "ix_media_job_retry_policy_events_created_at",
+        table_name="media_job_retry_policy_events",
+    )
+    op.drop_index(
+        "ix_media_job_retry_policy_events_actor_user_id",
+        table_name="media_job_retry_policy_events",
+    )
+    op.drop_index(
+        "ix_media_job_retry_policy_events_action",
+        table_name="media_job_retry_policy_events",
+    )
+    op.drop_index(
+        "ix_media_job_retry_policy_events_job_type",
+        table_name="media_job_retry_policy_events",
+    )
     op.drop_table("media_job_retry_policy_events")

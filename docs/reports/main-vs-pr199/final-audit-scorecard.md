@@ -1,7 +1,7 @@
 # Final Audit Scorecard: Main vs PR #199
 
-Date: 2026-02-16  
-Baseline: PR #199 (`5e3b438520a023ae2f3d1ce3b27fa772e10aa627`)  
+Date: 2026-02-16
+Baseline: PR #199 (`5e3b438520a023ae2f3d1ce3b27fa772e10aa627`)
 Current head audited: `dd589b6adcfcc295b14f0c9cae71abb949d1dbf7`
 
 ## Verdict
@@ -66,4 +66,3 @@ Interpretation:
 4. Fan/Sameday/media paths explicitly validated: **PASS**
 5. Env parity hardening added: **PASS**
 6. No unresolved S1/S2 findings: **PASS**
-

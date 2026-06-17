@@ -76,10 +76,15 @@ def admin_headers(client: TestClient, session_factory) -> dict[str, str]:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    return {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
 
 
-def test_admin_scheduling_endpoint_paginates_and_orders(test_app: Dict[str, object]) -> None:
+def test_admin_scheduling_endpoint_paginates_and_orders(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
 
@@ -169,4 +174,3 @@ def test_admin_scheduling_endpoint_paginates_and_orders(test_app: Dict[str, obje
     )
     assert res3.status_code == 200, res3.text
     assert res3.json()["items"][0]["key"] == "page.live"
-

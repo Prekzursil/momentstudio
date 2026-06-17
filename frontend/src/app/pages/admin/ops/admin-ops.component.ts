@@ -16,7 +16,7 @@ import {
   WebhookEventRead,
   WebhookEventDetail,
   SamedaySyncRunRead,
-  SamedaySyncStatusRead
+  SamedaySyncStatusRead,
 } from '../../../core/ops.service';
 import { appConfig } from '../../../core/app-config';
 import { HealthService } from '../../../core/health.service';
@@ -29,19 +29,36 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
 @Component({
   selector: 'app-admin-ops',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, BreadcrumbComponent, ButtonComponent, SkeletonComponent, AdminPageHeaderComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    SkeletonComponent,
+    AdminPageHeaderComponent,
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
 
-      <app-admin-page-header [titleKey]="'adminUi.ops.title'" [hintKey]="'adminUi.ops.subtitle'"></app-admin-page-header>
+      <app-admin-page-header
+        [titleKey]="'adminUi.ops.title'"
+        [hintKey]="'adminUi.ops.subtitle'"
+      ></app-admin-page-header>
 
       <div class="grid gap-6">
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <div
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <div class="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.health.title' | translate }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.health.hint' | translate }}</div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.health.title' | translate }}
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.health.hint' | translate }}
+              </div>
             </div>
             <app-button
               size="sm"
@@ -52,7 +69,10 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             ></app-button>
           </div>
 
-          <div *ngIf="healthLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div
+            *ngIf="healthLoading()"
+            class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+          >
             <app-skeleton [rows]="2"></app-skeleton>
           </div>
 
@@ -64,8 +84,12 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
           </div>
 
           <div *ngIf="!healthLoading()" class="grid gap-3 md:grid-cols-5">
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.ops.health.backend' | translate }}
               </p>
               <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">
@@ -77,43 +101,80 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               </p>
             </div>
 
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.ops.health.webhooksFailed' | translate }}
               </p>
-              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookFailures24h() }}</p>
-              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ webhookFailures24h() }}
+              </p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}
+              </p>
             </div>
 
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.ops.health.webhooksBacklogTotal' | translate }}
               </p>
-              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookBacklogTotal() }}</p>
-              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.totalPendingHint' | translate }}</p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ webhookBacklogTotal() }}
+              </p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.ops.health.totalPendingHint' | translate }}
+              </p>
             </div>
 
-
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.ops.health.webhooksBacklogRecent' | translate }}
               </p>
-              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ webhookBacklogRecent24h() }}</p>
-              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ webhookBacklogRecent24h() }}
+              </p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}
+              </p>
             </div>
 
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.ops.health.emailFailures' | translate }}
               </p>
-              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ emailFailures24h() }}</p>
-              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}</p>
+              <p class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ emailFailures24h() }}
+              </p>
+              <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.ops.health.lastHours' | translate: { hours: 24 } }}
+              </p>
             </div>
           </div>
 
-          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20 grid gap-2">
+          <div
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20 grid gap-2"
+          >
             <div class="flex items-center justify-between gap-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">DAM telemetry</p>
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
+                DAM telemetry
+              </p>
               <button
                 type="button"
                 class="rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200"
@@ -123,43 +184,107 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                 Refresh
               </button>
             </div>
-            <div *ngIf="damTelemetryLoading()" class="text-xs text-slate-500 dark:text-slate-400">Loading DAM telemetry…</div>
-            <div *ngIf="damTelemetryError()" class="text-xs text-rose-700 dark:text-rose-300">{{ damTelemetryError() }}</div>
+            <div *ngIf="damTelemetryLoading()" class="text-xs text-slate-500 dark:text-slate-400">
+              Loading DAM telemetry…
+            </div>
+            <div *ngIf="damTelemetryError()" class="text-xs text-rose-700 dark:text-rose-300">
+              {{ damTelemetryError() }}
+            </div>
             <div *ngIf="damTelemetry() as dam" class="grid gap-2 sm:grid-cols-3 lg:grid-cols-7">
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Queue</p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.queue_depth }}</p>
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
+                  Queue
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ dam.queue_depth }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Workers</p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.online_workers }}</p>
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
+                  Workers
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ dam.online_workers }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Stale</p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.stale_processing_count }}</p>
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
+                  Stale
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ dam.stale_processing_count }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Oldest queued</p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ formatDamAge(dam.oldest_queued_age_seconds) }}</p>
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
+                  Oldest queued
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ formatDamAge(dam.oldest_queued_age_seconds) }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Dead-letter</p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.dead_letter_count }}</p>
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
+                  Dead-letter
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ dam.dead_letter_count }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">SLA breaches</p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.sla_breached_count }}</p>
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
+                  SLA breaches
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ dam.sla_breached_count }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Retry scheduled</p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ dam.retry_scheduled_count }}</p>
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
+                  Retry scheduled
+                </p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ dam.retry_scheduled_count }}
+                </p>
               </div>
             </div>
           </div>
 
-          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20 grid gap-2">
+          <div
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20 grid gap-2"
+          >
             <div class="flex items-center justify-between gap-2">
-              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.ops.samedaySync.title' | translate }}
               </p>
               <div class="flex items-center gap-2">
@@ -188,19 +313,41 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             <div *ngIf="samedaySyncLoading()" class="text-xs text-slate-500 dark:text-slate-400">
               {{ 'adminUi.ops.samedaySync.loading' | translate }}
             </div>
-            <div *ngIf="samedaySyncError()" class="text-xs text-rose-700 dark:text-rose-300">{{ samedaySyncError() }}</div>
-            <div *ngIf="samedaySyncStatus() as sync" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div *ngIf="samedaySyncError()" class="text-xs text-rose-700 dark:text-rose-300">
+              {{ samedaySyncError() }}
+            </div>
+            <div
+              *ngIf="samedaySyncStatus() as sync"
+              class="grid gap-2 sm:grid-cols-2 lg:grid-cols-6"
+            >
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.ops.samedaySync.totalLockers' | translate }}
                 </p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ sync.total_lockers }}</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ sync.total_lockers }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.ops.samedaySync.stale' | translate }}
                 </p>
-                <p class="text-sm font-semibold" [ngClass]="sync.stale ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'">
+                <p
+                  class="text-sm font-semibold"
+                  [ngClass]="
+                    sync.stale
+                      ? 'text-amber-700 dark:text-amber-300'
+                      : 'text-emerald-700 dark:text-emerald-300'
+                  "
+                >
                   {{
                     sync.stale
                       ? ('adminUi.ops.samedaySync.staleYes' | translate)
@@ -208,30 +355,48 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                   }}
                 </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.ops.samedaySync.lastSuccess' | translate }}
                 </p>
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                   {{ sync.last_success_at ? (sync.last_success_at | date: 'short') : '—' }}
                 </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.ops.samedaySync.staleAge' | translate }}
                 </p>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ formatDamAge(sync.stale_age_seconds) }}</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ formatDamAge(sync.stale_age_seconds) }}
+                </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.ops.samedaySync.latestRun' | translate }}
                 </p>
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                   {{ sync.latest_run?.status || '—' }}
                 </p>
               </div>
-              <div class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              <div
+                class="rounded-lg border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p
+                  class="text-[10px] uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.ops.samedaySync.lastError' | translate }}
                 </p>
                 <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
@@ -248,17 +413,34 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                 <li *ngFor="let msg of samedaySyncStatus()?.canary_alert_messages">{{ msg }}</li>
               </ul>
             </div>
-            <div *ngIf="samedaySyncRuns().length" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
+            <div
+              *ngIf="samedaySyncRuns().length"
+              class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800"
+            >
               <table class="min-w-[720px] w-full text-xs">
                 <thead class="bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-200">
                   <tr>
-                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.started' | translate }}</th>
-                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.status' | translate }}</th>
-                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.fetched' | translate }}</th>
-                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.upserted' | translate }}</th>
-                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.deactivated' | translate }}</th>
-                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.failureKind' | translate }}</th>
-                    <th class="px-2 py-1 text-left">{{ 'adminUi.ops.samedaySync.table.schemaDrift' | translate }}</th>
+                    <th class="px-2 py-1 text-left">
+                      {{ 'adminUi.ops.samedaySync.table.started' | translate }}
+                    </th>
+                    <th class="px-2 py-1 text-left">
+                      {{ 'adminUi.ops.samedaySync.table.status' | translate }}
+                    </th>
+                    <th class="px-2 py-1 text-left">
+                      {{ 'adminUi.ops.samedaySync.table.fetched' | translate }}
+                    </th>
+                    <th class="px-2 py-1 text-left">
+                      {{ 'adminUi.ops.samedaySync.table.upserted' | translate }}
+                    </th>
+                    <th class="px-2 py-1 text-left">
+                      {{ 'adminUi.ops.samedaySync.table.deactivated' | translate }}
+                    </th>
+                    <th class="px-2 py-1 text-left">
+                      {{ 'adminUi.ops.samedaySync.table.failureKind' | translate }}
+                    </th>
+                    <th class="px-2 py-1 text-left">
+                      {{ 'adminUi.ops.samedaySync.table.schemaDrift' | translate }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -269,140 +451,249 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                     <td class="px-2 py-1">{{ run.upserted_count }}</td>
                     <td class="px-2 py-1">{{ run.deactivated_count }}</td>
                     <td class="px-2 py-1">{{ run.failure_kind || '—' }}</td>
-                    <td class="px-2 py-1">{{ run.schema_drift_detected ? ('adminUi.ops.samedaySync.staleYes' | translate) : ('adminUi.ops.samedaySync.staleNo' | translate) }}</td>
+                    <td class="px-2 py-1">
+                      {{
+                        run.schema_drift_detected
+                          ? ('adminUi.ops.samedaySync.staleYes' | translate)
+                          : ('adminUi.ops.samedaySync.staleNo' | translate)
+                      }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
-	          <p *ngIf="healthCheckedAt() as checkedAt" class="text-xs text-slate-500 dark:text-slate-400">
-	            {{ 'adminUi.ops.health.lastChecked' | translate }}: {{ checkedAt | date: 'short' }}
-	          </p>
-	        </div>
+          <p
+            *ngIf="healthCheckedAt() as checkedAt"
+            class="text-xs text-slate-500 dark:text-slate-400"
+          >
+            {{ 'adminUi.ops.health.lastChecked' | translate }}: {{ checkedAt | date: 'short' }}
+          </p>
+        </div>
 
-	        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <div>
-	              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.diagnostics.title' | translate }}</div>
-	              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.diagnostics.hint' | translate }}</div>
-	            </div>
-	            <app-button
-	              size="sm"
-	              variant="ghost"
-	              [label]="'adminUi.actions.refresh' | translate"
-	              [disabled]="diagnosticsLoading()"
-	              (action)="loadDiagnostics()"
-	            ></app-button>
-	          </div>
+        <div
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.diagnostics.title' | translate }}
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.diagnostics.hint' | translate }}
+              </div>
+            </div>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.refresh' | translate"
+              [disabled]="diagnosticsLoading()"
+              (action)="loadDiagnostics()"
+            ></app-button>
+          </div>
 
-	          <div *ngIf="diagnosticsLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-	            <app-skeleton [rows]="2"></app-skeleton>
-	          </div>
+          <div
+            *ngIf="diagnosticsLoading()"
+            class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+          >
+            <app-skeleton [rows]="2"></app-skeleton>
+          </div>
 
-	          <div
-	            *ngIf="!diagnosticsLoading() && diagnosticsError()"
-	            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	          >
-	            {{ diagnosticsError() }}
-	          </div>
+          <div
+            *ngIf="!diagnosticsLoading() && diagnosticsError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
+            {{ diagnosticsError() }}
+          </div>
 
-	          <div *ngIf="!diagnosticsLoading() && diagnostics() as diag" class="grid gap-3">
-	            <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
-	              <div>
-	                {{ 'adminUi.ops.diagnostics.environment' | translate }}:
-	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.environment }}</span>
-	                · {{ 'adminUi.ops.diagnostics.backendBuild' | translate }}:
-	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.app_version || 'n/a' }}</span>
-	                · {{ 'adminUi.ops.diagnostics.frontendBuild' | translate }}:
-	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ frontendBuildVersion }}</span>
-	                · {{ 'adminUi.ops.diagnostics.paymentsProvider' | translate }}:
-	                <span class="font-mono text-slate-700 dark:text-slate-200">{{ diag.payments_provider }}</span>
-	              </div>
-	              <div>{{ 'adminUi.ops.diagnostics.lastChecked' | translate }}: {{ diag.checked_at | date: 'short' }}</div>
-	            </div>
+          <div *ngIf="!diagnosticsLoading() && diagnostics() as diag" class="grid gap-3">
+            <div
+              class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400"
+            >
+              <div>
+                {{ 'adminUi.ops.diagnostics.environment' | translate }}:
+                <span class="font-mono text-slate-700 dark:text-slate-200">{{
+                  diag.environment
+                }}</span>
+                · {{ 'adminUi.ops.diagnostics.backendBuild' | translate }}:
+                <span class="font-mono text-slate-700 dark:text-slate-200">{{
+                  diag.app_version || 'n/a'
+                }}</span>
+                · {{ 'adminUi.ops.diagnostics.frontendBuild' | translate }}:
+                <span class="font-mono text-slate-700 dark:text-slate-200">{{
+                  frontendBuildVersion
+                }}</span>
+                · {{ 'adminUi.ops.diagnostics.paymentsProvider' | translate }}:
+                <span class="font-mono text-slate-700 dark:text-slate-200">{{
+                  diag.payments_provider
+                }}</span>
+              </div>
+              <div>
+                {{ 'adminUi.ops.diagnostics.lastChecked' | translate }}:
+                {{ diag.checked_at | date: 'short' }}
+              </div>
+            </div>
 
-	            <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.ops.diagnostics.smtp' | translate }}
-	                </p>
-	                <div class="mt-2 flex items-center gap-2">
-	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.smtp.status)">
-	                    {{ ('adminUi.ops.diagnostics.status.' + diag.smtp.status) | translate }}
-	                  </span>
-	                </div>
-	                <p *ngIf="diag.smtp.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.smtp.message }}</p>
-	              </div>
+            <div class="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.diagnostics.smtp' | translate }}
+                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <span
+                    class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                    [ngClass]="diagnosticsBadgeClass(diag.smtp.status)"
+                  >
+                    {{ 'adminUi.ops.diagnostics.status.' + diag.smtp.status | translate }}
+                  </span>
+                </div>
+                <p
+                  *ngIf="diag.smtp.message"
+                  class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ diag.smtp.message }}
+                </p>
+              </div>
 
-	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.ops.diagnostics.redis' | translate }}
-	                </p>
-	                <div class="mt-2 flex items-center gap-2">
-	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.redis.status)">
-	                    {{ ('adminUi.ops.diagnostics.status.' + diag.redis.status) | translate }}
-	                  </span>
-	                </div>
-	                <p *ngIf="diag.redis.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.redis.message }}</p>
-	              </div>
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.diagnostics.redis' | translate }}
+                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <span
+                    class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                    [ngClass]="diagnosticsBadgeClass(diag.redis.status)"
+                  >
+                    {{ 'adminUi.ops.diagnostics.status.' + diag.redis.status | translate }}
+                  </span>
+                </div>
+                <p
+                  *ngIf="diag.redis.message"
+                  class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ diag.redis.message }}
+                </p>
+              </div>
 
-	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.ops.diagnostics.storage' | translate }}
-	                </p>
-	                <div class="mt-2 flex items-center gap-2">
-	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.storage.status)">
-	                    {{ ('adminUi.ops.diagnostics.status.' + diag.storage.status) | translate }}
-	                  </span>
-	                </div>
-	                <p *ngIf="diag.storage.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.storage.message }}</p>
-	              </div>
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.diagnostics.storage' | translate }}
+                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <span
+                    class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                    [ngClass]="diagnosticsBadgeClass(diag.storage.status)"
+                  >
+                    {{ 'adminUi.ops.diagnostics.status.' + diag.storage.status | translate }}
+                  </span>
+                </div>
+                <p
+                  *ngIf="diag.storage.message"
+                  class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ diag.storage.message }}
+                </p>
+              </div>
 
-	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.ops.diagnostics.stripe' | translate }}
-	                </p>
-	                <div class="mt-2 flex items-center gap-2">
-	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.stripe.status)">
-	                    {{ ('adminUi.ops.diagnostics.status.' + diag.stripe.status) | translate }}
-	                  </span>
-	                </div>
-	                <p *ngIf="diag.stripe.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.stripe.message }}</p>
-	              </div>
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.diagnostics.stripe' | translate }}
+                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <span
+                    class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                    [ngClass]="diagnosticsBadgeClass(diag.stripe.status)"
+                  >
+                    {{ 'adminUi.ops.diagnostics.status.' + diag.stripe.status | translate }}
+                  </span>
+                </div>
+                <p
+                  *ngIf="diag.stripe.message"
+                  class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ diag.stripe.message }}
+                </p>
+              </div>
 
-	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.ops.diagnostics.paypal' | translate }}
-	                </p>
-	                <div class="mt-2 flex items-center gap-2">
-	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.paypal.status)">
-	                    {{ ('adminUi.ops.diagnostics.status.' + diag.paypal.status) | translate }}
-	                  </span>
-	                </div>
-	                <p *ngIf="diag.paypal.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.paypal.message }}</p>
-	              </div>
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.diagnostics.paypal' | translate }}
+                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <span
+                    class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                    [ngClass]="diagnosticsBadgeClass(diag.paypal.status)"
+                  >
+                    {{ 'adminUi.ops.diagnostics.status.' + diag.paypal.status | translate }}
+                  </span>
+                </div>
+                <p
+                  *ngIf="diag.paypal.message"
+                  class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ diag.paypal.message }}
+                </p>
+              </div>
 
-	              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.ops.diagnostics.netopia' | translate }}
-	                </p>
-	                <div class="mt-2 flex items-center gap-2">
-	                  <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="diagnosticsBadgeClass(diag.netopia.status)">
-	                    {{ ('adminUi.ops.diagnostics.status.' + diag.netopia.status) | translate }}
-	                  </span>
-	                </div>
-	                <p *ngIf="diag.netopia.message" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ diag.netopia.message }}</p>
-	              </div>
-	            </div>
-	          </div>
-	        </div>
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.diagnostics.netopia' | translate }}
+                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <span
+                    class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                    [ngClass]="diagnosticsBadgeClass(diag.netopia.status)"
+                  >
+                    {{ 'adminUi.ops.diagnostics.status.' + diag.netopia.status | translate }}
+                  </span>
+                </div>
+                <p
+                  *ngIf="diag.netopia.message"
+                  class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ diag.netopia.message }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
 
-	        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <div>
-	              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.newsletter.title' | translate }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.newsletter.hint' | translate }}</div>
+        <div
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.newsletter.title' | translate }}
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.newsletter.hint' | translate }}
+              </div>
             </div>
             <app-button
               size="sm"
@@ -414,11 +705,17 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
           </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <div
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <div class="flex items-center justify-between gap-3">
             <div>
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.banner.title' | translate }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.banner.hint' | translate }}</div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.banner.title' | translate }}
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.banner.hint' | translate }}
+              </div>
             </div>
             <app-button
               size="sm"
@@ -429,11 +726,17 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             ></app-button>
           </div>
 
-          <div *ngIf="bannersLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div
+            *ngIf="bannersLoading()"
+            class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+          >
             <app-skeleton [rows]="5"></app-skeleton>
           </div>
 
-          <div *ngIf="!bannersLoading() && bannersError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+          <div
+            *ngIf="!bannersLoading() && bannersError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
             {{ bannersError() }}
           </div>
 
@@ -445,13 +748,22 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="bannerLevel"
                 >
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="info">
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="info"
+                  >
                     {{ 'adminUi.ops.banner.levelInfo' | translate }}
                   </option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="warning">
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="warning"
+                  >
                     {{ 'adminUi.ops.banner.levelWarning' | translate }}
                   </option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="promo">
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="promo"
+                  >
                     {{ 'adminUi.ops.banner.levelPromo' | translate }}
                   </option>
                 </select>
@@ -476,7 +788,9 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                 </label>
               </div>
 
-              <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <label
+                class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"
+              >
                 <input type="checkbox" [(ngModel)]="bannerIsActive" />
                 <span class="font-medium">{{ 'adminUi.ops.banner.active' | translate }}</span>
               </label>
@@ -530,9 +844,14 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-200 dark:border-slate-800"
+          >
             <div class="text-xs text-slate-500 dark:text-slate-400">
-              <span *ngIf="editingBannerId">{{ 'adminUi.ops.banner.editing' | translate }} · {{ editingBannerId.slice(0, 8) }}</span>
+              <span *ngIf="editingBannerId"
+                >{{ 'adminUi.ops.banner.editing' | translate }} ·
+                {{ editingBannerId.slice(0, 8) }}</span
+              >
               <span *ngIf="!editingBannerId">{{ 'adminUi.ops.banner.creating' | translate }}</span>
             </div>
             <div class="flex items-center gap-2">
@@ -546,7 +865,10 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               ></app-button>
               <app-button
                 size="sm"
-                [label]="(editingBannerId ? 'adminUi.ops.banner.save' : 'adminUi.ops.banner.create') | translate"
+                [label]="
+                  (editingBannerId ? 'adminUi.ops.banner.save' : 'adminUi.ops.banner.create')
+                    | translate
+                "
                 [disabled]="bannerSaving()"
                 (action)="saveBanner()"
               ></app-button>
@@ -554,7 +876,9 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
           </div>
 
           <div *ngIf="!bannersLoading() && banners().length" class="grid gap-2">
-            <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <div
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               {{ 'adminUi.ops.banner.listTitle' | translate }}
             </div>
             <div class="grid gap-2">
@@ -568,15 +892,20 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                 <div class="flex flex-wrap items-start justify-between gap-2">
                   <div class="min-w-0">
                     <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                      {{ ('adminUi.ops.banner.status.' + bannerStatus(b)) | translate }}
+                      {{ 'adminUi.ops.banner.status.' + bannerStatus(b) | translate }}
                       <span class="text-xs font-normal text-slate-500 dark:text-slate-400">·</span>
-                      <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ b.level }}</span>
+                      <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+                        b.level
+                      }}</span>
                     </div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                      {{ b.starts_at | date: 'short' }}<span *ngIf="b.ends_at"> → {{ b.ends_at | date: 'short' }}</span>
+                      {{ b.starts_at | date: 'short'
+                      }}<span *ngIf="b.ends_at"> → {{ b.ends_at | date: 'short' }}</span>
                     </div>
                   </div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ b.id.slice(0, 8) }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400 shrink-0">
+                    {{ b.id.slice(0, 8) }}
+                  </div>
                 </div>
                 <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
                   <div class="truncate">{{ b.message_en }}</div>
@@ -587,13 +916,22 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
           </div>
         </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <div
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <div>
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.shipping.title' | translate }}</div>
-            <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.shipping.hint' | translate }}</div>
+            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.ops.shipping.title' | translate }}
+            </div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.ops.shipping.hint' | translate }}
+            </div>
           </div>
 
-          <div *ngIf="shippingMethodsLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div
+            *ngIf="shippingMethodsLoading()"
+            class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+          >
             <app-skeleton [rows]="3"></app-skeleton>
           </div>
 
@@ -621,7 +959,10 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="simShippingMethodId"
                 >
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value=""
+                  >
                     {{ 'adminUi.ops.shipping.methodAuto' | translate }}
                   </option>
                   <option
@@ -643,62 +984,120 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               </label>
             </div>
 
-            <app-button size="sm" [label]="'adminUi.ops.shipping.run' | translate" [disabled]="simLoading()" (action)="runSimulation()"></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.ops.shipping.run' | translate"
+              [disabled]="simLoading()"
+              (action)="runSimulation()"
+            ></app-button>
           </div>
 
-          <div *ngIf="simError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+          <div
+            *ngIf="simError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
             {{ simError() }}
           </div>
 
           <div *ngIf="simResult()" class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
             <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.shipping.result.subtotal' | translate }}</div>
-                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ simResult()!.subtotal_ron }} RON</div>
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.shipping.result.subtotal' | translate }}
+                </div>
+                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ simResult()!.subtotal_ron }} RON
+                </div>
               </div>
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.shipping.result.shipping' | translate }}</div>
-                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ simResult()!.shipping_ron }} RON</div>
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.shipping.result.shipping' | translate }}
+                </div>
+                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ simResult()!.shipping_ron }} RON
+                </div>
               </div>
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.shipping.result.vat' | translate }}</div>
-                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ simResult()!.vat_ron }} RON</div>
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.shipping.result.vat' | translate }}
+                </div>
+                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ simResult()!.vat_ron }} RON
+                </div>
               </div>
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.shipping.result.total' | translate }}</div>
-                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ simResult()!.total_ron }} RON</div>
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.ops.shipping.result.total' | translate }}
+                </div>
+                <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ simResult()!.total_ron }} RON
+                </div>
               </div>
             </div>
 
-            <div class="rounded-xl border border-slate-200 p-3 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+            <div
+              class="rounded-xl border border-slate-200 p-3 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300"
+            >
               <div>{{ 'adminUi.ops.shipping.result.settingsTitle' | translate }}</div>
               <div class="mt-1">
-                {{ 'adminUi.ops.shipping.result.settingsLine' | translate: { fee: simResult()!.shipping_fee_ron ?? '—', threshold: simResult()!.free_shipping_threshold_ron ?? '—' } }}
+                {{
+                  'adminUi.ops.shipping.result.settingsLine'
+                    | translate
+                      : {
+                          fee: simResult()!.shipping_fee_ron ?? '—',
+                          threshold: simResult()!.free_shipping_threshold_ron ?? '—',
+                        }
+                }}
               </div>
             </div>
 
-	            <div *ngIf="simResult()!.methods?.length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-	              <table class="min-w-[760px] w-full text-sm">
-	                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-	                  <tr>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.shipping.table.method' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.shipping.table.rateFlat' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.shipping.table.ratePerKg' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.shipping.table.computed' | translate }}</th>
+            <div
+              *ngIf="simResult()!.methods?.length"
+              class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            >
+              <table class="min-w-[760px] w-full text-sm">
+                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <tr>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.ops.shipping.table.method' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.ops.shipping.table.rateFlat' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.ops.shipping.table.ratePerKg' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.ops.shipping.table.computed' | translate }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                   <tr *ngFor="let m of simResult()!.methods">
                     <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ m.name }}</td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ m.rate_flat ?? '—' }}</td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ m.rate_per_kg ?? '—' }}</td>
-                    <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ m.computed_shipping_ron }} RON</td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ m.rate_flat ?? '—' }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ m.rate_per_kg ?? '—' }}
+                    </td>
+                    <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">
+                      {{ m.computed_shipping_ron }} RON
+                    </td>
                   </tr>
                 </tbody>
-	              </table>
-	            </div>
-	          </div>
-	        </div>
+              </table>
+            </div>
+          </div>
+        </div>
 
         <div
           id="admin-ops-email-failures"
@@ -706,8 +1105,12 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
         >
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.emailFailures.title' | translate }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.emailFailures.hint' | translate }}</div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.emailFailures.title' | translate }}
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.emailFailures.hint' | translate }}
+              </div>
             </div>
             <div class="flex items-center gap-2">
               <app-button
@@ -755,7 +1158,10 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             ></app-button>
           </div>
 
-          <div *ngIf="emailFailuresLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div
+            *ngIf="emailFailuresLoading()"
+            class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+          >
             <app-skeleton [rows]="4"></app-skeleton>
           </div>
 
@@ -780,19 +1186,35 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             <table class="min-w-[980px] w-full text-sm">
               <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                 <tr>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.to' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.subject' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.at' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.error' | translate }}</th>
-                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.ops.emailFailures.table.actions' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.emailFailures.table.to' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.emailFailures.table.subject' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.emailFailures.table.at' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.emailFailures.table.error' | translate }}
+                  </th>
+                  <th class="text-right font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.emailFailures.table.actions' | translate }}
+                  </th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                 <tr *ngFor="let row of emailFailures()">
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ row.to_email }}</td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">{{ row.subject }}</td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ row.created_at | date: 'short' }}</td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">{{ row.error_message || '—' }}</td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">
+                    {{ row.subject }}
+                  </td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                    {{ row.created_at | date: 'short' }}
+                  </td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">
+                    {{ row.error_message || '—' }}
+                  </td>
                   <td class="px-3 py-2">
                     <div class="flex justify-end items-center gap-2">
                       <app-button
@@ -808,12 +1230,21 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             </table>
           </div>
 
-          <div *ngIf="selectedEmailFailure()" class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+          <div
+            *ngIf="selectedEmailFailure()"
+            class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800"
+          >
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.ops.emailFailures.detailTitle' | translate }} · {{ selectedEmailFailure()!.to_email }}
+                {{ 'adminUi.ops.emailFailures.detailTitle' | translate }} ·
+                {{ selectedEmailFailure()!.to_email }}
               </div>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.ops.emailFailures.close' | translate" (action)="closeEmailFailureDetail()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.ops.emailFailures.close' | translate"
+                (action)="closeEmailFailureDetail()"
+              ></app-button>
             </div>
 
             <div class="mt-2 text-xs text-slate-600 dark:text-slate-300">
@@ -823,7 +1254,8 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             <pre
               *ngIf="selectedEmailFailure()!.error_message"
               class="mt-3 max-h-[220px] overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
-            >{{ selectedEmailFailure()!.error_message }}</pre>
+              >{{ selectedEmailFailure()!.error_message }}</pre
+            >
           </div>
         </div>
 
@@ -833,8 +1265,12 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
         >
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ops.webhooks.title' | translate }}</div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.ops.webhooks.hint' | translate }}</div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.ops.webhooks.title' | translate }}
+              </div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.ops.webhooks.hint' | translate }}
+              </div>
             </div>
             <app-button
               size="sm"
@@ -845,11 +1281,17 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             ></app-button>
           </div>
 
-          <div *ngIf="webhooksLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+          <div
+            *ngIf="webhooksLoading()"
+            class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+          >
             <app-skeleton [rows]="4"></app-skeleton>
           </div>
 
-          <div *ngIf="!webhooksLoading() && webhooksError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+          <div
+            *ngIf="!webhooksLoading() && webhooksError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
             {{ webhooksError() }}
           </div>
 
@@ -860,38 +1302,67 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             {{ 'adminUi.ops.webhooks.empty' | translate }}
           </div>
 
-          <div *ngIf="!webhooksLoading() && webhooks().length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <div
+            *ngIf="!webhooksLoading() && webhooks().length"
+            class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+          >
             <table class="min-w-[980px] w-full text-sm">
               <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                 <tr>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.provider' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.eventType' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.status' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.attempts' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.lastAttempt' | translate }}</th>
-                  <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.error' | translate }}</th>
-                  <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.ops.webhooks.table.actions' | translate }}</th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.webhooks.table.provider' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.webhooks.table.eventType' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.webhooks.table.status' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.webhooks.table.attempts' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.webhooks.table.lastAttempt' | translate }}
+                  </th>
+                  <th class="text-left font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.webhooks.table.error' | translate }}
+                  </th>
+                  <th class="text-right font-semibold px-3 py-2">
+                    {{ 'adminUi.ops.webhooks.table.actions' | translate }}
+                  </th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                 <tr *ngFor="let w of webhooks()">
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                    {{ ('adminUi.ops.webhooks.provider.' + w.provider) | translate }}
+                    {{ 'adminUi.ops.webhooks.provider.' + w.provider | translate }}
                   </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
                     {{ w.event_type || '—' }}
                   </td>
                   <td class="px-3 py-2">
-                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold" [ngClass]="webhookStatusClasses(w.status)">
-                      {{ ('adminUi.ops.webhooks.status.' + w.status) | translate }}
+                    <span
+                      class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
+                      [ngClass]="webhookStatusClasses(w.status)"
+                    >
+                      {{ 'adminUi.ops.webhooks.status.' + w.status | translate }}
                     </span>
                   </td>
                   <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ w.attempts }}</td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ w.last_attempt_at | date: 'short' }}</td>
-                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">{{ w.last_error || '—' }}</td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                    {{ w.last_attempt_at | date: 'short' }}
+                  </td>
+                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200 max-w-[360px] truncate">
+                    {{ w.last_error || '—' }}
+                  </td>
                   <td class="px-3 py-2">
                     <div class="flex justify-end items-center gap-2">
-                      <app-button size="sm" variant="ghost" [label]="'adminUi.ops.webhooks.view' | translate" (action)="viewWebhook(w)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.ops.webhooks.view' | translate"
+                        (action)="viewWebhook(w)"
+                      ></app-button>
                       <app-button
                         *ngIf="w.status !== 'processed'"
                         size="sm"
@@ -907,12 +1378,21 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
             </table>
           </div>
 
-          <div *ngIf="selectedWebhook()" class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
+          <div
+            *ngIf="selectedWebhook()"
+            class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800"
+          >
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.ops.webhooks.detailTitle' | translate }} · {{ selectedWebhook()!.provider }} · {{ selectedWebhook()!.event_id }}
+                {{ 'adminUi.ops.webhooks.detailTitle' | translate }} ·
+                {{ selectedWebhook()!.provider }} · {{ selectedWebhook()!.event_id }}
               </div>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.ops.webhooks.close' | translate" (action)="closeWebhookDetail()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.ops.webhooks.close' | translate"
+                (action)="closeWebhookDetail()"
+              ></app-button>
             </div>
 
             <div
@@ -922,12 +1402,15 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               {{ selectedWebhook()!.last_error }}
             </div>
 
-            <pre class="mt-3 max-h-[320px] overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950/30 dark:text-slate-200">{{ selectedWebhook()!.payload | json }}</pre>
+            <pre
+              class="mt-3 max-h-[320px] overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950/30 dark:text-slate-200"
+              >{{ selectedWebhook()!.payload | json }}</pre
+            >
           </div>
         </div>
-	      </div>
-	    </div>
-	  `
+      </div>
+    </div>
+  `,
 })
 export class AdminOpsComponent implements OnInit {
   readonly frontendBuildVersion = (appConfig.appVersion || '').trim() || 'n/a';
@@ -999,7 +1482,7 @@ export class AdminOpsComponent implements OnInit {
     private readonly ops: OpsService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    private readonly route: ActivatedRoute
+    private readonly route: ActivatedRoute,
   ) {}
 
   ngOnInit(): void {
@@ -1023,25 +1506,35 @@ export class AdminOpsComponent implements OnInit {
 
     forkJoin({
       ready: this.health.ready().pipe(catchError(() => of(null))),
-      webhooksFailed: this.ops.getWebhookFailureStats({ since_hours: sinceHours }).pipe(catchError(() => of(null))),
-      webhooksBacklog: this.ops.getWebhookBacklogStats({ since_hours: sinceHours }).pipe(catchError(() => of(null))),
-      emailsFailed: this.ops.getEmailFailureStats({ since_hours: sinceHours }).pipe(catchError(() => of(null)))
+      webhooksFailed: this.ops
+        .getWebhookFailureStats({ since_hours: sinceHours })
+        .pipe(catchError(() => of(null))),
+      webhooksBacklog: this.ops
+        .getWebhookBacklogStats({ since_hours: sinceHours })
+        .pipe(catchError(() => of(null))),
+      emailsFailed: this.ops
+        .getEmailFailureStats({ since_hours: sinceHours })
+        .pipe(catchError(() => of(null))),
     }).subscribe({
       next: (res) => {
         this.backendReady.set(Boolean(res.ready));
 
         if (res.webhooksFailed) {
-          const count = Number((res.webhooksFailed)?.failed ?? 0);
+          const count = Number(res.webhooksFailed?.failed ?? 0);
           this.webhookFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
         }
         if (res.webhooksBacklog) {
-          const totalCount = Number((res.webhooksBacklog)?.pending ?? 0);
-          const recentCount = Number((res.webhooksBacklog)?.pending_recent ?? 0);
-          this.webhookBacklogTotal.set(Number.isFinite(totalCount) ? Math.max(0, Math.floor(totalCount)) : 0);
-          this.webhookBacklogRecent24h.set(Number.isFinite(recentCount) ? Math.max(0, Math.floor(recentCount)) : 0);
+          const totalCount = Number(res.webhooksBacklog?.pending ?? 0);
+          const recentCount = Number(res.webhooksBacklog?.pending_recent ?? 0);
+          this.webhookBacklogTotal.set(
+            Number.isFinite(totalCount) ? Math.max(0, Math.floor(totalCount)) : 0,
+          );
+          this.webhookBacklogRecent24h.set(
+            Number.isFinite(recentCount) ? Math.max(0, Math.floor(recentCount)) : 0,
+          );
         }
         if (res.emailsFailed) {
-          const count = Number((res.emailsFailed)?.failed ?? 0);
+          const count = Number(res.emailsFailed?.failed ?? 0);
           this.emailFailures24h.set(Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
         }
 
@@ -1049,7 +1542,7 @@ export class AdminOpsComponent implements OnInit {
           res.ready == null,
           res.webhooksFailed == null,
           res.webhooksBacklog == null,
-          res.emailsFailed == null
+          res.emailsFailed == null,
         ].some(Boolean);
         if (failedCalls) {
           this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
@@ -1062,7 +1555,7 @@ export class AdminOpsComponent implements OnInit {
         this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
         this.healthCheckedAt.set(new Date());
         this.healthLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1078,7 +1571,7 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.diagnosticsError.set(this.translate.instant('adminUi.ops.diagnostics.errors.load'));
         this.diagnosticsLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1093,7 +1586,7 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.damTelemetryError.set('Failed to load DAM telemetry.');
         this.damTelemetryLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1102,11 +1595,11 @@ export class AdminOpsComponent implements OnInit {
     this.samedaySyncError.set(null);
     forkJoin({
       status: this.ops.getSamedaySyncStatus().pipe(catchError(() => of(null))),
-      runs: this.ops.listSamedaySyncRuns({ page: 1, limit: 8 }).pipe(catchError(() => of(null)))
+      runs: this.ops.listSamedaySyncRuns({ page: 1, limit: 8 }).pipe(catchError(() => of(null))),
     }).subscribe({
       next: (res) => {
         this.samedaySyncStatus.set((res.status as SamedaySyncStatusRead | null) ?? null);
-        this.samedaySyncRuns.set((res.runs)?.items || []);
+        this.samedaySyncRuns.set(res.runs?.items || []);
         if (!res.status || !res.runs) {
           this.samedaySyncError.set(this.translate.instant('adminUi.ops.samedaySync.errors.load'));
         }
@@ -1115,7 +1608,7 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.samedaySyncError.set(this.translate.instant('adminUi.ops.samedaySync.errors.load'));
         this.samedaySyncLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1131,10 +1624,11 @@ export class AdminOpsComponent implements OnInit {
       },
       error: (err) => {
         this.samedaySyncRunning.set(false);
-        const detail = err?.error?.detail || this.translate.instant('adminUi.ops.samedaySync.errors.run');
+        const detail =
+          err?.error?.detail || this.translate.instant('adminUi.ops.samedaySync.errors.run');
         this.samedaySyncError.set(String(detail));
         this.toast.error(String(detail));
-      }
+      },
     });
   }
 
@@ -1147,8 +1641,10 @@ export class AdminOpsComponent implements OnInit {
 
   diagnosticsBadgeClass(status: string): string {
     const key = (status || '').trim().toLowerCase();
-    if (key === 'ok') return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100';
-    if (key === 'warning') return 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
+    if (key === 'ok')
+      return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100';
+    if (key === 'warning')
+      return 'bg-amber-100 text-amber-900 dark:bg-amber-950/30 dark:text-amber-100';
     if (key === 'error') return 'bg-rose-100 text-rose-900 dark:bg-rose-950/30 dark:text-rose-100';
     return 'bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100';
   }
@@ -1157,7 +1653,7 @@ export class AdminOpsComponent implements OnInit {
     return [
       { label: 'nav.home', url: '/' },
       { label: 'nav.admin', url: '/admin/dashboard' },
-      { label: 'adminUi.nav.ops' }
+      { label: 'adminUi.nav.ops' },
     ];
   }
 
@@ -1180,7 +1676,7 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.ops.newsletter.error'));
         this.newsletterExporting.set(false);
-      }
+      },
     });
   }
 
@@ -1241,7 +1737,7 @@ export class AdminOpsComponent implements OnInit {
       link_label_en: this.bannerLinkLabelEn.trim() || null,
       link_label_ro: this.bannerLinkLabelRo.trim() || null,
       starts_at: startsAtIso,
-      ends_at: endsAtIso
+      ends_at: endsAtIso,
     };
 
     const req = this.editingBannerId
@@ -1259,7 +1755,7 @@ export class AdminOpsComponent implements OnInit {
         this.bannerSaving.set(false);
         const msg = err?.error?.detail || this.translate.instant('adminUi.ops.banner.errors.save');
         this.toast.error(msg);
-      }
+      },
     });
   }
 
@@ -1276,9 +1772,10 @@ export class AdminOpsComponent implements OnInit {
       },
       error: (err) => {
         this.bannerSaving.set(false);
-        const msg = err?.error?.detail || this.translate.instant('adminUi.ops.banner.errors.delete');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.ops.banner.errors.delete');
         this.toast.error(msg);
-      }
+      },
     });
   }
 
@@ -1296,7 +1793,7 @@ export class AdminOpsComponent implements OnInit {
         subtotal_ron: subtotal,
         discount_ron: this.simDiscount.trim() || '0.00',
         shipping_method_id: this.simShippingMethodId || undefined,
-        postal_code: this.simPostalCode.trim() || undefined
+        postal_code: this.simPostalCode.trim() || undefined,
       })
       .subscribe({
         next: (res) => {
@@ -1304,10 +1801,11 @@ export class AdminOpsComponent implements OnInit {
           this.simLoading.set(false);
         },
         error: (err) => {
-          const msg = err?.error?.detail || this.translate.instant('adminUi.ops.shipping.errors.run');
+          const msg =
+            err?.error?.detail || this.translate.instant('adminUi.ops.shipping.errors.run');
           this.simError.set(msg);
           this.simLoading.set(false);
-        }
+        },
       });
   }
 
@@ -1327,7 +1825,7 @@ export class AdminOpsComponent implements OnInit {
     this.webhooksError.set(null);
     this.ops.getWebhookDetail(w.provider, w.event_id).subscribe({
       next: (detail) => this.selectedWebhook.set(detail),
-      error: () => this.toast.error(this.translate.instant('adminUi.ops.webhooks.errors.detail'))
+      error: () => this.toast.error(this.translate.instant('adminUi.ops.webhooks.errors.detail')),
     });
   }
 
@@ -1344,15 +1842,19 @@ export class AdminOpsComponent implements OnInit {
         this.toast.success(this.translate.instant('adminUi.ops.webhooks.success.retried'));
         this.webhookRetrying.set(null);
         this.loadWebhooks();
-        if (this.selectedWebhook()?.provider === w.provider && this.selectedWebhook()?.event_id === w.event_id) {
+        if (
+          this.selectedWebhook()?.provider === w.provider &&
+          this.selectedWebhook()?.event_id === w.event_id
+        ) {
           this.viewWebhook(w);
         }
       },
       error: (err) => {
         this.webhookRetrying.set(null);
-        const msg = err?.error?.detail || this.translate.instant('adminUi.ops.webhooks.errors.retry');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.ops.webhooks.errors.retry');
         this.toast.error(msg);
-      }
+      },
     });
   }
 
@@ -1367,7 +1869,7 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.bannersError.set(this.translate.instant('adminUi.ops.banner.errors.load'));
         this.bannersLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1381,7 +1883,7 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.shippingMethods.set([]);
         this.shippingMethodsLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1396,7 +1898,7 @@ export class AdminOpsComponent implements OnInit {
       error: () => {
         this.webhooksError.set(this.translate.instant('adminUi.ops.webhooks.errors.load'));
         this.webhooksLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1410,18 +1912,20 @@ export class AdminOpsComponent implements OnInit {
       .listEmailFailures({
         limit: 50,
         since_hours: Number.isFinite(sinceHours) ? Math.max(1, Math.min(168, sinceHours)) : 24,
-        to_email: toEmail ? toEmail : undefined
+        to_email: toEmail ? toEmail : undefined,
       })
       .subscribe({
-      next: (rows) => {
-        this.emailFailures.set(rows || []);
-        this.emailFailuresLoading.set(false);
-      },
-      error: () => {
-        this.emailFailuresError.set(this.translate.instant('adminUi.ops.emailFailures.errors.load'));
-        this.emailFailuresLoading.set(false);
-      }
-    });
+        next: (rows) => {
+          this.emailFailures.set(rows || []);
+          this.emailFailuresLoading.set(false);
+        },
+        error: () => {
+          this.emailFailuresError.set(
+            this.translate.instant('adminUi.ops.emailFailures.errors.load'),
+          );
+          this.emailFailuresLoading.set(false);
+        },
+      });
   }
 
   resetEmailFailureFilters(): void {
@@ -1442,13 +1946,17 @@ export class AdminOpsComponent implements OnInit {
     const state = history.state;
     const focus = (state?.focusOpsSection || '').toString();
     const id =
-      focus === 'emails' ? 'admin-ops-email-failures' : focus === 'webhooks' ? 'admin-ops-webhooks' : '';
+      focus === 'emails'
+        ? 'admin-ops-email-failures'
+        : focus === 'webhooks'
+          ? 'admin-ops-webhooks'
+          : '';
     if (!id) return;
     window.setTimeout(() => {
       if (typeof document === 'undefined') return;
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       try {
-        const nextState = { ...(history.state) };
+        const nextState = { ...history.state };
         delete nextState.focusOpsSection;
         history.replaceState(nextState, '');
       } catch {
@@ -1464,7 +1972,8 @@ export class AdminOpsComponent implements OnInit {
     const sinceRaw = (qp.get('since_hours') || '').trim();
     if (sinceRaw) {
       const parsed = Number.parseInt(sinceRaw, 10);
-      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 168) this.emailFailuresSinceHours = parsed;
+      if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 168)
+        this.emailFailuresSinceHours = parsed;
     }
   }
 
@@ -1489,4 +1998,3 @@ export class AdminOpsComponent implements OnInit {
     return d.toISOString();
   }
 }
-

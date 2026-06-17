@@ -7,8 +7,8 @@ import { ServerTranslateLoader } from './core/server-translate.loader';
 const serverConfig: ApplicationConfig = {
   providers: [
     provideServerRendering(),
-    { provide: TranslateLoader, useClass: ServerTranslateLoader }
-  ]
+    { provide: TranslateLoader, useClass: ServerTranslateLoader },
+  ],
 };
 
 export const config = mergeApplicationConfig(appConfig, serverConfig);

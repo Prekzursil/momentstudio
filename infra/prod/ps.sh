@@ -23,4 +23,3 @@ if [[ ! -f "${env_file}" ]]; then
 fi
 
 docker compose --env-file "${env_file}" -f "${compose_file}" ps
-

@@ -20,36 +20,36 @@ function fallbackDescriptions(): Record<SeoRouteKey, Record<SeoLanguage, string>
   return {
     home: {
       en: `Discover handcrafted ceramic art, featured collections, and new arrivals from ${brand}.`,
-      ro: `Descopera arta ceramica lucrata manual, colectii recomandate si noutati de la ${brand}.`
+      ro: `Descopera arta ceramica lucrata manual, colectii recomandate si noutati de la ${brand}.`,
     },
     shop: {
       en: 'Browse handmade products by category, compare options, and find pieces crafted for everyday use.',
-      ro: 'Exploreaza produse lucrate manual pe categorii, compara optiuni si gaseste piese create pentru uz zilnic.'
+      ro: 'Exploreaza produse lucrate manual pe categorii, compara optiuni si gaseste piese create pentru uz zilnic.',
     },
     blog: {
       en: `Read practical stories, guides, and studio updates from ${brand}.`,
-      ro: `Citeste povesti practice, ghiduri si noutati din atelierul ${brand}.`
+      ro: `Citeste povesti practice, ghiduri si noutati din atelierul ${brand}.`,
     },
     blog_post: {
       en: `Read this article from ${brand} for practical ideas and studio context.`,
-      ro: `Citeste acest articol ${brand} pentru idei practice si context din atelier.`
+      ro: `Citeste acest articol ${brand} pentru idei practice si context din atelier.`,
     },
     page: {
       en: `Read this ${brand} page for details, policy information, and support links.`,
-      ro: `Citeste aceasta pagina ${brand} pentru detalii, informatii de politica si linkuri de suport.`
+      ro: `Citeste aceasta pagina ${brand} pentru detalii, informatii de politica si linkuri de suport.`,
     },
     product: {
       en: `View product details, materials, and availability for this handmade piece from ${brand}.`,
-      ro: `Vezi detalii de produs, materiale si disponibilitate pentru aceasta piesa lucrata manual la ${brand}.`
+      ro: `Vezi detalii de produs, materiale si disponibilitate pentru aceasta piesa lucrata manual la ${brand}.`,
     },
     about: {
       en: `Learn about ${brand} and the makers behind handcrafted ceramic art.`,
-      ro: `Afla povestea ${brand} si a creatorilor din spatele artei ceramice lucrate manual.`
+      ro: `Afla povestea ${brand} si a creatorilor din spatele artei ceramice lucrate manual.`,
     },
     contact: {
       en: `Contact ${brand} for custom requests, order support, and collaboration questions.`,
-      ro: `Contacteaza ${brand} pentru cereri personalizate, suport comenzi si colaborari.`
-    }
+      ro: `Contacteaza ${brand} pentru cereri personalizate, suport comenzi si colaborari.`,
+    },
   };
 }
 
@@ -64,7 +64,11 @@ function normalizeCandidate(value: unknown): string {
   return text;
 }
 
-export function resolveRouteSeoDescription(route: SeoRouteKey, lang: SeoLanguage, ...candidates: unknown[]): string {
+export function resolveRouteSeoDescription(
+  route: SeoRouteKey,
+  lang: SeoLanguage,
+  ...candidates: unknown[]
+): string {
   for (const candidate of candidates) {
     const normalized = normalizeCandidate(candidate);
     if (normalized) return normalized;

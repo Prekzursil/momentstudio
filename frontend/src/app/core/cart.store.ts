@@ -40,11 +40,9 @@ export class CartStore {
   readonly quote = this.quoteSignal.asReadonly();
   readonly syncing = computed(() => this.inFlightSignal() > 0);
   readonly subtotal = computed(() =>
-    this.itemsSignal().reduce((sum, item) => sum + item.price * item.quantity, 0)
+    this.itemsSignal().reduce((sum, item) => sum + item.price * item.quantity, 0),
   );
-  readonly count = computed(() =>
-    this.itemsSignal().reduce((sum, item) => sum + item.quantity, 0)
-  );
+  readonly count = computed(() => this.itemsSignal().reduce((sum, item) => sum + item.quantity, 0));
 
   constructor(private readonly api: CartApi) {}
 
@@ -70,7 +68,7 @@ export class CartStore {
         this.itemsSignal.set(this.load());
         this.quoteSignal.set(this.localQuote(this.itemsSignal()));
         this.inFlightSignal.update((v) => Math.max(0, v - 1));
-      }
+      },
     });
   }
 
@@ -89,32 +87,39 @@ export class CartStore {
       .addItem({
         product_id: payload.product_id,
         variant_id: payload.variant_id,
-        quantity: payload.quantity
+        quantity: payload.quantity,
       })
       .pipe(
-        map((res): CartItem => ({
-          id: res.id,
-          product_id: res.product_id,
-          variant_id: res.variant_id,
-          name: res.name ?? payload.name ?? '',
-          slug: res.slug ?? payload.slug ?? '',
-          price: Number(res.unit_price_at_add ?? payload.price ?? 0),
-          currency: res.currency ?? payload.currency ?? 'RON',
-          quantity: res.quantity,
-          stock: res.max_quantity == null ? UNLIMITED_CART_STOCK : Number(res.max_quantity ?? payload.stock ?? 99),
-          image: res.image_url ?? payload.image ?? ''
-        }))
+        map(
+          (res): CartItem => ({
+            id: res.id,
+            product_id: res.product_id,
+            variant_id: res.variant_id,
+            name: res.name ?? payload.name ?? '',
+            slug: res.slug ?? payload.slug ?? '',
+            price: Number(res.unit_price_at_add ?? payload.price ?? 0),
+            currency: res.currency ?? payload.currency ?? 'RON',
+            quantity: res.quantity,
+            stock:
+              res.max_quantity == null
+                ? UNLIMITED_CART_STOCK
+                : Number(res.max_quantity ?? payload.stock ?? 99),
+            image: res.image_url ?? payload.image ?? '',
+          }),
+        ),
       )
       .subscribe({
         next: (item) => {
           const current = this.itemsSignal();
           const idx = current.findIndex(
-            (i) => i.product_id === item.product_id && i.variant_id === item.variant_id
+            (i) => i.product_id === item.product_id && i.variant_id === item.variant_id,
           );
           const nextItems =
             idx >= 0
               ? current.map((existing, index) =>
-                  index === idx ? { ...existing, quantity: existing.quantity + item.quantity } : existing
+                  index === idx
+                    ? { ...existing, quantity: existing.quantity + item.quantity }
+                    : existing,
                 )
               : [...current, item];
           this.itemsSignal.set(nextItems);
@@ -122,7 +127,7 @@ export class CartStore {
         },
         error: () => {
           // if backend add fails, keep local state unchanged
-        }
+        },
       });
   }
 
@@ -132,7 +137,7 @@ export class CartStore {
       product_id: i.product_id,
       variant_id: i.variant_id ?? undefined,
       quantity: i.quantity,
-      max_quantity: undefined
+      max_quantity: undefined,
     }));
     this.api.sync(payload).subscribe({
       next: (res) => {
@@ -145,7 +150,7 @@ export class CartStore {
       error: () => {
         // keep local state on failure
         this.inFlightSignal.update((v) => Math.max(0, v - 1));
-      }
+      },
     });
   }
 
@@ -179,7 +184,7 @@ export class CartStore {
       error: () => {
         // keep local state unchanged on failure
         handlers?.onError?.();
-      }
+      },
     });
   }
 
@@ -207,7 +212,7 @@ export class CartStore {
       currency: i.currency ?? currency,
       quantity: i.quantity,
       stock: i.max_quantity == null ? UNLIMITED_CART_STOCK : Number(i.max_quantity ?? 99),
-      image: i.image_url ?? ''
+      image: i.image_url ?? '',
     }));
   }
 
@@ -238,7 +243,15 @@ export class CartStore {
   private localQuote(items: CartItem[]): CartQuote {
     const currency = items.find((i) => i.currency)?.currency ?? 'RON';
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    return { subtotal, fee: 0, tax: 0, shipping: 0, total: subtotal, currency, freeShippingThresholdRon: null };
+    return {
+      subtotal,
+      fee: 0,
+      tax: 0,
+      shipping: 0,
+      total: subtotal,
+      currency,
+      freeShippingThresholdRon: null,
+    };
   }
 
   private persist(next?: CartItem[]): void {
@@ -261,4 +274,3 @@ export class CartStore {
     }
   }
 }
-

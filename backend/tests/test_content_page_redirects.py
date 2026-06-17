@@ -76,13 +76,18 @@ def admin_headers(client: TestClient, session_factory) -> dict[str, str]:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    return {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
 
 
 async def seed_page(session_factory, *, key: str, title: str) -> None:
     async with session_factory() as session:
         await session.execute(delete(ContentRedirect))
-        await session.execute(delete(ContentBlock).where(ContentBlock.key.like("page.%")))
+        await session.execute(
+            delete(ContentBlock).where(ContentBlock.key.like("page.%"))
+        )
         block = ContentBlock(
             key=key,
             title=title,
@@ -96,7 +101,9 @@ async def seed_page(session_factory, *, key: str, title: str) -> None:
         await session.commit()
 
 
-def test_admin_can_rename_page_and_old_slug_redirects(test_app: Dict[str, object]) -> None:
+def test_admin_can_rename_page_and_old_slug_redirects(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
     asyncio.run(seed_page(session_factory, key="page.old-page", title="Old Page"))
@@ -118,10 +125,16 @@ def test_admin_can_rename_page_and_old_slug_redirects(test_app: Dict[str, object
 
     async def verify_redirects() -> None:
         async with session_factory() as session:
-            redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == "page.old-page"))
+            redirect = await session.scalar(
+                select(ContentRedirect).where(
+                    ContentRedirect.from_key == "page.old-page"
+                )
+            )
             assert redirect is not None
             assert redirect.to_key == "page.new-page"
-            old = await session.scalar(select(ContentBlock).where(ContentBlock.key == "page.old-page"))
+            old = await session.scalar(
+                select(ContentBlock).where(ContentBlock.key == "page.old-page")
+            )
             assert old is None
 
     asyncio.run(verify_redirects())
@@ -133,9 +146,17 @@ def test_renaming_twice_flattens_redirect_chain(test_app: Dict[str, object]) -> 
     asyncio.run(seed_page(session_factory, key="page.first", title="First"))
 
     headers = admin_headers(client, session_factory)
-    r1 = client.post("/api/v1/content/admin/pages/first/rename", json={"new_slug": "second"}, headers=headers)
+    r1 = client.post(
+        "/api/v1/content/admin/pages/first/rename",
+        json={"new_slug": "second"},
+        headers=headers,
+    )
     assert r1.status_code == 200, r1.text
-    r2 = client.post("/api/v1/content/admin/pages/second/rename", json={"new_slug": "final"}, headers=headers)
+    r2 = client.post(
+        "/api/v1/content/admin/pages/second/rename",
+        json={"new_slug": "final"},
+        headers=headers,
+    )
     assert r2.status_code == 200, r2.text
 
     res = client.get("/api/v1/content/pages/first")
@@ -144,8 +165,12 @@ def test_renaming_twice_flattens_redirect_chain(test_app: Dict[str, object]) -> 
 
     async def verify_chain() -> None:
         async with session_factory() as session:
-            old = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == "page.first"))
-            mid = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == "page.second"))
+            old = await session.scalar(
+                select(ContentRedirect).where(ContentRedirect.from_key == "page.first")
+            )
+            mid = await session.scalar(
+                select(ContentRedirect).where(ContentRedirect.from_key == "page.second")
+            )
             assert old is not None and mid is not None
             assert old.to_key == "page.final"
             assert mid.to_key == "page.final"
@@ -161,7 +186,12 @@ def test_admin_create_page_rejects_reserved_slug(test_app: Dict[str, object]) ->
 
     res = client.post(
         "/api/v1/content/admin/page.cart",
-        json={"title": "Cart", "body_markdown": "Nope", "status": "draft", "meta": {"version": 2, "blocks": []}},
+        json={
+            "title": "Cart",
+            "body_markdown": "Nope",
+            "status": "draft",
+            "meta": {"version": 2, "blocks": []},
+        },
         headers=headers,
     )
     assert res.status_code == 400, res.text
@@ -176,7 +206,12 @@ def test_admin_create_page_allows_locked_slug(test_app: Dict[str, object]) -> No
 
     res = client.post(
         "/api/v1/content/admin/page.about",
-        json={"title": "About", "body_markdown": "Hello", "status": "draft", "meta": {"version": 2, "blocks": []}},
+        json={
+            "title": "About",
+            "body_markdown": "Hello",
+            "status": "draft",
+            "meta": {"version": 2, "blocks": []},
+        },
         headers=headers,
     )
     assert res.status_code == 201, res.text
@@ -191,7 +226,12 @@ def test_admin_create_page_requires_canonical_slug(test_app: Dict[str, object]) 
 
     res = client.post(
         "/api/v1/content/admin/page.About",
-        json={"title": "About", "body_markdown": "Hello", "status": "draft", "meta": {"version": 2, "blocks": []}},
+        json={
+            "title": "About",
+            "body_markdown": "Hello",
+            "status": "draft",
+            "meta": {"version": 2, "blocks": []},
+        },
         headers=headers,
     )
     assert res.status_code == 400, res.text
@@ -205,7 +245,9 @@ def test_admin_can_list_and_delete_redirects(test_app: Dict[str, object]) -> Non
     async def seed_redirects() -> None:
         async with session_factory() as session:
             await session.execute(delete(ContentRedirect))
-            await session.execute(delete(ContentBlock).where(ContentBlock.key.like("page.%")))
+            await session.execute(
+                delete(ContentBlock).where(ContentBlock.key.like("page.%"))
+            )
             session.add(
                 ContentBlock(
                     key="page.target",
@@ -234,7 +276,9 @@ def test_admin_can_list_and_delete_redirects(test_app: Dict[str, object]) -> Non
     assert by_from["page.stale"]["target_exists"] is False
 
     stale_id = by_from["page.stale"]["id"]
-    deleted = client.delete(f"/api/v1/content/admin/redirects/{stale_id}", headers=headers)
+    deleted = client.delete(
+        f"/api/v1/content/admin/redirects/{stale_id}", headers=headers
+    )
     assert deleted.status_code == 204, deleted.text
 
     listed2 = client.get("/api/v1/content/admin/redirects", headers=headers)
@@ -243,14 +287,18 @@ def test_admin_can_list_and_delete_redirects(test_app: Dict[str, object]) -> Non
     assert "page.stale" not in keys
 
 
-def test_admin_upsert_redirect_accepts_display_values(test_app: Dict[str, object]) -> None:
+def test_admin_upsert_redirect_accepts_display_values(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
 
     async def seed_target() -> None:
         async with session_factory() as session:
             await session.execute(delete(ContentRedirect))
-            await session.execute(delete(ContentBlock).where(ContentBlock.key.like("page.%")))
+            await session.execute(
+                delete(ContentBlock).where(ContentBlock.key.like("page.%"))
+            )
             session.add(
                 ContentBlock(
                     key="page.target",

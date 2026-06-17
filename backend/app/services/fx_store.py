@@ -31,14 +31,22 @@ def _row_to_read(row: FxRate) -> FxRatesRead:
 
 
 async def _get_row(session: AsyncSession, *, is_override: bool) -> FxRate | None:
-    result = await session.execute(select(FxRate).where(FxRate.is_override == is_override))
+    result = await session.execute(
+        select(FxRate).where(FxRate.is_override == is_override)
+    )
     return result.scalar_one_or_none()
 
 
-async def _upsert_row(session: AsyncSession, *, is_override: bool, data: FxRatesRead) -> FxRate:
+async def _upsert_row(
+    session: AsyncSession, *, is_override: bool, data: FxRatesRead
+) -> FxRate:
     bind = session.get_bind()
     dialect = getattr(getattr(bind, "dialect", None), "name", "")
-    insert_fn = pg_insert if dialect == "postgresql" else (sqlite_insert if dialect == "sqlite" else None)
+    insert_fn = (
+        pg_insert
+        if dialect == "postgresql"
+        else (sqlite_insert if dialect == "sqlite" else None)
+    )
 
     if insert_fn is not None:
         stmt = insert_fn(FxRate).values(
@@ -147,7 +155,10 @@ async def get_effective_rates(session: AsyncSession) -> FxRatesRead:
         live = await fx_rates.get_fx_rates()
     except Exception as exc:
         logger.warning("fx_rates_fetch_failed", extra={"error": str(exc)})
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="FX rates unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="FX rates unavailable",
+        )
 
     read = FxRatesRead(
         base=live.base,
@@ -199,13 +210,17 @@ async def clear_override(
     cleared = _row_to_read(existing)
     await session.delete(existing)
     await session.commit()
-    await _log_override_audit(session, action=audit_action, user_id=user_id, data=cleared)
+    await _log_override_audit(
+        session, action=audit_action, user_id=user_id, data=cleared
+    )
 
 
 async def get_admin_status(session: AsyncSession) -> FxAdminStatus:
     override = await _get_row(session, is_override=True)
     last_known = await _get_row(session, is_override=False)
-    effective = _row_to_read(override) if override else (await get_effective_rates(session))
+    effective = (
+        _row_to_read(override) if override else (await get_effective_rates(session))
+    )
     return FxAdminStatus(
         effective=effective,
         override=_row_to_read(override) if override else None,

@@ -24,19 +24,54 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     with op.batch_alter_table("carts") as batch:
         batch.add_column(sa.Column("guest_email", sa.String(length=255), nullable=True))
-        batch.add_column(sa.Column("guest_email_verification_token", sa.String(length=64), nullable=True))
-        batch.add_column(sa.Column("guest_email_verification_expires_at", sa.DateTime(timezone=True), nullable=True))
-        batch.add_column(sa.Column("guest_email_verified_at", sa.DateTime(timezone=True), nullable=True))
-        batch.add_column(sa.Column("guest_email_verification_attempts", sa.Integer(), nullable=False, server_default="0"))
-        batch.add_column(sa.Column("guest_email_verification_last_attempt_at", sa.DateTime(timezone=True), nullable=True))
+        batch.add_column(
+            sa.Column(
+                "guest_email_verification_token", sa.String(length=64), nullable=True
+            )
+        )
+        batch.add_column(
+            sa.Column(
+                "guest_email_verification_expires_at",
+                sa.DateTime(timezone=True),
+                nullable=True,
+            )
+        )
+        batch.add_column(
+            sa.Column(
+                "guest_email_verified_at", sa.DateTime(timezone=True), nullable=True
+            )
+        )
+        batch.add_column(
+            sa.Column(
+                "guest_email_verification_attempts",
+                sa.Integer(),
+                nullable=False,
+                server_default="0",
+            )
+        )
+        batch.add_column(
+            sa.Column(
+                "guest_email_verification_last_attempt_at",
+                sa.DateTime(timezone=True),
+                nullable=True,
+            )
+        )
 
     with op.batch_alter_table("addresses") as batch:
-        batch.alter_column("user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=True)
+        batch.alter_column(
+            "user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=True
+        )
 
     with op.batch_alter_table("orders") as batch:
-        batch.add_column(sa.Column("customer_email", sa.String(length=255), nullable=True))
-        batch.add_column(sa.Column("customer_name", sa.String(length=255), nullable=True))
-        batch.alter_column("user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=True)
+        batch.add_column(
+            sa.Column("customer_email", sa.String(length=255), nullable=True)
+        )
+        batch.add_column(
+            sa.Column("customer_name", sa.String(length=255), nullable=True)
+        )
+        batch.alter_column(
+            "user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=True
+        )
 
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
@@ -87,18 +122,26 @@ def upgrade() -> None:
         )
 
     with op.batch_alter_table("orders") as batch:
-        batch.alter_column("customer_email", existing_type=sa.String(length=255), nullable=False)
-        batch.alter_column("customer_name", existing_type=sa.String(length=255), nullable=False)
+        batch.alter_column(
+            "customer_email", existing_type=sa.String(length=255), nullable=False
+        )
+        batch.alter_column(
+            "customer_name", existing_type=sa.String(length=255), nullable=False
+        )
 
 
 def downgrade() -> None:
     with op.batch_alter_table("orders") as batch:
-        batch.alter_column("user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=False)
+        batch.alter_column(
+            "user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=False
+        )
         batch.drop_column("customer_name")
         batch.drop_column("customer_email")
 
     with op.batch_alter_table("addresses") as batch:
-        batch.alter_column("user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=False)
+        batch.alter_column(
+            "user_id", existing_type=postgresql.UUID(as_uuid=True), nullable=False
+        )
 
     with op.batch_alter_table("carts") as batch:
         batch.drop_column("guest_email_verification_last_attempt_at")

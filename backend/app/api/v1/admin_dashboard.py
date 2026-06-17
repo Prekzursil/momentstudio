@@ -7,7 +7,17 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from fastapi.responses import FileResponse
 from sqlalchemy import (
     String,
@@ -75,7 +85,14 @@ from app.services import exporter as exporter_service
 from app.services import inventory as inventory_service
 from app.services import catalog as catalog_service
 from app.models.address import Address
-from app.models.order import Order, OrderRefund, OrderStatus, OrderTag, OrderEvent, OrderItem
+from app.models.order import (
+    Order,
+    OrderRefund,
+    OrderStatus,
+    OrderTag,
+    OrderEvent,
+    OrderItem,
+)
 from app.models.returns import ReturnRequest, ReturnRequestStatus
 from app.models.support import ContactSubmission
 from app.models.user import (
@@ -124,8 +141,15 @@ from app.schemas.gdpr_admin import (
     AdminGdprExportJobsResponse,
     AdminGdprUserRef,
 )
-from app.schemas.user_segments_admin import AdminUserSegmentListItem, AdminUserSegmentResponse
-from app.schemas.analytics import AdminFunnelConversions, AdminFunnelCounts, AdminFunnelMetricsResponse
+from app.schemas.user_segments_admin import (
+    AdminUserSegmentListItem,
+    AdminUserSegmentResponse,
+)
+from app.schemas.analytics import (
+    AdminFunnelConversions,
+    AdminFunnelCounts,
+    AdminFunnelMetricsResponse,
+)
 
 router = APIRouter(prefix="/admin/dashboard", tags=["admin"])
 
@@ -135,9 +159,13 @@ admin_password_reset_resend_rate_limit = limiter(
 )
 
 
-async def _get_dashboard_alert_thresholds(session: AsyncSession) -> AdminDashboardAlertThresholds:
+async def _get_dashboard_alert_thresholds(
+    session: AsyncSession,
+) -> AdminDashboardAlertThresholds:
     record = await session.scalar(
-        select(AdminDashboardAlertThresholds).where(AdminDashboardAlertThresholds.key == "default")
+        select(AdminDashboardAlertThresholds).where(
+            AdminDashboardAlertThresholds.key == "default"
+        )
     )
     if record is not None:
         return record
@@ -149,22 +177,30 @@ async def _get_dashboard_alert_thresholds(session: AsyncSession) -> AdminDashboa
     except IntegrityError:
         await session.rollback()
         record = await session.scalar(
-            select(AdminDashboardAlertThresholds).where(AdminDashboardAlertThresholds.key == "default")
+            select(AdminDashboardAlertThresholds).where(
+                AdminDashboardAlertThresholds.key == "default"
+            )
         )
         if record is None:
             raise
     return record
 
 
-def _dashboard_alert_thresholds_payload(record: AdminDashboardAlertThresholds) -> dict[str, object]:
+def _dashboard_alert_thresholds_payload(
+    record: AdminDashboardAlertThresholds,
+) -> dict[str, object]:
     return {
-        "failed_payments_min_count": int(getattr(record, "failed_payments_min_count", 1) or 1),
+        "failed_payments_min_count": int(
+            getattr(record, "failed_payments_min_count", 1) or 1
+        ),
         "failed_payments_min_delta_pct": (
             float(getattr(record, "failed_payments_min_delta_pct"))
             if getattr(record, "failed_payments_min_delta_pct", None) is not None
             else None
         ),
-        "refund_requests_min_count": int(getattr(record, "refund_requests_min_count", 1) or 1),
+        "refund_requests_min_count": int(
+            getattr(record, "refund_requests_min_count", 1) or 1
+        ),
         "refund_requests_min_rate_pct": (
             float(getattr(record, "refund_requests_min_rate_pct"))
             if getattr(record, "refund_requests_min_rate_pct", None) is not None
@@ -181,7 +217,9 @@ async def admin_get_alert_thresholds(
     _: User = Depends(require_admin_section("dashboard")),
 ) -> AdminDashboardAlertThresholdsResponse:
     record = await _get_dashboard_alert_thresholds(session)
-    return AdminDashboardAlertThresholdsResponse(**_dashboard_alert_thresholds_payload(record))
+    return AdminDashboardAlertThresholdsResponse(
+        **_dashboard_alert_thresholds_payload(record)
+    )
 
 
 @router.put("/alert-thresholds", response_model=AdminDashboardAlertThresholdsResponse)
@@ -226,7 +264,9 @@ async def admin_update_alert_thresholds(
     )
     await session.commit()
     await session.refresh(record)
-    return AdminDashboardAlertThresholdsResponse(**_dashboard_alert_thresholds_payload(record))
+    return AdminDashboardAlertThresholdsResponse(
+        **_dashboard_alert_thresholds_payload(record)
+    )
 
 
 @router.get("/summary")
@@ -326,12 +366,12 @@ async def admin_summary(
         )
     )
     net_sales_30d = (
-        (gross_sales_30d or 0)
-        - (refunds_30d or 0)
-        - (missing_refunds_30d or 0)
+        (gross_sales_30d or 0) - (refunds_30d or 0) - (missing_refunds_30d or 0)
     )
     orders_30d = await session.scalar(
-        select(func.count()).select_from(Order).where(Order.created_at >= since, exclude_test_orders)
+        select(func.count())
+        .select_from(Order)
+        .where(Order.created_at >= since, exclude_test_orders)
     )
 
     sales_range = await session.scalar(
@@ -374,9 +414,7 @@ async def admin_summary(
         )
     )
     net_sales_range = (
-        (gross_sales_range or 0)
-        - (refunds_range or 0)
-        - (missing_refunds_range or 0)
+        (gross_sales_range or 0) - (refunds_range or 0) - (missing_refunds_range or 0)
     )
     orders_range = await session.scalar(
         select(func.count())
@@ -390,7 +428,9 @@ async def admin_summary(
     today_orders = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(Order.created_at >= today_start, Order.created_at < now, exclude_test_orders)
+        .where(
+            Order.created_at >= today_start, Order.created_at < now, exclude_test_orders
+        )
     )
     yesterday_orders = await session.scalar(
         select(func.count())
@@ -480,9 +520,7 @@ async def admin_summary(
         )
     )
     net_today_sales = (
-        (gross_today_sales or 0)
-        - (refunds_today or 0)
-        - (missing_refunds_today or 0)
+        (gross_today_sales or 0) - (refunds_today or 0) - (missing_refunds_today or 0)
     )
     net_yesterday_sales = (
         (gross_yesterday_sales or 0)
@@ -599,35 +637,51 @@ async def admin_summary(
         return numer / denom * 100.0
 
     thresholds = await _get_dashboard_alert_thresholds(session)
-    failed_payments_threshold_min_count = int(getattr(thresholds, "failed_payments_min_count", 1) or 1)
+    failed_payments_threshold_min_count = int(
+        getattr(thresholds, "failed_payments_min_count", 1) or 1
+    )
     failed_payments_threshold_min_delta_pct = (
         float(getattr(thresholds, "failed_payments_min_delta_pct"))
         if getattr(thresholds, "failed_payments_min_delta_pct", None) is not None
         else None
     )
-    refund_requests_threshold_min_count = int(getattr(thresholds, "refund_requests_min_count", 1) or 1)
+    refund_requests_threshold_min_count = int(
+        getattr(thresholds, "refund_requests_min_count", 1) or 1
+    )
     refund_requests_threshold_min_rate_pct = (
         float(getattr(thresholds, "refund_requests_min_rate_pct"))
         if getattr(thresholds, "refund_requests_min_rate_pct", None) is not None
         else None
     )
-    stockouts_threshold_min_count = int(getattr(thresholds, "stockouts_min_count", 1) or 1)
+    stockouts_threshold_min_count = int(
+        getattr(thresholds, "stockouts_min_count", 1) or 1
+    )
 
-    failed_payments_delta_pct = _delta_pct(float(failed_payments or 0), float(failed_payments_prev or 0))
-    failed_payments_is_alert = bool(int(failed_payments or 0) >= failed_payments_threshold_min_count) and (
+    failed_payments_delta_pct = _delta_pct(
+        float(failed_payments or 0), float(failed_payments_prev or 0)
+    )
+    failed_payments_is_alert = bool(
+        int(failed_payments or 0) >= failed_payments_threshold_min_count
+    ) and (
         failed_payments_threshold_min_delta_pct is None
         or failed_payments_delta_pct is None
         or failed_payments_delta_pct >= failed_payments_threshold_min_delta_pct
     )
 
-    refund_rate_pct = _rate_pct(float(refund_requests or 0), float(refund_window_orders or 0))
-    refund_rate_prev_pct = _rate_pct(float(refund_requests_prev or 0), float(refund_window_orders_prev or 0))
+    refund_rate_pct = _rate_pct(
+        float(refund_requests or 0), float(refund_window_orders or 0)
+    )
+    refund_rate_prev_pct = _rate_pct(
+        float(refund_requests_prev or 0), float(refund_window_orders_prev or 0)
+    )
     refund_rate_delta_pct = (
         _delta_pct(refund_rate_pct, refund_rate_prev_pct)
         if refund_rate_pct is not None and refund_rate_prev_pct is not None
         else None
     )
-    refund_requests_is_alert = bool(int(refund_requests or 0) >= refund_requests_threshold_min_count) and (
+    refund_requests_is_alert = bool(
+        int(refund_requests or 0) >= refund_requests_threshold_min_count
+    ) and (
         refund_requests_threshold_min_rate_pct is None
         or refund_rate_pct is None
         or refund_rate_pct >= refund_requests_threshold_min_rate_pct
@@ -715,7 +769,9 @@ async def admin_send_scheduled_report(
     kind = str(payload.get("kind") or "").strip().lower()
     force = bool(payload.get("force", False))
     try:
-        result = await admin_reports_service.send_report_now(session, kind=kind, force=force)
+        result = await admin_reports_service.send_report_now(
+            session, kind=kind, force=force
+        )
     except ValueError as exc:
         await session.rollback()
         await audit_chain_service.add_admin_audit_log(
@@ -732,7 +788,9 @@ async def admin_send_scheduled_report(
             },
         )
         await session.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     except Exception as exc:
         await session.rollback()
         await audit_chain_service.add_admin_audit_log(
@@ -790,14 +848,19 @@ async def admin_funnel_metrics(
                 detail="range_to must be on/after range_from",
             )
         start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(
+            range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+        )
         effective_range_days = (range_to - range_from).days + 1
     else:
         start = now - timedelta(days=range_days)
         end = now
         effective_range_days = range_days
 
-    window_filters = [AnalyticsEvent.created_at >= start, AnalyticsEvent.created_at < end]
+    window_filters = [
+        AnalyticsEvent.created_at >= start,
+        AnalyticsEvent.created_at < end,
+    ]
 
     async def _distinct_sessions(event: str) -> int:
         value = await session.scalar(
@@ -943,7 +1006,10 @@ async def admin_channel_breakdown(
                     "net_sales": float(net or 0),
                 }
             )
-        items.sort(key=lambda row: (row.get("orders", 0), row.get("gross_sales", 0)), reverse=True)
+        items.sort(
+            key=lambda row: (row.get("orders", 0), row.get("gross_sales", 0)),
+            reverse=True,
+        )
         return items
 
     return {
@@ -992,8 +1058,12 @@ async def admin_payments_health(
         )
         .group_by(method_col)
     )
-    success_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in success_rows.all()}
-    pending_map = {str(row[0] or "unknown"): int(row[1] or 0) for row in pending_rows.all()}
+    success_map = {
+        str(row[0] or "unknown"): int(row[1] or 0) for row in success_rows.all()
+    }
+    pending_map = {
+        str(row[0] or "unknown"): int(row[1] or 0) for row in pending_rows.all()
+    }
 
     def _safe_int(value: int | None) -> int:
         return int(value or 0)
@@ -1018,10 +1088,26 @@ async def admin_payments_health(
             or_(model.last_error.is_(None), model.last_error == ""),
         )
 
-    stripe_errors = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_error_filter(StripeWebhookEvent)))
-    stripe_backlog = await session.scalar(select(func.count()).select_from(StripeWebhookEvent).where(*_backlog_filter(StripeWebhookEvent)))
-    paypal_errors = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_error_filter(PayPalWebhookEvent)))
-    paypal_backlog = await session.scalar(select(func.count()).select_from(PayPalWebhookEvent).where(*_backlog_filter(PayPalWebhookEvent)))
+    stripe_errors = await session.scalar(
+        select(func.count())
+        .select_from(StripeWebhookEvent)
+        .where(*_error_filter(StripeWebhookEvent))
+    )
+    stripe_backlog = await session.scalar(
+        select(func.count())
+        .select_from(StripeWebhookEvent)
+        .where(*_backlog_filter(StripeWebhookEvent))
+    )
+    paypal_errors = await session.scalar(
+        select(func.count())
+        .select_from(PayPalWebhookEvent)
+        .where(*_error_filter(PayPalWebhookEvent))
+    )
+    paypal_backlog = await session.scalar(
+        select(func.count())
+        .select_from(PayPalWebhookEvent)
+        .where(*_backlog_filter(PayPalWebhookEvent))
+    )
 
     stripe_recent_rows = (
         (
@@ -1071,12 +1157,25 @@ async def admin_payments_health(
                 "last_error": row.last_error,
             }
         )
-    recent_errors.sort(key=lambda item: item.get("last_attempt_at") or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    recent_errors.sort(
+        key=lambda item: item.get("last_attempt_at")
+        or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
     recent_errors = recent_errors[:12]
 
     preferred_order = ["stripe", "paypal", "netopia", "cod", "unknown"]
     methods = list({*success_map.keys(), *pending_map.keys(), *preferred_order})
-    methods.sort(key=lambda key: (preferred_order.index(key) if key in preferred_order else len(preferred_order), key))
+    methods.sort(
+        key=lambda key: (
+            (
+                preferred_order.index(key)
+                if key in preferred_order
+                else len(preferred_order)
+            ),
+            key,
+        )
+    )
 
     providers: list[dict] = []
     for method in methods:
@@ -1128,7 +1227,9 @@ async def admin_refunds_breakdown(
 
     provider_col = func.lower(func.coalesce(OrderRefund.provider, literal("unknown")))
 
-    async def _provider_rows(window_start: datetime, window_end: datetime) -> list[tuple[str, int, float]]:
+    async def _provider_rows(
+        window_start: datetime, window_end: datetime
+    ) -> list[tuple[str, int, float]]:
         rows = await session.execute(
             select(
                 provider_col,
@@ -1146,7 +1247,9 @@ async def admin_refunds_breakdown(
         )
         items: list[tuple[str, int, float]] = []
         for provider, count, amount in rows.all():
-            items.append((str(provider or "unknown"), int(count or 0), float(amount or 0)))
+            items.append(
+                (str(provider or "unknown"), int(count or 0), float(amount or 0))
+            )
         return items
 
     current_provider = await _provider_rows(start, now)
@@ -1172,9 +1275,17 @@ async def admin_refunds_breakdown(
                 },
             }
         )
-    providers.sort(key=lambda row: (row.get("current", {}).get("amount", 0), row.get("current", {}).get("count", 0)), reverse=True)
+    providers.sort(
+        key=lambda row: (
+            row.get("current", {}).get("amount", 0),
+            row.get("current", {}).get("count", 0),
+        ),
+        reverse=True,
+    )
 
-    async def _missing_refunds(window_start: datetime, window_end: datetime) -> tuple[int, float]:
+    async def _missing_refunds(
+        window_start: datetime, window_end: datetime
+    ) -> tuple[int, float]:
         row = await session.execute(
             select(
                 func.count().label("count"),
@@ -1207,21 +1318,84 @@ async def admin_refunds_breakdown(
         t = _normalize_text(reason)
         if not t:
             return "other"
-        if any(key in t for key in ("damaged", "broken", "defect", "defective", "crack", "spart", "stricat", "zgariat", "deterior")):
+        if any(
+            key in t
+            for key in (
+                "damaged",
+                "broken",
+                "defect",
+                "defective",
+                "crack",
+                "spart",
+                "stricat",
+                "zgariat",
+                "deterior",
+            )
+        ):
             return "damaged"
-        if any(key in t for key in ("wrong", "different", "gresit", "incorect", "alt produs", "other item", "not the one")):
+        if any(
+            key in t
+            for key in (
+                "wrong",
+                "different",
+                "gresit",
+                "incorect",
+                "alt produs",
+                "other item",
+                "not the one",
+            )
+        ):
             return "wrong_item"
-        if any(key in t for key in ("not as described", "different than expected", "nu corespunde", "nu este ca", "description", "poza", "picture")):
+        if any(
+            key in t
+            for key in (
+                "not as described",
+                "different than expected",
+                "nu corespunde",
+                "nu este ca",
+                "description",
+                "poza",
+                "picture",
+            )
+        ):
             return "not_as_described"
-        if any(key in t for key in ("size", "fit", "too big", "too small", "marime", "potriv")):
+        if any(
+            key in t
+            for key in ("size", "fit", "too big", "too small", "marime", "potriv")
+        ):
             return "size_fit"
-        if any(key in t for key in ("delivery", "shipping", "ship", "courier", "curier", "livrare", "intarzi", "intarzier")):
+        if any(
+            key in t
+            for key in (
+                "delivery",
+                "shipping",
+                "ship",
+                "courier",
+                "curier",
+                "livrare",
+                "intarzi",
+                "intarzier",
+            )
+        ):
             return "delivery_issue"
-        if any(key in t for key in ("changed my mind", "dont want", "do not want", "no longer", "nu mai", "razgand", "renunt")):
+        if any(
+            key in t
+            for key in (
+                "changed my mind",
+                "dont want",
+                "do not want",
+                "no longer",
+                "nu mai",
+                "razgand",
+                "renunt",
+            )
+        ):
             return "changed_mind"
         return "other"
 
-    async def _reason_counts(window_start: datetime, window_end: datetime) -> dict[str, int]:
+    async def _reason_counts(
+        window_start: datetime, window_end: datetime
+    ) -> dict[str, int]:
         rows = await session.execute(
             select(ReturnRequest.reason)
             .select_from(ReturnRequest)
@@ -1242,7 +1416,15 @@ async def admin_refunds_breakdown(
     current_reasons = await _reason_counts(start, now)
     previous_reasons = await _reason_counts(prev_start, start)
 
-    categories = ["damaged", "wrong_item", "not_as_described", "size_fit", "delivery_issue", "changed_mind", "other"]
+    categories = [
+        "damaged",
+        "wrong_item",
+        "not_as_described",
+        "size_fit",
+        "delivery_issue",
+        "changed_mind",
+        "other",
+    ]
     reasons: list[dict] = []
     for category in categories:
         cur = int(current_reasons.get(category, 0))
@@ -1263,11 +1445,21 @@ async def admin_refunds_breakdown(
         "window_end": now,
         "providers": providers,
         "missing_refunds": {
-            "current": {"count": missing_current_count, "amount": float(missing_current_amount)},
-            "previous": {"count": missing_prev_count, "amount": float(missing_prev_amount)},
+            "current": {
+                "count": missing_current_count,
+                "amount": float(missing_current_amount),
+            },
+            "previous": {
+                "count": missing_prev_count,
+                "amount": float(missing_prev_amount),
+            },
             "delta_pct": {
-                "count": _delta_pct(float(missing_current_count), float(missing_prev_count)),
-                "amount": _delta_pct(float(missing_current_amount), float(missing_prev_amount)),
+                "count": _delta_pct(
+                    float(missing_current_count), float(missing_prev_count)
+                ),
+                "amount": _delta_pct(
+                    float(missing_current_amount), float(missing_prev_amount)
+                ),
             },
         },
         "reasons": reasons,
@@ -1315,14 +1507,18 @@ async def admin_shipping_performance(
         .subquery()
     )
 
-    courier_col = func.lower(func.coalesce(Order.courier, literal("unknown"))).label("courier")
+    courier_col = func.lower(func.coalesce(Order.courier, literal("unknown"))).label(
+        "courier"
+    )
 
     def _delta_pct(current: float | None, previous: float | None) -> float | None:
         if current is None or previous is None or previous == 0:
             return None
         return (current - previous) / previous * 100.0
 
-    async def _collect_ship_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
+    async def _collect_ship_durations(
+        window_start: datetime, window_end: datetime
+    ) -> dict[str, list[float]]:
         rows = await session.execute(
             select(Order.created_at, courier_col, shipped_subq.c.shipped_at)
             .select_from(Order)
@@ -1344,9 +1540,13 @@ async def admin_shipping_performance(
             durations.setdefault(key, []).append(float(hours))
         return durations
 
-    async def _collect_delivery_durations(window_start: datetime, window_end: datetime) -> dict[str, list[float]]:
+    async def _collect_delivery_durations(
+        window_start: datetime, window_end: datetime
+    ) -> dict[str, list[float]]:
         rows = await session.execute(
-            select(courier_col, shipped_subq.c.shipped_at, delivered_subq.c.delivered_at)
+            select(
+                courier_col, shipped_subq.c.shipped_at, delivered_subq.c.delivered_at
+            )
             .select_from(Order)
             .join(delivered_subq, delivered_subq.c.order_id == Order.id)
             .join(shipped_subq, shipped_subq.c.order_id == Order.id)
@@ -1382,15 +1582,30 @@ async def admin_shipping_performance(
         ship_rows.append(
             {
                 "courier": courier,
-                "current": {"count": len(current_ship.get(courier, [])), "avg_hours": cur_avg},
-                "previous": {"count": len(previous_ship.get(courier, [])), "avg_hours": prev_avg},
+                "current": {
+                    "count": len(current_ship.get(courier, [])),
+                    "avg_hours": cur_avg,
+                },
+                "previous": {
+                    "count": len(previous_ship.get(courier, [])),
+                    "avg_hours": prev_avg,
+                },
                 "delta_pct": {
                     "avg_hours": _delta_pct(cur_avg, prev_avg),
-                    "count": _delta_pct(float(len(current_ship.get(courier, []))), float(len(previous_ship.get(courier, [])))),
+                    "count": _delta_pct(
+                        float(len(current_ship.get(courier, []))),
+                        float(len(previous_ship.get(courier, []))),
+                    ),
                 },
             }
         )
-    ship_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
+    ship_rows.sort(
+        key=lambda row: (
+            row.get("current", {}).get("count", 0),
+            row.get("courier", ""),
+        ),
+        reverse=True,
+    )
 
     current_delivery = await _collect_delivery_durations(start, now)
     previous_delivery = await _collect_delivery_durations(prev_start, start)
@@ -1402,15 +1617,30 @@ async def admin_shipping_performance(
         delivery_rows.append(
             {
                 "courier": courier,
-                "current": {"count": len(current_delivery.get(courier, [])), "avg_hours": cur_avg},
-                "previous": {"count": len(previous_delivery.get(courier, [])), "avg_hours": prev_avg},
+                "current": {
+                    "count": len(current_delivery.get(courier, [])),
+                    "avg_hours": cur_avg,
+                },
+                "previous": {
+                    "count": len(previous_delivery.get(courier, [])),
+                    "avg_hours": prev_avg,
+                },
                 "delta_pct": {
                     "avg_hours": _delta_pct(cur_avg, prev_avg),
-                    "count": _delta_pct(float(len(current_delivery.get(courier, []))), float(len(previous_delivery.get(courier, [])))),
+                    "count": _delta_pct(
+                        float(len(current_delivery.get(courier, []))),
+                        float(len(previous_delivery.get(courier, []))),
+                    ),
                 },
             }
         )
-    delivery_rows.sort(key=lambda row: (row.get("current", {}).get("count", 0), row.get("courier", "")), reverse=True)
+    delivery_rows.sort(
+        key=lambda row: (
+            row.get("current", {}).get("count", 0),
+            row.get("courier", ""),
+        ),
+        reverse=True,
+    )
 
     return {
         "window_days": int(window_days),
@@ -1440,9 +1670,18 @@ async def admin_stockout_impact(
         include_variants=False,
         default_threshold=DEFAULT_LOW_STOCK_DASHBOARD_THRESHOLD,
     )
-    stockouts = [row for row in restock_rows if int(getattr(row, "available_quantity", 0) or 0) <= 0]
+    stockouts = [
+        row
+        for row in restock_rows
+        if int(getattr(row, "available_quantity", 0) or 0) <= 0
+    ]
     if not stockouts:
-        return {"window_days": int(window_days), "window_start": since, "window_end": now, "items": []}
+        return {
+            "window_days": int(window_days),
+            "window_start": since,
+            "window_end": now,
+            "items": [],
+        }
 
     product_ids = [row.product_id for row in stockouts]
 
@@ -1464,8 +1703,7 @@ async def admin_stockout_impact(
         .group_by(OrderItem.product_id)
     )
     demand_map = {
-        row[0]: (int(row[1] or 0), float(row[2] or 0))
-        for row in demand_rows.all()
+        row[0]: (int(row[1] or 0), float(row[2] or 0)) for row in demand_rows.all()
     }
 
     product_rows = await session.execute(
@@ -1496,7 +1734,9 @@ async def admin_stockout_impact(
         current_price = float(sale_price if sale_price is not None else base_price)
 
         demand_units, demand_revenue = demand_map.get(row.product_id, (0, 0.0))
-        avg_price = float(demand_revenue / demand_units) if demand_units > 0 else current_price
+        avg_price = (
+            float(demand_revenue / demand_units) if demand_units > 0 else current_price
+        )
         reserved_carts = int(getattr(row, "reserved_in_carts", 0) or 0)
         reserved_orders = int(getattr(row, "reserved_in_orders", 0) or 0)
         estimated_missed = 0.0 if allow_backorder else float(reserved_carts) * avg_price
@@ -1561,7 +1801,9 @@ async def admin_channel_attribution(
                 detail="range_to must be on/after range_from",
             )
         start = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-        end = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
+        end = datetime.combine(
+            range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+        )
         effective_range_days = (range_to - range_from).days + 1
     else:
         start = now - timedelta(days=range_days)
@@ -1641,7 +1883,9 @@ async def admin_channel_attribution(
     order_amounts = {row[0]: float(row[1] or 0) for row in order_rows.all()}
 
     session_start_rows = await session.execute(
-        select(AnalyticsEvent.session_id, AnalyticsEvent.payload, AnalyticsEvent.created_at)
+        select(
+            AnalyticsEvent.session_id, AnalyticsEvent.payload, AnalyticsEvent.created_at
+        )
         .select_from(AnalyticsEvent)
         .where(
             AnalyticsEvent.event == "session_start",
@@ -1696,7 +1940,9 @@ async def admin_channel_attribution(
                 "gross_sales": float(entry.get("gross_sales", 0) or 0),
             }
         )
-    channel_rows.sort(key=lambda row: (row.get("gross_sales", 0), row.get("orders", 0)), reverse=True)
+    channel_rows.sort(
+        key=lambda row: (row.get("gross_sales", 0), row.get("orders", 0)), reverse=True
+    )
 
     coverage_pct = None
     if total_orders:
@@ -1766,7 +2012,11 @@ async def admin_global_search(
 
         user = await session.get(User, parsed_uuid)
         if user and user.deleted_at is None:
-            email_value = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
+            email_value = (
+                user.email
+                if include_pii
+                else (pii_service.mask_email(user.email) or user.email)
+            )
             subtitle = (user.username or "").strip() or None
             results.append(
                 AdminDashboardSearchResult(
@@ -1862,7 +2112,11 @@ async def admin_global_search(
         .all()
     )
     for user in users:
-        email_value = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
+        email_value = (
+            user.email
+            if include_pii
+            else (pii_service.mask_email(user.email) or user.email)
+        )
         subtitle = (user.username or "").strip() or None
         results.append(
             AdminDashboardSearchResult(
@@ -1938,11 +2192,18 @@ async def search_products(
         stmt = stmt.where(Category.slug == category_slug)
     missing_lang = (missing_translation_lang or "").strip().lower() or None
     if missing_lang:
-        has_lang = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == missing_lang)
+        has_lang = exists().where(
+            ProductTranslation.product_id == Product.id,
+            ProductTranslation.lang == missing_lang,
+        )
         stmt = stmt.where(~has_lang)
     elif missing_translations:
-        has_en = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == "en")
-        has_ro = exists().where(ProductTranslation.product_id == Product.id, ProductTranslation.lang == "ro")
+        has_en = exists().where(
+            ProductTranslation.product_id == Product.id, ProductTranslation.lang == "en"
+        )
+        has_ro = exists().where(
+            ProductTranslation.product_id == Product.id, ProductTranslation.lang == "ro"
+        )
         stmt = stmt.where(or_(~has_en, ~has_ro))
 
     total = await session.scalar(
@@ -1996,7 +2257,9 @@ async def search_products(
             publish_scheduled_for=getattr(prod, "publish_scheduled_for", None),
             unpublish_scheduled_for=getattr(prod, "unpublish_scheduled_for", None),
             missing_translations=[
-                lang for lang in ["en", "ro"] if lang not in langs_by_product.get(prod.id, set())
+                lang
+                for lang in ["en", "ro"]
+                if lang not in langs_by_product.get(prod.id, set())
             ],
         )
         for prod, cat in rows
@@ -2020,8 +2283,12 @@ async def restore_product(
 ) -> AdminProductListItem:
     product = await session.get(Product, product_id)
     if not product or not getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await catalog_service.restore_soft_deleted_product(session, product, user_id=current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    await catalog_service.restore_soft_deleted_product(
+        session, product, user_id=current_user.id
+    )
     row = (
         await session.execute(
             select(Product, Category)
@@ -2054,7 +2321,9 @@ async def restore_product(
     )
 
 
-@router.get("/products/duplicate-check", response_model=AdminProductDuplicateCheckResponse)
+@router.get(
+    "/products/duplicate-check", response_model=AdminProductDuplicateCheckResponse
+)
 async def duplicate_check_products(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("products")),
@@ -2076,7 +2345,9 @@ async def duplicate_check_products(
             is_active=product.is_active,
         )
 
-    slug_base = (catalog_service.slugify(name_value) or "")[:160] if name_value else None
+    slug_base = (
+        (catalog_service.slugify(name_value) or "")[:160] if name_value else None
+    )
     slug_matches: list[AdminProductDuplicateMatch] = []
     suggested_slug: str | None = None
 
@@ -2088,7 +2359,15 @@ async def duplicate_check_products(
         if exclude_slug_value:
             slug_stmt = slug_stmt.where(Product.slug != exclude_slug_value)
 
-        slug_rows = (await session.execute(slug_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
+        slug_rows = (
+            (
+                await session.execute(
+                    slug_stmt.order_by(Product.updated_at.desc()).limit(10)
+                )
+            )
+            .scalars()
+            .all()
+        )
         slug_matches = [to_match(prod) for prod in slug_rows]
 
         slug_values = set(
@@ -2116,10 +2395,20 @@ async def duplicate_check_products(
 
     sku_matches: list[AdminProductDuplicateMatch] = []
     if sku_value:
-        sku_stmt = select(Product).where(Product.is_deleted.is_(False), Product.sku == sku_value)
+        sku_stmt = select(Product).where(
+            Product.is_deleted.is_(False), Product.sku == sku_value
+        )
         if exclude_slug_value:
             sku_stmt = sku_stmt.where(Product.slug != exclude_slug_value)
-        sku_rows = (await session.execute(sku_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
+        sku_rows = (
+            (
+                await session.execute(
+                    sku_stmt.order_by(Product.updated_at.desc()).limit(10)
+                )
+            )
+            .scalars()
+            .all()
+        )
         sku_matches = [to_match(prod) for prod in sku_rows]
 
     name_matches: list[AdminProductDuplicateMatch] = []
@@ -2131,7 +2420,15 @@ async def duplicate_check_products(
         )
         if exclude_slug_value:
             name_stmt = name_stmt.where(Product.slug != exclude_slug_value)
-        name_rows = (await session.execute(name_stmt.order_by(Product.updated_at.desc()).limit(10))).scalars().all()
+        name_rows = (
+            (
+                await session.execute(
+                    name_stmt.order_by(Product.updated_at.desc()).limit(10)
+                )
+            )
+            .scalars()
+            .all()
+        )
         name_matches = [to_match(prod) for prod in name_rows]
 
     return AdminProductDuplicateCheckResponse(
@@ -2214,7 +2511,11 @@ async def admin_orders(
             "total_amount": float(order.total_amount),
             "currency": order.currency,
             "created_at": order.created_at,
-            "customer": (email or "guest") if include_pii or not email else (pii_service.mask_email(email) or email),
+            "customer": (
+                (email or "guest")
+                if include_pii or not email
+                else (pii_service.mask_email(email) or email)
+            ),
         }
         for order, email in rows
     ]
@@ -2236,7 +2537,9 @@ async def admin_users(
     return [
         {
             "id": str(u.id),
-            "email": u.email if include_pii else (pii_service.mask_email(u.email) or u.email),
+            "email": (
+                u.email if include_pii else (pii_service.mask_email(u.email) or u.email)
+            ),
             "username": u.username,
             "name": u.name if include_pii else pii_service.mask_text(u.name, keep=1),
             "name_tag": u.name_tag,
@@ -2292,7 +2595,9 @@ async def search_users(
     items = [
         AdminUserListItem(
             id=u.id,
-            email=u.email if include_pii else (pii_service.mask_email(u.email) or u.email),
+            email=(
+                u.email if include_pii else (pii_service.mask_email(u.email) or u.email)
+            ),
             username=u.username,
             name=u.name if include_pii else pii_service.mask_text(u.name, keep=1),
             name_tag=u.name_tag,
@@ -2385,9 +2690,17 @@ async def admin_user_segment_repeat_buyers(
             AdminUserSegmentListItem(
                 user=AdminUserListItem(
                     id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+                    email=(
+                        user.email
+                        if include_pii
+                        else (pii_service.mask_email(user.email) or user.email)
+                    ),
                     username=user.username,
-                    name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
+                    name=(
+                        user.name
+                        if include_pii
+                        else pii_service.mask_text(user.name, keep=1)
+                    ),
                     name_tag=user.name_tag,
                     role=user.role,
                     email_verified=bool(user.email_verified),
@@ -2469,9 +2782,17 @@ async def admin_user_segment_high_aov(
             AdminUserSegmentListItem(
                 user=AdminUserListItem(
                     id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+                    email=(
+                        user.email
+                        if include_pii
+                        else (pii_service.mask_email(user.email) or user.email)
+                    ),
                     username=user.username,
-                    name=user.name if include_pii else pii_service.mask_text(user.name, keep=1),
+                    name=(
+                        user.name
+                        if include_pii
+                        else pii_service.mask_text(user.name, keep=1)
+                    ),
                     name_tag=user.name_tag,
                     role=user.role,
                     email_verified=bool(user.email_verified),
@@ -2514,9 +2835,15 @@ async def admin_user_aliases(
     return {
         "user": {
             "id": str(user.id),
-            "email": user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+            "email": (
+                user.email
+                if include_pii
+                else (pii_service.mask_email(user.email) or user.email)
+            ),
             "username": user.username,
-            "name": user.name if include_pii else pii_service.mask_text(user.name, keep=1),
+            "name": (
+                user.name if include_pii else pii_service.mask_text(user.name, keep=1)
+            ),
             "name_tag": user.name_tag,
             "role": user.role,
         },
@@ -2543,17 +2870,28 @@ async def admin_user_profile(
         pii_service.require_pii_reveal(current_user, request=request)
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     addresses = (
-        (await session.execute(select(Address).where(Address.user_id == user_id).order_by(Address.created_at.desc())))
+        (
+            await session.execute(
+                select(Address)
+                .where(Address.user_id == user_id)
+                .order_by(Address.created_at.desc())
+            )
+        )
         .scalars()
         .all()
     )
     orders = (
         (
             await session.execute(
-                select(Order).where(Order.user_id == user_id).order_by(Order.created_at.desc()).limit(25)
+                select(Order)
+                .where(Order.user_id == user_id)
+                .order_by(Order.created_at.desc())
+                .limit(25)
             )
         )
         .scalars()
@@ -2599,7 +2937,9 @@ async def admin_user_profile(
                 "region": "***" if (addr.region or "").strip() else None,
                 "postal_code": "***",
                 "country": addr.country,
-                "is_default_shipping": bool(getattr(addr, "is_default_shipping", False)),
+                "is_default_shipping": bool(
+                    getattr(addr, "is_default_shipping", False)
+                ),
                 "is_default_billing": bool(getattr(addr, "is_default_billing", False)),
                 "created_at": addr.created_at,
                 "updated_at": addr.updated_at,
@@ -2607,7 +2947,11 @@ async def admin_user_profile(
             for addr in addresses
         ]
 
-    user_email = user.email if include_pii else (pii_service.mask_email(user.email) or user.email)
+    user_email = (
+        user.email
+        if include_pii
+        else (pii_service.mask_email(user.email) or user.email)
+    )
     user_name = user.name if include_pii else pii_service.mask_text(user.name, keep=1)
 
     return AdminUserProfileResponse(
@@ -2624,7 +2968,9 @@ async def admin_user_profile(
             admin_note=getattr(user, "admin_note", None),
             locked_until=getattr(user, "locked_until", None),
             locked_reason=getattr(user, "locked_reason", None),
-            password_reset_required=bool(getattr(user, "password_reset_required", False)),
+            password_reset_required=bool(
+                getattr(user, "password_reset_required", False)
+            ),
         ),
         addresses=addresses_payload,
         orders=orders,
@@ -2700,9 +3046,9 @@ async def admin_coupons(
         {
             "id": str(p.id),
             "code": p.code,
-            "percentage_off": float(p.percentage_off)
-            if p.percentage_off is not None
-            else None,
+            "percentage_off": (
+                float(p.percentage_off) if p.percentage_off is not None else None
+            ),
             "amount_off": float(p.amount_off) if p.amount_off is not None else None,
             "currency": p.currency,
             "expires_at": p.expires_at,
@@ -2851,9 +3197,9 @@ async def admin_create_coupon(
     return {
         "id": str(promo.id),
         "code": promo.code,
-        "percentage_off": float(promo.percentage_off)
-        if promo.percentage_off is not None
-        else None,
+        "percentage_off": (
+            float(promo.percentage_off) if promo.percentage_off is not None else None
+        ),
         "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
         "currency": promo.currency,
         "expires_at": promo.expires_at,
@@ -2909,9 +3255,9 @@ async def admin_update_coupon(
     return {
         "id": str(promo.id),
         "code": promo.code,
-        "percentage_off": float(promo.percentage_off)
-        if promo.percentage_off is not None
-        else None,
+        "percentage_off": (
+            float(promo.percentage_off) if promo.percentage_off is not None else None
+        ),
         "amount_off": float(promo.amount_off) if promo.amount_off is not None else None,
         "currency": promo.currency,
         "expires_at": promo.expires_at,
@@ -2975,9 +3321,9 @@ async def admin_audit(
                 "action": log.action,
                 "actor_user_id": str(log.actor_user_id) if log.actor_user_id else None,
                 "actor_email": actor_email,
-                "subject_user_id": str(log.subject_user_id)
-                if log.subject_user_id
-                else None,
+                "subject_user_id": (
+                    str(log.subject_user_id) if log.subject_user_id else None
+                ),
                 "subject_email": subject_email,
                 "data": log.data,
                 "created_at": log.created_at,
@@ -3077,14 +3423,18 @@ def _audit_filters(
     if action:
         needle = action.strip().lower()
         if needle:
-            tokens = [token.strip() for token in re.split(r"[|,]+", needle) if token.strip()]
+            tokens = [
+                token.strip() for token in re.split(r"[|,]+", needle) if token.strip()
+            ]
             if len(tokens) <= 1:
                 filters.append(
                     func.lower(getattr(audit.c, "action")).like(f"%{needle}%")  # type: ignore[attr-defined]
                 )
             else:
                 action_col = func.lower(getattr(audit.c, "action"))  # type: ignore[attr-defined]
-                filters.append(or_(*[action_col.like(f"%{token}%") for token in tokens]))
+                filters.append(
+                    or_(*[action_col.like(f"%{token}%") for token in tokens])
+                )
 
     if user:
         needle = user.strip().lower()
@@ -3119,7 +3469,9 @@ def _audit_filters(
     return filters
 
 
-_AUDIT_EMAIL_RE = re.compile(r"(?i)(?<![\w.+-])([\w.+-]{1,64})@([\w-]{1,255}(?:\.[\w-]{2,})+)")
+_AUDIT_EMAIL_RE = re.compile(
+    r"(?i)(?<![\w.+-])([\w.+-]{1,64})@([\w-]{1,255}(?:\.[\w-]{2,})+)"
+)
 _AUDIT_IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _AUDIT_IPV6_RE = re.compile(r"\b(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\b")
 _AUDIT_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -3307,11 +3659,17 @@ def _audit_retention_policies(now: datetime) -> dict[str, dict]:
     for key, days in policies.items():
         enabled = days > 0
         cutoff = now - timedelta(days=days) if enabled else None
-        out[key] = {"days": days, "enabled": enabled, "cutoff": cutoff.isoformat() if cutoff else None}
+        out[key] = {
+            "days": days,
+            "enabled": enabled,
+            "cutoff": cutoff.isoformat() if cutoff else None,
+        }
     return out
 
 
-async def _audit_retention_counts(session: AsyncSession, model: Any, cutoff: datetime | None) -> dict:
+async def _audit_retention_counts(
+    session: AsyncSession, model: Any, cutoff: datetime | None
+) -> dict:
     table = model.__table__
     total = await session.scalar(select(func.count()).select_from(table))
     total_int = int(total or 0)
@@ -3332,9 +3690,15 @@ async def admin_audit_retention(
     now = datetime.now(timezone.utc)
     policies = _audit_retention_policies(now)
     counts = {
-        "product": await _audit_retention_counts(session, ProductAuditLog, _iso_to_dt(policies["product"]["cutoff"])),
-        "content": await _audit_retention_counts(session, ContentAuditLog, _iso_to_dt(policies["content"]["cutoff"])),
-        "security": await _audit_retention_counts(session, AdminAuditLog, _iso_to_dt(policies["security"]["cutoff"])),
+        "product": await _audit_retention_counts(
+            session, ProductAuditLog, _iso_to_dt(policies["product"]["cutoff"])
+        ),
+        "content": await _audit_retention_counts(
+            session, ContentAuditLog, _iso_to_dt(policies["content"]["cutoff"])
+        ),
+        "security": await _audit_retention_counts(
+            session, AdminAuditLog, _iso_to_dt(policies["security"]["cutoff"])
+        ),
     }
     return {"now": now.isoformat(), "policies": policies, "counts": counts}
 
@@ -3355,10 +3719,14 @@ async def admin_audit_retention_purge(
     current_user: User = Depends(require_admin_section("audit")),
 ) -> dict:
     if current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Owner access required"
+        )
     confirm = str(payload.get("confirm") or "").strip()
     if confirm.upper() != "PURGE":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "PURGE" to confirm')
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail='Type "PURGE" to confirm'
+        )
     dry_run = bool(payload.get("dry_run"))
 
     now = datetime.now(timezone.utc)
@@ -3370,9 +3738,15 @@ async def admin_audit_retention_purge(
     }
 
     counts = {
-        "product": await _audit_retention_counts(session, ProductAuditLog, cutoffs["product"]),
-        "content": await _audit_retention_counts(session, ContentAuditLog, cutoffs["content"]),
-        "security": await _audit_retention_counts(session, AdminAuditLog, cutoffs["security"]),
+        "product": await _audit_retention_counts(
+            session, ProductAuditLog, cutoffs["product"]
+        ),
+        "content": await _audit_retention_counts(
+            session, ContentAuditLog, cutoffs["content"]
+        ),
+        "security": await _audit_retention_counts(
+            session, AdminAuditLog, cutoffs["security"]
+        ),
     }
 
     deleted: dict[str, int] = {"product": 0, "content": 0, "security": 0}
@@ -3458,15 +3832,23 @@ async def admin_list_user_sessions(
 ) -> list[RefreshSessionResponse]:
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     rows = (
-        await session.execute(
-            select(RefreshSession)
-            .where(RefreshSession.user_id == user_id, RefreshSession.revoked.is_(False))
-            .order_by(RefreshSession.created_at.desc())
+        (
+            await session.execute(
+                select(RefreshSession)
+                .where(
+                    RefreshSession.user_id == user_id, RefreshSession.revoked.is_(False)
+                )
+                .order_by(RefreshSession.created_at.desc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     now = datetime.now(timezone.utc)
     sessions: list[RefreshSessionResponse] = []
@@ -3495,7 +3877,9 @@ async def admin_list_user_sessions(
     return sessions
 
 
-@router.post("/sessions/{user_id}/{session_id}/revoke", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/sessions/{user_id}/{session_id}/revoke", status_code=status.HTTP_204_NO_CONTENT
+)
 async def admin_revoke_user_session(
     user_id: UUID,
     session_id: UUID,
@@ -3505,11 +3889,15 @@ async def admin_revoke_user_session(
 ) -> None:
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     row = await session.get(RefreshSession, session_id)
     if not row or row.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Session not found"
+        )
 
     if not row.revoked:
         row.revoked = True
@@ -3545,7 +3933,9 @@ async def admin_gdpr_export_jobs(
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
-    stmt = select(UserDataExportJob, User).join(User, UserDataExportJob.user_id == User.id)
+    stmt = select(UserDataExportJob, User).join(
+        User, UserDataExportJob.user_id == User.id
+    )
 
     if q:
         like = f"%{q.strip().lower()}%"
@@ -3565,7 +3955,9 @@ async def admin_gdpr_export_jobs(
 
     rows = (
         await session.execute(
-            stmt.order_by(UserDataExportJob.created_at.desc()).limit(limit).offset(offset)
+            stmt.order_by(UserDataExportJob.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
     ).all()
 
@@ -3573,8 +3965,16 @@ async def admin_gdpr_export_jobs(
     sla_days = max(1, int(getattr(settings, "gdpr_export_sla_days", 30) or 30))
     items: list[AdminGdprExportJobItem] = []
     for job, user in rows:
-        created_at = job.created_at if job.created_at.tzinfo else job.created_at.replace(tzinfo=timezone.utc)
-        updated_at = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
+        created_at = (
+            job.created_at
+            if job.created_at.tzinfo
+            else job.created_at.replace(tzinfo=timezone.utc)
+        )
+        updated_at = (
+            job.updated_at
+            if job.updated_at.tzinfo
+            else job.updated_at.replace(tzinfo=timezone.utc)
+        )
         started_at = job.started_at
         if started_at and started_at.tzinfo is None:
             started_at = started_at.replace(tzinfo=timezone.utc)
@@ -3595,7 +3995,11 @@ async def admin_gdpr_export_jobs(
                 id=job.id,
                 user=AdminGdprUserRef(
                     id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+                    email=(
+                        user.email
+                        if include_pii
+                        else (pii_service.mask_email(user.email) or user.email)
+                    ),
                     username=user.username,
                     role=user.role,
                 ),
@@ -3633,14 +4037,21 @@ async def admin_gdpr_retry_export_job(
 ) -> AdminGdprExportJobItem:
     job = await session.get(UserDataExportJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found"
+        )
     user = await session.get(User, job.user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     engine = session.bind
     if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database engine unavailable",
+        )
 
     job.status = UserDataExportStatus.pending
     job.progress = 0
@@ -3663,11 +4074,21 @@ async def admin_gdpr_retry_export_job(
     )
     await session.commit()
 
-    background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=job.id)
+    background_tasks.add_task(
+        user_export_service.run_user_export_job, engine, job_id=job.id
+    )
 
     now = datetime.now(timezone.utc)
-    created_at = job.created_at if job.created_at.tzinfo else job.created_at.replace(tzinfo=timezone.utc)
-    updated_at = job.updated_at if job.updated_at.tzinfo else job.updated_at.replace(tzinfo=timezone.utc)
+    created_at = (
+        job.created_at
+        if job.created_at.tzinfo
+        else job.created_at.replace(tzinfo=timezone.utc)
+    )
+    updated_at = (
+        job.updated_at
+        if job.updated_at.tzinfo
+        else job.updated_at.replace(tzinfo=timezone.utc)
+    )
     sla_days = max(1, int(getattr(settings, "gdpr_export_sla_days", 30) or 30))
     sla_due_at = created_at + timedelta(days=sla_days)
     return AdminGdprExportJobItem(
@@ -3701,23 +4122,33 @@ async def admin_gdpr_download_export_job(
     step_up_service.require_step_up(request, current_user)
     job = await session.get(UserDataExportJob, job_id)
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found"
+        )
     if job.status != UserDataExportStatus.succeeded or not job.file_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready"
+        )
 
     expires_at = job.expires_at
     if expires_at and expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at and expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found"
+        )
 
     path = private_storage.resolve_private_path(job.file_path)
     if not path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found"
+        )
 
     user = await session.get(User, job.user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     await audit_chain_service.add_admin_audit_log(
         session,
@@ -3732,9 +4163,18 @@ async def admin_gdpr_download_export_job(
     )
     await session.commit()
 
-    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
+    stamp = (
+        (job.finished_at or job.created_at or datetime.now(timezone.utc))
+        .date()
+        .isoformat()
+    )
     filename = f"moment-studio-export-{stamp}.json"
-    return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
+    return FileResponse(
+        path,
+        media_type="application/json",
+        filename=filename,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/gdpr/deletions", response_model=AdminGdprDeletionRequestsResponse)
@@ -3750,7 +4190,9 @@ async def admin_gdpr_deletion_requests(
     if include_pii:
         pii_service.require_pii_reveal(current_user, request=request)
     offset = (page - 1) * limit
-    stmt = select(User).where(User.deleted_at.is_(None), User.deletion_requested_at.is_not(None))
+    stmt = select(User).where(
+        User.deleted_at.is_(None), User.deletion_requested_at.is_not(None)
+    )
 
     if q:
         like = f"%{q.strip().lower()}%"
@@ -3760,13 +4202,17 @@ async def admin_gdpr_deletion_requests(
             | func.lower(User.name).ilike(like)
         )
 
-    total_items = int(await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0)
+    total_items = int(
+        await session.scalar(stmt.with_only_columns(func.count()).order_by(None)) or 0
+    )
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
 
     rows = (
         (
             await session.execute(
-                stmt.order_by(User.deletion_requested_at.desc()).limit(limit).offset(offset)
+                stmt.order_by(User.deletion_requested_at.desc())
+                .limit(limit)
+                .offset(offset)
             )
         )
         .scalars()
@@ -3795,7 +4241,11 @@ async def admin_gdpr_deletion_requests(
             AdminGdprDeletionRequestItem(
                 user=AdminGdprUserRef(
                     id=user.id,
-                    email=user.email if include_pii else (pii_service.mask_email(user.email) or user.email),
+                    email=(
+                        user.email
+                        if include_pii
+                        else (pii_service.mask_email(user.email) or user.email)
+                    ),
                     username=user.username,
                     role=user.role,
                 ),
@@ -3818,7 +4268,9 @@ async def admin_gdpr_deletion_requests(
     )
 
 
-@router.post("/gdpr/deletions/{user_id}/execute", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/gdpr/deletions/{user_id}/execute", status_code=status.HTTP_204_NO_CONTENT
+)
 async def admin_gdpr_execute_deletion(
     user_id: UUID,
     payload: AdminUserDeleteRequest,
@@ -3827,20 +4279,34 @@ async def admin_gdpr_execute_deletion(
     current_user: User = Depends(require_admin),
 ) -> None:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
 
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     if user.role == UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner account cannot be deleted")
-    if user.role in (
-        UserRole.admin,
-        UserRole.support,
-        UserRole.fulfillment,
-        UserRole.content,
-    ) and current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can delete staff accounts")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Owner account cannot be deleted",
+        )
+    if (
+        user.role
+        in (
+            UserRole.admin,
+            UserRole.support,
+            UserRole.fulfillment,
+            UserRole.content,
+        )
+        and current_user.role != UserRole.owner
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the owner can delete staff accounts",
+        )
 
     email_before = user.email
     await self_service.execute_account_deletion(session, user)
@@ -3868,18 +4334,33 @@ async def admin_gdpr_cancel_deletion(
 ) -> None:
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     if user.role == UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner account cannot be modified")
-    if user.role in (
-        UserRole.admin,
-        UserRole.support,
-        UserRole.fulfillment,
-        UserRole.content,
-    ) and current_user.role != UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the owner can modify staff accounts")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Owner account cannot be modified",
+        )
+    if (
+        user.role
+        in (
+            UserRole.admin,
+            UserRole.support,
+            UserRole.fulfillment,
+            UserRole.content,
+        )
+        and current_user.role != UserRole.owner
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the owner can modify staff accounts",
+        )
 
-    if user.deletion_requested_at is not None or user.deletion_scheduled_for is not None:
+    if (
+        user.deletion_requested_at is not None
+        or user.deletion_scheduled_for is not None
+    ):
         user.deletion_requested_at = None
         user.deletion_scheduled_for = None
         session.add(user)
@@ -3906,10 +4387,15 @@ async def update_user_role(
     current_user: User = Depends(require_admin),
 ) -> dict:
     if current_user.role not in (UserRole.owner, UserRole.admin):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner/admin can change user roles")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owner/admin can change user roles",
+        )
 
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
 
     user = await session.get(User, user_id)
     if not user:
@@ -3969,7 +4455,9 @@ async def update_user_internal(
 ) -> AdminUserProfileUser:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     before_vip = bool(getattr(user, "vip", False))
     before_note = getattr(user, "admin_note", None)
@@ -3987,7 +4475,10 @@ async def update_user_internal(
 
     changes: dict[str, object] = {}
     if before_vip != bool(getattr(user, "vip", False)):
-        changes["vip"] = {"before": before_vip, "after": bool(getattr(user, "vip", False))}
+        changes["vip"] = {
+            "before": before_vip,
+            "after": bool(getattr(user, "vip", False)),
+        }
     if before_note != getattr(user, "admin_note", None):
         changes["admin_note"] = {
             "before_length": len(before_note or ""),
@@ -4033,18 +4524,28 @@ async def update_user_security(
 ) -> AdminUserProfileUser:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     if user.role == UserRole.owner:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify owner security settings")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot modify owner security settings",
+        )
     if user.id == current_user.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot modify your own security settings")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot modify your own security settings",
+        )
 
     now = datetime.now(timezone.utc)
     before_locked_until = getattr(user, "locked_until", None)
     if before_locked_until and before_locked_until.tzinfo is None:
         before_locked_until = before_locked_until.replace(tzinfo=timezone.utc)
     before_locked_reason = getattr(user, "locked_reason", None)
-    before_password_reset_required = bool(getattr(user, "password_reset_required", False))
+    before_password_reset_required = bool(
+        getattr(user, "password_reset_required", False)
+    )
 
     data = payload.model_dump(exclude_unset=True)
     if "locked_until" in data:
@@ -4063,14 +4564,19 @@ async def update_user_security(
     if getattr(user, "locked_until", None) is None:
         user.locked_reason = None
 
-    if "password_reset_required" in data and data.get("password_reset_required") is not None:
+    if (
+        "password_reset_required" in data
+        and data.get("password_reset_required") is not None
+    ):
         user.password_reset_required = bool(data["password_reset_required"])
 
     after_locked_until = getattr(user, "locked_until", None)
     if after_locked_until and after_locked_until.tzinfo is None:
         after_locked_until = after_locked_until.replace(tzinfo=timezone.utc)
     after_locked_reason = getattr(user, "locked_reason", None)
-    after_password_reset_required = bool(getattr(user, "password_reset_required", False))
+    after_password_reset_required = bool(
+        getattr(user, "password_reset_required", False)
+    )
 
     changes: dict[str, object] = {}
     if before_locked_until != after_locked_until:
@@ -4079,9 +4585,15 @@ async def update_user_security(
             "after": after_locked_until.isoformat() if after_locked_until else None,
         }
     if before_locked_reason != after_locked_reason:
-        changes["locked_reason"] = {"before_length": len(before_locked_reason or ""), "after_length": len(after_locked_reason or "")}
+        changes["locked_reason"] = {
+            "before_length": len(before_locked_reason or ""),
+            "after_length": len(after_locked_reason or ""),
+        }
     if before_password_reset_required != after_password_reset_required:
-        changes["password_reset_required"] = {"before": before_password_reset_required, "after": after_password_reset_required}
+        changes["password_reset_required"] = {
+            "before": before_password_reset_required,
+            "after": after_password_reset_required,
+        }
 
     session.add(user)
     await session.flush()
@@ -4116,7 +4628,10 @@ async def update_user_security(
     )
 
 
-@router.get("/users/{user_id}/email/verification", response_model=AdminEmailVerificationHistoryResponse)
+@router.get(
+    "/users/{user_id}/email/verification",
+    response_model=AdminEmailVerificationHistoryResponse,
+)
 async def email_verification_history(
     user_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -4124,16 +4639,22 @@ async def email_verification_history(
 ) -> AdminEmailVerificationHistoryResponse:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     rows = (
-        await session.execute(
-            select(EmailVerificationToken)
-            .where(EmailVerificationToken.user_id == user.id)
-            .order_by(EmailVerificationToken.created_at.desc())
-            .limit(50)
+        (
+            await session.execute(
+                select(EmailVerificationToken)
+                .where(EmailVerificationToken.user_id == user.id)
+                .order_by(EmailVerificationToken.created_at.desc())
+                .limit(50)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     tokens = [
         AdminEmailVerificationTokenInfo(
             id=row.id,
@@ -4146,7 +4667,9 @@ async def email_verification_history(
     return AdminEmailVerificationHistoryResponse(tokens=tokens)
 
 
-@router.post("/users/{user_id}/email/verification/resend", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/users/{user_id}/email/verification/resend", status_code=status.HTTP_202_ACCEPTED
+)
 async def resend_email_verification(
     user_id: UUID,
     request: Request,
@@ -4156,9 +4679,13 @@ async def resend_email_verification(
 ) -> dict:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     if bool(user.email_verified):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already verified")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already verified"
+        )
 
     record = await auth_service.create_email_verification(session, user)
     background_tasks.add_task(
@@ -4183,7 +4710,9 @@ async def resend_email_verification(
     return {"detail": "Verification email sent"}
 
 
-@router.post("/users/{user_id}/password-reset/resend", status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/users/{user_id}/password-reset/resend", status_code=status.HTTP_202_ACCEPTED
+)
 async def resend_password_reset(
     user_id: UUID,
     payload: AdminPasswordResetResendRequest,
@@ -4195,7 +4724,9 @@ async def resend_password_reset(
 ) -> dict:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     requested_email = (payload.email or "").strip().lower()
     target_email = (user.email or "").strip()
@@ -4212,16 +4743,22 @@ async def resend_password_reset(
                 )
             )
             if not secondary:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid email"
+                )
             target_email = (secondary.email or "").strip()
             target_kind = "secondary"
 
     if not target_email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User email missing")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="User email missing"
+        )
 
     reset = await auth_service.create_reset_token(session, target_email.lower())
     if not reset:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     background_tasks.add_task(
         email_service.send_password_reset,
@@ -4247,7 +4784,9 @@ async def resend_password_reset(
     return {"detail": "Password reset email sent"}
 
 
-@router.post("/users/{user_id}/email/verification/override", response_model=AdminUserProfileUser)
+@router.post(
+    "/users/{user_id}/email/verification/override", response_model=AdminUserProfileUser
+)
 async def override_email_verification(
     user_id: UUID,
     payload: AdminUserDeleteRequest,
@@ -4256,22 +4795,31 @@ async def override_email_verification(
     current_user: User = Depends(require_admin),
 ) -> AdminUserProfileUser:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
 
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
 
     before_verified = bool(getattr(user, "email_verified", False))
     if not before_verified:
         user.email_verified = True
         tokens = (
-            await session.execute(
-                select(EmailVerificationToken).where(
-                    EmailVerificationToken.user_id == user.id, EmailVerificationToken.used.is_(False)
+            (
+                await session.execute(
+                    select(EmailVerificationToken).where(
+                        EmailVerificationToken.user_id == user.id,
+                        EmailVerificationToken.used.is_(False),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         for tok in tokens:
             tok.used = True
         if tokens:
@@ -4311,7 +4859,9 @@ async def override_email_verification(
     )
 
 
-@router.post("/users/{user_id}/impersonate", response_model=AdminUserImpersonationResponse)
+@router.post(
+    "/users/{user_id}/impersonate", response_model=AdminUserImpersonationResponse
+)
 async def impersonate_user(
     user_id: UUID,
     request: Request,
@@ -4320,9 +4870,14 @@ async def impersonate_user(
 ) -> AdminUserImpersonationResponse:
     user = await session.get(User, user_id)
     if not user or user.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
     if user.role != UserRole.customer:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only customer accounts can be impersonated")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only customer accounts can be impersonated",
+        )
 
     expires_minutes = max(1, int(settings.admin_impersonation_exp_minutes or 10))
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
@@ -4345,7 +4900,9 @@ async def impersonate_user(
     )
     await session.commit()
 
-    return AdminUserImpersonationResponse(access_token=access_token, expires_at=expires_at)
+    return AdminUserImpersonationResponse(
+        access_token=access_token, expires_at=expires_at
+    )
 
 
 @router.post("/owner/transfer")
@@ -4367,7 +4924,9 @@ async def transfer_owner(
         )
 
     if not security.verify_password(payload.password, current_owner.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
 
     if "@" in identifier:
         target = await auth_service.get_user_by_any_email(session, identifier)
@@ -4500,11 +5059,15 @@ async def export_stock_adjustments(
 ) -> Response:
     step_up_service.require_step_up(request, admin)
     if from_date and to_date and to_date < from_date:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date range"
+        )
 
     product = await session.get(Product, product_id)
     if not product or getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
 
     stmt = (
         select(StockAdjustment, ProductVariant, User)
@@ -4521,9 +5084,10 @@ async def export_stock_adjustments(
         stmt = stmt.where(func.date(StockAdjustment.created_at) <= to_date)
 
     rows = (
-        (await session.execute(stmt.order_by(StockAdjustment.created_at.desc()).limit(limit)))
-        .all()
-    )
+        await session.execute(
+            stmt.order_by(StockAdjustment.created_at.desc()).limit(limit)
+        )
+    ).all()
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -4623,12 +5187,16 @@ async def inventory_reserved_carts(
 
     product = await session.get(Product, product_id)
     if not product or getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
 
     if variant_id is not None:
         variant = await session.get(ProductVariant, variant_id)
         if not variant or variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant"
+            )
 
     cutoff, rows = await inventory_service.list_cart_reservations(
         session,
@@ -4671,12 +5239,16 @@ async def inventory_reserved_orders(
 
     product = await session.get(Product, product_id)
     if not product or getattr(product, "is_deleted", False):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
 
     if variant_id is not None:
         variant = await session.get(ProductVariant, variant_id)
         if not variant or variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant"
+            )
 
     rows = await inventory_service.list_order_reservations(
         session,

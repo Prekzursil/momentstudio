@@ -20,12 +20,27 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "content_audit_log",
-        sa.Column("id", sa.dialects.postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("content_block_id", sa.dialects.postgresql.UUID(as_uuid=True), sa.ForeignKey("content_blocks.id"), nullable=False),
+        sa.Column(
+            "id",
+            sa.dialects.postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            nullable=False,
+        ),
+        sa.Column(
+            "content_block_id",
+            sa.dialects.postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("content_blocks.id"),
+            nullable=False,
+        ),
         sa.Column("action", sa.String(length=120), nullable=False),
         sa.Column("version", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
 

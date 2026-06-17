@@ -7,4 +7,3 @@ class SocialThumbnailRequest(BaseModel):
 
 class SocialThumbnailResponse(BaseModel):
     thumbnail_url: str | None = None
-

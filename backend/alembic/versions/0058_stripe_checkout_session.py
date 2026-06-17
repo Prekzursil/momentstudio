@@ -17,7 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("orders", sa.Column("stripe_checkout_session_id", sa.String(length=255), nullable=True))
+    op.add_column(
+        "orders",
+        sa.Column("stripe_checkout_session_id", sa.String(length=255), nullable=True),
+    )
     op.create_index(
         "ix_orders_stripe_checkout_session_id",
         "orders",
@@ -29,4 +32,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_orders_stripe_checkout_session_id", table_name="orders")
     op.drop_column("orders", "stripe_checkout_session_id")
-

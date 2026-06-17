@@ -17,11 +17,25 @@ import { CartStore } from '../core/cart.store';
 @Component({
   selector: 'app-product-card',
   standalone: true,
-  imports: [CommonModule, RouterLink, NgOptimizedImage, LocalizedCurrencyPipe, ButtonComponent, TranslateModule, ImgFallbackDirective],
+  imports: [
+    CommonModule,
+    RouterLink,
+    NgOptimizedImage,
+    LocalizedCurrencyPipe,
+    ButtonComponent,
+    TranslateModule,
+    ImgFallbackDirective,
+  ],
   template: `
-    <article class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none">
+    <article
+      class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none"
+    >
       <div class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800">
-        <a [routerLink]="['/products', product.slug]" class="block" (click)="onPrimaryClick($event)">
+        <a
+          [routerLink]="['/products', product.slug]"
+          class="block"
+          (click)="onPrimaryClick($event)"
+        >
           <img
             [ngSrc]="primaryImage"
             [alt]="product.name"
@@ -39,11 +53,19 @@ import { CartStore } from '../core/cart.store';
           class="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
           [class.border-rose-200]="wishlisted"
           [class.text-rose-600]="wishlisted"
-          [attr.aria-label]="wishlisted ? ('wishlist.remove' | translate) : ('wishlist.add' | translate)"
+          [attr.aria-label]="
+            wishlisted ? ('wishlist.remove' | translate) : ('wishlist.add' | translate)
+          "
           [attr.aria-pressed]="wishlisted"
           (click)="toggleWishlist($event)"
         >
-          <svg viewBox="0 0 24 24" class="h-5 w-5" [attr.fill]="wishlisted ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+          <svg
+            viewBox="0 0 24 24"
+            class="h-5 w-5"
+            [attr.fill]="wishlisted ? 'currentColor' : 'none'"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -57,26 +79,26 @@ import { CartStore } from '../core/cart.store';
         >
           {{ badge }}
         </span>
-	        <button
-	          *ngIf="showStorefrontEdit()"
-	          type="button"
-	          class="absolute left-3 bottom-3 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
-	          (click)="openAdminEdit($event)"
-	        >
-	          {{ 'adminUi.common.edit' | translate }}
-	        </button>
-	        <select
-	          *ngIf="showStorefrontEdit()"
-	          class="absolute right-3 bottom-3 h-8 rounded-full border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
-	          [disabled]="statusSaving"
-	          [value]="product.status ?? 'published'"
-	          (change)="onStatusChange($event)"
-	        >
-	          <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-	          <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-	          <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-	    </select>
-	      </div>
+        <button
+          *ngIf="showStorefrontEdit()"
+          type="button"
+          class="absolute left-3 bottom-3 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+          (click)="openAdminEdit($event)"
+        >
+          {{ 'adminUi.common.edit' | translate }}
+        </button>
+        <select
+          *ngIf="showStorefrontEdit()"
+          class="absolute right-3 bottom-3 h-8 rounded-full border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+          [disabled]="statusSaving"
+          [value]="product.status ?? 'published'"
+          (change)="onStatusChange($event)"
+        >
+          <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+          <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+          <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
+        </select>
+      </div>
       <div class="grid gap-1">
         <div class="flex items-center justify-between gap-2">
           <a
@@ -90,94 +112,108 @@ import { CartStore } from '../core/cart.store';
         </div>
         <div class="flex items-baseline gap-2">
           <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-            {{ displayPrice | localizedCurrency : product.currency }}
+            {{ displayPrice | localizedCurrency: product.currency }}
           </p>
-          <p
-            *ngIf="isOnSale"
-            class="text-sm text-slate-500 line-through dark:text-slate-300"
-          >
-            {{ product.base_price | localizedCurrency : product.currency }}
+          <p *ngIf="isOnSale" class="text-sm text-slate-500 line-through dark:text-slate-300">
+            {{ product.base_price | localizedCurrency: product.currency }}
           </p>
         </div>
-        <p *ngIf="product.short_description" class="text-sm text-slate-600 line-clamp-2 dark:text-slate-300">
+        <p
+          *ngIf="product.short_description"
+          class="text-sm text-slate-600 line-clamp-2 dark:text-slate-300"
+        >
           {{ product.short_description }}
         </p>
-	        <div class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400" *ngIf="product.rating_count">
-	          ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
-	          {{ 'product.reviews' | translate : { count: product.rating_count } }}
-	        </div>
-	      </div>
-	      <div
-	        *ngIf="showStorefrontEdit()"
-	        class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/40"
-	        (click)="$event.stopPropagation()"
-	      >
-	        <div class="grid grid-cols-2 gap-2">
-	          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
-	            <span>{{ 'adminUi.products.table.price' | translate }}</span>
-	            <input
-	              type="number"
-	              inputmode="decimal"
-	              step="0.01"
-	              min="0"
-	              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-	              [disabled]="inlineSaving"
-	              [value]="inlinePrice"
-	              (input)="inlinePrice = $any($event.target).value"
-	            />
-	          </label>
-	          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
-	            <span>{{ 'adminUi.products.table.stock' | translate }}</span>
-	            <input
-	              type="number"
-	              inputmode="numeric"
-	              step="1"
-	              min="0"
-	              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
-	              [disabled]="inlineSaving"
-	              [value]="inlineStock"
-	              (input)="inlineStock = $any($event.target).value"
-	            />
-	          </label>
-	        </div>
-	        <div class="flex items-center justify-between gap-3">
-	          <p *ngIf="inlineError" class="text-xs text-rose-700 dark:text-rose-300">{{ inlineError }}</p>
-	          <span class="flex-1"></span>
-	          <app-button
-	            *ngIf="showPin"
-	            [label]="'adminUi.storefront.products.pinToTop' | translate"
-	            size="sm"
-	            variant="ghost"
-	            [disabled]="inlineSaving"
-	            (action)="requestPinToTop()"
-	          ></app-button>
-	          <app-button
-	            [label]="inlineSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
-	            size="sm"
-	            [disabled]="inlineSaving"
-	            (action)="saveInline()"
-	          ></app-button>
-	        </div>
-	      </div>
-	      <div class="flex flex-wrap items-center gap-2">
-	        <app-button
-	          *ngIf="showAddToCart"
-	          [label]="'product.addToCart' | translate"
-	          size="sm"
-	          [disabled]="isOutOfStock()"
-	          (action)="addToCart()"
-	        ></app-button>
-	        <app-button
-	          *ngIf="showQuickView"
-	          [label]="'shop.quickView' | translate"
+        <div
+          class="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400"
+          *ngIf="product.rating_count"
+        >
+          ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
+          {{ 'product.reviews' | translate: { count: product.rating_count } }}
+        </div>
+      </div>
+      <div
+        *ngIf="showStorefrontEdit()"
+        class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/40"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="grid grid-cols-2 gap-2">
+          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <span>{{ 'adminUi.products.table.price' | translate }}</span>
+            <input
+              type="number"
+              inputmode="decimal"
+              step="0.01"
+              min="0"
+              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              [disabled]="inlineSaving"
+              [value]="inlinePrice"
+              (input)="inlinePrice = $any($event.target).value"
+            />
+          </label>
+          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <span>{{ 'adminUi.products.table.stock' | translate }}</span>
+            <input
+              type="number"
+              inputmode="numeric"
+              step="1"
+              min="0"
+              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              [disabled]="inlineSaving"
+              [value]="inlineStock"
+              (input)="inlineStock = $any($event.target).value"
+            />
+          </label>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <p *ngIf="inlineError" class="text-xs text-rose-700 dark:text-rose-300">
+            {{ inlineError }}
+          </p>
+          <span class="flex-1"></span>
+          <app-button
+            *ngIf="showPin"
+            [label]="'adminUi.storefront.products.pinToTop' | translate"
             size="sm"
             variant="ghost"
-            (action)="openQuickView()"
+            [disabled]="inlineSaving"
+            (action)="requestPinToTop()"
           ></app-button>
-          <app-button [label]="'product.viewDetails' | translate" size="sm" variant="ghost" (action)="goToDetails()"></app-button>
+          <app-button
+            [label]="
+              inlineSaving
+                ? ('adminUi.common.saving' | translate)
+                : ('adminUi.common.save' | translate)
+            "
+            size="sm"
+            [disabled]="inlineSaving"
+            (action)="saveInline()"
+          ></app-button>
         </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <app-button
+          *ngIf="showAddToCart"
+          [label]="'product.addToCart' | translate"
+          size="sm"
+          [disabled]="isOutOfStock()"
+          (action)="addToCart()"
+        ></app-button>
+        <app-button
+          *ngIf="showQuickView"
+          [label]="'shop.quickView' | translate"
+          size="sm"
+          variant="ghost"
+          (action)="openQuickView()"
+        ></app-button>
+        <app-button
+          [label]="'product.viewDetails' | translate"
+          size="sm"
+          variant="ghost"
+          (action)="goToDetails()"
+        ></app-button>
+      </div>
     </article>
-  `
+  `,
 })
 export class ProductCardComponent implements OnChanges {
   @Input({ required: true }) product!: Product;
@@ -203,7 +239,7 @@ export class ProductCardComponent implements OnChanges {
     private readonly router: Router,
     private readonly storefrontAdminMode: StorefrontAdminModeService,
     private readonly admin: AdminService,
-    private readonly cart: CartStore
+    private readonly cart: CartStore,
   ) {
     this.wishlist.ensureLoaded();
   }
@@ -214,7 +250,10 @@ export class ProductCardComponent implements OnChanges {
     if (!currentId) return;
     if (this.lastInlineProductId === currentId) return;
     this.lastInlineProductId = currentId;
-    const price = typeof this.product?.base_price === 'number' && Number.isFinite(this.product.base_price) ? this.product.base_price : 0;
+    const price =
+      typeof this.product?.base_price === 'number' && Number.isFinite(this.product.base_price)
+        ? this.product.base_price
+        : 0;
     this.inlinePrice = price.toFixed(2);
     const stock = this.product?.stock_quantity ?? 0;
     this.inlineStock = String(Number.isFinite(Number(stock)) ? stock : 0);
@@ -277,7 +316,10 @@ export class ProductCardComponent implements OnChanges {
       if (typeof endMs === 'number' && Number.isFinite(endMs) && now >= endMs) return false;
       return true;
     };
-    const active = badges.filter(isActive).map((b: any) => String(b?.badge || '').trim()).filter(Boolean);
+    const active = badges
+      .filter(isActive)
+      .map((b: any) => String(b?.badge || '').trim())
+      .filter(Boolean);
     const priority = ['limited', 'new', 'handmade'];
     for (const key of priority) {
       if (active.includes(key)) return key;
@@ -291,7 +333,10 @@ export class ProductCardComponent implements OnChanges {
 
     if (!this.product?.id) return;
     if (!this.auth.isAuthenticated()) {
-      this.toast.info(this.translate.instant('wishlist.signInTitle'), this.translate.instant('wishlist.signInBody'));
+      this.toast.info(
+        this.translate.instant('wishlist.signInTitle'),
+        this.translate.instant('wishlist.signInBody'),
+      );
       void this.router.navigateByUrl('/login');
       return;
     }
@@ -302,9 +347,9 @@ export class ProductCardComponent implements OnChanges {
           this.wishlist.removeLocal(this.product.id);
           this.toast.success(
             this.translate.instant('wishlist.removedTitle'),
-            this.translate.instant('wishlist.removedBody', { name: this.product.name })
+            this.translate.instant('wishlist.removedBody', { name: this.product.name }),
           );
-        }
+        },
       });
       return;
     }
@@ -314,9 +359,9 @@ export class ProductCardComponent implements OnChanges {
         this.wishlist.addLocal(product);
         this.toast.success(
           this.translate.instant('wishlist.addedTitle'),
-          this.translate.instant('wishlist.addedBody', { name: this.product.name })
+          this.translate.instant('wishlist.addedBody', { name: this.product.name }),
         );
-      }
+      },
     });
   }
 
@@ -372,14 +417,14 @@ export class ProductCardComponent implements OnChanges {
           this.translate.instant('adminUi.products.inline.success'),
           this.translate.instant('adminUi.common.undo'),
           () => this.undoStatusChange(slug, current, nextStatus, select),
-          { tone: 'success' }
+          { tone: 'success' },
         );
       },
       error: () => {
         this.statusSaving = false;
         if (select) select.value = current;
         this.toast.error(this.translate.instant('adminUi.products.inline.errors.save'));
-      }
+      },
     });
   }
 
@@ -416,7 +461,9 @@ export class ProductCardComponent implements OnChanges {
     const stockChanged = stock !== currentStock;
     if (!priceChanged && !stockChanged) return;
 
-    const update: { product_id: string; base_price?: number; stock_quantity?: number } = { product_id: this.product.id };
+    const update: { product_id: string; base_price?: number; stock_quantity?: number } = {
+      product_id: this.product.id,
+    };
     if (priceChanged) update.base_price = Number(price.toFixed(2));
     if (stockChanged) update.stock_quantity = stock;
 
@@ -432,13 +479,13 @@ export class ProductCardComponent implements OnChanges {
           this.translate.instant('adminUi.products.inline.success'),
           this.translate.instant('adminUi.common.undo'),
           () => this.undoInlineUpdate(currentPrice, currentStock, nextPrice, nextStock),
-          { tone: 'success' }
+          { tone: 'success' },
         );
       },
       error: () => {
         this.inlineSaving = false;
         this.toast.error(this.translate.instant('adminUi.products.inline.errors.save'));
-      }
+      },
     });
   }
 
@@ -446,7 +493,7 @@ export class ProductCardComponent implements OnChanges {
     slug: string,
     previousStatus: string,
     currentStatus: string,
-    select?: HTMLSelectElement | null
+    select?: HTMLSelectElement | null,
   ): void {
     if (!this.showStorefrontEdit()) return;
     if (this.statusSaving) return;
@@ -469,11 +516,16 @@ export class ProductCardComponent implements OnChanges {
         this.product.status = currentStatus;
         if (select) select.value = currentStatus;
         this.toast.error(this.translate.instant('adminUi.storefront.undoFailed'));
-      }
+      },
     });
   }
 
-  private undoInlineUpdate(previousPrice: number, previousStock: number, currentPrice: number, currentStock: number): void {
+  private undoInlineUpdate(
+    previousPrice: number,
+    previousStock: number,
+    currentPrice: number,
+    currentStock: number,
+  ): void {
     if (!this.showStorefrontEdit()) return;
     if (this.inlineSaving) return;
     if (!this.product?.id) return;
@@ -481,7 +533,7 @@ export class ProductCardComponent implements OnChanges {
     const update: { product_id: string; base_price: number; stock_quantity: number } = {
       product_id: this.product.id,
       base_price: Number(previousPrice.toFixed(2)),
-      stock_quantity: previousStock
+      stock_quantity: previousStock,
     };
 
     this.inlineSaving = true;
@@ -503,7 +555,7 @@ export class ProductCardComponent implements OnChanges {
         this.inlinePrice = Number(currentPrice.toFixed(2)).toFixed(2);
         this.inlineStock = String(currentStock);
         this.toast.error(this.translate.instant('adminUi.storefront.undoFailed'));
-      }
+      },
     });
   }
 
@@ -554,7 +606,10 @@ export class ProductCardComponent implements OnChanges {
     const variant = product.variants?.[0] ?? null;
     const variantId = variant?.id ?? null;
     const allowBackorder = !!product.allow_backorder;
-    const stockRaw = variant && variant.stock_quantity == null ? null : (variant?.stock_quantity ?? product.stock_quantity);
+    const stockRaw =
+      variant && variant.stock_quantity == null
+        ? null
+        : (variant?.stock_quantity ?? product.stock_quantity);
     const stock = stockRaw == null ? (allowBackorder ? 9_999 : 99) : Number(stockRaw);
 
     this.cart.addFromProduct({
@@ -566,12 +621,12 @@ export class ProductCardComponent implements OnChanges {
       image: this.primaryImage,
       price: this.displayPrice,
       currency: product.currency,
-      stock: Number.isFinite(stock) ? stock : 99
+      stock: Number.isFinite(stock) ? stock : 99,
     });
 
     this.toast.success(
       this.translate.instant('product.addedTitle'),
-      this.translate.instant('product.addedBody', { qty: 1, name: product.name })
+      this.translate.instant('product.addedBody', { qty: 1, name: product.name }),
     );
   }
 
@@ -594,4 +649,3 @@ export class ProductCardComponent implements OnChanges {
     }
   }
 }
-

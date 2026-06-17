@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     _default_sqlite_path = _backend_root / "adrianaart.db"
     _default_sqlite_url = f"sqlite+aiosqlite:///{_default_sqlite_path.as_posix()}"
 
-    model_config = SettingsConfigDict(env_file=str(_backend_env_file), env_file_encoding="utf-8", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=str(_backend_env_file), env_file_encoding="utf-8", case_sensitive=False
+    )
 
     app_name: str = "momentstudio API"
     app_version: str = "0.1.0"
@@ -202,7 +204,9 @@ class Settings(BaseSettings):
     admin_alert_email: str | None = None
     log_json: bool = False
     csp_enabled: bool = True
-    csp_policy: str = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    csp_policy: str = (
+        "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    )
     slow_query_threshold_ms: int = 500
     sentry_dsn: str | None = None
     sentry_send_default_pii: bool = True

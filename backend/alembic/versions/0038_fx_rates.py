@@ -22,15 +22,24 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "fx_rates",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("base", sa.String(length=3), nullable=False, server_default="RON"),
         sa.Column("eur_per_ron", sa.Numeric(12, 8), nullable=False),
         sa.Column("usd_per_ron", sa.Numeric(12, 8), nullable=False),
         sa.Column("as_of", sa.Date(), nullable=False),
         sa.Column("source", sa.String(length=32), nullable=False),
         sa.Column("fetched_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("is_override", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "is_override", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -47,4 +56,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_fx_rates_is_override", table_name="fx_rates")
     op.drop_table("fx_rates")
-

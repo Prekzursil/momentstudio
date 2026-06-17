@@ -23,7 +23,7 @@ type ButtonSize = 'md' | 'sm';
         {{ copiedKey | translate }}
       </span>
     </span>
-  `
+  `,
 })
 export class CopyButtonComponent {
   @Input() value = '';
@@ -74,4 +74,3 @@ export class CopyButtonComponent {
     document.body.removeChild(el);
   }
 }
-

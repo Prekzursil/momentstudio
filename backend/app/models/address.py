@@ -12,8 +12,12 @@ from app.models.user import User
 class Address(Base):
     __tablename__ = "addresses"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     label: Mapped[str | None] = mapped_column(String(50), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     line1: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -22,13 +26,20 @@ class Address(Base):
     region: Mapped[str | None] = mapped_column(String(100), nullable=True)
     postal_code: Mapped[str] = mapped_column(String(20), nullable=False)
     country: Mapped[str] = mapped_column(String(2), nullable=False)
-    is_default_shipping: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_default_billing: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_default_shipping: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    is_default_billing: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
     user: Mapped[User | None] = relationship("User")

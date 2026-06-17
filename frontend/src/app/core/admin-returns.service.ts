@@ -3,7 +3,13 @@ import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { AdminPaginationMeta } from './admin-orders.service';
 
-export type ReturnRequestStatus = 'requested' | 'approved' | 'rejected' | 'received' | 'refunded' | 'closed';
+export type ReturnRequestStatus =
+  | 'requested'
+  | 'approved'
+  | 'rejected'
+  | 'received'
+  | 'refunded'
+  | 'closed';
 
 export interface ReturnRequestListItem {
   id: string;
@@ -80,11 +86,20 @@ export class AdminReturnsService {
     return this.api.patch<ReturnRequestRead>(`/returns/admin/${returnId}`, payload);
   }
 
-  uploadReturnLabel(returnId: string, file: File, opts?: { include_pii?: boolean }): Observable<ReturnRequestRead> {
+  uploadReturnLabel(
+    returnId: string,
+    file: File,
+    opts?: { include_pii?: boolean },
+  ): Observable<ReturnRequestRead> {
     const data = new FormData();
     data.append('file', file);
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.post<ReturnRequestRead>(`/returns/admin/${returnId}/label`, data, undefined, params);
+    return this.api.post<ReturnRequestRead>(
+      `/returns/admin/${returnId}/label`,
+      data,
+      undefined,
+      params,
+    );
   }
 
   downloadReturnLabel(returnId: string): Observable<Blob> {
@@ -109,4 +124,3 @@ export class AdminReturnsService {
     return this.api.post<ReturnRequestRead>('/returns/admin', payload as any);
   }
 }
-

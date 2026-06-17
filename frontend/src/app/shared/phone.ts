@@ -3,7 +3,7 @@ import {
   type CountryCode,
   getCountries,
   getCountryCallingCode,
-  parsePhoneNumberFromString
+  parsePhoneNumberFromString,
 } from 'libphonenumber-js';
 
 export type PhoneCountryOption = {
@@ -24,7 +24,12 @@ function flagEmoji(code: string): string {
 
 function displayName(locale: string, regionCode: string): string {
   try {
-    const anyIntl = Intl as unknown as { DisplayNames?: new (locales: string[], options: { type: string }) => { of: (x: string) => string } };
+    const anyIntl = Intl as unknown as {
+      DisplayNames?: new (
+        locales: string[],
+        options: { type: string },
+      ) => { of: (x: string) => string };
+    };
     const DisplayNames = anyIntl.DisplayNames;
     if (!DisplayNames) return regionCode;
     const names = new DisplayNames([locale], { type: 'region' });
@@ -45,7 +50,7 @@ export function listPhoneCountries(locale: string): PhoneCountryOption[] {
       code,
       dial,
       name: displayName(normalizedLocale, code),
-      flag: flagEmoji(code)
+      flag: flagEmoji(code),
     } satisfies PhoneCountryOption;
   });
 
@@ -88,7 +93,10 @@ export function formatInternationalFromE164(e164: string): string {
   }
 }
 
-export function formatInternationalPreview(country: CountryCode, nationalNumber: string): string | null {
+export function formatInternationalPreview(
+  country: CountryCode,
+  nationalNumber: string,
+): string | null {
   const e164 = buildE164(country, nationalNumber);
   if (!e164) return null;
   return formatInternationalFromE164(e164);
@@ -99,7 +107,6 @@ export function splitE164(e164: string): { country: CountryCode | null; national
   if (!parsed) return { country: null, nationalNumber: '' };
   return {
     country: (parsed.country as CountryCode | undefined) ?? null,
-    nationalNumber: parsed.nationalNumber
+    nationalNumber: parsed.nationalNumber,
   };
 }
-

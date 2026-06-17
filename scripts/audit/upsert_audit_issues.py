@@ -16,7 +16,10 @@ from typing import Any
 
 
 SEVERE_LEVELS = {"s1", "s2"}
-ALLOWED_AUDIT_PATH_PREFIXES = ("artifacts/audit-evidence", "artifacts/audit-evidence-local")
+ALLOWED_AUDIT_PATH_PREFIXES = (
+    "artifacts/audit-evidence",
+    "artifacts/audit-evidence-local",
+)
 ALLOWED_FINDINGS_FILES = frozenset(
     {
         "artifacts/audit-evidence/deterministic-findings.json",
@@ -42,7 +45,9 @@ def _validated_repo_path(candidate: Path, *, allowed_prefixes: tuple[str, ...]) 
         rel = resolved.relative_to(root).as_posix()
     except ValueError as exc:
         raise ValueError(f"Path must stay inside repository: {candidate}") from exc
-    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
+    if not any(
+        rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes
+    ):
         raise ValueError(f"Path is outside allowed audit roots: {candidate}")
     return resolved
 
@@ -52,19 +57,29 @@ def _resolve_findings_path(raw: str) -> Path:
     if normalized not in ALLOWED_FINDINGS_FILES:
         allowed = ", ".join(sorted(ALLOWED_FINDINGS_FILES))
         raise ValueError(f"Unsupported --findings path '{raw}'. Allowed: {allowed}")
-    return _validated_repo_path(_repo_root() / normalized, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+    return _validated_repo_path(
+        _repo_root() / normalized, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES
+    )
 
 
 def _write_repo_severe_json(payload: Any) -> None:
-    safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_REPO, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+    safe_path = _validated_repo_path(
+        _repo_root() / SEVERE_OUTPUT_REPO, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES
+    )
     safe_path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")  # NOSONAR
+    safe_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )  # NOSONAR
 
 
 def _write_local_severe_json(payload: Any) -> None:
-    safe_path = _validated_repo_path(_repo_root() / SEVERE_OUTPUT_LOCAL, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES)
+    safe_path = _validated_repo_path(
+        _repo_root() / SEVERE_OUTPUT_LOCAL, allowed_prefixes=ALLOWED_AUDIT_PATH_PREFIXES
+    )
     safe_path.parent.mkdir(parents=True, exist_ok=True)
-    safe_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")  # NOSONAR
+    safe_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )  # NOSONAR
 
 
 def _resolve_severe_output_target(raw: str) -> str | None:
@@ -74,7 +89,9 @@ def _resolve_severe_output_target(raw: str) -> str | None:
     target = SEVERE_OUTPUT_TARGETS.get(normalized)
     if target is None:
         allowed = ", ".join(sorted(SEVERE_OUTPUT_TARGETS))
-        raise ValueError(f"Unsupported --severe-output path '{raw}'. Allowed: {allowed}")
+        raise ValueError(
+            f"Unsupported --severe-output path '{raw}'. Allowed: {allowed}"
+        )
     return target
 
 
@@ -85,7 +102,9 @@ def _emit_severe_output(target: str | None, rows: list[dict[str, Any]]) -> None:
         _write_local_severe_json(rows)
 
 
-def _issue_candidate_fingerprints(findings: list[dict[str, Any]], *, include_s3_seo: bool) -> set[str]:
+def _issue_candidate_fingerprints(
+    findings: list[dict[str, Any]], *, include_s3_seo: bool
+) -> set[str]:
     return {
         str(row.get("fingerprint") or "")
         for row in findings
@@ -126,7 +145,9 @@ def _github_context(repo_arg: str | None) -> GitHubContext:
     return GitHubContext(token=token, owner=owner, repo=repo)
 
 
-def _request(ctx: GitHubContext, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+def _request(
+    ctx: GitHubContext, method: str, path: str, payload: dict[str, Any] | None = None
+) -> Any:
     url = f"{ctx.api_root}{path}"
     data = None
     headers = {
@@ -145,10 +166,14 @@ def _request(ctx: GitHubContext, method: str, path: str, payload: dict[str, Any]
             return json.loads(body) if body else {}
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"GitHub API {method} {path} failed: {exc.code} {body}") from exc
+        raise RuntimeError(
+            f"GitHub API {method} {path} failed: {exc.code} {body}"
+        ) from exc
 
 
-def _list_open_issues(ctx: GitHubContext, *, labels: list[str] | None = None) -> list[dict[str, Any]]:
+def _list_open_issues(
+    ctx: GitHubContext, *, labels: list[str] | None = None
+) -> list[dict[str, Any]]:
     per_page = 100
     page = 1
     all_issues: list[dict[str, Any]] = []
@@ -406,7 +431,9 @@ def _close_stale_fingerprint_issues(
     return closed_count
 
 
-def _upsert_severe(ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None) -> list[dict[str, Any]]:
+def _upsert_severe(
+    ctx: GitHubContext, findings: list[dict[str, Any]], run_url: str | None
+) -> list[dict[str, Any]]:
     # Backward-compatible test helper used by existing unit tests.
     return _upsert_issues(ctx, findings, run_url, include_s3_seo=False)[2]
 
@@ -419,7 +446,14 @@ def _upsert_digest(
     run_url: str | None,
 ) -> None:
     open_issues = _list_open_issues(ctx, labels=["audit:ux"])
-    digest = next((row for row in open_issues if str(row.get("title") or "").strip() == digest_title), None)
+    digest = next(
+        (
+            row
+            for row in open_issues
+            if str(row.get("title") or "").strip() == digest_title
+        ),
+        None,
+    )
     body = _digest_body(low_findings, run_url)
     if digest:
         _request(
@@ -447,7 +481,9 @@ def _load_findings(path: Path) -> list[dict[str, Any]]:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default="", help="Repository in owner/repo format.")
-    parser.add_argument("--findings", required=True, help="Path to deterministic-findings.json.")
+    parser.add_argument(
+        "--findings", required=True, help="Path to deterministic-findings.json."
+    )
     parser.add_argument(
         "--digest-title",
         default="Weekly UX/IA Audit Digest",
@@ -491,9 +527,19 @@ def main() -> int:
 
     findings = _load_findings(findings_path)
     include_s3_seo = bool(args.include_s3_seo)
-    issue_candidate_fingerprints = _issue_candidate_fingerprints(findings, include_s3_seo=include_s3_seo)
-    issue_candidates = [row for row in findings if str(row.get("fingerprint") or "") in issue_candidate_fingerprints]
-    low = [row for row in findings if str(row.get("fingerprint") or "") not in issue_candidate_fingerprints]
+    issue_candidate_fingerprints = _issue_candidate_fingerprints(
+        findings, include_s3_seo=include_s3_seo
+    )
+    issue_candidates = [
+        row
+        for row in findings
+        if str(row.get("fingerprint") or "") in issue_candidate_fingerprints
+    ]
+    low = [
+        row
+        for row in findings
+        if str(row.get("fingerprint") or "") not in issue_candidate_fingerprints
+    ]
 
     try:
         ctx = _github_context(args.repo)
@@ -509,7 +555,11 @@ def main() -> int:
         run_url,
         include_s3_seo=include_s3_seo,
     )
-    severe_rows = [row for row in issue_rows if str(row.get("severity") or "").lower() in SEVERE_LEVELS]
+    severe_rows = [
+        row
+        for row in issue_rows
+        if str(row.get("severity") or "").lower() in SEVERE_LEVELS
+    ]
     _emit_severe_output(severe_output_target, severe_rows)
     closed = 0
     if args.close_stale:

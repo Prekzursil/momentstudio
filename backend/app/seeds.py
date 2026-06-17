@@ -11,8 +11,19 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.future import select
 
 from app.core.config import settings
-from app.models.catalog import Category, Product, ProductImage, ProductStatus, ProductVariant
-from app.models.content import ContentBlock, ContentBlockTranslation, ContentBlockVersion, ContentStatus
+from app.models.catalog import (
+    Category,
+    Product,
+    ProductImage,
+    ProductStatus,
+    ProductVariant,
+)
+from app.models.content import (
+    ContentBlock,
+    ContentBlockTranslation,
+    ContentBlockVersion,
+    ContentStatus,
+)
 
 SEED_PROFILES_ROOT = (Path(__file__).resolve().parent / "seed_profiles").resolve()
 PROFILE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -134,9 +145,13 @@ def _resolve_profile_dir(profile: str) -> Path:
     return profile_dir
 
 
-def _load_md(profile_files: dict[str, Path], rel_path: str, *, allowed_markdown_paths: set[str]) -> str:
+def _load_md(
+    profile_files: dict[str, Path], rel_path: str, *, allowed_markdown_paths: set[str]
+) -> str:
     text = (
-        _resolve_profile_file(profile_files, rel_path, allowed_paths=allowed_markdown_paths)
+        _resolve_profile_file(
+            profile_files, rel_path, allowed_paths=allowed_markdown_paths
+        )
         .read_text(encoding="utf-8")
         .replace("\r\n", "\n")
         .strip()
@@ -144,24 +159,29 @@ def _load_md(profile_files: dict[str, Path], rel_path: str, *, allowed_markdown_
     return f"{text}\n"
 
 
-def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct], list[SeedContentBlock]]:
+def _load_profile(
+    profile: str,
+) -> tuple[list[dict[str, Any]], list[SeedProduct], list[SeedContentBlock]]:
     profile_dir = _resolve_profile_dir(profile)
     profile_files = _build_profile_file_map(profile_dir)
     allowed_markdown_paths = {
         path.relative_to(profile_dir).as_posix()
         for path in profile_dir.rglob("*.md")
-        if path.is_file() and PROFILE_CONTENT_PATH_PATTERN.fullmatch(path.relative_to(profile_dir).as_posix())
+        if path.is_file()
+        and PROFILE_CONTENT_PATH_PATTERN.fullmatch(
+            path.relative_to(profile_dir).as_posix()
+        )
     }
 
     catalog = json.loads(
-        _resolve_profile_file(profile_files, "catalog.json", allowed_paths=SEED_JSON_ALLOWLIST).read_text(
-            encoding="utf-8"
-        )
+        _resolve_profile_file(
+            profile_files, "catalog.json", allowed_paths=SEED_JSON_ALLOWLIST
+        ).read_text(encoding="utf-8")
     )
     content = json.loads(
-        _resolve_profile_file(profile_files, "content_blocks.json", allowed_paths=SEED_JSON_ALLOWLIST).read_text(
-            encoding="utf-8"
-        )
+        _resolve_profile_file(
+            profile_files, "content_blocks.json", allowed_paths=SEED_JSON_ALLOWLIST
+        ).read_text(encoding="utf-8")
     )
 
     categories = list(catalog.get("categories", []))
@@ -181,7 +201,9 @@ def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct]
             "variants": [
                 {
                     "name": str(variant["name"]),
-                    "additional_price_delta": Decimal(str(variant["additional_price_delta"])),
+                    "additional_price_delta": Decimal(
+                        str(variant["additional_price_delta"])
+                    ),
                     "stock_quantity": int(variant["stock_quantity"]),
                 }
                 for variant in prod.get("variants", [])
@@ -193,7 +215,11 @@ def _load_profile(profile: str) -> tuple[list[dict[str, Any]], list[SeedProduct]
     for block in content.get("content_blocks", []):
         body_markdown = block.get("body_markdown")
         if body_markdown is None and block.get("body_markdown_file"):
-            body_markdown = _load_md(profile_files, block["body_markdown_file"], allowed_markdown_paths=allowed_markdown_paths)
+            body_markdown = _load_md(
+                profile_files,
+                block["body_markdown_file"],
+                allowed_markdown_paths=allowed_markdown_paths,
+            )
 
         translations: list[SeedTranslation] = []
         for translation in block.get("translations", []):
@@ -232,7 +258,9 @@ async def seed(session: AsyncSession, *, profile: str = "default") -> None:
 
     # Categories
     for cat in categories:
-        existing = await session.execute(select(Category).where(Category.slug == cat["slug"]))
+        existing = await session.execute(
+            select(Category).where(Category.slug == cat["slug"])
+        )
         if existing.scalar_one_or_none():
             continue
         session.add(Category(**cat))
@@ -240,11 +268,15 @@ async def seed(session: AsyncSession, *, profile: str = "default") -> None:
 
     # Products
     for prod in products:
-        result = await session.execute(select(Product).where(Product.slug == prod["slug"]))
+        result = await session.execute(
+            select(Product).where(Product.slug == prod["slug"])
+        )
         if result.scalar_one_or_none():
             continue
 
-        cat_result = await session.execute(select(Category).where(Category.slug == prod["category_slug"]))
+        cat_result = await session.execute(
+            select(Category).where(Category.slug == prod["category_slug"])
+        )
         category = cat_result.scalar_one()
 
         product = Product(
@@ -269,12 +301,16 @@ async def seed(session: AsyncSession, *, profile: str = "default") -> None:
 
     # Content blocks
     for block in blocks:
-        existing = await session.execute(select(ContentBlock).where(ContentBlock.key == block["key"]))
+        existing = await session.execute(
+            select(ContentBlock).where(ContentBlock.key == block["key"])
+        )
         if existing.scalar_one_or_none():
             continue
 
         status = ContentStatus(block["status"])
-        published_at = datetime.now(timezone.utc) if status == ContentStatus.published else None
+        published_at = (
+            datetime.now(timezone.utc) if status == ContentStatus.published else None
+        )
         content_block = ContentBlock(
             key=block["key"],
             title=block["title"],
@@ -285,7 +321,10 @@ async def seed(session: AsyncSession, *, profile: str = "default") -> None:
             lang=block["lang"],
             published_at=published_at,
         )
-        content_block.translations = [ContentBlockTranslation(**translation) for translation in block["translations"]]
+        content_block.translations = [
+            ContentBlockTranslation(**translation)
+            for translation in block["translations"]
+        ]
         content_block.versions = [
             ContentBlockVersion(
                 version=1,
@@ -313,6 +352,8 @@ async def main(profile: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Seed catalog/content bootstrap data")
-    parser.add_argument("--profile", default="default", help="Seed profile (e.g. default, adrianaart)")
+    parser.add_argument(
+        "--profile", default="default", help="Seed profile (e.g. default, adrianaart)"
+    )
     args = parser.parse_args()
     asyncio.run(main(args.profile))

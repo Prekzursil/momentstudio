@@ -205,8 +205,10 @@ function readBoolean(value: unknown, fallback = false): boolean {
   if (typeof value === 'number') return value === 1;
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase();
-    if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
-    if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
+    if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on')
+      return true;
+    if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off')
+      return false;
   }
   return fallback;
 }
@@ -250,39 +252,55 @@ function parseLayout(value: unknown): PageBlockLayout {
     spacing: normalizeLayoutSpacing(rec['spacing']),
     background: normalizeLayoutBackground(rec['background']),
     align: normalizeLayoutAlign(rec['align']),
-    max_width: normalizeLayoutMaxWidth(rec['max_width'] ?? rec['maxWidth'])
+    max_width: normalizeLayoutMaxWidth(rec['max_width'] ?? rec['maxWidth']),
   };
 }
 
 export function pageBlockOuterClasses(layout: PageBlockLayout | null | undefined): string {
-  const effective = layout || { spacing: 'none', background: 'none', align: 'left', max_width: 'full' };
+  const effective = layout || {
+    spacing: 'none',
+    background: 'none',
+    align: 'left',
+    max_width: 'full',
+  };
   const backgroundClasses: Record<PageBlockLayoutBackground, string> = {
     none: '',
-    muted: 'rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/30',
-    accent: 'rounded-2xl border border-indigo-200 bg-indigo-50 dark:border-indigo-900/40 dark:bg-indigo-950/20'
+    muted:
+      'rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/30',
+    accent:
+      'rounded-2xl border border-indigo-200 bg-indigo-50 dark:border-indigo-900/40 dark:bg-indigo-950/20',
   };
   const spacingClasses: Record<PageBlockLayoutSpacing, string> = {
     none: '',
     sm: 'p-3 md:p-4',
     md: 'p-5 md:p-6',
-    lg: 'p-8 md:p-10'
+    lg: 'p-8 md:p-10',
   };
-  return [backgroundClasses[effective.background], spacingClasses[effective.spacing]].filter(Boolean).join(' ');
+  return [backgroundClasses[effective.background], spacingClasses[effective.spacing]]
+    .filter(Boolean)
+    .join(' ');
 }
 
 export function pageBlockInnerClasses(layout: PageBlockLayout | null | undefined): string {
-  const effective = layout || { spacing: 'none', background: 'none', align: 'left', max_width: 'full' };
+  const effective = layout || {
+    spacing: 'none',
+    background: 'none',
+    align: 'left',
+    max_width: 'full',
+  };
   const maxWidthClasses: Record<PageBlockLayoutMaxWidth, string> = {
     full: '',
     narrow: 'max-w-2xl',
     prose: 'max-w-prose',
-    wide: 'max-w-4xl'
+    wide: 'max-w-4xl',
   };
   const alignClasses: Record<PageBlockLayoutAlign, string> = {
     left: '',
-    center: 'mx-auto text-center'
+    center: 'mx-auto text-center',
   };
-  return ['w-full', maxWidthClasses[effective.max_width], alignClasses[effective.align]].filter(Boolean).join(' ');
+  return ['w-full', maxWidthClasses[effective.max_width], alignClasses[effective.align]]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function normalizeVariant(value: unknown): SlideVariant {
@@ -337,7 +355,7 @@ function parseSlide(raw: unknown, lang: UiLang): Slide | null {
     size,
     text_style: textStyle,
     focal_x: focalX,
-    focal_y: focalY
+    focal_y: focalY,
   };
 }
 
@@ -348,7 +366,13 @@ function parseCarouselSettings(raw: unknown): CarouselSettings {
   const showDots = readBoolean(rec['show_dots'], true);
   const showArrows = readBoolean(rec['show_arrows'], true);
   const pauseOnHover = readBoolean(rec['pause_on_hover'], true);
-  return { autoplay, interval_ms: intervalMs, show_dots: showDots, show_arrows: showArrows, pause_on_hover: pauseOnHover };
+  return {
+    autoplay,
+    interval_ms: intervalMs,
+    show_dots: showDots,
+    show_arrows: showArrows,
+    pause_on_hover: pauseOnHover,
+  };
 }
 
 function normalizeColumnsBreakpoint(value: unknown): ColumnsBreakpoint {
@@ -363,7 +387,8 @@ function normalizeProductGridSource(value: unknown): ProductGridSource {
   const normalized = raw.trim().toLowerCase();
   if (normalized === 'category' || normalized === 'categories') return 'category';
   if (normalized === 'collection' || normalized === 'collections') return 'collection';
-  if (normalized === 'products' || normalized === 'product' || normalized === 'manual') return 'products';
+  if (normalized === 'products' || normalized === 'product' || normalized === 'manual')
+    return 'products';
   return 'products';
 }
 
@@ -413,7 +438,7 @@ function normalizeContactTopic(value: unknown): ContactSubmissionTopic {
 export function parsePageBlocks(
   meta: Record<string, unknown> | null | undefined,
   lang: UiLang,
-  renderMarkdown: (md: string) => string
+  renderMarkdown: (md: string) => string,
 ): PageBlock[] {
   const rawBlocks = meta?.['blocks'];
   if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) return [];
@@ -457,7 +482,7 @@ export function parsePageBlocks(
         enabled: true,
         title,
         layout,
-        body_html: renderMarkdown(bodyMarkdown)
+        body_html: renderMarkdown(bodyMarkdown),
       } satisfies PageTextBlock);
       continue;
     }
@@ -478,7 +503,7 @@ export function parsePageBlocks(
         body_html: renderMarkdown(bodyMarkdown),
         cta_label: ctaLabel,
         cta_url: ctaUrl,
-        cta_new_tab: ctaNewTab
+        cta_new_tab: ctaNewTab,
       } satisfies PageCtaBlock);
       continue;
     }
@@ -501,7 +526,7 @@ export function parsePageBlocks(
         limit,
         category_slug: categorySlug,
         collection_slug: collectionSlug,
-        product_slugs: productSlugs.length ? productSlugs : undefined
+        product_slugs: productSlugs.length ? productSlugs : undefined,
       } satisfies PageProductGridBlock);
       continue;
     }
@@ -516,7 +541,7 @@ export function parsePageBlocks(
         title,
         layout,
         form_type: formType,
-        topic
+        topic,
       } satisfies PageFormBlock);
       continue;
     }
@@ -554,7 +579,14 @@ export function parsePageBlocks(
         if (items.length >= 12) break;
       }
       if (!items.length) continue;
-      blocks.push({ key, type: 'testimonials', enabled: true, title, layout, items } satisfies PageTestimonialsBlock);
+      blocks.push({
+        key,
+        type: 'testimonials',
+        enabled: true,
+        title,
+        layout,
+        items,
+      } satisfies PageTestimonialsBlock);
       continue;
     }
 
@@ -575,7 +607,7 @@ export function parsePageBlocks(
         caption: readLocalized(rec['caption'], lang),
         link_url: linkUrl || null,
         focal_x: focalX,
-        focal_y: focalY
+        focal_y: focalY,
       } satisfies PageImageBlock);
       continue;
     }
@@ -589,7 +621,7 @@ export function parsePageBlocks(
         enabled: true,
         title,
         layout,
-        slide
+        slide,
       } satisfies PageBannerBlock);
       continue;
     }
@@ -611,7 +643,7 @@ export function parsePageBlocks(
         title,
         layout,
         slides,
-        settings: parseCarouselSettings(rec['settings'])
+        settings: parseCarouselSettings(rec['settings']),
       } satisfies PageCarouselBlock);
       continue;
     }
@@ -643,7 +675,9 @@ export function parsePageBlocks(
         layout,
         columns,
         columns_count: columns.length === 3 ? 3 : 2,
-        breakpoint: normalizeColumnsBreakpoint(rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'])
+        breakpoint: normalizeColumnsBreakpoint(
+          rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'],
+        ),
       } satisfies PageColumnsBlock);
       continue;
     }
@@ -663,7 +697,7 @@ export function parsePageBlocks(
         alt: readLocalized(imgRec['alt'], lang),
         caption: readLocalized(imgRec['caption'], lang),
         focal_x: focalX,
-        focal_y: focalY
+        focal_y: focalY,
       });
     }
     if (!images.length) continue;
@@ -673,7 +707,7 @@ export function parsePageBlocks(
       enabled: true,
       title,
       layout,
-      images
+      images,
     } satisfies PageGalleryBlock);
   }
 

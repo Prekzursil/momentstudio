@@ -18,7 +18,9 @@ type VerifyKind = 'primary' | 'secondary' | 'guest';
   template: `
     <app-container classes="py-10 grid gap-6">
       <div class="grid gap-2">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.verifyEmail.title' | translate }}</h1>
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'auth.verifyEmail.title' | translate }}
+        </h1>
         <p class="text-sm text-slate-600 dark:text-slate-300">{{ subtitle }}</p>
       </div>
 
@@ -50,7 +52,7 @@ type VerifyKind = 'primary' | 'secondary' | 'guest';
         ></app-button>
       </div>
     </app-container>
-  `
+  `,
 })
 export class VerifyEmailComponent implements OnInit {
   status: 'verifying' | 'success' | 'error' = 'verifying';
@@ -65,16 +67,20 @@ export class VerifyEmailComponent implements OnInit {
     private readonly api: ApiService,
     public auth: AuthService,
     private readonly cartApi: CartApi,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
     const qp = this.route.snapshot.queryParamMap;
     const rawToken = String(qp.get('token') || '').trim();
-    const rawKind = String(qp.get('kind') || 'primary').trim().toLowerCase();
+    const rawKind = String(qp.get('kind') || 'primary')
+      .trim()
+      .toLowerCase();
     const rawEmail = String(qp.get('email') || '').trim();
     const rawNext = String(qp.get('next') || '').trim();
-    const kind = (rawKind === 'guest' || rawKind === 'secondary' ? rawKind : 'primary') as VerifyKind;
+    const kind = (
+      rawKind === 'guest' || rawKind === 'secondary' ? rawKind : 'primary'
+    ) as VerifyKind;
 
     this.kind = kind;
     this.subtitle = this.translate.instant('auth.verifyEmail.verifying');
@@ -90,10 +96,13 @@ export class VerifyEmailComponent implements OnInit {
         return;
       }
       this.api
-        .post<{ email: string | null; verified: boolean }>(
+        .post<{
+          email: string | null;
+          verified: boolean;
+        }>(
           '/orders/guest-checkout/email/confirm',
           { email: rawEmail, token: rawToken },
-          this.cartApi.headers()
+          this.cartApi.headers(),
         )
         .subscribe({
           next: (res) => {
@@ -106,7 +115,7 @@ export class VerifyEmailComponent implements OnInit {
           },
           error: () => {
             this.fail(this.translate.instant('auth.verifyEmail.guestDeviceHint'));
-          }
+          },
         });
       return;
     }
@@ -118,7 +127,7 @@ export class VerifyEmailComponent implements OnInit {
           this.refreshAuthUserIfPossible();
           if (rawNext) this.safeNavigateNext(rawNext, '/account');
         },
-        error: () => this.fail(this.translate.instant('auth.verifyEmail.invalidOrExpired'))
+        error: () => this.fail(this.translate.instant('auth.verifyEmail.invalidOrExpired')),
       });
       return;
     }
@@ -129,7 +138,7 @@ export class VerifyEmailComponent implements OnInit {
         this.refreshAuthUserIfPossible();
         if (rawNext) this.safeNavigateNext(rawNext, '/account');
       },
-      error: () => this.fail(this.translate.instant('auth.verifyEmail.invalidOrExpired'))
+      error: () => this.fail(this.translate.instant('auth.verifyEmail.invalidOrExpired')),
     });
   }
 
@@ -138,7 +147,7 @@ export class VerifyEmailComponent implements OnInit {
     this.auth.loadCurrentUser().subscribe({
       error: () => {
         // Best-effort; showing success is still accurate even if the session expired.
-      }
+      },
     });
   }
 
@@ -152,7 +161,10 @@ export class VerifyEmailComponent implements OnInit {
       this.navigateSilently(fallback);
       return;
     }
-    const allowed = this.allowedNextPrefixes.some((prefix) => target === prefix || target.startsWith(`${prefix}/`) || target.startsWith(`${prefix}?`));
+    const allowed = this.allowedNextPrefixes.some(
+      (prefix) =>
+        target === prefix || target.startsWith(`${prefix}/`) || target.startsWith(`${prefix}?`),
+    );
     if (!allowed) {
       this.navigateSilently(fallback);
       return;
@@ -178,4 +190,3 @@ export class VerifyEmailComponent implements OnInit {
     this.errorMessage = message;
   }
 }
-

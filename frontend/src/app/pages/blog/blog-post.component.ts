@@ -1,5 +1,14 @@
 import { CommonModule, DOCUMENT } from '@angular/common';
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Meta, Title } from '@angular/platform-browser';
@@ -21,7 +30,14 @@ import { CatalogService, Category, FeaturedCollection, Product } from '../../cor
 import { MarkdownService } from '../../core/markdown.service';
 import { NewsletterService } from '../../core/newsletter.service';
 import { ToastService } from '../../core/toast.service';
-import { BlogComment, BlogCommentSort, BlogPost, BlogPostListItem, BlogService, PaginationMeta } from '../../core/blog.service';
+import {
+  BlogComment,
+  BlogCommentSort,
+  BlogPost,
+  BlogPostListItem,
+  BlogService,
+  PaginationMeta,
+} from '../../core/blog.service';
 import { StorefrontAdminModeService } from '../../core/storefront-admin-mode.service';
 import { ContainerComponent } from '../../layout/container.component';
 import { BreadcrumbComponent } from '../../shared/breadcrumb.component';
@@ -57,7 +73,7 @@ hljs.registerLanguage('typescript', typescript);
     CardComponent,
     ButtonComponent,
     CaptchaTurnstileComponent,
-    SkeletonComponent
+    SkeletonComponent,
   ],
   template: `
     <div
@@ -80,11 +96,20 @@ hljs.registerLanguage('typescript', typescript);
 
       <div *ngIf="canEditBlog()" class="flex flex-col items-end gap-2 no-print">
         <div class="flex items-center gap-2">
-          <app-button size="sm" variant="ghost" [label]="'blog.admin.edit' | translate" (action)="editBlogPost()"></app-button>
           <app-button
             size="sm"
             variant="ghost"
-            [label]="quickEditOpen() ? ('blog.admin.quickEditClose' | translate) : ('blog.admin.quickEdit' | translate)"
+            [label]="'blog.admin.edit' | translate"
+            (action)="editBlogPost()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="
+              quickEditOpen()
+                ? ('blog.admin.quickEditClose' | translate)
+                : ('blog.admin.quickEdit' | translate)
+            "
             (action)="toggleQuickEdit()"
           ></app-button>
         </div>
@@ -95,9 +120,12 @@ hljs.registerLanguage('typescript', typescript);
         >
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="grid gap-1">
-              <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.admin.quickEdit' | translate }}</p>
+              <p class="font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'blog.admin.quickEdit' | translate }}
+              </p>
               <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="adminBlock() as blk">
-                {{ 'adminUi.blog.fields.status' | translate }}: {{ ('adminUi.status.' + blk.status) | translate }}
+                {{ 'adminUi.blog.fields.status' | translate }}:
+                {{ 'adminUi.status.' + blk.status | translate }}
               </p>
               <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="adminBlockLoading()">
                 {{ 'adminUi.common.loading' | translate }}
@@ -117,7 +145,11 @@ hljs.registerLanguage('typescript', typescript);
               ></app-button>
               <app-button
                 size="sm"
-                [label]="quickEditSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+                [label]="
+                  quickEditSaving()
+                    ? ('adminUi.common.saving' | translate)
+                    : ('adminUi.common.save' | translate)
+                "
                 (action)="saveQuickEdit()"
                 [disabled]="quickEditSaving() || adminBlockLoading() || !adminBlock()"
               ></app-button>
@@ -127,7 +159,9 @@ hljs.registerLanguage('typescript', typescript);
           <div class="mt-4 grid gap-3" *ngIf="adminBlock() as blk">
             <div class="grid gap-3 md:grid-cols-3">
               <label class="grid gap-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.status' | translate }}</span>
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                  'adminUi.blog.fields.status' | translate
+                }}</span>
                 <select
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="quickEditStatus"
@@ -163,7 +197,9 @@ hljs.registerLanguage('typescript', typescript);
 
             <div class="grid gap-3 md:grid-cols-3">
               <label class="grid gap-1 md:col-span-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.title' | translate }}</span>
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                  'adminUi.blog.fields.title' | translate
+                }}</span>
                 <input
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="quickEditTitle"
@@ -172,7 +208,7 @@ hljs.registerLanguage('typescript', typescript);
 
               <label class="grid gap-1 md:col-span-1">
                 <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
-                  'adminUi.blog.editing.summaryOptional' | translate : { lang: activeLang() }
+                  'adminUi.blog.editing.summaryOptional' | translate: { lang: activeLang() }
                 }}</span>
                 <textarea
                   rows="2"
@@ -182,7 +218,9 @@ hljs.registerLanguage('typescript', typescript);
               </label>
 
               <label class="grid gap-1 md:col-span-1">
-                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.blog.fields.tags' | translate }}</span>
+                <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                  'adminUi.blog.fields.tags' | translate
+                }}</span>
                 <input
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
@@ -191,7 +229,9 @@ hljs.registerLanguage('typescript', typescript);
               </label>
             </div>
 
-            <p class="text-xs text-rose-600 dark:text-rose-300" *ngIf="quickEditError()">{{ quickEditError() }}</p>
+            <p class="text-xs text-rose-600 dark:text-rose-300" *ngIf="quickEditError()">
+              {{ quickEditError() }}
+            </p>
           </div>
         </div>
       </div>
@@ -204,23 +244,38 @@ hljs.registerLanguage('typescript', typescript);
       </div>
 
       <div class="grid gap-2">
-        <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
-          <span *ngIf="loadingPost(); else postTitleTpl">{{ 'blog.post.loadingTitle' | translate }}</span>
+        <h1
+          class="text-3xl font-semibold text-slate-900 dark:text-slate-50"
+          data-route-heading="true"
+          tabindex="-1"
+        >
+          <span *ngIf="loadingPost(); else postTitleTpl">{{
+            'blog.post.loadingTitle' | translate
+          }}</span>
           <ng-template #postTitleTpl>{{ post()?.title }}</ng-template>
         </h1>
         <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post()?.published_at">
           {{ post()!.published_at | date: 'mediumDate' }}
-          <ng-container *ngIf="post()?.reading_time_minutes"> · {{ 'blog.minutesRead' | translate : { minutes: post()!.reading_time_minutes } }}</ng-container>
-          <ng-container *ngIf="post()?.author_name"> · {{ 'blog.byAuthor' | translate : { author: post()!.author_name } }}</ng-container>
+          <ng-container *ngIf="post()?.reading_time_minutes">
+            ·
+            {{
+              'blog.minutesRead' | translate: { minutes: post()!.reading_time_minutes }
+            }}</ng-container
+          >
+          <ng-container *ngIf="post()?.author_name">
+            · {{ 'blog.byAuthor' | translate: { author: post()!.author_name } }}</ng-container
+          >
         </p>
         <a
           *ngIf="post()?.series"
           [routerLink]="['/blog/series', post()!.series]"
           class="justify-self-start text-xs font-semibold rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
         >
-          {{ 'blog.seriesPill' | translate : { series: post()!.series } }}
+          {{ 'blog.seriesPill' | translate: { series: post()!.series } }}
         </a>
-        <p class="text-sm text-slate-600 dark:text-slate-300" *ngIf="post()?.summary">{{ post()!.summary }}</p>
+        <p class="text-sm text-slate-600 dark:text-slate-300" *ngIf="post()?.summary">
+          {{ post()!.summary }}
+        </p>
         <div class="flex flex-wrap gap-1" *ngIf="post()?.tags?.length">
           <a
             *ngFor="let tag of post()!.tags"
@@ -241,8 +296,12 @@ hljs.registerLanguage('typescript', typescript);
         *ngIf="!loadingPost() && hasPostError()"
         class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-2 dark:border-amber-900/40 dark:bg-amber-950/30"
       >
-        <p class="text-lg font-semibold text-amber-900 dark:text-amber-100">{{ 'blog.post.errorTitle' | translate }}</p>
-        <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'blog.post.errorCopy' | translate }}</p>
+        <p class="text-lg font-semibold text-amber-900 dark:text-amber-100">
+          {{ 'blog.post.errorTitle' | translate }}
+        </p>
+        <p class="text-sm text-amber-800 dark:text-amber-200">
+          {{ 'blog.post.errorCopy' | translate }}
+        </p>
         <div class="flex justify-center">
           <app-button [label]="'blog.retry' | translate" size="sm" (action)="load()"></app-button>
         </div>
@@ -258,10 +317,15 @@ hljs.registerLanguage('typescript', typescript);
                 [alt]="post()!.title"
                 class="w-full aspect-[16/9] rounded-2xl border border-slate-200 dark:border-slate-800"
                 [ngClass]="coverImageClass(post()!.cover_fit)"
-                [style.object-position]="focalPosition(post()!.cover_focal_x, post()!.cover_focal_y)"
+                [style.object-position]="
+                  focalPosition(post()!.cover_focal_x, post()!.cover_focal_y)
+                "
                 loading="lazy"
               />
-              <div class="markdown blog-markdown text-slate-700 dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+              <div
+                class="markdown blog-markdown text-slate-700 dark:text-slate-200"
+                [innerHTML]="bodyHtml()"
+              ></div>
               <p
                 *ngIf="!hasMeaningfulArticleText()"
                 class="mx-auto w-full max-w-prose text-base text-slate-700 leading-relaxed dark:text-slate-200"
@@ -282,13 +346,17 @@ hljs.registerLanguage('typescript', typescript);
           <aside *ngIf="toc().length > 1" class="hidden lg:block lg:sticky lg:top-24 no-print">
             <app-card>
               <nav class="grid gap-3" [attr.aria-label]="'blog.post.tocTitle' | translate">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.tocTitle' | translate }}</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'blog.post.tocTitle' | translate }}
+                </p>
                 <div class="grid gap-1">
                   <a
                     *ngFor="let item of toc()"
                     class="text-sm rounded-md px-2 py-1 transition-colors"
                     [ngClass]="
-                      (item.id === activeHeadingId() ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950/40' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-slate-50 dark:hover:bg-slate-950/40') +
+                      (item.id === activeHeadingId()
+                        ? 'text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-950/40'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-slate-50 dark:hover:bg-slate-950/40') +
                       (item.level === 3 ? ' pl-5' : '')
                     "
                     [attr.href]="'#' + item.id"
@@ -304,11 +372,28 @@ hljs.registerLanguage('typescript', typescript);
       </div>
 
       <section *ngIf="post()" class="grid gap-2 no-print">
-        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.shareTitle' | translate }}</p>
+        <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'blog.post.shareTitle' | translate }}
+        </p>
         <div class="flex flex-wrap gap-2">
-          <app-button size="sm" variant="ghost" [label]="'blog.post.shareCopy' | translate" (action)="copyShareLink()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'blog.post.shareWhatsApp' | translate" (action)="shareWhatsApp()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'blog.post.shareFacebook' | translate" (action)="shareFacebook()"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'blog.post.shareCopy' | translate"
+            (action)="copyShareLink()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'blog.post.shareWhatsApp' | translate"
+            (action)="shareWhatsApp()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'blog.post.shareFacebook' | translate"
+            (action)="shareFacebook()"
+          ></app-button>
         </div>
       </section>
 
@@ -319,10 +404,14 @@ hljs.registerLanguage('typescript', typescript);
             [routerLink]="['/blog', prev.slug]"
             class="group block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
           >
-            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <p
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               ← {{ 'blog.post.previousPost' | translate }}
             </p>
-            <p class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+            <p
+              class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300"
+            >
               {{ prev.title }}
             </p>
           </a>
@@ -331,10 +420,14 @@ hljs.registerLanguage('typescript', typescript);
             [routerLink]="['/blog', next.slug]"
             class="group block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700 dark:shadow-none"
           >
-            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 text-right">
+            <p
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 text-right"
+            >
               {{ 'blog.post.nextPost' | translate }} →
             </p>
-            <p class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300 text-right">
+            <p
+              class="pt-1 text-base font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300 text-right"
+            >
               {{ next.title }}
             </p>
           </a>
@@ -342,10 +435,18 @@ hljs.registerLanguage('typescript', typescript);
       </section>
 
       <section *ngIf="relatedPosts().length" class="grid gap-3 no-print">
-        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.post.relatedTitle' | translate }}</h2>
+        <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'blog.post.relatedTitle' | translate }}
+        </h2>
         <div class="grid gap-4 sm:grid-cols-2">
-          <a *ngFor="let related of relatedPosts()" [routerLink]="['/blog', related.slug]" class="group block">
-            <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
+          <a
+            *ngFor="let related of relatedPosts()"
+            [routerLink]="['/blog', related.slug]"
+            class="group block"
+          >
+            <div
+              class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5"
+            >
               <app-card class="h-full">
                 <div class="grid gap-3">
                   <div
@@ -357,19 +458,29 @@ hljs.registerLanguage('typescript', typescript);
                       [alt]="related.title"
                       class="w-full aspect-[16/9]"
                       [ngClass]="coverImageClass(related.cover_fit)"
-                      [style.object-position]="focalPosition(related.cover_focal_x, related.cover_focal_y)"
+                      [style.object-position]="
+                        focalPosition(related.cover_focal_x, related.cover_focal_y)
+                      "
                       loading="lazy"
                       decoding="async"
                     />
                   </div>
                   <div class="grid gap-1">
-                    <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="related.published_at">
+                    <p
+                      class="text-sm text-slate-500 dark:text-slate-400"
+                      *ngIf="related.published_at"
+                    >
                       {{ related.published_at | date: 'mediumDate' }}
                       <ng-container *ngIf="related.reading_time_minutes">
-                        · {{ 'blog.minutesRead' | translate : { minutes: related.reading_time_minutes } }}
+                        ·
+                        {{
+                          'blog.minutesRead' | translate: { minutes: related.reading_time_minutes }
+                        }}
                       </ng-container>
                     </p>
-                    <h3 class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+                    <h3
+                      class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300"
+                    >
                       {{ related.title }}
                     </h3>
                     <p class="text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
@@ -404,13 +515,18 @@ hljs.registerLanguage('typescript', typescript);
             </ng-template>
 
             <div class="grid gap-1 flex-1">
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <p
+                class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+              >
                 {{ 'blog.post.author.title' | translate }}
               </p>
               <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {{ authorDisplayName() }}
               </p>
-              <p *ngIf="authorBio()" class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line">
+              <p
+                *ngIf="authorBio()"
+                class="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-line"
+              >
                 {{ authorBio() }}
               </p>
               <div *ngIf="authorLinks().length" class="flex flex-wrap gap-3 pt-1 text-sm">
@@ -435,7 +551,7 @@ hljs.registerLanguage('typescript', typescript);
 
         <div *ngIf="!loadingMoreFromAuthor() && moreFromAuthor().length" class="grid gap-2">
           <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            {{ 'blog.post.author.moreFrom' | translate : { author: authorDisplayName() } }}
+            {{ 'blog.post.author.moreFrom' | translate: { author: authorDisplayName() } }}
           </p>
           <div class="grid gap-3 sm:grid-cols-2">
             <a
@@ -446,10 +562,12 @@ hljs.registerLanguage('typescript', typescript);
               <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="item.published_at">
                 {{ item.published_at | date: 'mediumDate' }}
                 <ng-container *ngIf="item.reading_time_minutes">
-                  · {{ 'blog.minutesRead' | translate : { minutes: item.reading_time_minutes } }}
+                  · {{ 'blog.minutesRead' | translate: { minutes: item.reading_time_minutes } }}
                 </ng-container>
               </p>
-              <p class="pt-1 text-base font-semibold text-slate-900 hover:text-indigo-600 dark:text-slate-50 dark:hover:text-indigo-300">
+              <p
+                class="pt-1 text-base font-semibold text-slate-900 hover:text-indigo-600 dark:text-slate-50 dark:hover:text-indigo-300"
+              >
                 {{ item.title }}
               </p>
             </a>
@@ -461,14 +579,23 @@ hljs.registerLanguage('typescript', typescript);
         <app-card>
           <form class="grid gap-3" (submit)="submitNewsletter($event)">
             <div class="grid gap-1">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.newsletter.title' | translate }}</p>
-              <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.newsletter.copy' | translate }}</p>
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'blog.newsletter.title' | translate }}
+              </p>
+              <p class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'blog.newsletter.copy' | translate }}
+              </p>
             </div>
 
-            <div *ngIf="newsletterSubscribed()" class="text-sm text-emerald-700 dark:text-emerald-300">
+            <div
+              *ngIf="newsletterSubscribed()"
+              class="text-sm text-emerald-700 dark:text-emerald-300"
+            >
               {{
-                (newsletterAlreadySubscribed() ? 'blog.newsletter.alreadyCopy' : 'blog.newsletter.successCopy')
-                  | translate
+                (newsletterAlreadySubscribed()
+                  ? 'blog.newsletter.alreadyCopy'
+                  : 'blog.newsletter.successCopy'
+                ) | translate
               }}
             </div>
 
@@ -489,7 +616,11 @@ hljs.registerLanguage('typescript', typescript);
                 size="sm"
                 type="submit"
                 [label]="'blog.newsletter.subscribe' | translate"
-                [disabled]="newsletterLoading() || !newsletterEmail.trim() || (captchaEnabled && !newsletterCaptchaToken)"
+                [disabled]="
+                  newsletterLoading() ||
+                  !newsletterEmail.trim() ||
+                  (captchaEnabled && !newsletterCaptchaToken)
+                "
               ></app-button>
             </div>
 
@@ -506,21 +637,24 @@ hljs.registerLanguage('typescript', typescript);
       <section class="grid gap-3 no-print">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
-            {{ 'blog.comments.title' | translate : { count: commentsTotal() } }}
+            {{ 'blog.comments.title' | translate: { count: commentsTotal() } }}
           </h2>
-	          <div class="flex flex-wrap items-center justify-end gap-2">
-              <label *ngIf="auth.isAuthenticated()" class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  [checked]="commentSubscribed()"
-                  [disabled]="commentSubscriptionLoading() || !canSubscribeToComments()"
-                  (change)="toggleCommentSubscription($event)"
-                />
-                <span>{{ 'blog.comments.follow' | translate }}</span>
-              </label>
-	            <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-	              <span class="font-medium">{{ 'blog.comments.sortLabel' | translate }}</span>
-	              <select
+          <div class="flex flex-wrap items-center justify-end gap-2">
+            <label
+              *ngIf="auth.isAuthenticated()"
+              class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
+            >
+              <input
+                type="checkbox"
+                [checked]="commentSubscribed()"
+                [disabled]="commentSubscriptionLoading() || !canSubscribeToComments()"
+                (change)="toggleCommentSubscription($event)"
+              />
+              <span>{{ 'blog.comments.follow' | translate }}</span>
+            </label>
+            <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <span class="font-medium">{{ 'blog.comments.sortLabel' | translate }}</span>
+              <select
                 class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 [disabled]="loadingComments()"
                 [ngModel]="commentSort()"
@@ -546,7 +680,9 @@ hljs.registerLanguage('typescript', typescript);
           *ngIf="commentsMeta() as meta"
           class="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300 sm:flex-row sm:items-center sm:justify-between"
         >
-          <span>{{ 'blog.comments.pageMeta' | translate : { page: meta.page, totalPages: meta.total_pages } }}</span>
+          <span>{{
+            'blog.comments.pageMeta' | translate: { page: meta.page, totalPages: meta.total_pages }
+          }}</span>
           <div class="flex items-center justify-center gap-2">
             <app-button
               size="sm"
@@ -573,8 +709,12 @@ hljs.registerLanguage('typescript', typescript);
           *ngIf="!loadingComments() && hasCommentsError()"
           class="border border-amber-200 bg-amber-50 rounded-2xl p-4 text-center grid gap-1 dark:border-amber-900/40 dark:bg-amber-950/30"
         >
-          <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'blog.comments.errorTitle' | translate }}</p>
-          <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'blog.comments.errorCopy' | translate }}</p>
+          <p class="font-semibold text-amber-900 dark:text-amber-100">
+            {{ 'blog.comments.errorTitle' | translate }}
+          </p>
+          <p class="text-sm text-amber-800 dark:text-amber-200">
+            {{ 'blog.comments.errorCopy' | translate }}
+          </p>
         </div>
 
         <div
@@ -585,14 +725,27 @@ hljs.registerLanguage('typescript', typescript);
         </div>
 
         <div
-          *ngIf="!loadingComments() && !hasCommentsError() && commentsTotal() > 0 && comments().length === 0"
+          *ngIf="
+            !loadingComments() &&
+            !hasCommentsError() &&
+            commentsTotal() > 0 &&
+            comments().length === 0
+          "
           class="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-600 dark:border-slate-800 dark:text-slate-300 grid gap-2"
         >
           <p>{{ 'blog.comments.emptyPage' | translate }}</p>
-          <app-button size="sm" variant="ghost" [label]="'blog.comments.goToFirstPage' | translate" (action)="goToCommentsPage(1)"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'blog.comments.goToFirstPage' | translate"
+            (action)="goToCommentsPage(1)"
+          ></app-button>
         </div>
 
-        <div *ngIf="!loadingComments() && !hasCommentsError() && comments().length" class="grid gap-3">
+        <div
+          *ngIf="!loadingComments() && !hasCommentsError() && comments().length"
+          class="grid gap-3"
+        >
           <ng-container *ngFor="let comment of rootComments()">
             <app-card>
               <div class="grid gap-2">
@@ -635,7 +788,11 @@ hljs.registerLanguage('typescript', typescript);
 
                 <div
                   class="text-sm leading-relaxed whitespace-pre-line"
-                  [ngClass]="comment.is_deleted || comment.is_hidden ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
+                  [ngClass]="
+                    comment.is_deleted || comment.is_hidden
+                      ? 'text-slate-500 dark:text-slate-400 italic'
+                      : 'text-slate-700 dark:text-slate-200'
+                  "
                 >
                   {{
                     comment.is_deleted
@@ -646,7 +803,10 @@ hljs.registerLanguage('typescript', typescript);
                   }}
                 </div>
 
-                <div *ngIf="replies(comment.id).length" class="grid gap-2 border-l border-slate-200 pl-4 dark:border-slate-700">
+                <div
+                  *ngIf="replies(comment.id).length"
+                  class="grid gap-2 border-l border-slate-200 pl-4 dark:border-slate-700"
+                >
                   <div *ngFor="let reply of replies(comment.id)" class="grid gap-1">
                     <div class="flex items-start justify-between gap-2">
                       <div>
@@ -678,7 +838,11 @@ hljs.registerLanguage('typescript', typescript);
                     </div>
                     <div
                       class="text-sm leading-relaxed whitespace-pre-line"
-                      [ngClass]="reply.is_deleted || reply.is_hidden ? 'text-slate-500 dark:text-slate-400 italic' : 'text-slate-700 dark:text-slate-200'"
+                      [ngClass]="
+                        reply.is_deleted || reply.is_hidden
+                          ? 'text-slate-500 dark:text-slate-400 italic'
+                          : 'text-slate-700 dark:text-slate-200'
+                      "
                     >
                       {{
                         reply.is_deleted
@@ -698,16 +862,27 @@ hljs.registerLanguage('typescript', typescript);
         <app-card>
           <div *ngIf="!auth.isAuthenticated()" class="text-sm text-slate-700 dark:text-slate-200">
             {{ 'blog.comments.signInPrompt' | translate }}
-            <a routerLink="/login" class="text-indigo-600 dark:text-indigo-300 hover:underline">{{ 'nav.signIn' | translate }}</a
+            <a routerLink="/login" class="text-indigo-600 dark:text-indigo-300 hover:underline">{{
+              'nav.signIn' | translate
+            }}</a
             >.
           </div>
 
           <form *ngIf="auth.isAuthenticated()" class="grid gap-3" (submit)="submitComment($event)">
-            <div *ngIf="replyTo()" class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200">
+            <div
+              *ngIf="replyTo()"
+              class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
+            >
               <span>
-                {{ 'blog.comments.replyingTo' | translate : { name: authorLabel(replyTo()!.author) } }}
+                {{
+                  'blog.comments.replyingTo' | translate: { name: authorLabel(replyTo()!.author) }
+                }}
               </span>
-              <button type="button" class="text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white" (click)="cancelReply()">
+              <button
+                type="button"
+                class="text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                (click)="cancelReply()"
+              >
                 {{ 'blog.comments.cancelReply' | translate }}
               </button>
             </div>
@@ -727,18 +902,22 @@ hljs.registerLanguage('typescript', typescript);
               <app-button
                 size="sm"
                 [label]="'blog.comments.submit' | translate"
-                [disabled]="submitting() || !commentBody.trim() || (captchaEnabled && !commentCaptchaToken)"
+                [disabled]="
+                  submitting() || !commentBody.trim() || (captchaEnabled && !commentCaptchaToken)
+                "
                 (action)="submitComment()"
               ></app-button>
-              <span *ngIf="submitting()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'blog.comments.submitting' | translate }}</span>
+              <span *ngIf="submitting()" class="text-xs text-slate-500 dark:text-slate-400">{{
+                'blog.comments.submitting' | translate
+              }}</span>
             </div>
 
-	            <app-captcha-turnstile
-                #commentCaptcha
-	              *ngIf="captchaEnabled"
-	              [siteKey]="captchaSiteKey"
-	              (tokenChange)="commentCaptchaToken = $event"
-	            ></app-captcha-turnstile>
+            <app-captcha-turnstile
+              #commentCaptcha
+              *ngIf="captchaEnabled"
+              [siteKey]="captchaSiteKey"
+              (tokenChange)="commentCaptchaToken = $event"
+            ></app-captcha-turnstile>
           </form>
         </app-card>
       </section>
@@ -769,13 +948,18 @@ hljs.registerLanguage('typescript', typescript);
         />
 
         <div class="pt-3 grid gap-2 text-center">
-          <p *ngIf="lightboxImage()?.alt" class="text-sm text-white/80">{{ lightboxImage()!.alt }}</p>
+          <p *ngIf="lightboxImage()?.alt" class="text-sm text-white/80">
+            {{ lightboxImage()!.alt }}
+          </p>
           <p *ngIf="galleryImages().length > 1" class="text-xs text-white/60">
             {{ (lightboxIndex() ?? 0) + 1 }} / {{ galleryImages().length }}
           </p>
         </div>
 
-        <div *ngIf="galleryImages().length > 1" class="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-2">
+        <div
+          *ngIf="galleryImages().length > 1"
+          class="absolute inset-y-0 left-0 right-0 flex items-center justify-between px-2"
+        >
           <button
             type="button"
             class="h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/55"
@@ -805,13 +989,13 @@ hljs.registerLanguage('typescript', typescript);
     >
       ↑
     </button>
-  `
+  `,
 })
 export class BlogPostComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.blog', url: '/blog' },
-    { label: 'blog.post.breadcrumb' }
+    { label: 'blog.post.breadcrumb' },
   ];
 
   post = signal<BlogPost | null>(null);
@@ -821,7 +1005,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   fallbackIntro = signal<string>('');
   toc = signal<Array<{ id: string; title: string; level: 2 | 3 }>>([]);
   activeHeadingId = signal<string | null>(null);
-  neighbors = signal<{ previous: BlogPostListItem | null; next: BlogPostListItem | null }>({ previous: null, next: null });
+  neighbors = signal<{ previous: BlogPostListItem | null; next: BlogPostListItem | null }>({
+    previous: null,
+    next: null,
+  });
   relatedPosts = signal<BlogPostListItem[]>([]);
   moreFromAuthor = signal<BlogPostListItem[]>([]);
   loadingMoreFromAuthor = signal<boolean>(false);
@@ -895,7 +1082,8 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const bio = author?.bio;
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     if (typeof bio === 'string') return bio.trim();
-    if (bio && typeof bio === 'object' && typeof bio[lang] === 'string') return String(bio[lang]).trim();
+    if (bio && typeof bio === 'object' && typeof bio[lang] === 'string')
+      return String(bio[lang]).trim();
     return '';
   });
   authorLinks = computed(() => {
@@ -907,7 +1095,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     return links
       .map((row: any) => ({
         label: typeof row?.label === 'string' ? row.label.trim() : '',
-        url: typeof row?.url === 'string' ? row.url.trim() : ''
+        url: typeof row?.url === 'string' ? row.url.trim() : '',
       }))
       .filter((row) => row.label && row.url);
   });
@@ -962,7 +1150,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     private readonly markdown: MarkdownService,
     private readonly catalog: CatalogService,
     public auth: AuthService,
-    private readonly seoCopyFallback: SeoCopyFallbackService
+    private readonly seoCopyFallback: SeoCopyFallbackService,
   ) {}
 
   ngOnInit(): void {
@@ -972,12 +1160,14 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     this.isPreview.set(!!this.previewToken);
     this.load();
 
-    this.routeSub = combineLatest([this.route.params, this.route.queryParams]).subscribe(([params, query]) => {
-      this.slug = params['slug'];
-      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
-      this.isPreview.set(!!this.previewToken);
-      this.load();
-    });
+    this.routeSub = combineLatest([this.route.params, this.route.queryParams]).subscribe(
+      ([params, query]) => {
+        this.slug = params['slug'];
+        this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
+        this.isPreview.set(!!this.previewToken);
+        this.load();
+      },
+    );
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
 
     const w = this.document?.defaultView;
@@ -1074,7 +1264,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.crumbs = [
           { label: 'nav.home', url: '/' },
           { label: 'nav.blog', url: '/blog' },
-          { label: post.title }
+          { label: post.title },
         ];
         this.setMetaTags(post);
         this.measureReadingProgressSoon();
@@ -1109,7 +1299,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.commentSubscribed.set(false);
         this.commentSubscriptionLoading.set(false);
         this.hydrateQuickEditFromState();
-      }
+      },
     });
   }
 
@@ -1124,7 +1314,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   coverImageClass(fit: string | null | undefined): string {
-    return fit === 'contain' ? 'object-contain bg-slate-50 dark:bg-slate-900' : 'object-cover bg-slate-50 dark:bg-slate-800';
+    return fit === 'contain'
+      ? 'object-contain bg-slate-50 dark:bg-slate-900'
+      : 'object-cover bg-slate-50 dark:bg-slate-800';
   }
 
   activeLang(): 'en' | 'ro' {
@@ -1170,7 +1362,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const desiredPublishLocal = (this.quickEditPublishAt || '').trim();
     if (desiredPublishLocal && desiredPublishLocal !== currentPublishLocal) {
       payload.published_at = this.toIsoFromDateTimeLocal(desiredPublishLocal);
-    } else if (!desiredPublishLocal && currentPublishLocal && this.isFutureIso(block.published_at)) {
+    } else if (
+      !desiredPublishLocal &&
+      currentPublishLocal &&
+      this.isFutureIso(block.published_at)
+    ) {
       // Treat clearing a scheduled publish time as “publish now”.
       payload.published_at = null;
     }
@@ -1178,7 +1374,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const currentUnpublishLocal = this.toDateTimeLocal(block.published_until);
     const desiredUnpublishLocal = (this.quickEditUnpublishAt || '').trim();
     if (desiredUnpublishLocal !== currentUnpublishLocal) {
-      payload.published_until = desiredUnpublishLocal ? this.toIsoFromDateTimeLocal(desiredUnpublishLocal) : null;
+      payload.published_until = desiredUnpublishLocal
+        ? this.toIsoFromDateTimeLocal(desiredUnpublishLocal)
+        : null;
     }
 
     let metaChanged = false;
@@ -1195,7 +1393,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       const existing = meta['summary'];
       if (desiredSummary) {
         if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
-          meta['summary'] = { ...(existing as Record<string, unknown>), [desiredLang]: desiredSummary };
+          meta['summary'] = {
+            ...(existing as Record<string, unknown>),
+            [desiredLang]: desiredSummary,
+          };
         } else {
           meta['summary'] = { [desiredLang]: desiredSummary };
         }
@@ -1249,21 +1450,27 @@ export class BlogPostComponent implements OnInit, OnDestroy {
           this.crumbs = [
             { label: 'nav.home', url: '/' },
             { label: 'nav.blog', url: '/blog' },
-            { label: nextPost.title }
+            { label: nextPost.title },
           ];
           this.setMetaTags(nextPost);
         }
 
         this.quickEditSaving.set(false);
-        this.toast.success(this.translate.instant('blog.admin.savedTitle'), this.translate.instant('blog.admin.savedCopy'));
+        this.toast.success(
+          this.translate.instant('blog.admin.savedTitle'),
+          this.translate.instant('blog.admin.savedCopy'),
+        );
       },
       error: (err) => {
         this.quickEditSaving.set(false);
         const detail = err?.error?.detail;
-        const msg = typeof detail === 'string' && detail.trim() ? detail.trim() : this.translate.instant('blog.admin.saveErrorCopy');
+        const msg =
+          typeof detail === 'string' && detail.trim()
+            ? detail.trim()
+            : this.translate.instant('blog.admin.saveErrorCopy');
         this.quickEditError.set(msg);
         this.toast.error(this.translate.instant('blog.admin.saveErrorTitle'), msg);
-      }
+      },
     });
   }
 
@@ -1289,7 +1496,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.adminBlockLoading.set(false);
         this.adminBlockError.set(true);
         this.adminBlock.set(null);
-      }
+      },
     });
   }
 
@@ -1346,7 +1553,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
   private normalizeTags(raw: unknown): string[] {
     if (raw === null || raw === undefined) return [];
-    const values = Array.isArray(raw) ? raw.map((v) => String(v)) : typeof raw === 'string' ? raw.split(',') : [];
+    const values = Array.isArray(raw)
+      ? raw.map((v) => String(v))
+      : typeof raw === 'string'
+        ? raw.split(',')
+        : [];
     const seen = new Set<string>();
     const out: string[] = [];
     for (const item of values) {
@@ -1365,8 +1576,24 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   }
 
   private sameStringSet(a: string[], b: string[]): boolean {
-    const aSet = new Set(a.map((v) => String(v || '').trim().toLowerCase()).filter(Boolean));
-    const bSet = new Set(b.map((v) => String(v || '').trim().toLowerCase()).filter(Boolean));
+    const aSet = new Set(
+      a
+        .map((v) =>
+          String(v || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
+    );
+    const bSet = new Set(
+      b
+        .map((v) =>
+          String(v || '')
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
+    );
     if (aSet.size !== bSet.size) return false;
     for (const value of aSet) {
       if (!bSet.has(value)) return false;
@@ -1393,7 +1620,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.neighbors.set({ previous: null, next: null });
-      }
+      },
     });
   }
 
@@ -1409,7 +1636,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         lang,
         page: 1,
         limit: 50,
-        sort: 'newest'
+        sort: 'newest',
       })
       .subscribe({
         next: (resp) => {
@@ -1420,7 +1647,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
               if (series && item.series?.toLowerCase() === series) {
                 score += 10;
               }
-              const sharedTags = (item.tags || []).reduce((acc, t) => acc + (tagSet.has(t.toLowerCase()) ? 1 : 0), 0);
+              const sharedTags = (item.tags || []).reduce(
+                (acc, t) => acc + (tagSet.has(t.toLowerCase()) ? 1 : 0),
+                0,
+              );
               score += sharedTags;
               return { item, score };
             })
@@ -1437,7 +1667,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.relatedPosts.set([]);
-        }
+        },
       });
   }
 
@@ -1455,7 +1685,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         page: 1,
         limit: 8,
         sort: 'newest',
-        author_id: authorId
+        author_id: authorId,
       })
       .subscribe({
         next: (resp) => {
@@ -1466,7 +1696,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         error: () => {
           this.moreFromAuthor.set([]);
           this.loadingMoreFromAuthor.set(false);
-        }
+        },
       });
   }
 
@@ -1485,7 +1715,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const offset = 112;
     const top = target.getBoundingClientRect().top + (w.scrollY || 0) - offset;
     w.scrollTo({ top, behavior: 'smooth' });
-    w.history.replaceState(null, '', `${w.location.pathname}${w.location.search}#${encodeURIComponent(id)}`);
+    w.history.replaceState(
+      null,
+      '',
+      `${w.location.pathname}${w.location.search}#${encodeURIComponent(id)}`,
+    );
     this.activeHeadingId.set(id);
   }
 
@@ -1494,7 +1728,15 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const link = target?.closest('a[data-router-link]') as HTMLAnchorElement | null;
     if (link) {
       const to = link.getAttribute('data-router-link') || '';
-      if (to && !event.defaultPrevented && event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
+      if (
+        to &&
+        !event.defaultPrevented &&
+        event.button === 0 &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey
+      ) {
         event.preventDefault();
         event.stopPropagation();
         void this.router.navigateByUrl(to);
@@ -1512,8 +1754,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         if (value) this.copyCode(value);
       } else if (action === 'wrap') {
         const wrap = wrapper.classList.toggle('blog-codeblock--wrap');
-        const wrapLabel = codeButton.getAttribute('data-wrap-label') || this.translate.instant('blog.post.code.wrap');
-        const unwrapLabel = codeButton.getAttribute('data-unwrap-label') || this.translate.instant('blog.post.code.unwrap');
+        const wrapLabel =
+          codeButton.getAttribute('data-wrap-label') ||
+          this.translate.instant('blog.post.code.wrap');
+        const unwrapLabel =
+          codeButton.getAttribute('data-unwrap-label') ||
+          this.translate.instant('blog.post.code.unwrap');
         codeButton.textContent = wrap ? unwrapLabel : wrapLabel;
       }
       event.preventDefault();
@@ -1660,14 +1906,19 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!w) return;
     const url = this.buildShareUrl();
     if (!url) return;
-    w.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer');
+    w.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
   }
 
   loadComments(opts: { page?: number; sort?: BlogCommentSort } = {}): void {
     if (!this.slug) return;
 
     const nextSort = opts.sort ?? this.commentSort();
-    const sort = nextSort === 'oldest' || nextSort === 'top' || nextSort === 'newest' ? nextSort : 'newest';
+    const sort =
+      nextSort === 'oldest' || nextSort === 'top' || nextSort === 'newest' ? nextSort : 'newest';
     const nextPage = opts.page ?? this.commentPage();
     const page = Math.max(1, Math.floor(nextPage));
 
@@ -1676,27 +1927,29 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
     this.loadingComments.set(true);
     this.hasCommentsError.set(false);
-    this.blog.listCommentThreads(this.slug, { page, limit: this.commentThreadsLimit, sort }).subscribe({
-      next: (resp) => {
-        const flattened: BlogComment[] = [];
-        for (const thread of resp.items || []) {
-          if (thread?.root) flattened.push(thread.root);
-          if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
-        }
-        this.comments.set(flattened);
-        this.commentsMeta.set(resp.meta ?? null);
-        this.commentsTotal.set(Number(resp.total_comments ?? 0));
-        this.loadingComments.set(false);
-        this.hasCommentsError.set(false);
-      },
-      error: () => {
-        this.comments.set([]);
-        this.commentsMeta.set(null);
-        this.commentsTotal.set(0);
-        this.loadingComments.set(false);
-        this.hasCommentsError.set(true);
-      }
-    });
+    this.blog
+      .listCommentThreads(this.slug, { page, limit: this.commentThreadsLimit, sort })
+      .subscribe({
+        next: (resp) => {
+          const flattened: BlogComment[] = [];
+          for (const thread of resp.items || []) {
+            if (thread?.root) flattened.push(thread.root);
+            if (Array.isArray(thread?.replies)) flattened.push(...thread.replies);
+          }
+          this.comments.set(flattened);
+          this.commentsMeta.set(resp.meta ?? null);
+          this.commentsTotal.set(Number(resp.total_comments ?? 0));
+          this.loadingComments.set(false);
+          this.hasCommentsError.set(false);
+        },
+        error: () => {
+          this.comments.set([]);
+          this.commentsMeta.set(null);
+          this.commentsTotal.set(0);
+          this.loadingComments.set(false);
+          this.hasCommentsError.set(true);
+        },
+      });
   }
 
   loadCommentSubscription(): void {
@@ -1714,7 +1967,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       error: () => {
         this.commentSubscribed.set(false);
         this.commentSubscriptionLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1729,7 +1982,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!this.slug) return;
     if (!this.auth.isAuthenticated()) return;
     if (!this.canSubscribeToComments()) {
-      this.toast.error(this.translate.instant('blog.comments.followVerifyTitle'), this.translate.instant('blog.comments.followVerifyCopy'));
+      this.toast.error(
+        this.translate.instant('blog.comments.followVerifyTitle'),
+        this.translate.instant('blog.comments.followVerifyCopy'),
+      );
       if (target) target.checked = this.commentSubscribed();
       return;
     }
@@ -1741,15 +1997,23 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         const enabled = Boolean(resp?.enabled);
         this.commentSubscribed.set(enabled);
         this.commentSubscriptionLoading.set(false);
-        const toastKey = enabled ? 'blog.comments.followEnabledCopy' : 'blog.comments.followDisabledCopy';
-        this.toast.success(this.translate.instant('blog.comments.followTitle'), this.translate.instant(toastKey));
+        const toastKey = enabled
+          ? 'blog.comments.followEnabledCopy'
+          : 'blog.comments.followDisabledCopy';
+        this.toast.success(
+          this.translate.instant('blog.comments.followTitle'),
+          this.translate.instant(toastKey),
+        );
       },
       error: () => {
         this.commentSubscribed.set(previous);
         this.commentSubscriptionLoading.set(false);
         if (target) target.checked = previous;
-        this.toast.error(this.translate.instant('blog.comments.followErrorTitle'), this.translate.instant('blog.comments.followErrorCopy'));
-      }
+        this.toast.error(
+          this.translate.instant('blog.comments.followErrorTitle'),
+          this.translate.instant('blog.comments.followErrorCopy'),
+        );
+      },
     });
   }
 
@@ -1809,64 +2073,81 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const body = this.commentBody.trim();
     if (!body) return;
     if (this.captchaEnabled && !this.commentCaptchaToken) {
-      this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('auth.captchaRequired'));
+      this.toast.error(
+        this.translate.instant('blog.comments.createErrorTitle'),
+        this.translate.instant('auth.captchaRequired'),
+      );
       return;
     }
 
     this.submitting.set(true);
     const parent = this.replyTo();
-    this.blog.createComment(this.slug, { body, parent_id: parent?.id ?? null, captcha_token: this.commentCaptchaToken }).subscribe({
-      next: () => {
-        this.commentBody = '';
-        this.replyTo.set(null);
-        this.submitting.set(false);
-        if (!parent) {
-          if (this.commentSort() === 'oldest') {
-            const meta = this.commentsMeta();
-            const totalThreads = meta?.total_items ?? 0;
-            const limit = meta?.limit ?? this.commentThreadsLimit;
-            const lastPage = Math.max(1, Math.ceil((totalThreads + 1) / limit));
-            this.commentPage.set(lastPage);
-          } else if (this.commentSort() === 'top') {
-            this.commentSort.set('newest');
-            this.commentPage.set(1);
-          } else {
-            this.commentPage.set(1);
+    this.blog
+      .createComment(this.slug, {
+        body,
+        parent_id: parent?.id ?? null,
+        captcha_token: this.commentCaptchaToken,
+      })
+      .subscribe({
+        next: () => {
+          this.commentBody = '';
+          this.replyTo.set(null);
+          this.submitting.set(false);
+          if (!parent) {
+            if (this.commentSort() === 'oldest') {
+              const meta = this.commentsMeta();
+              const totalThreads = meta?.total_items ?? 0;
+              const limit = meta?.limit ?? this.commentThreadsLimit;
+              const lastPage = Math.max(1, Math.ceil((totalThreads + 1) / limit));
+              this.commentPage.set(lastPage);
+            } else if (this.commentSort() === 'top') {
+              this.commentSort.set('newest');
+              this.commentPage.set(1);
+            } else {
+              this.commentPage.set(1);
+            }
           }
-        }
-        this.commentCaptchaToken = null;
-        this.commentCaptcha?.reset();
-        this.loadComments();
-      },
-      error: (err) => {
-        this.submitting.set(false);
-        this.commentCaptchaToken = null;
-        this.commentCaptcha?.reset();
-        const statusCode = typeof (err)?.status === 'number' ? (err).status : 0;
-        const detail = (err)?.error?.detail;
-        if (statusCode === 429) {
-          this.toast.error(this.translate.instant('blog.comments.rateLimitedTitle'), this.translate.instant('blog.comments.rateLimitedCopy'));
-          return;
-        }
-        if (statusCode === 400 && typeof detail === 'string') {
-          if (detail.toLowerCase().includes('link')) {
-            this.toast.error(this.translate.instant('blog.comments.linkLimitTitle'), this.translate.instant('blog.comments.linkLimitCopy'));
+          this.commentCaptchaToken = null;
+          this.commentCaptcha?.reset();
+          this.loadComments();
+        },
+        error: (err) => {
+          this.submitting.set(false);
+          this.commentCaptchaToken = null;
+          this.commentCaptcha?.reset();
+          const statusCode = typeof err?.status === 'number' ? err.status : 0;
+          const detail = err?.error?.detail;
+          if (statusCode === 429) {
+            this.toast.error(
+              this.translate.instant('blog.comments.rateLimitedTitle'),
+              this.translate.instant('blog.comments.rateLimitedCopy'),
+            );
             return;
           }
-          if (detail.toLowerCase().includes('captcha')) {
-            const copy =
-              detail.toLowerCase().includes('required')
+          if (statusCode === 400 && typeof detail === 'string') {
+            if (detail.toLowerCase().includes('link')) {
+              this.toast.error(
+                this.translate.instant('blog.comments.linkLimitTitle'),
+                this.translate.instant('blog.comments.linkLimitCopy'),
+              );
+              return;
+            }
+            if (detail.toLowerCase().includes('captcha')) {
+              const copy = detail.toLowerCase().includes('required')
                 ? this.translate.instant('auth.captchaRequired')
                 : this.translate.instant('auth.captchaFailedTryAgain');
-            this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
+              this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), copy);
+              return;
+            }
+            this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
             return;
           }
-          this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), detail);
-          return;
-        }
-        this.toast.error(this.translate.instant('blog.comments.createErrorTitle'), this.translate.instant('blog.comments.createErrorCopy'));
-      }
-    });
+          this.toast.error(
+            this.translate.instant('blog.comments.createErrorTitle'),
+            this.translate.instant('blog.comments.createErrorCopy'),
+          );
+        },
+      });
   }
 
   submitNewsletter(event?: Event): void {
@@ -1874,30 +2155,41 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const email = this.newsletterEmail.trim();
     if (!email) return;
     if (this.captchaEnabled && !this.newsletterCaptchaToken) {
-      this.toast.error(this.translate.instant('blog.newsletter.errorTitle'), this.translate.instant('auth.captchaRequired'));
+      this.toast.error(
+        this.translate.instant('blog.newsletter.errorTitle'),
+        this.translate.instant('auth.captchaRequired'),
+      );
       return;
     }
     this.newsletterLoading.set(true);
     this.newsletterSubscribed.set(false);
     this.newsletterAlreadySubscribed.set(false);
-    this.newsletter.subscribe(email, { source: 'blog', captcha_token: this.newsletterCaptchaToken }).subscribe({
-      next: (resp) => {
-        const already = Boolean(resp?.already_subscribed);
-        this.newsletterSubscribed.set(true);
-        this.newsletterAlreadySubscribed.set(already);
-        this.newsletterLoading.set(false);
-        this.newsletterCaptchaToken = null;
-        this.newsletterCaptcha?.reset();
-        const copyKey = already ? 'blog.newsletter.alreadyCopy' : 'blog.newsletter.successCopy';
-        this.toast.success(this.translate.instant('blog.newsletter.title'), this.translate.instant(copyKey));
-      },
-      error: () => {
-        this.newsletterLoading.set(false);
-        this.newsletterCaptchaToken = null;
-        this.newsletterCaptcha?.reset();
-        this.toast.error(this.translate.instant('blog.newsletter.errorTitle'), this.translate.instant('blog.newsletter.errorCopy'));
-      }
-    });
+    this.newsletter
+      .subscribe(email, { source: 'blog', captcha_token: this.newsletterCaptchaToken })
+      .subscribe({
+        next: (resp) => {
+          const already = Boolean(resp?.already_subscribed);
+          this.newsletterSubscribed.set(true);
+          this.newsletterAlreadySubscribed.set(already);
+          this.newsletterLoading.set(false);
+          this.newsletterCaptchaToken = null;
+          this.newsletterCaptcha?.reset();
+          const copyKey = already ? 'blog.newsletter.alreadyCopy' : 'blog.newsletter.successCopy';
+          this.toast.success(
+            this.translate.instant('blog.newsletter.title'),
+            this.translate.instant(copyKey),
+          );
+        },
+        error: () => {
+          this.newsletterLoading.set(false);
+          this.newsletterCaptchaToken = null;
+          this.newsletterCaptcha?.reset();
+          this.toast.error(
+            this.translate.instant('blog.newsletter.errorTitle'),
+            this.translate.instant('blog.newsletter.errorCopy'),
+          );
+        },
+      });
   }
 
   deleteComment(comment: BlogComment): void {
@@ -1909,8 +2201,11 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         this.loadComments();
       },
       error: () => {
-        this.toast.error(this.translate.instant('blog.comments.deleteErrorTitle'), this.translate.instant('blog.comments.deleteErrorCopy'));
-      }
+        this.toast.error(
+          this.translate.instant('blog.comments.deleteErrorTitle'),
+          this.translate.instant('blog.comments.deleteErrorCopy'),
+        );
+      },
     });
   }
 
@@ -1927,11 +2222,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const reason = prompt(this.translate.instant('blog.comments.reportPrompt')) || '';
     this.blog.flagComment(comment.id, { reason: reason.trim() || null }).subscribe({
       next: () => {
-        this.toast.success(this.translate.instant('blog.comments.reportedTitle'), this.translate.instant('blog.comments.reportedCopy'));
+        this.toast.success(
+          this.translate.instant('blog.comments.reportedTitle'),
+          this.translate.instant('blog.comments.reportedCopy'),
+        );
       },
       error: () => {
-        this.toast.error(this.translate.instant('blog.comments.reportErrorTitle'), this.translate.instant('blog.comments.reportErrorCopy'));
-      }
+        this.toast.error(
+          this.translate.instant('blog.comments.reportErrorTitle'),
+          this.translate.instant('blog.comments.reportErrorCopy'),
+        );
+      },
     });
   }
 
@@ -1943,7 +2244,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       lang,
       (post.summary || post.body_markdown || '').replace(/\s+/g, ' ').trim().slice(0, 160),
       this.translate.instant('meta.descriptions.blog_post'),
-      this.translate.instant('blog.post.metaDescription')
+      this.translate.instant('blog.post.metaDescription'),
     );
     this.title.setTitle(pageTitle);
     this.meta.updateTag({ name: 'description', content: description });
@@ -1975,15 +2276,15 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         dateModified: post.updated_at || post.created_at,
         author: {
           '@type': 'Person',
-          name: post.author_name || post.author?.name || post.author?.username || 'momentstudio'
+          name: post.author_name || post.author?.name || post.author?.username || 'momentstudio',
         },
         mainEntityOfPage: {
           '@type': 'WebPage',
-          '@id': canonical
+          '@id': canonical,
         },
         url: canonical,
-        inLanguage: lang
-      }
+        inLanguage: lang,
+      },
     ]);
   }
 
@@ -1994,7 +2295,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       'blog_post',
       lang,
       this.translate.instant('meta.descriptions.blog_post'),
-      this.translate.instant('blog.post.metaDescription')
+      this.translate.instant('blog.post.metaDescription'),
     );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
@@ -2008,15 +2309,19 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         name: title,
         description,
         url: canonical,
-        inLanguage: lang
-      }
+        inLanguage: lang,
+      },
     ]);
   }
 
   private setCanonical(): string {
     if (!this.slug) return '';
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const href = this.seoHeadLinks.setLocalizedCanonical(`/blog/${encodeURIComponent(this.slug)}`, lang, {});
+    const href = this.seoHeadLinks.setLocalizedCanonical(
+      `/blog/${encodeURIComponent(this.slug)}`,
+      lang,
+      {},
+    );
     this.meta.updateTag({ property: 'og:url', content: href });
     return href;
   }
@@ -2158,7 +2463,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       const title = (img.getAttribute('title') || '').trim().toLowerCase();
       if (!title) continue;
       const tokens = title.split(/[\s,]+/).filter(Boolean);
-      const hasLayoutToken = tokens.some((t) => t === 'wide' || t === 'full' || t === 'left' || t === 'right' || t === 'gallery');
+      const hasLayoutToken = tokens.some(
+        (t) => t === 'wide' || t === 'full' || t === 'left' || t === 'right' || t === 'gallery',
+      );
       if (!hasLayoutToken) continue;
 
       if (tokens.includes('wide') || tokens.includes('full')) img.classList.add('blog-img-wide');
@@ -2186,7 +2493,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         const candidate = doc.body.children[j];
         if (candidate.tagName !== 'P') break;
         const candidateImg = candidate.querySelector('img');
-        if (!candidateImg || !candidateImg.classList.contains('blog-img-gallery') || candidate.children.length !== 1) break;
+        if (
+          !candidateImg ||
+          !candidateImg.classList.contains('blog-img-gallery') ||
+          candidate.children.length !== 1
+        )
+          break;
         group.push(candidate);
         j += 1;
       }
@@ -2216,7 +2528,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       const match = text.match(embedRe);
       if (!match) continue;
       const rawType = (match[1] || '').toLowerCase();
-      const type = rawType === 'product' || rawType === 'category' || rawType === 'collection' ? rawType : null;
+      const type =
+        rawType === 'product' || rawType === 'category' || rawType === 'collection'
+          ? rawType
+          : null;
       if (!type) continue;
       const slug = (match[2] || '').trim();
       if (!slug) continue;
@@ -2262,7 +2577,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       } else if (kind === 'warning') {
         addPath('M12 9v4');
         addPath('M12 17h.01');
-        addPath('M10.29 3.86 1.82 18.53A1 1 0 0 0 2.68 20h18.64a1 1 0 0 0 .86-1.47L13.71 3.86a1 1 0 0 0-1.72 0z');
+        addPath(
+          'M10.29 3.86 1.82 18.53A1 1 0 0 0 2.68 20h18.64a1 1 0 0 0 .86-1.47L13.71 3.86a1 1 0 0 0-1.72 0z',
+        );
       } else {
         addPath('M12 17h.01');
         addPath('M11 10h1v4h1');
@@ -2280,7 +2597,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       const match = text.match(/^\[!(TIP|NOTE|WARNING|CAUTION|IMPORTANT|INFO)\]/i);
       if (!match) continue;
       const marker = match[1].toLowerCase();
-      const kind = marker === 'tip' ? 'tip' : marker === 'warning' || marker === 'caution' ? 'warning' : 'note';
+      const kind =
+        marker === 'tip'
+          ? 'tip'
+          : marker === 'warning' || marker === 'caution'
+            ? 'warning'
+            : 'note';
 
       const firstChild = firstPara.firstChild;
       if (firstChild?.nodeType === w.Node.TEXT_NODE) {
@@ -2292,7 +2614,12 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         firstPara.remove();
       }
 
-      const labelText = kind === 'tip' ? calloutTipLabel : kind === 'warning' ? calloutWarningLabel : calloutNoteLabel;
+      const labelText =
+        kind === 'tip'
+          ? calloutTipLabel
+          : kind === 'warning'
+            ? calloutWarningLabel
+            : calloutNoteLabel;
       const header = doc.createElement('div');
       header.className = 'blog-callout-header';
       header.appendChild(createCalloutIcon(kind));
@@ -2334,7 +2661,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
                 : rawLang;
 
       try {
-        const highlighted = lang && hljs.getLanguage(lang) ? hljs.highlight(raw, { language: lang }).value : hljs.highlightAuto(raw).value;
+        const highlighted =
+          lang && hljs.getLanguage(lang)
+            ? hljs.highlight(raw, { language: lang }).value
+            : hljs.highlightAuto(raw).value;
         codeEl.innerHTML = highlighted;
         codeEl.classList.add('hljs');
       } catch {
@@ -2385,7 +2715,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
   private hydrateEmbeds(
     embeds: Array<{ type: 'product' | 'category' | 'collection'; slug: string }>,
     revision: number,
-    lang: string
+    lang: string,
   ): void {
     const html = this.bodyHtml();
     if (!html || !embeds.length) return;
@@ -2409,30 +2739,48 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
     const req = forkJoin({
       products: Object.keys(productCalls).length ? forkJoin(productCalls) : of({}),
-      categories: categorySlugs.length ? this.catalog.listCategories(lang as any).pipe(catchError(() => of([]))) : of([]),
-      collections: collectionSlugs.length ? this.catalog.listFeaturedCollections().pipe(catchError(() => of([]))) : of([])
+      categories: categorySlugs.length
+        ? this.catalog.listCategories(lang as any).pipe(catchError(() => of([])))
+        : of([]),
+      collections: collectionSlugs.length
+        ? this.catalog.listFeaturedCollections().pipe(catchError(() => of([])))
+        : of([]),
     });
 
     req.subscribe({
-      next: ({ products, categories, collections }: { products: Record<string, Product | null>; categories: Category[]; collections: FeaturedCollection[] }) => {
+      next: ({
+        products,
+        categories,
+        collections,
+      }: {
+        products: Record<string, Product | null>;
+        categories: Category[];
+        collections: FeaturedCollection[];
+      }) => {
         if (revision !== this.embedRevision) return;
         const nextHtml = this.applyEmbedData(html, { products, categories, collections });
         if (nextHtml !== html) {
           this.bodyHtml.set(nextHtml);
           this.measureReadingProgressSoon();
         }
-      }
+      },
     });
   }
 
   private applyEmbedData(
     html: string,
-    data: { products: Record<string, Product | null>; categories: Category[]; collections: FeaturedCollection[] }
+    data: {
+      products: Record<string, Product | null>;
+      categories: Category[];
+      collections: FeaturedCollection[];
+    },
   ): string {
     const w = this.document?.defaultView;
     if (!w?.DOMParser) return html;
     const doc = new w.DOMParser().parseFromString(html, 'text/html');
-    const embeds = Array.from(doc.body.querySelectorAll('.blog-embed[data-embed-type][data-embed-slug]')) as HTMLElement[];
+    const embeds = Array.from(
+      doc.body.querySelectorAll('.blog-embed[data-embed-type][data-embed-slug]'),
+    ) as HTMLElement[];
     if (!embeds.length) return html;
 
     const categoryBySlug = new Map<string, Category>();
@@ -2446,10 +2794,19 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
     const buildPrice = (product: Product): { primary: string; secondary?: string } => {
       const currency = product.currency || '';
-      const base = typeof product.base_price === 'number' && Number.isFinite(product.base_price) ? product.base_price : 0;
-      const sale = typeof product.sale_price === 'number' && Number.isFinite(product.sale_price) ? product.sale_price : null;
+      const base =
+        typeof product.base_price === 'number' && Number.isFinite(product.base_price)
+          ? product.base_price
+          : 0;
+      const sale =
+        typeof product.sale_price === 'number' && Number.isFinite(product.sale_price)
+          ? product.sale_price
+          : null;
       if (sale !== null && sale < base) {
-        return { primary: `${sale.toFixed(2)} ${currency}`, secondary: `${base.toFixed(2)} ${currency}` };
+        return {
+          primary: `${sale.toFixed(2)} ${currency}`,
+          secondary: `${base.toFixed(2)} ${currency}`,
+        };
       }
       return { primary: `${base.toFixed(2)} ${currency}` };
     };
@@ -2533,7 +2890,10 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
         const media = doc.createElement('div');
         media.className = 'blog-embed-media';
-        const imgUrl = category.thumbnail_url || category.banner_url || 'assets/placeholder/product-placeholder.svg';
+        const imgUrl =
+          category.thumbnail_url ||
+          category.banner_url ||
+          'assets/placeholder/product-placeholder.svg';
         media.appendChild(buildThumb(imgUrl, category.name || category.slug));
 
         const content = doc.createElement('div');

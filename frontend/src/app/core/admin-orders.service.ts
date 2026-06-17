@@ -48,7 +48,11 @@ export interface AdminOrderTagRenameResult {
   total: number;
 }
 
-export type OrderDocumentExportKind = 'packing_slip' | 'packing_slips_batch' | 'shipping_label' | 'receipt';
+export type OrderDocumentExportKind =
+  | 'packing_slip'
+  | 'packing_slips_batch'
+  | 'shipping_label'
+  | 'receipt';
 
 export interface AdminOrderDocumentExport {
   id: string;
@@ -169,9 +173,9 @@ export class AdminOrdersService {
         items: (res?.items ?? []).map((o: any) => ({
           ...o,
           total_amount: parseMoney(o?.total_amount),
-          tags: Array.isArray(o?.tags) ? o.tags : []
-        }))
-      }))
+          tags: Array.isArray(o?.tags) ? o.tags : [],
+        })),
+      })),
     );
   }
 
@@ -186,7 +190,7 @@ export class AdminOrdersService {
         shipping_amount: parseMoney(o?.shipping_amount),
         refunds: (o?.refunds ?? []).map((r: any) => ({
           ...r,
-          amount: parseMoney(r?.amount)
+          amount: parseMoney(r?.amount),
         })),
         admin_notes: o?.admin_notes ?? [],
         fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
@@ -194,20 +198,20 @@ export class AdminOrdersService {
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
+          subtotal: parseMoney(it?.subtotal),
+        })),
+      })),
     );
   }
 
   listEmailEvents(
     orderId: string,
-    params?: { limit?: number; since_hours?: number; include_pii?: boolean }
+    params?: { limit?: number; since_hours?: number; include_pii?: boolean },
   ): Observable<AdminOrderEmailEvent[]> {
     const finalParams = { ...params, include_pii: params?.include_pii ?? true };
-    return this.api.get<AdminOrderEmailEvent[]>(`/orders/admin/${orderId}/email-events`, finalParams as any).pipe(
-      map((rows: any) => (Array.isArray(rows) ? rows : []))
-    );
+    return this.api
+      .get<AdminOrderEmailEvent[]>(`/orders/admin/${orderId}/email-events`, finalParams as any)
+      .pipe(map((rows: any) => (Array.isArray(rows) ? rows : [])));
   }
 
   update(
@@ -219,59 +223,68 @@ export class AdminOrdersService {
       tracking_number?: string | null;
       tracking_url?: string | null;
     },
-    opts?: { include_pii?: boolean }
+    opts?: { include_pii?: boolean },
   ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+    return this.api
+      .patch<AdminOrderDetail>(`/orders/admin/${orderId}`, payload, undefined, params as any)
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
   reviewFraud(
     orderId: string,
     payload: { decision: 'approve' | 'deny'; note?: string | null },
-    opts?: { include_pii?: boolean }
+    opts?: { include_pii?: boolean },
   ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/fraud-review`, payload, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+    return this.api
+      .post<AdminOrderDetail>(
+        `/orders/admin/${orderId}/fraud-review`,
+        payload,
+        undefined,
+        params as any,
+      )
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
   updateAddresses(
@@ -282,156 +295,211 @@ export class AdminOrdersService {
       rerate_shipping?: boolean;
       note?: string | null;
     },
-    opts?: { include_pii?: boolean }
+    opts?: { include_pii?: boolean },
   ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/addresses`, payload, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+    return this.api
+      .patch<AdminOrderDetail>(
+        `/orders/admin/${orderId}/addresses`,
+        payload,
+        undefined,
+        params as any,
+      )
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
   createShipment(
     orderId: string,
     payload: { courier?: string | null; tracking_number: string; tracking_url?: string | null },
-    opts?: { include_pii?: boolean }
+    opts?: { include_pii?: boolean },
   ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipments`, payload, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+    return this.api
+      .post<AdminOrderDetail>(
+        `/orders/admin/${orderId}/shipments`,
+        payload,
+        undefined,
+        params as any,
+      )
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
   updateShipment(
     orderId: string,
     shipmentId: string,
-    payload: { courier?: string | null; tracking_number?: string | null; tracking_url?: string | null },
-    opts?: { include_pii?: boolean }
+    payload: {
+      courier?: string | null;
+      tracking_number?: string | null;
+      tracking_url?: string | null;
+    },
+    opts?: { include_pii?: boolean },
   ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.patch<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`, payload, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+    return this.api
+      .patch<AdminOrderDetail>(
+        `/orders/admin/${orderId}/shipments/${shipmentId}`,
+        payload,
+        undefined,
+        params as any,
+      )
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
-  deleteShipment(orderId: string, shipmentId: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
+  deleteShipment(
+    orderId: string,
+    shipmentId: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.delete<AdminOrderDetail>(`/orders/admin/${orderId}/shipments/${shipmentId}`, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+    return this.api
+      .delete<AdminOrderDetail>(
+        `/orders/admin/${orderId}/shipments/${shipmentId}`,
+        undefined,
+        params as any,
+      )
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
   fulfillItem(
     orderId: string,
     itemId: string,
     shippedQuantity: number,
-    opts?: { include_pii?: boolean }
+    opts?: { include_pii?: boolean },
   ): Observable<AdminOrderDetail> {
-    const params: any = { shipped_quantity: shippedQuantity, include_pii: opts?.include_pii ?? true };
+    const params: any = {
+      shipped_quantity: shippedQuantity,
+      include_pii: opts?.include_pii ?? true,
+    };
     return this.api
-      .post<AdminOrderDetail>(`/orders/admin/${orderId}/items/${itemId}/fulfill`, {}, undefined, params)
+      .post<AdminOrderDetail>(
+        `/orders/admin/${orderId}/items/${itemId}/fulfill`,
+        {},
+        undefined,
+        params,
+      )
       .pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          shipments: Array.isArray(o?.shipments) ? o.shipments : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        shipments: Array.isArray(o?.shipments) ? o.shipments : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
-  uploadShippingLabel(orderId: string, file: File, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
+  uploadShippingLabel(
+    orderId: string,
+    file: File,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminOrderDetail> {
     const data = new FormData();
     data.append('file', file);
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/shipping-label`, data, undefined, params as any);
+    return this.api.post<AdminOrderDetail>(
+      `/orders/admin/${orderId}/shipping-label`,
+      data,
+      undefined,
+      params as any,
+    );
   }
 
-  downloadShippingLabel(orderId: string, opts?: { action?: 'download' | 'print' }): Observable<Blob> {
+  downloadShippingLabel(
+    orderId: string,
+    opts?: { action?: 'download' | 'print' },
+  ): Observable<Blob> {
     const action = opts?.action;
     const params = action && action !== 'download' ? { action } : undefined;
     return this.api.getBlob(`/orders/admin/${orderId}/shipping-label`, params);
@@ -464,7 +532,7 @@ export class AdminOrdersService {
       note: string;
       items?: Array<{ order_item_id: string; quantity: number }>;
       process_payment?: boolean;
-    }
+    },
   ): Observable<AdminOrderDetail> {
     return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/refunds`, payload).pipe(
       map((o: any) => ({
@@ -475,7 +543,7 @@ export class AdminOrdersService {
         shipping_amount: parseMoney(o?.shipping_amount),
         refunds: (o?.refunds ?? []).map((r: any) => ({
           ...r,
-          amount: parseMoney(r?.amount)
+          amount: parseMoney(r?.amount),
         })),
         admin_notes: o?.admin_notes ?? [],
         fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
@@ -483,40 +551,52 @@ export class AdminOrdersService {
         items: (o?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
+          subtotal: parseMoney(it?.subtotal),
+        })),
+      })),
     );
   }
 
-  addAdminNote(orderId: string, note: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
+  addAdminNote(
+    orderId: string,
+    note: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/notes`, { note }, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+    return this.api
+      .post<AdminOrderDetail>(`/orders/admin/${orderId}/notes`, { note }, undefined, params as any)
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
   listOrderTags(): Observable<string[]> {
-    return this.api.get<{ items?: string[] }>('/orders/admin/tags').pipe(
-      map((res: any) => (Array.isArray(res?.items) ? res.items : []).filter((t: any) => typeof t === 'string' && t.length))
-    );
+    return this.api
+      .get<{ items?: string[] }>('/orders/admin/tags')
+      .pipe(
+        map((res: any) =>
+          (Array.isArray(res?.items) ? res.items : []).filter(
+            (t: any) => typeof t === 'string' && t.length,
+          ),
+        ),
+      );
   }
 
   listOrderTagStats(): Observable<AdminOrderTagStat[]> {
@@ -524,73 +604,95 @@ export class AdminOrdersService {
       map((res: any) =>
         (Array.isArray(res?.items) ? res.items : [])
           .filter((row: any) => typeof row?.tag === 'string' && row.tag.length)
-          .map((row: any) => ({ tag: String(row.tag), count: Math.max(0, Number(row.count || 0) || 0) }))
-      )
+          .map((row: any) => ({
+            tag: String(row.tag),
+            count: Math.max(0, Number(row.count || 0) || 0),
+          })),
+      ),
     );
   }
 
-  renameOrderTag(payload: { from_tag: string; to_tag: string }): Observable<AdminOrderTagRenameResult> {
-    return this.api.post<AdminOrderTagRenameResult>('/orders/admin/tags/rename', payload as any).pipe(
-      map((res: any) => ({
-        from_tag: String(res?.from_tag || ''),
-        to_tag: String(res?.to_tag || ''),
-        updated: Math.max(0, Number(res?.updated || 0) || 0),
-        merged: Math.max(0, Number(res?.merged || 0) || 0),
-        total: Math.max(0, Number(res?.total || 0) || 0)
-      }))
-    );
-  }
-
-  addOrderTag(orderId: string, tag: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
-    const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.post<AdminOrderDetail>(`/orders/admin/${orderId}/tags`, { tag }, undefined, params as any).pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+  renameOrderTag(payload: {
+    from_tag: string;
+    to_tag: string;
+  }): Observable<AdminOrderTagRenameResult> {
+    return this.api
+      .post<AdminOrderTagRenameResult>('/orders/admin/tags/rename', payload as any)
+      .pipe(
+        map((res: any) => ({
+          from_tag: String(res?.from_tag || ''),
+          to_tag: String(res?.to_tag || ''),
+          updated: Math.max(0, Number(res?.updated || 0) || 0),
+          merged: Math.max(0, Number(res?.merged || 0) || 0),
+          total: Math.max(0, Number(res?.total || 0) || 0),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        tags: Array.isArray(o?.tags) ? o.tags : [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
   }
 
-  removeOrderTag(orderId: string, tag: string, opts?: { include_pii?: boolean }): Observable<AdminOrderDetail> {
+  addOrderTag(
+    orderId: string,
+    tag: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminOrderDetail> {
     const params = { include_pii: opts?.include_pii ?? true };
     return this.api
-      .delete<AdminOrderDetail>(`/orders/admin/${orderId}/tags/${encodeURIComponent(tag)}`, undefined, params as any)
+      .post<AdminOrderDetail>(`/orders/admin/${orderId}/tags`, { tag }, undefined, params as any)
       .pipe(
-      map((o: any) => ({
-        ...o,
-        total_amount: parseMoney(o?.total_amount),
-        tax_amount: parseMoney(o?.tax_amount),
-        fee_amount: parseMoney(o?.fee_amount),
-        shipping_amount: parseMoney(o?.shipping_amount),
-        refunds: (o?.refunds ?? []).map((r: any) => ({
-          ...r,
-          amount: parseMoney(r?.amount)
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          tags: Array.isArray(o?.tags) ? o.tags : [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
         })),
-        admin_notes: o?.admin_notes ?? [],
-        tags: Array.isArray(o?.tags) ? o.tags : [],
-        fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
-        items: (o?.items ?? []).map((it: any) => ({
-          ...it,
-          unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
-        }))
-      }))
-    );
+      );
+  }
+
+  removeOrderTag(
+    orderId: string,
+    tag: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminOrderDetail> {
+    const params = { include_pii: opts?.include_pii ?? true };
+    return this.api
+      .delete<AdminOrderDetail>(
+        `/orders/admin/${orderId}/tags/${encodeURIComponent(tag)}`,
+        undefined,
+        params as any,
+      )
+      .pipe(
+        map((o: any) => ({
+          ...o,
+          total_amount: parseMoney(o?.total_amount),
+          tax_amount: parseMoney(o?.tax_amount),
+          fee_amount: parseMoney(o?.fee_amount),
+          shipping_amount: parseMoney(o?.shipping_amount),
+          refunds: (o?.refunds ?? []).map((r: any) => ({
+            ...r,
+            amount: parseMoney(r?.amount),
+          })),
+          admin_notes: o?.admin_notes ?? [],
+          tags: Array.isArray(o?.tags) ? o.tags : [],
+          fraud_signals: Array.isArray(o?.fraud_signals) ? o.fraud_signals : [],
+          items: (o?.items ?? []).map((it: any) => ({
+            ...it,
+            unit_price: parseMoney(it?.unit_price),
+            subtotal: parseMoney(it?.subtotal),
+          })),
+        })),
+      );
   }
 
   sendDeliveryEmail(orderId: string): Observable<Order> {
@@ -621,8 +723,14 @@ export class AdminOrdersService {
     return this.api.getBlob(`/orders/admin/${orderId}/receipt`);
   }
 
-  listDocumentExports(params?: { page?: number; limit?: number }): Observable<AdminOrderDocumentExportListResponse> {
-    return this.api.get<AdminOrderDocumentExportListResponse>('/orders/admin/exports', params as any);
+  listDocumentExports(params?: {
+    page?: number;
+    limit?: number;
+  }): Observable<AdminOrderDocumentExportListResponse> {
+    return this.api.get<AdminOrderDocumentExportListResponse>(
+      '/orders/admin/exports',
+      params as any,
+    );
   }
 
   downloadDocumentExport(exportId: string): Observable<Blob> {
@@ -637,7 +745,9 @@ export class AdminOrdersService {
   }
 
   resendOrderConfirmationEmail(orderId: string, note?: string | null): Observable<Order> {
-    return this.api.post<Order>(`/orders/admin/${orderId}/confirmation-email`, { note: note ?? null });
+    return this.api.post<Order>(`/orders/admin/${orderId}/confirmation-email`, {
+      note: note ?? null,
+    });
   }
 
   resendDeliveryEmail(orderId: string, note?: string | null): Observable<Order> {

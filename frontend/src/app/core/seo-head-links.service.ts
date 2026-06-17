@@ -12,7 +12,11 @@ export class SeoHeadLinksService {
   private readonly document = inject(DOCUMENT);
   private readonly managedAlternateSelector = 'link[rel="alternate"][data-seo-managed="true"]';
 
-  setLocalizedCanonical(path: string, currentLang: SeoLanguage, query: Record<string, SeoQueryValue> = {}): string {
+  setLocalizedCanonical(
+    path: string,
+    currentLang: SeoLanguage,
+    query: Record<string, SeoQueryValue> = {},
+  ): string {
     const lang = currentLang === 'ro' ? 'ro' : 'en';
     const langAgnosticQuery = this.withoutLang(query);
     const canonicalEn = this.buildHref(path, langAgnosticQuery);
@@ -29,11 +33,15 @@ export class SeoHeadLinksService {
   }
 
   clearManagedAlternates(): void {
-    this.document.querySelectorAll<HTMLLinkElement>(this.managedAlternateSelector).forEach((node) => node.remove());
+    this.document
+      .querySelectorAll<HTMLLinkElement>(this.managedAlternateSelector)
+      .forEach((node) => node.remove());
   }
 
   private upsertCanonical(href: string): void {
-    const existing = Array.from(this.document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]'));
+    const existing = Array.from(
+      this.document.querySelectorAll<HTMLLinkElement>('link[rel="canonical"]'),
+    );
     let link = existing[0] ?? null;
     if (!link) {
       link = this.document.createElement('link');
@@ -64,7 +72,9 @@ export class SeoHeadLinksService {
     const fromDocument = this.document.defaultView?.location?.origin;
     if (fromDocument) return fromDocument;
     if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
-    const configured = String(appConfig.publicBaseUrl || '').trim().replace(/\/$/, '');
+    const configured = String(appConfig.publicBaseUrl || '')
+      .trim()
+      .replace(/\/$/, '');
     return configured || 'https://momentstudio.ro';
   }
 

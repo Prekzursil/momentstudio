@@ -23,7 +23,9 @@ branch_labels: str | Sequence[str] | None = None
 depends_on: Sequence[str] | None = None
 
 
-media_asset_type = postgresql.ENUM("image", "video", "document", name="mediaassettype", create_type=False)
+media_asset_type = postgresql.ENUM(
+    "image", "video", "document", name="mediaassettype", create_type=False
+)
 media_asset_status = postgresql.ENUM(
     "draft",
     "approved",
@@ -33,7 +35,9 @@ media_asset_status = postgresql.ENUM(
     name="mediaassetstatus",
     create_type=False,
 )
-media_visibility = postgresql.ENUM("public", "private", name="mediavisibility", create_type=False)
+media_visibility = postgresql.ENUM(
+    "public", "private", name="mediavisibility", create_type=False
+)
 media_job_type = postgresql.ENUM(
     "ingest",
     "variant",
@@ -68,11 +72,17 @@ def upgrade() -> None:
 
     op.create_table(
         "media_assets",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("asset_type", media_asset_type, nullable=False),
         sa.Column("status", media_asset_status, nullable=False, server_default="draft"),
-        sa.Column("visibility", media_visibility, nullable=False, server_default="private"),
-        sa.Column("source_kind", sa.String(length=64), nullable=False, server_default="upload"),
+        sa.Column(
+            "visibility", media_visibility, nullable=False, server_default="private"
+        ),
+        sa.Column(
+            "source_kind", sa.String(length=64), nullable=False, server_default="upload"
+        ),
         sa.Column("source_ref", sa.String(length=255), nullable=True),
         sa.Column("storage_key", sa.String(length=512), nullable=False),
         sa.Column("public_url", sa.String(length=512), nullable=False),
@@ -93,67 +103,163 @@ def upgrade() -> None:
         sa.Column("approved_by_user_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("approved_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("trashed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["approved_by_user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["created_by_user_id"], ["users.id"], ondelete="SET NULL"
+        ),
+        sa.ForeignKeyConstraint(
+            ["approved_by_user_id"], ["users.id"], ondelete="SET NULL"
+        ),
         sa.UniqueConstraint("storage_key"),
         sa.UniqueConstraint("public_url"),
     )
-    op.create_index(op.f("ix_media_assets_asset_type"), "media_assets", ["asset_type"], unique=False)
-    op.create_index(op.f("ix_media_assets_status"), "media_assets", ["status"], unique=False)
-    op.create_index(op.f("ix_media_assets_visibility"), "media_assets", ["visibility"], unique=False)
-    op.create_index(op.f("ix_media_assets_source_kind"), "media_assets", ["source_kind"], unique=False)
-    op.create_index(op.f("ix_media_assets_source_ref"), "media_assets", ["source_ref"], unique=False)
-    op.create_index(op.f("ix_media_assets_checksum_sha256"), "media_assets", ["checksum_sha256"], unique=False)
-    op.create_index(op.f("ix_media_assets_perceptual_hash"), "media_assets", ["perceptual_hash"], unique=False)
-    op.create_index(op.f("ix_media_assets_dedupe_group"), "media_assets", ["dedupe_group"], unique=False)
-    op.create_index(op.f("ix_media_assets_created_by_user_id"), "media_assets", ["created_by_user_id"], unique=False)
-    op.create_index(op.f("ix_media_assets_approved_by_user_id"), "media_assets", ["approved_by_user_id"], unique=False)
-    op.create_index(op.f("ix_media_assets_trashed_at"), "media_assets", ["trashed_at"], unique=False)
+    op.create_index(
+        op.f("ix_media_assets_asset_type"), "media_assets", ["asset_type"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_assets_status"), "media_assets", ["status"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_assets_visibility"), "media_assets", ["visibility"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_assets_source_kind"),
+        "media_assets",
+        ["source_kind"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_assets_source_ref"), "media_assets", ["source_ref"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_assets_checksum_sha256"),
+        "media_assets",
+        ["checksum_sha256"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_assets_perceptual_hash"),
+        "media_assets",
+        ["perceptual_hash"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_assets_dedupe_group"),
+        "media_assets",
+        ["dedupe_group"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_assets_created_by_user_id"),
+        "media_assets",
+        ["created_by_user_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_assets_approved_by_user_id"),
+        "media_assets",
+        ["approved_by_user_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_assets_trashed_at"), "media_assets", ["trashed_at"], unique=False
+    )
 
     op.create_table(
         "media_asset_i18n",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("lang", sa.String(length=10), nullable=False),
         sa.Column("title", sa.String(length=255), nullable=True),
         sa.Column("alt_text", sa.String(length=255), nullable=True),
         sa.Column("caption", sa.Text(), nullable=True),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["asset_id"], ["media_assets.id"], ondelete="CASCADE"),
         sa.UniqueConstraint("asset_id", "lang", name="uq_media_asset_i18n_asset_lang"),
     )
-    op.create_index(op.f("ix_media_asset_i18n_asset_id"), "media_asset_i18n", ["asset_id"], unique=False)
-    op.create_index(op.f("ix_media_asset_i18n_lang"), "media_asset_i18n", ["lang"], unique=False)
+    op.create_index(
+        op.f("ix_media_asset_i18n_asset_id"),
+        "media_asset_i18n",
+        ["asset_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_asset_i18n_lang"), "media_asset_i18n", ["lang"], unique=False
+    )
 
     op.create_table(
         "media_tags",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("value", sa.String(length=64), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.UniqueConstraint("value"),
     )
     op.create_index(op.f("ix_media_tags_value"), "media_tags", ["value"], unique=False)
 
     op.create_table(
         "media_asset_tags",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("tag_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["asset_id"], ["media_assets.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["tag_id"], ["media_tags.id"], ondelete="CASCADE"),
         sa.UniqueConstraint("asset_id", "tag_id", name="uq_media_asset_tags_asset_tag"),
     )
-    op.create_index(op.f("ix_media_asset_tags_asset_id"), "media_asset_tags", ["asset_id"], unique=False)
-    op.create_index(op.f("ix_media_asset_tags_tag_id"), "media_asset_tags", ["tag_id"], unique=False)
+    op.create_index(
+        op.f("ix_media_asset_tags_asset_id"),
+        "media_asset_tags",
+        ["asset_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_asset_tags_tag_id"), "media_asset_tags", ["tag_id"], unique=False
+    )
 
     op.create_table(
         "media_variants",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("profile", sa.String(length=64), nullable=False),
         sa.Column("format", sa.String(length=24), nullable=True),
@@ -162,25 +268,53 @@ def upgrade() -> None:
         sa.Column("storage_key", sa.String(length=512), nullable=False),
         sa.Column("public_url", sa.String(length=512), nullable=False),
         sa.Column("size_bytes", sa.Integer(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["asset_id"], ["media_assets.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("asset_id", "profile", name="uq_media_variant_asset_profile"),
+        sa.UniqueConstraint(
+            "asset_id", "profile", name="uq_media_variant_asset_profile"
+        ),
     )
-    op.create_index(op.f("ix_media_variants_asset_id"), "media_variants", ["asset_id"], unique=False)
-    op.create_index(op.f("ix_media_variants_profile"), "media_variants", ["profile"], unique=False)
+    op.create_index(
+        op.f("ix_media_variants_asset_id"), "media_variants", ["asset_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_variants_profile"), "media_variants", ["profile"], unique=False
+    )
 
     op.create_table(
         "media_usage_edges",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("source_type", sa.String(length=64), nullable=False),
         sa.Column("source_key", sa.String(length=255), nullable=False),
         sa.Column("source_id", sa.String(length=64), nullable=True),
         sa.Column("field_path", sa.String(length=255), nullable=False),
         sa.Column("lang", sa.String(length=10), nullable=True),
-        sa.Column("last_seen_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "last_seen_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["asset_id"], ["media_assets.id"], ondelete="CASCADE"),
         sa.UniqueConstraint(
             "asset_id",
@@ -191,15 +325,39 @@ def upgrade() -> None:
             name="uq_media_usage_edges_asset_source",
         ),
     )
-    op.create_index(op.f("ix_media_usage_edges_asset_id"), "media_usage_edges", ["asset_id"], unique=False)
-    op.create_index(op.f("ix_media_usage_edges_source_type"), "media_usage_edges", ["source_type"], unique=False)
-    op.create_index(op.f("ix_media_usage_edges_source_key"), "media_usage_edges", ["source_key"], unique=False)
-    op.create_index(op.f("ix_media_usage_edges_source_id"), "media_usage_edges", ["source_id"], unique=False)
-    op.create_index(op.f("ix_media_usage_edges_lang"), "media_usage_edges", ["lang"], unique=False)
+    op.create_index(
+        op.f("ix_media_usage_edges_asset_id"),
+        "media_usage_edges",
+        ["asset_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_usage_edges_source_type"),
+        "media_usage_edges",
+        ["source_type"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_usage_edges_source_key"),
+        "media_usage_edges",
+        ["source_key"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_usage_edges_source_id"),
+        "media_usage_edges",
+        ["source_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_usage_edges_lang"), "media_usage_edges", ["lang"], unique=False
+    )
 
     op.create_table(
         "media_jobs",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("job_type", media_job_type, nullable=False),
         sa.Column("status", media_job_status, nullable=False, server_default="queued"),
@@ -211,57 +369,133 @@ def upgrade() -> None:
         sa.Column("created_by_user_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["asset_id"], ["media_assets.id"], ondelete="SET NULL"),
-        sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.ForeignKeyConstraint(
+            ["created_by_user_id"], ["users.id"], ondelete="SET NULL"
+        ),
     )
-    op.create_index(op.f("ix_media_jobs_asset_id"), "media_jobs", ["asset_id"], unique=False)
-    op.create_index(op.f("ix_media_jobs_job_type"), "media_jobs", ["job_type"], unique=False)
-    op.create_index(op.f("ix_media_jobs_status"), "media_jobs", ["status"], unique=False)
+    op.create_index(
+        op.f("ix_media_jobs_asset_id"), "media_jobs", ["asset_id"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_jobs_job_type"), "media_jobs", ["job_type"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_jobs_status"), "media_jobs", ["status"], unique=False
+    )
 
     op.create_table(
         "media_collections",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("name", sa.String(length=160), nullable=False),
         sa.Column("slug", sa.String(length=190), nullable=False),
-        sa.Column("visibility", media_visibility, nullable=False, server_default="private"),
+        sa.Column(
+            "visibility", media_visibility, nullable=False, server_default="private"
+        ),
         sa.Column("created_by_user_id", postgresql.UUID(as_uuid=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["created_by_user_id"], ["users.id"], ondelete="SET NULL"
+        ),
         sa.UniqueConstraint("slug"),
     )
-    op.create_index(op.f("ix_media_collections_slug"), "media_collections", ["slug"], unique=False)
-    op.create_index(op.f("ix_media_collections_visibility"), "media_collections", ["visibility"], unique=False)
+    op.create_index(
+        op.f("ix_media_collections_slug"), "media_collections", ["slug"], unique=False
+    )
+    op.create_index(
+        op.f("ix_media_collections_visibility"),
+        "media_collections",
+        ["visibility"],
+        unique=False,
+    )
 
     op.create_table(
         "media_collection_items",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("collection_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.ForeignKeyConstraint(["collection_id"], ["media_collections.id"], ondelete="CASCADE"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(
+            ["collection_id"], ["media_collections.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(["asset_id"], ["media_assets.id"], ondelete="CASCADE"),
-        sa.UniqueConstraint("collection_id", "asset_id", name="uq_media_collection_items_collection_asset"),
+        sa.UniqueConstraint(
+            "collection_id",
+            "asset_id",
+            name="uq_media_collection_items_collection_asset",
+        ),
     )
-    op.create_index(op.f("ix_media_collection_items_collection_id"), "media_collection_items", ["collection_id"], unique=False)
-    op.create_index(op.f("ix_media_collection_items_asset_id"), "media_collection_items", ["asset_id"], unique=False)
+    op.create_index(
+        op.f("ix_media_collection_items_collection_id"),
+        "media_collection_items",
+        ["collection_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_media_collection_items_asset_id"),
+        "media_collection_items",
+        ["asset_id"],
+        unique=False,
+    )
 
     op.create_table(
         "media_approval_events",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("asset_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("from_status", media_asset_status, nullable=True),
         sa.Column("to_status", media_asset_status, nullable=False),
         sa.Column("actor_user_id", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("note", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["asset_id"], ["media_assets.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["actor_user_id"], ["users.id"], ondelete="SET NULL"),
     )
-    op.create_index(op.f("ix_media_approval_events_asset_id"), "media_approval_events", ["asset_id"], unique=False)
+    op.create_index(
+        op.f("ix_media_approval_events_asset_id"),
+        "media_approval_events",
+        ["asset_id"],
+        unique=False,
+    )
 
     _backfill_legacy_content_images()
 
@@ -339,7 +573,9 @@ def _backfill_legacy_content_images() -> None:
         sa.column("created_at", sa.DateTime(timezone=True)),
     )
 
-    block_key_rows = conn.execute(sa.select(content_blocks.c.id, content_blocks.c.key)).all()
+    block_key_rows = conn.execute(
+        sa.select(content_blocks.c.id, content_blocks.c.key)
+    ).all()
     block_key_by_id = {row[0]: row[1] for row in block_key_rows}
 
     rows = conn.execute(
@@ -468,14 +704,23 @@ def _backfill_legacy_content_images() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_media_approval_events_asset_id"), table_name="media_approval_events")
+    op.drop_index(
+        op.f("ix_media_approval_events_asset_id"), table_name="media_approval_events"
+    )
     op.drop_table("media_approval_events")
 
-    op.drop_index(op.f("ix_media_collection_items_asset_id"), table_name="media_collection_items")
-    op.drop_index(op.f("ix_media_collection_items_collection_id"), table_name="media_collection_items")
+    op.drop_index(
+        op.f("ix_media_collection_items_asset_id"), table_name="media_collection_items"
+    )
+    op.drop_index(
+        op.f("ix_media_collection_items_collection_id"),
+        table_name="media_collection_items",
+    )
     op.drop_table("media_collection_items")
 
-    op.drop_index(op.f("ix_media_collections_visibility"), table_name="media_collections")
+    op.drop_index(
+        op.f("ix_media_collections_visibility"), table_name="media_collections"
+    )
     op.drop_index(op.f("ix_media_collections_slug"), table_name="media_collections")
     op.drop_table("media_collections")
 
@@ -485,9 +730,15 @@ def downgrade() -> None:
     op.drop_table("media_jobs")
 
     op.drop_index(op.f("ix_media_usage_edges_lang"), table_name="media_usage_edges")
-    op.drop_index(op.f("ix_media_usage_edges_source_id"), table_name="media_usage_edges")
-    op.drop_index(op.f("ix_media_usage_edges_source_key"), table_name="media_usage_edges")
-    op.drop_index(op.f("ix_media_usage_edges_source_type"), table_name="media_usage_edges")
+    op.drop_index(
+        op.f("ix_media_usage_edges_source_id"), table_name="media_usage_edges"
+    )
+    op.drop_index(
+        op.f("ix_media_usage_edges_source_key"), table_name="media_usage_edges"
+    )
+    op.drop_index(
+        op.f("ix_media_usage_edges_source_type"), table_name="media_usage_edges"
+    )
     op.drop_index(op.f("ix_media_usage_edges_asset_id"), table_name="media_usage_edges")
     op.drop_table("media_usage_edges")
 
@@ -507,7 +758,9 @@ def downgrade() -> None:
     op.drop_table("media_asset_i18n")
 
     op.drop_index(op.f("ix_media_assets_trashed_at"), table_name="media_assets")
-    op.drop_index(op.f("ix_media_assets_approved_by_user_id"), table_name="media_assets")
+    op.drop_index(
+        op.f("ix_media_assets_approved_by_user_id"), table_name="media_assets"
+    )
     op.drop_index(op.f("ix_media_assets_created_by_user_id"), table_name="media_assets")
     op.drop_index(op.f("ix_media_assets_dedupe_group"), table_name="media_assets")
     op.drop_index(op.f("ix_media_assets_perceptual_hash"), table_name="media_assets")

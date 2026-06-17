@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
 import { Product } from './catalog.service';
 
-export type RecentlyViewedProduct = Pick<Product, 'id' | 'slug' | 'name' | 'base_price' | 'currency' | 'images'>;
+export type RecentlyViewedProduct = Pick<
+  Product,
+  'id' | 'slug' | 'name' | 'base_price' | 'currency' | 'images'
+>;
 
 @Injectable({ providedIn: 'root' })
 export class RecentlyViewedService {
@@ -22,9 +25,9 @@ export class RecentlyViewedService {
         name: product.name,
         base_price: product.base_price,
         currency: product.currency || 'RON',
-        images: Array.isArray(product.images) ? product.images : []
+        images: Array.isArray(product.images) ? product.images : [],
       },
-      ...filtered
+      ...filtered,
     ];
     const sliced = next.slice(0, this.maxItems);
     this.write(sliced);
@@ -65,7 +68,9 @@ export class RecentlyViewedService {
       const base_price = Number.isFinite(basePriceRaw) ? basePriceRaw : 0;
       const currencyRaw = typeof item.currency === 'string' ? item.currency.trim() : '';
       const currency = currencyRaw || 'RON';
-      const images = Array.isArray(item.images) ? item.images.filter((img: any) => img && typeof img.url === 'string') : [];
+      const images = Array.isArray(item.images)
+        ? item.images.filter((img: any) => img && typeof img.url === 'string')
+        : [];
 
       normalized.push({ id, slug, name, base_price, currency, images });
     }

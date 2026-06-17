@@ -24,8 +24,15 @@ def upgrade() -> None:
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column("stripe_event_id", sa.String(255), nullable=False),
         sa.Column("event_type", sa.String(255), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.UniqueConstraint("stripe_event_id", name="uq_stripe_webhook_events_stripe_event_id"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.UniqueConstraint(
+            "stripe_event_id", name="uq_stripe_webhook_events_stripe_event_id"
+        ),
     )
     op.create_index(
         "ix_stripe_webhook_events_stripe_event_id",
@@ -35,5 +42,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_stripe_webhook_events_stripe_event_id", table_name="stripe_webhook_events")
+    op.drop_index(
+        "ix_stripe_webhook_events_stripe_event_id", table_name="stripe_webhook_events"
+    )
     op.drop_table("stripe_webhook_events")

@@ -43,7 +43,7 @@ export class FxRatesService {
       asOf: this.asOf,
       fetchedAt: this.fetchedAt,
       source: this.source,
-      loaded: this.loaded
+      loaded: this.loaded,
     };
   }
 
@@ -65,8 +65,7 @@ export class FxRatesService {
         this.lastErrorAt = Date.now();
         captureException(err);
         this.loading = false;
-      }
+      },
     });
   }
 }
-

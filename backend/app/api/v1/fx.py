@@ -9,7 +9,12 @@ from app.core.dependencies import require_admin
 from app.db.session import get_session
 from app.models.fx import FxOverrideAuditLog
 from app.models.user import User
-from app.schemas.fx import FxAdminStatus, FxOverrideAuditEntry, FxOverrideUpsert, FxRatesRead
+from app.schemas.fx import (
+    FxAdminStatus,
+    FxOverrideAuditEntry,
+    FxOverrideUpsert,
+    FxRatesRead,
+)
 from app.services import fx_store
 
 router = APIRouter(prefix="/fx", tags=["fx"])
@@ -82,12 +87,21 @@ async def revert_fx_override(
 ) -> FxAdminStatus:
     entry = await session.get(FxOverrideAuditLog, audit_id)
     if not entry:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit entry not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Audit entry not found"
+        )
     if entry.eur_per_ron is None or entry.usd_per_ron is None or entry.as_of is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Audit entry cannot be restored")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Audit entry cannot be restored",
+        )
     await fx_store.set_override(
         session,
-        FxOverrideUpsert(eur_per_ron=float(entry.eur_per_ron), usd_per_ron=float(entry.usd_per_ron), as_of=entry.as_of),
+        FxOverrideUpsert(
+            eur_per_ron=float(entry.eur_per_ron),
+            usd_per_ron=float(entry.usd_per_ron),
+            as_of=entry.as_of,
+        ),
         user_id=current_user.id,
         audit_action="restore",
     )

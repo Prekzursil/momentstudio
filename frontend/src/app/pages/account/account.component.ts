@@ -1,6 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  ActivatedRoute,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 
 import { AccountState } from './account.state';
@@ -32,7 +38,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
     TranslateModule,
     ContainerComponent,
     ButtonComponent,
-    SkeletonComponent
+    SkeletonComponent,
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
@@ -42,14 +48,21 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
       >
         <div class="flex items-start justify-between gap-3">
           <span class="min-w-0">{{ error() | translate }}</span>
-          <app-button size="sm" variant="ghost" [label]="'shop.retry' | translate" (action)="retryAccountLoad()"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'shop.retry' | translate"
+            (action)="retryAccountLoad()"
+          ></app-button>
         </div>
       </div>
 
       <div class="grid gap-6" *ngIf="!error()">
         <header class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0">
-            <p class="text-sm text-slate-500 dark:text-slate-400">{{ 'account.header.signedInAs' | translate }}</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400">
+              {{ 'account.header.signedInAs' | translate }}
+            </p>
 
             <ng-container *ngIf="loading(); else headerBody">
               <app-skeleton height="28px" width="360px"></app-skeleton>
@@ -70,56 +83,73 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                     variant="ghost"
                     [label]="
                       primaryVerificationResendRemainingSeconds() > 0
-                        ? ('account.verification.resendIn' | translate: { seconds: primaryVerificationResendRemainingSeconds() })
+                        ? ('account.verification.resendIn'
+                          | translate: { seconds: primaryVerificationResendRemainingSeconds() })
                         : ('auth.emailVerificationResend' | translate)
                     "
                     [disabled]="primaryVerificationResendRemainingSeconds() > 0"
                     (action)="resendVerification()"
                   ></app-button>
                 </div>
-                <p class="text-xs text-amber-800 dark:text-amber-200">{{ 'account.verification.linkInstructions' | translate }}</p>
-                <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ verificationStatus }}</p>
+                <p class="text-xs text-amber-800 dark:text-amber-200">
+                  {{ 'account.verification.linkInstructions' | translate }}
+                </p>
+                <p *ngIf="verificationStatus" class="text-xs text-amber-800 dark:text-amber-200">
+                  {{ verificationStatus }}
+                </p>
               </div>
             </ng-template>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <app-button variant="ghost" [label]="'nav.signOut' | translate" (action)="signOut()"></app-button>
+            <app-button
+              variant="ghost"
+              [label]="'nav.signOut' | translate"
+              (action)="signOut()"
+            ></app-button>
           </div>
         </header>
 
         <div class="grid gap-6">
-	            <div
-	              class="lg:hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2"
-	              [attr.aria-label]="'account.aria.sectionSelect' | translate"
-	            >
-              <label class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                {{ 'account.nav.sectionSelect' | translate }}
-              </label>
-              <select
-                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [value]="navigationSection()"
-                (change)="navigateToSection($any($event.target).value)"
-              >
-                <option value="overview">{{ 'account.sections.overview' | translate }}</option>
-                <option value="profile">{{ 'nav.myProfile' | translate }}</option>
-                <option value="orders">{{ 'nav.myOrders' | translate }}</option>
-                <option value="addresses">{{ 'account.sections.addresses' | translate }}</option>
-                <option value="wishlist">{{ 'nav.myWishlist' | translate }}</option>
-                <option value="coupons">{{ 'nav.myCoupons' | translate }}</option>
-                <option value="notifications">{{ 'account.sections.notifications' | translate }}</option>
-                <option value="security">{{ 'account.sections.security' | translate }}</option>
-                <option value="comments">{{ 'account.sections.comments' | translate }}</option>
-                <option value="privacy">{{ 'account.sections.privacy' | translate }}</option>
-              </select>
-              <a routerLink="/tickets" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'nav.helpCenter' | translate }}</a>
-            </div>
+          <div
+            class="lg:hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2"
+            [attr.aria-label]="'account.aria.sectionSelect' | translate"
+          >
+            <label
+              class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+            >
+              {{ 'account.nav.sectionSelect' | translate }}
+            </label>
+            <select
+              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [value]="navigationSection()"
+              (change)="navigateToSection($any($event.target).value)"
+            >
+              <option value="overview">{{ 'account.sections.overview' | translate }}</option>
+              <option value="profile">{{ 'nav.myProfile' | translate }}</option>
+              <option value="orders">{{ 'nav.myOrders' | translate }}</option>
+              <option value="addresses">{{ 'account.sections.addresses' | translate }}</option>
+              <option value="wishlist">{{ 'nav.myWishlist' | translate }}</option>
+              <option value="coupons">{{ 'nav.myCoupons' | translate }}</option>
+              <option value="notifications">
+                {{ 'account.sections.notifications' | translate }}
+              </option>
+              <option value="security">{{ 'account.sections.security' | translate }}</option>
+              <option value="comments">{{ 'account.sections.comments' | translate }}</option>
+              <option value="privacy">{{ 'account.sections.privacy' | translate }}</option>
+            </select>
+            <a
+              routerLink="/tickets"
+              class="text-sm text-indigo-600 dark:text-indigo-300 font-medium"
+              >{{ 'nav.helpCenter' | translate }}</a
+            >
+          </div>
 
-            <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
-	            <nav
-	              class="hidden lg:grid rounded-2xl border border-slate-200 bg-white p-3 gap-1 dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-24 lg:self-start"
-	              [attr.aria-label]="'account.aria.navigation' | translate"
-	            >
+          <div class="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <nav
+              class="hidden lg:grid rounded-2xl border border-slate-200 bg-white p-3 gap-1 dark:border-slate-800 dark:bg-slate-900 lg:sticky lg:top-24 lg:self-start"
+              [attr.aria-label]="'account.aria.navigation' | translate"
+            >
               <a
                 routerLink="/account/overview"
                 [routerLinkActiveOptions]="{ exact: true }"
@@ -215,14 +245,14 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               </a>
             </nav>
 
-	            <main class="grid gap-4 min-w-0">
-	              <router-outlet></router-outlet>
-	            </main>
-	          </div>
-	        </div>
-	      </div>
-	    </app-container>
-  `
+            <main class="grid gap-4 min-w-0">
+              <router-outlet></router-outlet>
+            </main>
+          </div>
+        </div>
+      </div>
+    </app-container>
+  `,
 })
 export class AccountComponent extends AccountState {
   constructor(
@@ -241,7 +271,7 @@ export class AccountComponent extends AccountState {
     googleLinkPendingService: GoogleLinkPendingService,
     theme: ThemeService,
     lang: LanguageService,
-    translate: TranslateService
+    translate: TranslateService,
   ) {
     super(
       toast,
@@ -259,7 +289,7 @@ export class AccountComponent extends AccountState {
       theme,
       lang,
       translate,
-      googleLinkPendingService
+      googleLinkPendingService,
     );
   }
 }

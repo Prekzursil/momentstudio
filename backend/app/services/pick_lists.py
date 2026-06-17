@@ -37,7 +37,9 @@ class _PickListAccumulator:
 
 
 def _order_ref(order: object) -> str:
-    return str(getattr(order, "reference_code", None) or getattr(order, "id", "") or "").strip()
+    return str(
+        getattr(order, "reference_code", None) or getattr(order, "id", "") or ""
+    ).strip()
 
 
 def build_pick_list_rows(orders: Sequence[object]) -> list[PickListRow]:
@@ -49,7 +51,12 @@ def build_pick_list_rows(orders: Sequence[object]) -> list[PickListRow]:
             product: Any = getattr(item_any, "product", None)
             sku = str(getattr(product, "sku", None) or "").strip() or "—"
             product_name = (
-                str(getattr(product, "name", None) or getattr(item_any, "product_id", "") or "").strip() or "—"
+                str(
+                    getattr(product, "name", None)
+                    or getattr(item_any, "product_id", "")
+                    or ""
+                ).strip()
+                or "—"
             )
             variant: Any = getattr(item_any, "variant", None)
             variant_name_raw = str(getattr(variant, "name", None) or "").strip()

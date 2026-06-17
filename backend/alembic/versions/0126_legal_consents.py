@@ -27,13 +27,33 @@ def upgrade() -> None:
         sa.Column("doc_version", sa.Integer(), nullable=False),
         sa.Column(
             "context",
-            sa.Enum("register", "checkout", name="legalconsentcontext", native_enum=False),
+            sa.Enum(
+                "register", "checkout", name="legalconsentcontext", native_enum=False
+            ),
             nullable=False,
         ),
-        sa.Column("user_id", UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("order_id", UUID(as_uuid=True), sa.ForeignKey("orders.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("accepted_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.CheckConstraint("user_id IS NOT NULL OR order_id IS NOT NULL", name="ck_legal_consents_subject"),
+        sa.Column(
+            "user_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "order_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("orders.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        sa.Column(
+            "accepted_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.CheckConstraint(
+            "user_id IS NOT NULL OR order_id IS NOT NULL",
+            name="ck_legal_consents_subject",
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_legal_consents_doc_key", "legal_consents", ["doc_key"])
@@ -48,4 +68,3 @@ def downgrade() -> None:
     op.drop_index("ix_legal_consents_context", table_name="legal_consents")
     op.drop_index("ix_legal_consents_doc_key", table_name="legal_consents")
     op.drop_table("legal_consents")
-

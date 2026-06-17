@@ -23,7 +23,8 @@ export class CheckoutPrefsService {
       if (!raw) return null;
       const parsed = JSON.parse(raw);
       const courier: LockerProvider = parsed?.courier === 'fan_courier' ? 'fan_courier' : 'sameday';
-      const deliveryType: CheckoutDeliveryType = parsed?.deliveryType === 'locker' ? 'locker' : 'home';
+      const deliveryType: CheckoutDeliveryType =
+        parsed?.deliveryType === 'locker' ? 'locker' : 'home';
       return { courier, deliveryType };
     } catch {
       return null;
@@ -54,8 +55,8 @@ export class CheckoutPrefsService {
 
   savePaymentMethod(method: CheckoutPaymentMethod): void {
     if (typeof localStorage === 'undefined') return;
-    const value: CheckoutPaymentMethod = method === 'netopia' || method === 'paypal' || method === 'stripe' ? method : 'cod';
+    const value: CheckoutPaymentMethod =
+      method === 'netopia' || method === 'paypal' || method === 'stripe' ? method : 'cod';
     localStorage.setItem(PAYMENT_PREFS_KEY, value);
   }
 }
-

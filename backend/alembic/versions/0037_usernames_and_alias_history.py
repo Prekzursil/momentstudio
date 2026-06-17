@@ -59,27 +59,44 @@ def _make_unique_username(base: str, used: set[str]) -> str:
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("username", sa.String(length=USERNAME_MAX_LEN), nullable=True))
+    op.add_column(
+        "users",
+        sa.Column("username", sa.String(length=USERNAME_MAX_LEN), nullable=True),
+    )
     op.add_column("users", sa.Column("name_tag", sa.Integer(), nullable=True))
 
     op.create_table(
         "user_username_history",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("username", sa.String(length=USERNAME_MAX_LEN), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
-    op.create_index("ix_user_username_history_user_id", "user_username_history", ["user_id"])
+    op.create_index(
+        "ix_user_username_history_user_id", "user_username_history", ["user_id"]
+    )
 
     op.create_table(
         "user_display_name_history",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("name_tag", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )
-    op.create_index("ix_user_display_name_history_user_id", "user_display_name_history", ["user_id"])
+    op.create_index(
+        "ix_user_display_name_history_user_id", "user_display_name_history", ["user_id"]
+    )
 
     conn = op.get_bind()
 
@@ -109,7 +126,9 @@ def upgrade() -> None:
     )
 
     rows = conn.execute(
-        sa.select(users.c.id, users.c.email, users.c.name, users.c.created_at).order_by(users.c.created_at, users.c.id)
+        sa.select(users.c.id, users.c.email, users.c.name, users.c.created_at).order_by(
+            users.c.created_at, users.c.id
+        )
     ).all()
 
     used_usernames: set[str] = set()
@@ -139,7 +158,12 @@ def upgrade() -> None:
 
         timestamp = created_at or now
         username_history_rows.append(
-            {"id": uuid.uuid4(), "user_id": user_id, "username": username_value, "created_at": timestamp}
+            {
+                "id": uuid.uuid4(),
+                "user_id": user_id,
+                "username": username_value,
+                "created_at": timestamp,
+            }
         )
         name_history_rows.append(
             {
@@ -167,11 +191,14 @@ def downgrade() -> None:
     op.drop_constraint("uq_users_name_name_tag", "users", type_="unique")
     op.drop_index("ix_users_username", table_name="users")
 
-    op.drop_index("ix_user_display_name_history_user_id", table_name="user_display_name_history")
+    op.drop_index(
+        "ix_user_display_name_history_user_id", table_name="user_display_name_history"
+    )
     op.drop_table("user_display_name_history")
-    op.drop_index("ix_user_username_history_user_id", table_name="user_username_history")
+    op.drop_index(
+        "ix_user_username_history_user_id", table_name="user_username_history"
+    )
     op.drop_table("user_username_history")
 
     op.drop_column("users", "name_tag")
     op.drop_column("users", "username")
-

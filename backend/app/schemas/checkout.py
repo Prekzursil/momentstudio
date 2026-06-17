@@ -57,7 +57,9 @@ class GuestCheckoutRequest(BaseModel):
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
     invoice_company: str | None = Field(default=None, max_length=200)
     invoice_vat_id: str | None = Field(default=None, max_length=64)
-    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
+    payment_method: str = Field(
+        default="stripe", pattern="^(stripe|cod|paypal|netopia)$"
+    )
     accept_terms: bool = Field(default=False, description="Accept Terms & Conditions")
     accept_privacy: bool = Field(default=False, description="Accept Privacy Policy")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")
@@ -87,7 +89,9 @@ class GuestCheckoutResponse(BaseModel):
 class PayPalCaptureRequest(BaseModel):
     paypal_order_id: str = Field(min_length=1, max_length=255)
     order_id: UUID | None = None
-    mock: MockPaymentOutcome | None = Field(default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)")
+    mock: MockPaymentOutcome | None = Field(
+        default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)"
+    )
 
 
 class PayPalCaptureResponse(BaseModel):
@@ -100,7 +104,9 @@ class PayPalCaptureResponse(BaseModel):
 class StripeConfirmRequest(BaseModel):
     session_id: str = Field(min_length=1, max_length=255)
     order_id: UUID | None = None
-    mock: MockPaymentOutcome | None = Field(default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)")
+    mock: MockPaymentOutcome | None = Field(
+        default=None, description="Mock outcome (only when PAYMENTS_PROVIDER=mock)"
+    )
 
 
 class StripeConfirmResponse(BaseModel):
@@ -136,7 +142,9 @@ class CheckoutRequest(BaseModel):
     billing_country: str | None = Field(default=None, min_length=2, max_length=2)
     invoice_company: str | None = Field(default=None, max_length=200)
     invoice_vat_id: str | None = Field(default=None, max_length=64)
-    payment_method: str = Field(default="stripe", pattern="^(stripe|cod|paypal|netopia)$")
+    payment_method: str = Field(
+        default="stripe", pattern="^(stripe|cod|paypal|netopia)$"
+    )
     accept_terms: bool = Field(default=False, description="Accept Terms & Conditions")
     accept_privacy: bool = Field(default=False, description="Accept Privacy Policy")
     courier: str = Field(default="sameday", pattern="^(sameday|fan_courier)$")

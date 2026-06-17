@@ -8,7 +8,7 @@ import {
   Input,
   OnDestroy,
   Output,
-  ViewChild
+  ViewChild,
 } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
 
@@ -35,10 +35,14 @@ function loadTurnstileScript(): Promise<void> {
       resolve();
       return;
     }
-    const existing = document.querySelector('script[data-turnstile="true"]') as HTMLScriptElement | null;
+    const existing = document.querySelector(
+      'script[data-turnstile="true"]',
+    ) as HTMLScriptElement | null;
     if (existing) {
       existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), {
+        once: true,
+      });
       return;
     }
 
@@ -48,7 +52,9 @@ function loadTurnstileScript(): Promise<void> {
     script.defer = true;
     script.dataset['turnstile'] = 'true';
     script.addEventListener('load', () => resolve(), { once: true });
-    script.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), { once: true });
+    script.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), {
+      once: true,
+    });
     document.head.appendChild(script);
   });
   return turnstileScriptPromise;
@@ -62,9 +68,11 @@ function loadTurnstileScript(): Promise<void> {
   template: `
     <div class="grid gap-2">
       <div #host></div>
-      <p *ngIf="errorKey" class="text-xs text-rose-700 dark:text-rose-300">{{ errorKey | translate }}</p>
+      <p *ngIf="errorKey" class="text-xs text-rose-700 dark:text-rose-300">
+        {{ errorKey | translate }}
+      </p>
     </div>
-  `
+  `,
 })
 export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
   @Input({ required: true }) siteKey!: string;
@@ -100,7 +108,7 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
         'error-callback': () => {
           this.errorKey = 'auth.captchaFailedTryAgain';
           this.tokenChange.emit(null);
-        }
+        },
       });
     } catch {
       this.errorKey = 'auth.captchaFailedLoad';
@@ -120,4 +128,3 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
     }
   }
 }
-

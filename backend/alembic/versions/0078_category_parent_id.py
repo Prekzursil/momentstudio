@@ -33,4 +33,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_categories_parent_id", table_name="categories")
     op.drop_column("categories", "parent_id")
-

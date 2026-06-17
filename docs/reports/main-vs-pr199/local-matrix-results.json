@@ -48,4 +48,3 @@
     "aiosqlite event-loop shutdown warnings in some test paths (non-blocking, pre-existing)"
   ]
 }
-

@@ -9,7 +9,7 @@ async function acceptLegalModal(page: Page): Promise<void> {
   await expect(acceptButton).toBeVisible();
   const { scrollHeight, clientHeight } = await body.evaluate((el) => ({
     scrollHeight: el.scrollHeight,
-    clientHeight: el.clientHeight
+    clientHeight: el.clientHeight,
   }));
   const isScrollable = scrollHeight > clientHeight + 8;
 
@@ -36,7 +36,9 @@ test.beforeEach(async ({ page }) => {
 test('registration requires reading legal docs in a scroll-to-accept modal', async ({ page }) => {
   await page.goto('/register');
 
-  const unique = uniqueSessionId('e2e-register').replaceAll(/[^a-z0-9]/gi, '').slice(0, 16);
+  const unique = uniqueSessionId('e2e-register')
+    .replaceAll(/[^a-z0-9]/gi, '')
+    .slice(0, 16);
   const username = `e2e_${unique}`.slice(0, 25);
   const email = `e2e_${unique}@example.com`;
   const password = uniqueSessionId('e2e-pass').slice(0, 24);
@@ -63,7 +65,8 @@ test('registration requires reading legal docs in a scroll-to-accept modal', asy
   await expect(page.getByText('This field is required.').first()).toBeVisible();
 
   const termsResponse = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/content/pages/terms-and-conditions') && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/content/pages/terms-and-conditions') && res.status() === 200,
   );
   await page.locator('input[name="acceptTerms"]').click();
   await termsResponse;
@@ -71,7 +74,7 @@ test('registration requires reading legal docs in a scroll-to-accept modal', asy
   await expect(page.locator('input[name="acceptTerms"]')).toBeChecked();
 
   const privacyResponse = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/content/pages/privacy-policy') && res.status() === 200
+    (res) => res.url().includes('/api/v1/content/pages/privacy-policy') && res.status() === 200,
   );
   await page.locator('input[name="acceptPrivacy"]').click();
   await privacyResponse;

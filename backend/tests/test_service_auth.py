@@ -15,8 +15,13 @@ def test_auth_service_register_and_login():
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         async with SessionLocal() as session:
-            user = await auth_service.create_user(session, UserCreate(email="svc@example.com", password="svcpass1", name="Svc"))
-            found = await auth_service.authenticate_user(session, "svc@example.com", "svcpass1")
+            user = await auth_service.create_user(
+                session,
+                UserCreate(email="svc@example.com", password="svcpass1", name="Svc"),
+            )
+            found = await auth_service.authenticate_user(
+                session, "svc@example.com", "svcpass1"
+            )
             assert found.id == user.id
 
     asyncio.run(run_flow())

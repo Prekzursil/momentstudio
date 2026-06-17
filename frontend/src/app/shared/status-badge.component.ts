@@ -9,10 +9,13 @@ type BadgeTone = 'slate' | 'blue' | 'green' | 'amber' | 'rose';
   standalone: true,
   imports: [CommonModule, TranslateModule],
   template: `
-    <span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide uppercase" [ngClass]="classes">
-      {{ label || (labelKey ? (labelKey | translate) : (value || '—')) }}
+    <span
+      class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold tracking-wide uppercase"
+      [ngClass]="classes"
+    >
+      {{ label || (labelKey ? (labelKey | translate) : value || '—') }}
     </span>
-  `
+  `,
 })
 export class StatusBadgeComponent {
   @Input() value = '';
@@ -36,11 +39,12 @@ export class StatusBadgeComponent {
 
   private resolveTone(): BadgeTone {
     const raw = `${this.value}`.toLowerCase();
-    if (['paid', 'completed', 'active', 'published', 'verified', 'success'].includes(raw)) return 'green';
+    if (['paid', 'completed', 'active', 'published', 'verified', 'success'].includes(raw))
+      return 'green';
     if (['processing', 'accepted', 'shipped', 'pending_acceptance'].includes(raw)) return 'blue';
     if (['pending', 'pending_payment', 'draft', 'warning'].includes(raw)) return 'amber';
-    if (['cancelled', 'failed', 'error', 'archived', 'blocked', 'refunded'].includes(raw)) return 'rose';
+    if (['cancelled', 'failed', 'error', 'archived', 'blocked', 'refunded'].includes(raw))
+      return 'rose';
     return 'slate';
   }
 }
-

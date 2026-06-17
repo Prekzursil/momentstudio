@@ -18,7 +18,12 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("products", sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()))
+    op.add_column(
+        "products",
+        sa.Column(
+            "is_deleted", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+    )
     op.alter_column("products", "is_deleted", server_default=None)
 
 

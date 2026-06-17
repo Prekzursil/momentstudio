@@ -9,6 +9,8 @@ from app.schemas.observability import AdminClientErrorIn
 logger = logging.getLogger("app.admin_client_errors")
 
 router = APIRouter(prefix="/admin/observability", tags=["admin"])
+
+
 @router.post("/client-errors", status_code=status.HTTP_204_NO_CONTENT)
 async def log_admin_client_error(
     payload: AdminClientErrorIn,  # parsed/validated to enforce schema at ingress

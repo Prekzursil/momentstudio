@@ -24,7 +24,13 @@ async def _run_once() -> int:
 
 
 async def _loop(stop: asyncio.Event) -> None:
-    interval = max(300, int(getattr(settings, "sameday_mirror_sync_interval_seconds", 2592000) or 2592000))
+    interval = max(
+        300,
+        int(
+            getattr(settings, "sameday_mirror_sync_interval_seconds", 2592000)
+            or 2592000
+        ),
+    )
     while not stop.is_set():
         try:
             refreshed = await _run_once()
@@ -33,7 +39,9 @@ async def _loop(stop: asyncio.Event) -> None:
         except asyncio.CancelledError:
             break
         except Exception as exc:
-            logger.warning("sameday_easybox_sync_scheduler_failed", extra={"error": str(exc)})
+            logger.warning(
+                "sameday_easybox_sync_scheduler_failed", extra={"error": str(exc)}
+            )
 
         with suppress(asyncio.TimeoutError):
             await asyncio.wait_for(stop.wait(), timeout=interval)
@@ -45,7 +53,11 @@ def start(app: FastAPI) -> None:
     if getattr(app.state, "sameday_easybox_sync_scheduler_task", None) is not None:
         return
     stop = asyncio.Event()
-    task = asyncio.create_task(leader_lock.run_as_leader(name="sameday_easybox_sync_scheduler", stop=stop, work=_loop))
+    task = asyncio.create_task(
+        leader_lock.run_as_leader(
+            name="sameday_easybox_sync_scheduler", stop=stop, work=_loop
+        )
+    )
     app.state.sameday_easybox_sync_scheduler_stop = stop
     app.state.sameday_easybox_sync_scheduler_task = task
 

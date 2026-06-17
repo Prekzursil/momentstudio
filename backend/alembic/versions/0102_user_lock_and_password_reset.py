@@ -19,8 +19,12 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("users", sa.Column("locked_reason", sa.String(length=255), nullable=True))
+    op.add_column(
+        "users", sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "users", sa.Column("locked_reason", sa.String(length=255), nullable=True)
+    )
     op.add_column(
         "users",
         sa.Column(
@@ -36,4 +40,3 @@ def downgrade() -> None:
     op.drop_column("users", "password_reset_required")
     op.drop_column("users", "locked_reason")
     op.drop_column("users", "locked_until")
-

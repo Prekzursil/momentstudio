@@ -23,12 +23,19 @@ async def test_user_model_persists_in_sqlite_memory() -> None:
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
     async with SessionLocal() as session:
-        user = User(email="alice@example.com", username="alice", hashed_password="hashedpw", name="Alice")
+        user = User(
+            email="alice@example.com",
+            username="alice",
+            hashed_password="hashedpw",
+            name="Alice",
+        )
         session.add(user)
         await session.commit()
         await session.refresh(user)
 
-        result = await session.execute(select(User).where(User.email == "alice@example.com"))
+        result = await session.execute(
+            select(User).where(User.email == "alice@example.com")
+        )
         fetched = result.scalar_one()
         assert fetched.id is not None
         assert fetched.role == UserRole.customer
@@ -52,12 +59,21 @@ async def test_catalog_models_sqlite_memory() -> None:
             currency="RON",
             stock_quantity=5,
         )
-        product.variants = [ProductVariant(name="Large", additional_price_delta=2.0, stock_quantity=1)]
-        image = ProductImage(product=product, url="http://example.com/cup.jpg", alt_text="Cup", sort_order=1)
+        product.variants = [
+            ProductVariant(name="Large", additional_price_delta=2.0, stock_quantity=1)
+        ]
+        image = ProductImage(
+            product=product,
+            url="http://example.com/cup.jpg",
+            alt_text="Cup",
+            sort_order=1,
+        )
         session.add_all([category, product, image])
         await session.commit()
 
-        result = await session.execute(select(Product).where(Product.slug == "white-cup"))
+        result = await session.execute(
+            select(Product).where(Product.slug == "white-cup")
+        )
         fetched = result.scalar_one()
         assert fetched.category.slug == "cups"
         assert fetched.images[0].url.endswith("cup.jpg")
@@ -87,7 +103,14 @@ async def test_cart_models_sqlite_memory() -> None:
 
         cart = Cart(session_id="guest-123")
         session.add(cart)
-        session.add(CartItem(cart=cart, product=product, quantity=2, unit_price_at_add=product.base_price))
+        session.add(
+            CartItem(
+                cart=cart,
+                product=product,
+                quantity=2,
+                unit_price_at_add=product.base_price,
+            )
+        )
         await session.commit()
 
         result = await session.execute(select(CartItem).where(CartItem.cart == cart))
@@ -128,9 +151,19 @@ async def test_order_models_sqlite_memory() -> None:
             customer_name=user.name or user.email,
         )
         session.add(order)
-        session.add(OrderItem(order=order, product_id=product.id, quantity=1, unit_price=15, subtotal=15))
+        session.add(
+            OrderItem(
+                order=order,
+                product_id=product.id,
+                quantity=1,
+                unit_price=15,
+                subtotal=15,
+            )
+        )
         await session.commit()
 
-        result = await session.execute(select(OrderItem).where(OrderItem.order == order))
+        result = await session.execute(
+            select(OrderItem).where(OrderItem.order == order)
+        )
         fetched = result.scalar_one()
         assert fetched.subtotal == 15

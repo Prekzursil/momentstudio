@@ -11,7 +11,13 @@ from sqlalchemy.orm import selectinload, with_loader_criteria
 
 from app.models.cart import Cart, CartItem
 from app.models.catalog import Product, ProductImage, ProductVariant, ProductStatus
-from app.schemas.cart import CartItemCreate, CartItemUpdate, CartRead, CartItemRead, Totals
+from app.schemas.cart import (
+    CartItemCreate,
+    CartItemUpdate,
+    CartRead,
+    CartItemRead,
+    Totals,
+)
 from app.schemas.promo import PromoCodeRead, PromoCodeCreate
 from app.schemas.cart_sync import CartSyncItem
 from app.models.promo import PromoCode
@@ -68,7 +74,9 @@ def _log_cart(event: str, cart: Cart, user_id: UUID | None = None) -> None:
     )
 
 
-async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, session_id: str | None) -> Cart:
+async def _get_or_create_cart(
+    session: AsyncSession, user_id: UUID | None, session_id: str | None
+) -> Cart:
     async def _load_by_session_id(sid: str) -> Cart | None:
         result = await session.execute(
             select(Cart)
@@ -76,7 +84,11 @@ async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, sessi
                 selectinload(Cart.items)
                 .selectinload(CartItem.product)
                 .selectinload(Product.images),
-                with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
+                with_loader_criteria(
+                    ProductImage,
+                    ProductImage.is_deleted.is_(False),
+                    include_aliases=True,
+                ),
             )
             .where(Cart.session_id == sid)
         )
@@ -89,7 +101,11 @@ async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, sessi
                 selectinload(Cart.items)
                 .selectinload(CartItem.product)
                 .selectinload(Product.images),
-                with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
+                with_loader_criteria(
+                    ProductImage,
+                    ProductImage.is_deleted.is_(False),
+                    include_aliases=True,
+                ),
             )
             .where(Cart.user_id == user_id)
         )
@@ -118,23 +134,32 @@ async def _get_or_create_cart(session: AsyncSession, user_id: UUID | None, sessi
     return cart
 
 
-async def get_cart(session: AsyncSession, user_id: UUID | None, session_id: str | None) -> Cart:
+async def get_cart(
+    session: AsyncSession, user_id: UUID | None, session_id: str | None
+) -> Cart:
     cart = await _get_or_create_cart(session, user_id, session_id)
     return cart
 
 
-async def _validate_stock(product: Product, variant: ProductVariant | None, quantity: int) -> None:
+async def _validate_stock(
+    product: Product, variant: ProductVariant | None, quantity: int
+) -> None:
     if getattr(product, "allow_backorder", False):
         return
     stock = variant.stock_quantity if variant else product.stock_quantity
     if quantity > stock:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock"
+        )
     # Cart max-quantity enforcement is handled separately.
 
 
 def _enforce_max_quantity(quantity: int, limit: int | None) -> None:
     if limit and quantity > limit:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity exceeds allowed maximum")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Quantity exceeds allowed maximum",
+        )
 
 
 def _get_first_image(product: Product | None) -> str | None:
@@ -226,17 +251,29 @@ def _calculate_totals(
     currency: str | None = "RON",
 ) -> Totals:
     checkout = checkout_settings or CheckoutSettings()
-    subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
+    subtotal = sum(
+        _to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items
+    )
     subtotal = _to_decimal(subtotal)
     discount_val = _compute_discount(subtotal, promo)
 
-    shipping_fee = shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
-    threshold = (
-        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+    shipping_fee = (
+        shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
     )
-    shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee)
+    threshold = (
+        free_shipping_threshold_ron
+        if free_shipping_threshold_ron is not None
+        else checkout.free_shipping_threshold_ron
+    )
+    shipping_amount = _calculate_shipping_amount(
+        subtotal, shipping_method, shipping_fee_ron=shipping_fee
+    )
     shipping = _to_decimal(shipping_amount)
-    if threshold is not None and threshold >= 0 and (subtotal - discount_val) >= threshold:
+    if (
+        threshold is not None
+        and threshold >= 0
+        and (subtotal - discount_val) >= threshold
+    ):
         shipping = Decimal("0.00")
 
     breakdown = pricing.compute_totals(
@@ -273,7 +310,9 @@ def calculate_totals(
     shipping_fee_ron: Decimal | None = None,
     free_shipping_threshold_ron: Decimal | None = None,
 ) -> tuple[Totals, Decimal]:
-    subtotal = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
+    subtotal = sum(
+        _to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items
+    )
     discount_val = _compute_discount(_to_decimal(subtotal), promo)
     # The app enforces a single-currency policy (RON). Avoid accessing lazy-loaded
     # product relationships here, since this function is used in sync contexts.
@@ -304,17 +343,29 @@ async def calculate_totals_async(
     checkout = checkout_settings or CheckoutSettings()
     rounding = checkout.money_rounding
 
-    subtotal_raw = sum(_to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items)
+    subtotal_raw = sum(
+        _to_decimal(item.unit_price_at_add) * item.quantity for item in cart.items
+    )
     subtotal = _to_decimal(subtotal_raw)
     discount_val = _compute_discount(subtotal, promo)
 
-    shipping_fee = shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
-    threshold = (
-        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+    shipping_fee = (
+        shipping_fee_ron if shipping_fee_ron is not None else checkout.shipping_fee_ron
     )
-    shipping_amount = _calculate_shipping_amount(subtotal, shipping_method, shipping_fee_ron=shipping_fee)
+    threshold = (
+        free_shipping_threshold_ron
+        if free_shipping_threshold_ron is not None
+        else checkout.free_shipping_threshold_ron
+    )
+    shipping_amount = _calculate_shipping_amount(
+        subtotal, shipping_method, shipping_fee_ron=shipping_fee
+    )
     shipping = _to_decimal(shipping_amount)
-    if threshold is not None and threshold >= 0 and (subtotal - discount_val) >= threshold:
+    if (
+        threshold is not None
+        and threshold >= 0
+        and (subtotal - discount_val) >= threshold
+    ):
         shipping = Decimal("0.00")
 
     base_breakdown = pricing.compute_totals(
@@ -336,18 +387,24 @@ async def calculate_totals_async(
         product_id = getattr(item, "product_id", None)
         if not product_id:
             continue
-        line_subtotal = pricing.quantize_money(_to_decimal(item.unit_price_at_add) * item.quantity, rounding=rounding)
+        line_subtotal = pricing.quantize_money(
+            _to_decimal(item.unit_price_at_add) * item.quantity, rounding=rounding
+        )
         lines.append(TaxableProductLine(product_id=product_id, subtotal=line_subtotal))
 
     if lines:
         line_sum = sum((line.subtotal for line in lines), start=Decimal("0.00"))
-        diff = pricing.quantize_money(base_breakdown.subtotal - line_sum, rounding=rounding)
+        diff = pricing.quantize_money(
+            base_breakdown.subtotal - line_sum, rounding=rounding
+        )
         if diff != 0:
             idx = max(range(len(lines)), key=lambda i: lines[i].subtotal)
             adjusted = lines[idx].subtotal + diff
             if adjusted < 0:
                 adjusted = Decimal("0.00")
-            lines[idx] = TaxableProductLine(product_id=lines[idx].product_id, subtotal=adjusted)
+            lines[idx] = TaxableProductLine(
+                product_id=lines[idx].product_id, subtotal=adjusted
+            )
 
     vat_override = await taxes_service.compute_cart_vat_amount(
         session,
@@ -402,21 +459,33 @@ async def serialize_cart(
 ) -> CartRead:
     result = await session.execute(
         select(Cart)
-            .options(
-                selectinload(Cart.items)
-                .selectinload(CartItem.product)
-                .selectinload(Product.images),
-                with_loader_criteria(ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True),
-            )
-            .where(Cart.id == cart.id)
+        .options(
+            selectinload(Cart.items)
+            .selectinload(CartItem.product)
+            .selectinload(Product.images),
+            with_loader_criteria(
+                ProductImage, ProductImage.is_deleted.is_(False), include_aliases=True
+            ),
+        )
+        .where(Cart.id == cart.id)
     )
     hydrated = result.scalar_one()
-    currency = next(
-        (getattr(item.product, "currency", None) for item in hydrated.items if getattr(item, "product", None)), "RON"
-    ) or "RON"
+    currency = (
+        next(
+            (
+                getattr(item.product, "currency", None)
+                for item in hydrated.items
+                if getattr(item, "product", None)
+            ),
+            "RON",
+        )
+        or "RON"
+    )
     checkout = checkout_settings or CheckoutSettings()
     threshold = (
-        free_shipping_threshold_ron if free_shipping_threshold_ron is not None else checkout.free_shipping_threshold_ron
+        free_shipping_threshold_ron
+        if free_shipping_threshold_ron is not None
+        else checkout.free_shipping_threshold_ron
     )
     totals = totals_override
     if not totals:
@@ -434,8 +503,12 @@ async def serialize_cart(
         totals = Totals(**totals_override.model_dump(), currency=currency)
     if totals is not None:
         totals.free_shipping_threshold_ron = threshold
-        totals.phone_required_home = bool(getattr(checkout, "phone_required_home", False))
-        totals.phone_required_locker = bool(getattr(checkout, "phone_required_locker", False))
+        totals.phone_required_home = bool(
+            getattr(checkout, "phone_required_home", False)
+        )
+        totals.phone_required_locker = bool(
+            getattr(checkout, "phone_required_locker", False)
+        )
         locker_allowed, allowed_couriers = delivery_constraints(hydrated)
         totals.delivery_locker_allowed = locker_allowed
         totals.delivery_allowed_couriers = allowed_couriers
@@ -454,7 +527,8 @@ async def serialize_cart(
                     if item.max_quantity is not None
                     else (
                         None
-                        if item.product and getattr(item.product, "allow_backorder", False)
+                        if item.product
+                        and getattr(item.product, "allow_backorder", False)
                         else (item.product.stock_quantity if item.product else None)
                     )
                 ),
@@ -486,13 +560,17 @@ async def add_item(
         or not product.is_active
         or getattr(product, "status", None) != ProductStatus.published
     ):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
 
     variant = None
     if payload.variant_id:
         variant = await session.get(ProductVariant, payload.variant_id)
         if not variant or variant.product_id != product.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant"
+            )
 
     await _validate_stock(product, variant, payload.quantity)
     limit = payload.max_quantity
@@ -521,23 +599,38 @@ async def add_item(
     else:
         await session.flush()
     record_cart_event(
-        "add_item", {"cart_id": str(cart.id), "product_id": str(product.id), "quantity": payload.quantity}
+        "add_item",
+        {
+            "cart_id": str(cart.id),
+            "product_id": str(product.id),
+            "quantity": payload.quantity,
+        },
     )
     return item
 
 
-async def update_item(session: AsyncSession, cart: Cart, item_id: UUID, payload: CartItemUpdate) -> CartItem:
-    result = await session.execute(select(CartItem).where(CartItem.id == item_id, CartItem.cart_id == cart.id))
+async def update_item(
+    session: AsyncSession, cart: Cart, item_id: UUID, payload: CartItemUpdate
+) -> CartItem:
+    result = await session.execute(
+        select(CartItem).where(CartItem.id == item_id, CartItem.cart_id == cart.id)
+    )
     item = result.scalar_one_or_none()
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found"
+        )
 
     cart.last_order_id = None
     session.add(cart)
     product = await session.get(Product, item.product_id)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    variant = await session.get(ProductVariant, item.variant_id) if item.variant_id else None
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    variant = (
+        await session.get(ProductVariant, item.variant_id) if item.variant_id else None
+    )
     await _validate_stock(product, variant, payload.quantity)
     _enforce_max_quantity(payload.quantity, item.max_quantity)
 
@@ -546,16 +639,25 @@ async def update_item(session: AsyncSession, cart: Cart, item_id: UUID, payload:
     await session.commit()
     await session.refresh(item)
     record_cart_event(
-        "update_item", {"cart_id": str(cart.id), "item_id": str(item.id), "quantity": payload.quantity}
+        "update_item",
+        {
+            "cart_id": str(cart.id),
+            "item_id": str(item.id),
+            "quantity": payload.quantity,
+        },
     )
     return item
 
 
 async def delete_item(session: AsyncSession, cart: Cart, item_id: UUID) -> None:
-    result = await session.execute(select(CartItem).where(CartItem.id == item_id, CartItem.cart_id == cart.id))
+    result = await session.execute(
+        select(CartItem).where(CartItem.id == item_id, CartItem.cart_id == cart.id)
+    )
     item = result.scalar_one_or_none()
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cart item not found"
+        )
     cart.last_order_id = None
     session.add(cart)
     await session.delete(item)
@@ -563,7 +665,9 @@ async def delete_item(session: AsyncSession, cart: Cart, item_id: UUID) -> None:
     record_cart_event("delete_item", {"cart_id": str(cart.id), "item_id": str(item_id)})
 
 
-async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]) -> None:
+async def sync_cart(
+    session: AsyncSession, cart: Cart, items: list[CartSyncItem]
+) -> None:
     cart.last_order_id = None
     session.add(cart)
     # clear existing items
@@ -587,7 +691,9 @@ async def sync_cart(session: AsyncSession, cart: Cart, items: list[CartSyncItem]
     await session.refresh(cart)
 
 
-async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session_id: str | None) -> Cart:
+async def merge_guest_cart(
+    session: AsyncSession, user_cart: Cart, guest_session_id: str | None
+) -> Cart:
     if not guest_session_id:
         return user_cart
 
@@ -600,13 +706,22 @@ async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session
     for guest_item in guest.items:
         # try to find matching item
         match = next(
-            (i for i in user_cart.items if i.product_id == guest_item.product_id and i.variant_id == guest_item.variant_id),
+            (
+                i
+                for i in user_cart.items
+                if i.product_id == guest_item.product_id
+                and i.variant_id == guest_item.variant_id
+            ),
             None,
         )
         product = await session.get(Product, guest_item.product_id)
         if not product:
             continue
-        variant = await session.get(ProductVariant, guest_item.variant_id) if guest_item.variant_id else None
+        variant = (
+            await session.get(ProductVariant, guest_item.variant_id)
+            if guest_item.variant_id
+            else None
+        )
         new_qty = guest_item.quantity + (match.quantity if match else 0)
         await _validate_stock(product, variant, new_qty)
 
@@ -631,9 +746,13 @@ async def merge_guest_cart(session: AsyncSession, user_cart: Cart, guest_session
     return user_cart
 
 
-async def cleanup_stale_guest_carts(session: AsyncSession, max_age_hours: int = 72) -> int:
+async def cleanup_stale_guest_carts(
+    session: AsyncSession, max_age_hours: int = 72
+) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
-    result = await session.execute(select(Cart).where(Cart.user_id.is_(None), Cart.updated_at < cutoff))
+    result = await session.execute(
+        select(Cart).where(Cart.user_id.is_(None), Cart.updated_at < cutoff)
+    )
     stale = result.scalars().all()
     deleted = 0
     for cart in stale:
@@ -648,9 +767,14 @@ async def create_promo(session: AsyncSession, payload: PromoCodeCreate) -> Promo
     code = payload.code.strip().upper()
     result = await session.execute(select(PromoCode).where(PromoCode.code == code))
     if result.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code already exists"
+        )
     if payload.percentage_off and payload.amount_off:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose percentage_off or amount_off, not both")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Choose percentage_off or amount_off, not both",
+        )
     promo = PromoCode(**payload.model_dump())
     promo.code = code
     session.add(promo)
@@ -659,18 +783,32 @@ async def create_promo(session: AsyncSession, payload: PromoCodeCreate) -> Promo
     return promo
 
 
-async def validate_promo(session: AsyncSession, code: str, currency: str | None = None) -> PromoCodeRead:
+async def validate_promo(
+    session: AsyncSession, code: str, currency: str | None = None
+) -> PromoCodeRead:
     cleaned = code.strip().upper()
-    result = await session.execute(select(PromoCode).where(PromoCode.code == cleaned, PromoCode.active.is_(True)))
+    result = await session.execute(
+        select(PromoCode).where(PromoCode.code == cleaned, PromoCode.active.is_(True))
+    )
     promo = result.scalar_one_or_none()
     if not promo:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Promo code not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Promo code not found"
+        )
     if promo.expires_at and promo.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code expired")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code expired"
+        )
     if promo.max_uses and promo.times_used >= promo.max_uses:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code usage limit reached")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Promo code usage limit reached",
+        )
     if promo.currency and currency and promo.currency.upper() != currency.upper():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Promo code currency mismatch")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Promo code currency mismatch",
+        )
     return PromoCodeRead.model_validate(promo)
 
 
@@ -682,13 +820,17 @@ async def reserve_stock_for_checkout(session: AsyncSession, cart: Cart) -> bool:
 async def run_abandoned_cart_job(session: AsyncSession, max_age_hours: int = 24) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
     result = await session.execute(
-        select(Cart).options(selectinload(Cart.items)).where(Cart.user_id.isnot(None), Cart.updated_at < cutoff)
+        select(Cart)
+        .options(selectinload(Cart.items))
+        .where(Cart.user_id.isnot(None), Cart.updated_at < cutoff)
     )
     carts = result.scalars().all()
     sent = 0
     for cart in carts:
         if cart.items and cart.user_id:
-            user_result = await session.execute(select(User).where(User.id == cart.user_id))
+            user_result = await session.execute(
+                select(User).where(User.id == cart.user_id)
+            )
             user = user_result.scalar_one_or_none()
             if user and user.email and bool(getattr(user, "notify_marketing", False)):
                 await email_service.send_cart_abandonment(user.email)
@@ -703,13 +845,19 @@ def record_cart_event(event: str, payload: dict | None = None) -> None:
     cart_logger.info("cart_event")
 
 
-async def reorder_from_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Cart:
+async def reorder_from_order(
+    session: AsyncSession, user_id: UUID, order_id: UUID
+) -> Cart:
     result = await session.execute(
-        select(Order).options(selectinload(Order.items)).where(Order.id == order_id, Order.user_id == user_id)
+        select(Order)
+        .options(selectinload(Order.items))
+        .where(Order.id == order_id, Order.user_id == user_id)
     )
     order = result.scalar_one_or_none()
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
 
     cart = await _get_or_create_cart(session, user_id, None)
     await session.refresh(cart, attribute_names=["items"])

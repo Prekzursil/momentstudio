@@ -49,4 +49,3 @@ class AdminGdprDeletionRequestItem(BaseModel):
 class AdminGdprDeletionRequestsResponse(BaseModel):
     items: list[AdminGdprDeletionRequestItem]
     meta: AdminPaginationMeta
-

@@ -121,9 +121,11 @@ async def list_cart_reservations(
         .where(
             Cart.updated_at >= cutoff,
             CartItem.product_id == product_id,
-            CartItem.variant_id == variant_id
-            if variant_id is not None
-            else CartItem.variant_id.is_(None),
+            (
+                CartItem.variant_id == variant_id
+                if variant_id is not None
+                else CartItem.variant_id.is_(None)
+            ),
         )
         .group_by(Cart.id, Cart.updated_at, User.email, Cart.guest_email)
         .order_by(Cart.updated_at.desc())
@@ -179,9 +181,11 @@ async def list_order_reservations(
         .where(
             Order.status.in_(open_statuses),
             OrderItem.product_id == product_id,
-            OrderItem.variant_id == variant_id
-            if variant_id is not None
-            else OrderItem.variant_id.is_(None),
+            (
+                OrderItem.variant_id == variant_id
+                if variant_id is not None
+                else OrderItem.variant_id.is_(None)
+            ),
         )
         .group_by(
             Order.id,
@@ -197,7 +201,14 @@ async def list_order_reservations(
     )
     rows = (await session.execute(stmt)).all()
     items: list[dict] = []
-    for order_id, reference_code, status_value, created_at, customer_email, quantity in rows:
+    for (
+        order_id,
+        reference_code,
+        status_value,
+        created_at,
+        customer_email,
+        quantity,
+    ) in rows:
         items.append(
             {
                 "order_id": order_id,
@@ -349,16 +360,20 @@ async def list_restock_list(
                     threshold=threshold,
                     is_critical=is_critical,
                     restock_at=product.restock_at,
-                    supplier=getattr(note_record, "supplier", None)
-                    if note_record
-                    else None,
-                    desired_quantity=getattr(note_record, "desired_quantity", None)
-                    if note_record
-                    else None,
+                    supplier=(
+                        getattr(note_record, "supplier", None) if note_record else None
+                    ),
+                    desired_quantity=(
+                        getattr(note_record, "desired_quantity", None)
+                        if note_record
+                        else None
+                    ),
                     note=getattr(note_record, "note", None) if note_record else None,
-                    note_updated_at=getattr(note_record, "updated_at", None)
-                    if note_record
-                    else None,
+                    note_updated_at=(
+                        getattr(note_record, "updated_at", None)
+                        if note_record
+                        else None
+                    ),
                 )
             )
 
@@ -399,16 +414,20 @@ async def list_restock_list(
                     threshold=threshold,
                     is_critical=is_critical,
                     restock_at=product.restock_at,
-                    supplier=getattr(note_record, "supplier", None)
-                    if note_record
-                    else None,
-                    desired_quantity=getattr(note_record, "desired_quantity", None)
-                    if note_record
-                    else None,
+                    supplier=(
+                        getattr(note_record, "supplier", None) if note_record else None
+                    ),
+                    desired_quantity=(
+                        getattr(note_record, "desired_quantity", None)
+                        if note_record
+                        else None
+                    ),
                     note=getattr(note_record, "note", None) if note_record else None,
-                    note_updated_at=getattr(note_record, "updated_at", None)
-                    if note_record
-                    else None,
+                    note_updated_at=(
+                        getattr(note_record, "updated_at", None)
+                        if note_record
+                        else None
+                    ),
                 )
             )
 

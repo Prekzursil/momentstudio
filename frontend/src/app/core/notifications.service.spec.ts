@@ -9,7 +9,7 @@ describe('NotificationsService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [NotificationsService]
+      providers: [NotificationsService],
     });
     service = TestBed.inject(NotificationsService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -37,9 +37,21 @@ describe('NotificationsService', () => {
     expect(req.request.params.get('limit')).toBe('25');
     req.flush({
       items: [
-        { id: 'n1', type: 'order', title: 'Order', created_at: '2000-01-01T00:00:00+00:00', read_at: null },
-        { id: 'n2', type: 'order', title: 'Old', created_at: '2000-01-01T00:00:00+00:00', read_at: '2000-01-01T00:00:00+00:00' }
-      ]
+        {
+          id: 'n1',
+          type: 'order',
+          title: 'Order',
+          created_at: '2000-01-01T00:00:00+00:00',
+          read_at: null,
+        },
+        {
+          id: 'n2',
+          type: 'order',
+          title: 'Old',
+          created_at: '2000-01-01T00:00:00+00:00',
+          read_at: '2000-01-01T00:00:00+00:00',
+        },
+      ],
     });
 
     expect(service.items().map((n) => n.id)).toEqual(['n1', 'n2']);
@@ -52,7 +64,15 @@ describe('NotificationsService', () => {
     expect(loadReq.request.method).toBe('GET');
     expect(loadReq.request.params.get('limit')).toBe('20');
     loadReq.flush({
-      items: [{ id: 'n1', type: 'order', title: 'Order', created_at: '2000-01-01T00:00:00+00:00', read_at: null }]
+      items: [
+        {
+          id: 'n1',
+          type: 'order',
+          title: 'Order',
+          created_at: '2000-01-01T00:00:00+00:00',
+          read_at: null,
+        },
+      ],
     });
 
     service.markRead('n1');
@@ -63,7 +83,7 @@ describe('NotificationsService', () => {
       type: 'order',
       title: 'Order',
       created_at: '2000-01-01T00:00:00+00:00',
-      read_at: '2000-01-01T00:00:00+00:00'
+      read_at: '2000-01-01T00:00:00+00:00',
     });
 
     expect(service.items()[0].read_at).toBeTruthy();
@@ -76,7 +96,15 @@ describe('NotificationsService', () => {
     expect(loadReq.request.method).toBe('GET');
     expect(loadReq.request.params.get('limit')).toBe('20');
     loadReq.flush({
-      items: [{ id: 'n1', type: 'order', title: 'Order', created_at: '2000-01-01T00:00:00+00:00', read_at: null }]
+      items: [
+        {
+          id: 'n1',
+          type: 'order',
+          title: 'Order',
+          created_at: '2000-01-01T00:00:00+00:00',
+          read_at: null,
+        },
+      ],
     });
 
     service.dismiss('n1');
@@ -87,7 +115,7 @@ describe('NotificationsService', () => {
       type: 'order',
       title: 'Order',
       created_at: '2000-01-01T00:00:00+00:00',
-      dismissed_at: '2000-01-01T00:00:00+00:00'
+      dismissed_at: '2000-01-01T00:00:00+00:00',
     });
 
     expect(service.items().length).toBe(0);

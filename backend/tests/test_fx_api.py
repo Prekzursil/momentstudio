@@ -45,7 +45,12 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_admin_token(session_factory) -> str:
     async def create_and_token() -> str:
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email="admin@example.com", password="password123", name="Admin"))
+            user = await create_user(
+                session,
+                UserCreate(
+                    email="admin@example.com", password="password123", name="Admin"
+                ),
+            )
             user.role = UserRole.admin
             session.add(
                 UserPasskey(
@@ -64,7 +69,9 @@ def create_admin_token(session_factory) -> str:
     return asyncio.run(create_and_token())
 
 
-def test_fx_rates_endpoint_persists_last_known_and_falls_back(test_app: Dict[str, object], monkeypatch) -> None:
+def test_fx_rates_endpoint_persists_last_known_and_falls_back(
+    test_app: Dict[str, object], monkeypatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
     async def fake_get_fx_rates(*, force_refresh: bool = False) -> fx_rates.FxRates:
@@ -100,7 +107,9 @@ def test_fx_rates_endpoint_persists_last_known_and_falls_back(test_app: Dict[str
     assert fallback.json()["usd_per_ron"] == 0.22
 
 
-def test_fx_admin_override_takes_precedence(test_app: Dict[str, object], monkeypatch) -> None:
+def test_fx_admin_override_takes_precedence(
+    test_app: Dict[str, object], monkeypatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     token = create_admin_token(SessionLocal)
@@ -154,7 +163,11 @@ def test_fx_override_audit_and_restore(test_app: Dict[str, object]) -> None:
     assert any(e["action"] == "set" for e in entries)
     assert any(e.get("user_email") == "admin@example.com" for e in entries)
 
-    restore_target = next(e for e in entries if e.get("eur_per_ron") == 0.25 and e.get("usd_per_ron") == 0.23)
+    restore_target = next(
+        e
+        for e in entries
+        if e.get("eur_per_ron") == 0.25 and e.get("usd_per_ron") == 0.23
+    )
     restore = client.post(
         f"/api/v1/fx/admin/override/audit/{restore_target['id']}/revert",
         json={},
@@ -165,7 +178,9 @@ def test_fx_override_audit_and_restore(test_app: Dict[str, object]) -> None:
     assert restored["override"]["eur_per_ron"] == 0.25
     assert restored["override"]["usd_per_ron"] == 0.23
 
-    audit_after = client.get("/api/v1/fx/admin/override/audit", headers=auth_headers(token))
+    audit_after = client.get(
+        "/api/v1/fx/admin/override/audit", headers=auth_headers(token)
+    )
     assert audit_after.status_code == 200, audit_after.text
     after_entries = audit_after.json()
     assert after_entries[0]["action"] == "restore"

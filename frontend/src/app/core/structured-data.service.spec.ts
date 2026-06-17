@@ -10,7 +10,7 @@ describe('StructuredDataService', () => {
   beforeEach(() => {
     doc = document.implementation.createHTMLDocument('structured-data');
     TestBed.configureTestingModule({
-      providers: [StructuredDataService, { provide: DOCUMENT, useValue: doc }]
+      providers: [StructuredDataService, { provide: DOCUMENT, useValue: doc }],
     });
     service = TestBed.inject(StructuredDataService);
   });
@@ -18,7 +18,7 @@ describe('StructuredDataService', () => {
   it('upserts route schemas with deterministic ids', () => {
     service.setRouteSchemas([
       { '@context': 'https://schema.org', '@type': 'WebPage', name: 'Home' },
-      { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Shop' }
+      { '@context': 'https://schema.org', '@type': 'CollectionPage', name: 'Shop' },
     ]);
 
     const scripts = Array.from(doc.querySelectorAll('script[data-seo-route-schema="true"]'));
@@ -30,10 +30,12 @@ describe('StructuredDataService', () => {
   it('removes stale managed scripts when schema count shrinks', () => {
     service.setRouteSchemas([
       { '@context': 'https://schema.org', '@type': 'WebPage', name: 'A' },
-      { '@context': 'https://schema.org', '@type': 'WebPage', name: 'B' }
+      { '@context': 'https://schema.org', '@type': 'WebPage', name: 'B' },
     ]);
 
-    service.setRouteSchemas([{ '@context': 'https://schema.org', '@type': 'WebPage', name: 'Only' }]);
+    service.setRouteSchemas([
+      { '@context': 'https://schema.org', '@type': 'WebPage', name: 'Only' },
+    ]);
 
     const scripts = Array.from(doc.querySelectorAll('script[data-seo-route-schema="true"]'));
     expect(scripts.length).toBe(1);
@@ -42,7 +44,9 @@ describe('StructuredDataService', () => {
   });
 
   it('clears managed route schemas', () => {
-    service.setRouteSchemas([{ '@context': 'https://schema.org', '@type': 'WebPage', name: 'Home' }]);
+    service.setRouteSchemas([
+      { '@context': 'https://schema.org', '@type': 'WebPage', name: 'Home' },
+    ]);
     service.clearRouteSchemas();
 
     const scripts = Array.from(doc.querySelectorAll('script[data-seo-route-schema="true"]'));

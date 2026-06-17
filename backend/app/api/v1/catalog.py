@@ -3,7 +3,17 @@ from functools import partial
 from uuid import UUID
 
 import anyio
-from fastapi import APIRouter, Depends, File, HTTPException, Path, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Path,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,10 +83,14 @@ router = APIRouter(prefix="/catalog", tags=["catalog"])
 _CSV_IMPORT_MAX_BYTES = 25 * 1024 * 1024
 
 
-async def _read_upload_csv_bytes(file: UploadFile, *, max_bytes: int = _CSV_IMPORT_MAX_BYTES) -> bytes:
+async def _read_upload_csv_bytes(
+    file: UploadFile, *, max_bytes: int = _CSV_IMPORT_MAX_BYTES
+) -> bytes:
     raw = await file.read(max_bytes + 1)
     if len(raw) > max_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file too large")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file too large"
+        )
     return raw
 
 
@@ -87,7 +101,11 @@ async def list_categories(
     include_hidden: bool = Query(default=False),
     current_user: User | None = Depends(get_current_user_optional),
 ) -> list[Category]:
-    is_staff = current_user is not None and current_user.role in {UserRole.admin, UserRole.owner, UserRole.content}
+    is_staff = current_user is not None and current_user.role in {
+        UserRole.admin,
+        UserRole.owner,
+        UserRole.content,
+    }
     query = select(Category).order_by(Category.sort_order, Category.name)
     if not (include_hidden and is_staff):
         query = query.where(Category.is_visible.is_(True))
@@ -112,7 +130,10 @@ async def list_products(
     min_price: float | None = Query(default=None, ge=0),
     max_price: float | None = Query(default=None, ge=0),
     tags: list[str] | None = Query(default=None),
-    sort: str | None = Query(default=None, description="recommended|newest|price_asc|price_desc|name_asc|name_desc"),
+    sort: str | None = Query(
+        default=None,
+        description="recommended|newest|price_asc|price_desc|name_asc|name_desc",
+    ),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
@@ -122,7 +143,11 @@ async def list_products(
         on_sale = True
         category_slug = None
 
-    is_staff = current_user is not None and current_user.role in {UserRole.admin, UserRole.owner, UserRole.content}
+    is_staff = current_user is not None and current_user.role in {
+        UserRole.admin,
+        UserRole.owner,
+        UserRole.content,
+    }
     include_unpublished = bool(include_unpublished and is_staff)
 
     await catalog_service.auto_publish_due_sales(session)
@@ -161,8 +186,15 @@ async def list_products(
     total_pages = max(1, (total_items + limit - 1) // limit) if total_items else 1
     return ProductListResponse(
         items=payload_items,
-        meta={"total_items": total_items, "total_pages": total_pages, "page": page, "limit": limit},
-        bounds=ProductPriceBounds(min_price=min_bound, max_price=max_bound, currency=currency),
+        meta={
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "page": page,
+            "limit": limit,
+        },
+        bounds=ProductPriceBounds(
+            min_price=min_bound, max_price=max_bound, currency=currency
+        ),
     )
 
 
@@ -181,7 +213,11 @@ async def get_product_price_bounds(
         on_sale = True
         category_slug = None
 
-    is_staff = current_user is not None and current_user.role in {UserRole.admin, UserRole.owner, UserRole.content}
+    is_staff = current_user is not None and current_user.role in {
+        UserRole.admin,
+        UserRole.owner,
+        UserRole.content,
+    }
     include_unpublished = bool(include_unpublished and is_staff)
 
     await catalog_service.auto_publish_due_sales(session)
@@ -195,7 +231,9 @@ async def get_product_price_bounds(
         tags=tags,
         include_unpublished=include_unpublished,
     )
-    return ProductPriceBounds(min_price=min_price, max_price=max_price, currency=currency)
+    return ProductPriceBounds(
+        min_price=min_price, max_price=max_price, currency=currency
+    )
 
 
 @router.get("/products/feed", response_model=list[ProductFeedItem])
@@ -219,7 +257,9 @@ async def product_feed_csv(
 # Admin endpoints
 
 
-@router.post("/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/categories", response_model=CategoryRead, status_code=status.HTTP_201_CREATED
+)
 async def create_category(
     payload: CategoryCreate,
     session: AsyncSession = Depends(get_session),
@@ -233,7 +273,11 @@ async def create_category(
             action="catalog.category.create",
             actor_user_id=current_user.id,
             subject_user_id=None,
-            data={"source": source, "slug": created.slug, "category_id": str(created.id)},
+            data={
+                "source": source,
+                "slug": created.slug,
+                "category_id": str(created.id),
+            },
         )
         await session.commit()
     return created
@@ -249,7 +293,9 @@ async def update_category(
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
     updated = await catalog_service.update_category(session, category, payload)
     if source:
         await audit_chain_service.add_admin_audit_log(
@@ -257,13 +303,19 @@ async def update_category(
             action="catalog.category.update",
             actor_user_id=current_user.id,
             subject_user_id=None,
-            data={"source": source, "slug": slug, "patch": payload.model_dump(exclude_unset=True)},
+            data={
+                "source": source,
+                "slug": slug,
+                "patch": payload.model_dump(exclude_unset=True),
+            },
         )
         await session.commit()
     return updated
 
 
-@router.get("/categories/{slug}/translations", response_model=list[CategoryTranslationRead])
+@router.get(
+    "/categories/{slug}/translations", response_model=list[CategoryTranslationRead]
+)
 async def list_category_translations(
     slug: str,
     session: AsyncSession = Depends(get_session),
@@ -271,12 +323,16 @@ async def list_category_translations(
 ) -> list[CategoryTranslationRead]:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
     translations = await catalog_service.list_category_translations(session, category)
     return [CategoryTranslationRead.model_validate(t) for t in translations]
 
 
-@router.put("/categories/{slug}/translations/{lang}", response_model=CategoryTranslationRead)
+@router.put(
+    "/categories/{slug}/translations/{lang}", response_model=CategoryTranslationRead
+)
 async def upsert_category_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
@@ -287,8 +343,12 @@ async def upsert_category_translation(
 ) -> CategoryTranslationRead:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-    updated = await catalog_service.upsert_category_translation(session, category=category, lang=lang, payload=payload)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
+    updated = await catalog_service.upsert_category_translation(
+        session, category=category, lang=lang, payload=payload
+    )
     if source:
         await audit_chain_service.add_admin_audit_log(
             session,
@@ -301,7 +361,9 @@ async def upsert_category_translation(
     return CategoryTranslationRead.model_validate(updated)
 
 
-@router.delete("/categories/{slug}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/categories/{slug}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def delete_category_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
@@ -311,8 +373,12 @@ async def delete_category_translation(
 ) -> None:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-    await catalog_service.delete_category_translation(session, category=category, lang=lang)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
+    await catalog_service.delete_category_translation(
+        session, category=category, lang=lang
+    )
     if source:
         await audit_chain_service.add_admin_audit_log(
             session,
@@ -334,7 +400,9 @@ async def delete_category(
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
     await session.delete(category)
     await session.commit()
     if source:
@@ -391,13 +459,19 @@ async def import_categories_csv(
     _: object = Depends(require_admin_section("products")),
 ) -> ImportResult:
     if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required"
+        )
     raw = await _read_upload_csv_bytes(file)
     try:
         content = raw.decode()
     except UnicodeDecodeError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to decode CSV")
-    result = await catalog_service.import_categories_csv(session, content, dry_run=dry_run)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to decode CSV"
+        )
+    result = await catalog_service.import_categories_csv(
+        session, content, dry_run=dry_run
+    )
     return ImportResult(**result)
 
 
@@ -412,7 +486,9 @@ async def upload_category_image(
 ) -> Category:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
 
     media_root = storage.ensure_media_root()
     dest = media_root / "catalog" / "categories" / slug
@@ -421,7 +497,13 @@ async def upload_category_image(
             storage.save_upload,
             file,
             root=dest,
-            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            allowed_content_types=(
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+                "image/gif",
+                "image/svg+xml",
+            ),
             max_bytes=None,
             generate_thumbnails=True,
         )
@@ -456,13 +538,19 @@ async def preview_delete_category(
 ) -> CategoryDeletePreview:
     category = await catalog_service.get_category_by_slug(session, slug)
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
 
     product_count = (
-        await session.execute(select(func.count(Product.id)).where(Product.category_id == category.id))
+        await session.execute(
+            select(func.count(Product.id)).where(Product.category_id == category.id)
+        )
     ).scalar_one()
     child_count = (
-        await session.execute(select(func.count(Category.id)).where(Category.parent_id == category.id))
+        await session.execute(
+            select(func.count(Category.id)).where(Category.parent_id == category.id)
+        )
     ).scalar_one()
     product_count_int = int(product_count or 0)
     child_count_int = int(child_count or 0)
@@ -483,16 +571,24 @@ async def preview_merge_category(
 ) -> CategoryMergePreview:
     source = await catalog_service.get_category_by_slug(session, slug)
     if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
     target = await catalog_service.get_category_by_slug(session, target_slug)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found"
+        )
 
     product_count = (
-        await session.execute(select(func.count(Product.id)).where(Product.category_id == source.id))
+        await session.execute(
+            select(func.count(Product.id)).where(Product.category_id == source.id)
+        )
     ).scalar_one()
     child_count = (
-        await session.execute(select(func.count(Category.id)).where(Category.parent_id == source.id))
+        await session.execute(
+            select(func.count(Category.id)).where(Category.parent_id == source.id)
+        )
     ).scalar_one()
     product_count_int = int(product_count or 0)
     child_count_int = int(child_count or 0)
@@ -525,24 +621,41 @@ async def merge_category(
     payload: CategoryMergeRequest,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_admin_section("products")),
-    audit_source: str | None = Query(default=None, alias="source", pattern="^(storefront)$"),
+    audit_source: str | None = Query(
+        default=None, alias="source", pattern="^(storefront)$"
+    ),
 ) -> CategoryMergeResult:
     source = await catalog_service.get_category_by_slug(session, slug)
     if not source:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Category not found"
+        )
     target = await catalog_service.get_category_by_slug(session, payload.target_slug)
     if not target:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Target category not found"
+        )
     if source.slug == target.slug:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category into itself")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot merge a category into itself",
+        )
     if source.parent_id != target.parent_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Categories must share the same parent")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Categories must share the same parent",
+        )
 
     child_count = (
-        await session.execute(select(func.count(Category.id)).where(Category.parent_id == source.id))
+        await session.execute(
+            select(func.count(Category.id)).where(Category.parent_id == source.id)
+        )
     ).scalar_one()
     if int(child_count or 0) > 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot merge a category with subcategories")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot merge a category with subcategories",
+        )
 
     result = await session.execute(
         update(Product)
@@ -553,7 +666,9 @@ async def merge_category(
 
     await session.delete(source)
     await session.commit()
-    result_model = CategoryMergeResult(source_slug=source.slug, target_slug=target.slug, moved_products=moved_products)
+    result_model = CategoryMergeResult(
+        source_slug=source.slug, target_slug=target.slug, moved_products=moved_products
+    )
     if audit_source:
         await audit_chain_service.add_admin_audit_log(
             session,
@@ -571,13 +686,17 @@ async def merge_category(
     return result_model
 
 
-@router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED
+)
 async def create_product(
     payload: ProductCreate,
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_admin_section("products")),
 ) -> Product:
-    return await catalog_service.create_product(session, payload, user_id=current_user.id)
+    return await catalog_service.create_product(
+        session, payload, user_id=current_user.id
+    )
 
 
 @router.patch("/products/{slug}", response_model=ProductRead)
@@ -590,11 +709,17 @@ async def update_product(
 ) -> Product:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return await catalog_service.update_product(session, product, payload, user_id=current_user.id, source=source)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    return await catalog_service.update_product(
+        session, product, payload, user_id=current_user.id, source=source
+    )
 
 
-@router.get("/products/{slug}/translations", response_model=list[ProductTranslationRead])
+@router.get(
+    "/products/{slug}/translations", response_model=list[ProductTranslationRead]
+)
 async def list_product_translations(
     slug: str,
     session: AsyncSession = Depends(get_session),
@@ -602,12 +727,16 @@ async def list_product_translations(
 ) -> list[ProductTranslationRead]:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     translations = await catalog_service.list_product_translations(session, product)
     return [ProductTranslationRead.model_validate(t) for t in translations]
 
 
-@router.put("/products/{slug}/translations/{lang}", response_model=ProductTranslationRead)
+@router.put(
+    "/products/{slug}/translations/{lang}", response_model=ProductTranslationRead
+)
 async def upsert_product_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
@@ -617,12 +746,18 @@ async def upsert_product_translation(
 ) -> ProductTranslationRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    updated = await catalog_service.upsert_product_translation(session, product=product, lang=lang, payload=payload)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    updated = await catalog_service.upsert_product_translation(
+        session, product=product, lang=lang, payload=payload
+    )
     return ProductTranslationRead.model_validate(updated)
 
 
-@router.delete("/products/{slug}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/products/{slug}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def delete_product_translation(
     slug: str,
     lang: str = Path(..., pattern="^(en|ro)$"),
@@ -631,8 +766,12 @@ async def delete_product_translation(
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await catalog_service.delete_product_translation(session, product=product, lang=lang)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    await catalog_service.delete_product_translation(
+        session, product=product, lang=lang
+    )
     return None
 
 
@@ -644,7 +783,9 @@ async def get_product_relationships(
 ) -> ProductRelationshipsRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     return await catalog_service.get_product_relationships(session, product.id)
 
 
@@ -657,8 +798,12 @@ async def update_product_relationships(
 ) -> ProductRelationshipsRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return await catalog_service.update_product_relationships(session, product=product, payload=payload, user_id=current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    return await catalog_service.update_product_relationships(
+        session, product=product, payload=payload, user_id=current_user.id
+    )
 
 
 @router.get("/products/{slug}/audit", response_model=list[AdminProductAuditEntry])
@@ -670,7 +815,9 @@ async def list_product_audit(
 ) -> list[AdminProductAuditEntry]:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     rows = (
         await session.execute(
             select(ProductAuditLog, User.email)
@@ -709,7 +856,9 @@ async def soft_delete_product(
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     await catalog_service.soft_delete_product(session, product, user_id=current_user.id)
     return None
 
@@ -722,28 +871,46 @@ async def upload_product_image(
     _: object = Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
 
     path, filename = await anyio.to_thread.run_sync(
         partial(
             storage.save_upload,
             file,
-            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            allowed_content_types=(
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+                "image/gif",
+                "image/svg+xml",
+            ),
             max_bytes=None,
             generate_thumbnails=True,
         )
     )
     await catalog_service.add_product_image_from_path(
-        session, product, url=path, alt_text=filename, sort_order=len(product.images) + 1
+        session,
+        product,
+        url=path,
+        alt_text=filename,
+        sort_order=len(product.images) + 1,
     )
     refreshed = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not refreshed:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     return ProductRead.model_validate(refreshed)
 
 
@@ -754,7 +921,9 @@ async def bulk_update_products(
     current_user=Depends(require_admin_section("products")),
     source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> list[Product]:
-    updated = await catalog_service.bulk_update_products(session, payload, user_id=current_user.id, source=source)
+    updated = await catalog_service.bulk_update_products(
+        session, payload, user_id=current_user.id, source=source
+    )
     return updated
 
 
@@ -765,10 +934,16 @@ async def update_product_variants(
     session: AsyncSession = Depends(get_session),
     current_user=Depends(require_admin_section("products")),
 ) -> list[ProductVariantRead]:
-    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.variants)])
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.variants)]
+    )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    return await catalog_service.update_product_variants(session, product=product, payload=payload, user_id=current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    return await catalog_service.update_product_variants(
+        session, product=product, payload=payload, user_id=current_user.id
+    )
 
 
 @router.get("/collections/featured", response_model=list[FeaturedCollectionRead])
@@ -802,7 +977,11 @@ async def list_featured_collections(
     return payload
 
 
-@router.post("/collections/featured", response_model=FeaturedCollectionRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/collections/featured",
+    response_model=FeaturedCollectionRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_featured_collection(
     payload: FeaturedCollectionCreate,
     session: AsyncSession = Depends(get_session),
@@ -821,12 +1000,20 @@ async def update_featured_collection(
 ) -> FeaturedCollectionRead:
     collection = await catalog_service.get_featured_collection_by_slug(session, slug)
     if not collection:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
-    updated = await catalog_service.update_featured_collection(session, collection, payload)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found"
+        )
+    updated = await catalog_service.update_featured_collection(
+        session, collection, payload
+    )
     return FeaturedCollectionRead.model_validate(updated)
 
 
-@router.post("/products/{slug}/duplicate", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/products/{slug}/duplicate",
+    response_model=ProductRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def duplicate_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
@@ -834,18 +1021,30 @@ async def duplicate_product(
     source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category), selectinload(Product.options)]
+        session,
+        slug,
+        options=[
+            selectinload(Product.images),
+            selectinload(Product.category),
+            selectinload(Product.options),
+        ],
     )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    clone = await catalog_service.duplicate_product(session, product, user_id=current_user.id, source=source)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    clone = await catalog_service.duplicate_product(
+        session, product, user_id=current_user.id, source=source
+    )
     return clone
 
 
 @router.get("/products/recently-viewed", response_model=list[ProductRead])
 async def recently_viewed_products(
     session: AsyncSession = Depends(get_session),
-    session_id: str | None = Query(default=None, description="Client session identifier for guests"),
+    session_id: str | None = Query(
+        default=None, description="Client session identifier for guests"
+    ),
     limit: int = Query(default=5, ge=1, le=20),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     current_user=Depends(get_current_user_optional),
@@ -853,7 +1052,10 @@ async def recently_viewed_products(
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
     products = await catalog_service.get_recently_viewed(
-        session, getattr(current_user, "id", None) if current_user else None, session_id, limit
+        session,
+        getattr(current_user, "id", None) if current_user else None,
+        session_id,
+        limit,
     )
     if lang:
         for p in products:
@@ -887,13 +1089,19 @@ async def import_products_csv(
     _: object = Depends(require_admin_section("products")),
 ) -> ImportResult:
     if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file required"
+        )
     raw = await _read_upload_csv_bytes(file)
     try:
         content = raw.decode()
     except UnicodeDecodeError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to decode CSV")
-    result = await catalog_service.import_products_csv(session, content, dry_run=dry_run)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to decode CSV"
+        )
+    result = await catalog_service.import_products_csv(
+        session, content, dry_run=dry_run
+    )
     return ImportResult(**result)
 
 
@@ -901,7 +1109,10 @@ async def import_products_csv(
 async def get_product(
     slug: str,
     session: AsyncSession = Depends(get_session),
-    session_id: str | None = Query(default=None, description="Client session identifier for recently viewed tracking"),
+    session_id: str | None = Query(
+        default=None,
+        description="Client session identifier for recently viewed tracking",
+    ),
     lang: str | None = Query(default=None, pattern="^(en|ro)$"),
     current_user=Depends(get_current_user_optional),
 ) -> Product:
@@ -913,20 +1124,34 @@ async def get_product(
     product_options = [image_loader]
     if lang:
         product_options.append(selectinload(Product.translations))
-        product_options.append(selectinload(Product.category).selectinload(Category.translations))
+        product_options.append(
+            selectinload(Product.category).selectinload(Category.translations)
+        )
     else:
         product_options.append(selectinload(Product.category))
     product = await catalog_service.get_product_by_slug(
         session, slug, options=product_options, follow_history=True, lang=lang
     )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    is_admin = (
+        current_user is not None
+        and getattr(current_user, "role", None) != UserRole.customer
+    )
+    if not is_admin and (
+        not product.is_active or product.status != ProductStatus.published
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     if product.is_active and product.status == ProductStatus.published:
         await catalog_service.record_recently_viewed(
-            session, product, getattr(current_user, "id", None) if current_user else None, session_id
+            session,
+            product,
+            getattr(current_user, "id", None) if current_user else None,
+            session_id,
         )
     model = ProductRead.model_validate(product)
     if not is_admin and not catalog_service.is_sale_active(product):
@@ -942,11 +1167,22 @@ async def get_back_in_stock_status(
 ) -> BackInStockStatus:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    request = await catalog_service.get_active_back_in_stock_request(session, user_id=current_user.id, product_id=product.id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    is_admin = (
+        current_user is not None
+        and getattr(current_user, "role", None) != UserRole.customer
+    )
+    if not is_admin and (
+        not product.is_active or product.status != ProductStatus.published
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    request = await catalog_service.get_active_back_in_stock_request(
+        session, user_id=current_user.id, product_id=product.id
+    )
     return BackInStockStatus(
         in_stock=not catalog_service.is_out_of_stock(product),
         request=BackInStockRequestRead.model_validate(request) if request else None,
@@ -961,11 +1197,22 @@ async def request_back_in_stock(
 ) -> BackInStockRequestRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    record = await catalog_service.create_back_in_stock_request(session, user_id=current_user.id, product=product)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    is_admin = (
+        current_user is not None
+        and getattr(current_user, "role", None) != UserRole.customer
+    )
+    if not is_admin and (
+        not product.is_active or product.status != ProductStatus.published
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    record = await catalog_service.create_back_in_stock_request(
+        session, user_id=current_user.id, product=product
+    )
     return BackInStockRequestRead.model_validate(record)
 
 
@@ -977,11 +1224,22 @@ async def cancel_back_in_stock(
 ) -> None:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await catalog_service.cancel_back_in_stock_request(session, user_id=current_user.id, product_id=product.id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    is_admin = (
+        current_user is not None
+        and getattr(current_user, "role", None) != UserRole.customer
+    )
+    if not is_admin and (
+        not product.is_active or product.status != ProductStatus.published
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    await catalog_service.cancel_back_in_stock_request(
+        session, user_id=current_user.id, product_id=product.id
+    )
     return None
 
 
@@ -993,17 +1251,27 @@ async def delete_product_image(
     current_user=Depends(require_admin_section("products")),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
 
-    await catalog_service.delete_product_image(session, product, str(image_id), user_id=current_user.id)
+    await catalog_service.delete_product_image(
+        session, product, str(image_id), user_id=current_user.id
+    )
     refreshed = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not refreshed:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     return ProductRead.model_validate(refreshed)
 
 
@@ -1017,20 +1285,37 @@ async def reorder_product_image(
     source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> Product:
     product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await catalog_service.update_product_image_sort(session, product, str(image_id), sort_order, user_id=current_user.id, source=source)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    await catalog_service.update_product_image_sort(
+        session,
+        product,
+        str(image_id),
+        sort_order,
+        user_id=current_user.id,
+        source=source,
+    )
     refreshed = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not refreshed:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     return ProductRead.model_validate(refreshed)
 
 
-@router.get("/products/{slug}/images/deleted", response_model=list[AdminDeletedProductImage])
+@router.get(
+    "/products/{slug}/images/deleted", response_model=list[AdminDeletedProductImage]
+)
 async def list_deleted_product_images(
     slug: str,
     session: AsyncSession = Depends(get_session),
@@ -1038,7 +1323,9 @@ async def list_deleted_product_images(
 ) -> list[AdminDeletedProductImage]:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     images = await catalog_service.list_deleted_product_images(session, product.id)
     return [
         AdminDeletedProductImage(
@@ -1061,33 +1348,53 @@ async def restore_deleted_product_image(
 ) -> ProductRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    await catalog_service.restore_product_image(session, product, str(image_id), user_id=current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    await catalog_service.restore_product_image(
+        session, product, str(image_id), user_id=current_user.id
+    )
     refreshed = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not refreshed:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     return ProductRead.model_validate(refreshed)
 
 
-@router.get("/products/{slug}/images/{image_id}/translations", response_model=list[ProductImageTranslationRead])
+@router.get(
+    "/products/{slug}/images/{image_id}/translations",
+    response_model=list[ProductImageTranslationRead],
+)
 async def list_product_image_translations(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
     _: object = Depends(require_admin_section("products")),
 ) -> list[ProductImageTranslationRead]:
-    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images)]
+    )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
+        )
     return await catalog_service.list_product_image_translations(session, image=image)
 
 
-@router.put("/products/{slug}/images/{image_id}/translations/{lang}", response_model=ProductImageTranslationRead)
+@router.put(
+    "/products/{slug}/images/{image_id}/translations/{lang}",
+    response_model=ProductImageTranslationRead,
+)
 async def upsert_product_image_translation(
     slug: str,
     image_id: UUID,
@@ -1097,18 +1404,32 @@ async def upsert_product_image_translation(
     current_user=Depends(require_admin_section("products")),
     source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> ProductImageTranslationRead:
-    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images)]
+    )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
+        )
     return await catalog_service.upsert_product_image_translation(
-        session, image=image, lang=lang, payload=payload, user_id=current_user.id, source=source
+        session,
+        image=image,
+        lang=lang,
+        payload=payload,
+        user_id=current_user.id,
+        source=source,
     )
 
 
-@router.delete("/products/{slug}/images/{image_id}/translations/{lang}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/products/{slug}/images/{image_id}/translations/{lang}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 async def delete_product_image_translation(
     slug: str,
     image_id: UUID,
@@ -1117,49 +1438,79 @@ async def delete_product_image_translation(
     current_user=Depends(require_admin_section("products")),
     source: str | None = Query(default=None, pattern="^(storefront)$"),
 ) -> None:
-    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images)]
+    )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
-    await catalog_service.delete_product_image_translation(session, image=image, lang=lang, user_id=current_user.id, source=source)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
+        )
+    await catalog_service.delete_product_image_translation(
+        session, image=image, lang=lang, user_id=current_user.id, source=source
+    )
     return None
 
 
-@router.get("/products/{slug}/images/{image_id}/stats", response_model=ProductImageOptimizationStats)
+@router.get(
+    "/products/{slug}/images/{image_id}/stats",
+    response_model=ProductImageOptimizationStats,
+)
 async def get_product_image_stats(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
     _: object = Depends(require_admin_section("products")),
 ) -> ProductImageOptimizationStats:
-    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images)]
+    )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
+        )
     return catalog_service.get_product_image_optimization_stats(image)
 
 
-@router.post("/products/{slug}/images/{image_id}/reprocess", response_model=ProductImageOptimizationStats)
+@router.post(
+    "/products/{slug}/images/{image_id}/reprocess",
+    response_model=ProductImageOptimizationStats,
+)
 async def reprocess_product_image(
     slug: str,
     image_id: UUID,
     session: AsyncSession = Depends(get_session),
     _: object = Depends(require_admin_section("products")),
 ) -> ProductImageOptimizationStats:
-    product = await catalog_service.get_product_by_slug(session, slug, options=[selectinload(Product.images)])
+    product = await catalog_service.get_product_by_slug(
+        session, slug, options=[selectinload(Product.images)]
+    )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     image = next((img for img in product.images if str(img.id) == str(image_id)), None)
     if not image:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
+        )
     return catalog_service.reprocess_product_image_thumbnails(image)
 
 
-@router.post("/products/{slug}/reviews", response_model=ProductReviewRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/products/{slug}/reviews",
+    response_model=ProductReviewRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_review(
     slug: str,
     payload: ProductReviewCreate,
@@ -1168,15 +1519,31 @@ async def create_review(
 ) -> ProductReviewRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    review = await catalog_service.add_review(session, product, payload, getattr(current_user, "id", None) if current_user else None)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    is_admin = (
+        current_user is not None
+        and getattr(current_user, "role", None) != UserRole.customer
+    )
+    if not is_admin and (
+        not product.is_active or product.status != ProductStatus.published
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    review = await catalog_service.add_review(
+        session,
+        product,
+        payload,
+        getattr(current_user, "id", None) if current_user else None,
+    )
     return review
 
 
-@router.post("/products/{slug}/reviews/{review_id}/approve", response_model=ProductReviewRead)
+@router.post(
+    "/products/{slug}/reviews/{review_id}/approve", response_model=ProductReviewRead
+)
 async def approve_review(
     slug: str,
     review_id: UUID,
@@ -1185,13 +1552,19 @@ async def approve_review(
 ) -> ProductReviewRead:
     product = await catalog_service.get_product_by_slug(session, slug)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     result = await session.execute(
-        select(ProductReview).where(ProductReview.id == review_id, ProductReview.product_id == product.id)
+        select(ProductReview).where(
+            ProductReview.id == review_id, ProductReview.product_id == product.id
+        )
     )
     review = result.scalar_one_or_none()
     if not review:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Review not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Review not found"
+        )
     review = await catalog_service.approve_review(session, review)
     return review
 
@@ -1206,13 +1579,24 @@ async def related_products(
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
     product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    is_admin = (
+        current_user is not None
+        and getattr(current_user, "role", None) != UserRole.customer
+    )
+    if not is_admin and (
+        not product.is_active or product.status != ProductStatus.published
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     curated = await catalog_service.get_curated_relationship_products(
         session,
         product_id=product.id,
@@ -1220,7 +1604,9 @@ async def related_products(
         limit=4,
         include_inactive=is_admin,
     )
-    related = curated or await catalog_service.get_related_products(session, product, limit=4)
+    related = curated or await catalog_service.get_related_products(
+        session, product, limit=4
+    )
     payload_items = []
     for p in related:
         if lang:
@@ -1242,13 +1628,24 @@ async def upsell_products(
     await catalog_service.auto_publish_due_sales(session)
     await catalog_service.apply_due_product_schedules(session)
     product = await catalog_service.get_product_by_slug(
-        session, slug, options=[selectinload(Product.images), selectinload(Product.category)]
+        session,
+        slug,
+        options=[selectinload(Product.images), selectinload(Product.category)],
     )
     if not product or product.is_deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
-    is_admin = current_user is not None and getattr(current_user, "role", None) != UserRole.customer
-    if not is_admin and (not product.is_active or product.status != ProductStatus.published):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
+    is_admin = (
+        current_user is not None
+        and getattr(current_user, "role", None) != UserRole.customer
+    )
+    if not is_admin and (
+        not product.is_active or product.status != ProductStatus.published
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
 
     upsells = await catalog_service.get_curated_relationship_products(
         session,

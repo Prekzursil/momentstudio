@@ -30,16 +30,30 @@ def upgrade() -> None:
         sa.Column("event_type", sa.String(length=50), nullable=False),
         sa.Column("user_agent", sa.String(length=255), nullable=True),
         sa.Column("ip_address", sa.String(length=45), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
-    op.create_index("ix_user_security_events_user_id", "user_security_events", ["user_id"])
-    op.create_index("ix_user_security_events_event_type", "user_security_events", ["event_type"])
-    op.create_index("ix_user_security_events_created_at", "user_security_events", ["created_at"])
+    op.create_index(
+        "ix_user_security_events_user_id", "user_security_events", ["user_id"]
+    )
+    op.create_index(
+        "ix_user_security_events_event_type", "user_security_events", ["event_type"]
+    )
+    op.create_index(
+        "ix_user_security_events_created_at", "user_security_events", ["created_at"]
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_user_security_events_created_at", table_name="user_security_events")
-    op.drop_index("ix_user_security_events_event_type", table_name="user_security_events")
+    op.drop_index(
+        "ix_user_security_events_created_at", table_name="user_security_events"
+    )
+    op.drop_index(
+        "ix_user_security_events_event_type", table_name="user_security_events"
+    )
     op.drop_index("ix_user_security_events_user_id", table_name="user_security_events")
     op.drop_table("user_security_events")
-

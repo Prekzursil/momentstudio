@@ -26,7 +26,11 @@ from app.models.content import (
     ContentStatus,
 )
 from app.models.catalog import Category, Product, ProductStatus
-from app.schemas.content import ContentImageEditRequest, ContentLinkCheckIssue, ContentTranslationStatusUpdate
+from app.schemas.content import (
+    ContentImageEditRequest,
+    ContentLinkCheckIssue,
+    ContentTranslationStatusUpdate,
+)
 from app.schemas.content import ContentBlockCreate, ContentBlockUpdate
 from app.services import audit_chain as audit_chain_service
 from app.services import storage
@@ -78,7 +82,11 @@ def _present_langs_for_bilingual(block: ContentBlock) -> set[str]:
     present: set[str] = set()
 
     base_lang = (block.lang or "").strip().lower()
-    if base_lang in _SUPPORTED_LANGS and (block.title or "").strip() and (block.body_markdown or "").strip():
+    if (
+        base_lang in _SUPPORTED_LANGS
+        and (block.title or "").strip()
+        and (block.body_markdown or "").strip()
+    ):
         present.add(base_lang)
 
     for tr in getattr(block, "translations", None) or []:
@@ -127,7 +135,9 @@ def _mark_other_needs_translation(block: ContentBlock, lang: str) -> None:
         block.needs_translation_en = True
 
 
-def _meta_changes_require_translation(old_meta: object | None, new_meta: object | None) -> bool:
+def _meta_changes_require_translation(
+    old_meta: object | None, new_meta: object | None
+) -> bool:
     old_dict = old_meta if isinstance(old_meta, dict) else {}
     new_dict = new_meta if isinstance(new_meta, dict) else {}
     keys = set(old_dict.keys()) | set(new_dict.keys())
@@ -152,9 +162,13 @@ def slugify_page_slug(value: str) -> str:
 def _validate_page_slug(value: str) -> str:
     slug = slugify_page_slug(value)
     if not slug:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid page slug")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid page slug"
+        )
     if slug in _RESERVED_PAGE_SLUGS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved"
+        )
     return slug
 
 
@@ -165,25 +179,39 @@ def validate_page_key_for_create(key: str) -> None:
     slug = value.split(".", 1)[1]
     slug_norm = slugify_page_slug(slug)
     if not slug_norm or f"page.{slug_norm}" != value:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid page slug")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid page slug"
+        )
     if slug_norm in _RESERVED_PAGE_SLUGS and slug_norm not in _LOCKED_PAGE_SLUGS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved"
+        )
 
 
-async def resolve_redirect_key(session: AsyncSession, key: str, *, max_hops: int = 10) -> str:
+async def resolve_redirect_key(
+    session: AsyncSession, key: str, *, max_hops: int = 10
+) -> str:
     current = (key or "").strip()
     if not current:
         return current
     seen: set[str] = set()
     for _ in range(max_hops):
         if current in seen:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid content redirect loop")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid content redirect loop",
+            )
         seen.add(current)
-        redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == current))
+        redirect = await session.scalar(
+            select(ContentRedirect).where(ContentRedirect.from_key == current)
+        )
         if not redirect:
             return current
         current = redirect.to_key
-    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Invalid content redirect chain")
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail="Invalid content redirect chain",
+    )
 
 
 def _ensure_utc(dt: datetime | None) -> datetime | None:
@@ -205,10 +233,15 @@ def _apply_content_translation(block: ContentBlock, lang: str | None) -> None:
 
 def _snapshot_translations(block: ContentBlock) -> list[dict[str, object]]:
     items = getattr(block, "translations", None) or []
-    return [{"lang": t.lang, "title": t.title, "body_markdown": t.body_markdown} for t in items]
+    return [
+        {"lang": t.lang, "title": t.title, "body_markdown": t.body_markdown}
+        for t in items
+    ]
 
 
-async def get_published_by_key(session: AsyncSession, key: str, lang: str | None = None) -> ContentBlock | None:
+async def get_published_by_key(
+    session: AsyncSession, key: str, lang: str | None = None
+) -> ContentBlock | None:
     options = [
         selectinload(ContentBlock.images),
         selectinload(ContentBlock.audits),
@@ -223,7 +256,10 @@ async def get_published_by_key(session: AsyncSession, key: str, lang: str | None
             ContentBlock.key == key,
             ContentBlock.status == ContentStatus.published,
             or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-            or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+            or_(
+                ContentBlock.published_until.is_(None),
+                ContentBlock.published_until > now,
+            ),
         )
     )
     block = result.scalar_one_or_none()
@@ -242,14 +278,18 @@ async def get_published_by_key_following_redirects(
     return await get_published_by_key(session, resolved, lang=lang)
 
 
-async def get_block_by_key(session: AsyncSession, key: str, lang: str | None = None) -> ContentBlock | None:
+async def get_block_by_key(
+    session: AsyncSession, key: str, lang: str | None = None
+) -> ContentBlock | None:
     options = [
         selectinload(ContentBlock.images),
         selectinload(ContentBlock.audits),
     ]
     if lang:
         options.append(selectinload(ContentBlock.translations))
-    result = await session.execute(select(ContentBlock).options(*options).where(ContentBlock.key == key))
+    result = await session.execute(
+        select(ContentBlock).options(*options).where(ContentBlock.key == key)
+    )
     block = result.scalar_one_or_none()
     if block:
         _apply_content_translation(block, lang)
@@ -265,38 +305,68 @@ async def rename_page_slug(
 ) -> tuple[str, str, str, str]:
     old_norm = slugify_page_slug(old_slug)
     if not old_norm:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Page not found"
+        )
 
     old_key = f"page.{old_norm}"
-    block = await session.scalar(select(ContentBlock).where(ContentBlock.key == old_key))
+    block = await session.scalar(
+        select(ContentBlock).where(ContentBlock.key == old_key)
+    )
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Page not found"
+        )
     if old_norm in _LOCKED_PAGE_SLUGS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This page URL cannot be changed")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This page URL cannot be changed",
+        )
 
     new_norm = _validate_page_slug(new_slug)
     if old_norm == new_norm:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New page slug must be different")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New page slug must be different",
+        )
 
     new_key = f"page.{new_norm}"
 
-    existing = await session.scalar(select(ContentBlock.id).where(ContentBlock.key == new_key))
+    existing = await session.scalar(
+        select(ContentBlock.id).where(ContentBlock.key == new_key)
+    )
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug already exists"
+        )
 
-    reserved_by_redirect = await session.scalar(select(ContentRedirect.id).where(ContentRedirect.from_key == new_key))
+    reserved_by_redirect = await session.scalar(
+        select(ContentRedirect.id).where(ContentRedirect.from_key == new_key)
+    )
     if reserved_by_redirect:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug is reserved by a redirect")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Page slug is reserved by a redirect",
+        )
 
     resolved_target = await resolve_redirect_key(session, new_key)
     if resolved_target == old_key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page slug would create a redirect loop")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Page slug would create a redirect loop",
+        )
 
     block.key = new_key
     session.add(block)
 
-    await session.execute(update(ContentRedirect).where(ContentRedirect.to_key == old_key).values(to_key=new_key))
-    redirect = await session.scalar(select(ContentRedirect).where(ContentRedirect.from_key == old_key))
+    await session.execute(
+        update(ContentRedirect)
+        .where(ContentRedirect.to_key == old_key)
+        .values(to_key=new_key)
+    )
+    redirect = await session.scalar(
+        select(ContentRedirect).where(ContentRedirect.from_key == old_key)
+    )
     if redirect:
         redirect.to_key = new_key
     else:
@@ -316,7 +386,10 @@ async def rename_page_slug(
 
 
 async def upsert_block(
-    session: AsyncSession, key: str, payload: ContentBlockUpdate | ContentBlockCreate, actor_id: UUID | None = None
+    session: AsyncSession,
+    key: str,
+    payload: ContentBlockUpdate | ContentBlockCreate,
+    actor_id: UUID | None = None,
 ) -> ContentBlock:
     block = await get_block_by_key(session, key)
     now = datetime.now(timezone.utc)
@@ -402,8 +475,8 @@ async def upsert_block(
     # If lang is provided and differs from the base language, upsert a translation instead of touching base content.
     # Admin UI often sends lang for base edits (e.g. en), so we treat lang==block.lang (or unset base lang) as base update.
     if lang and block.lang and lang != block.lang:
-        translation_changed = (
-            ("title" in data and data["title"] is not None) or ("body_markdown" in data and data["body_markdown"] is not None)
+        translation_changed = ("title" in data and data["title"] is not None) or (
+            "body_markdown" in data and data["body_markdown"] is not None
         )
         await session.refresh(block, attribute_names=["translations"])
         translation = next((t for t in block.translations if t.lang == lang), None)
@@ -480,17 +553,27 @@ async def upsert_block(
         block.sort_order = data["sort_order"]
     if "lang" in data and data["lang"] is not None:
         block.lang = data["lang"]
-    effective_lang = (block.lang or lang) if isinstance(block.lang or lang, str) else None
-    translation_sensitive_change = any(field in data for field in ("title", "body_markdown"))
+    effective_lang = (
+        (block.lang or lang) if isinstance(block.lang or lang, str) else None
+    )
+    translation_sensitive_change = any(
+        field in data for field in ("title", "body_markdown")
+    )
     if not translation_sensitive_change and "meta" in data:
-        translation_sensitive_change = _meta_changes_require_translation(prev_meta, block.meta)
+        translation_sensitive_change = _meta_changes_require_translation(
+            prev_meta, block.meta
+        )
     if translation_sensitive_change and isinstance(effective_lang, str):
         _mark_other_needs_translation(block, effective_lang)
     if block.status in (ContentStatus.draft, ContentStatus.review):
         block.published_at = None
         block.published_until = None
     if block.status == ContentStatus.published:
-        if block.published_until and block.published_at and block.published_until <= block.published_at:
+        if (
+            block.published_until
+            and block.published_at
+            and block.published_until <= block.published_at
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Unpublish time must be after publish time",
@@ -524,18 +607,28 @@ async def upsert_block(
     return block
 
 
-async def add_image(session: AsyncSession, block: ContentBlock, file, actor_id: UUID | None = None) -> ContentBlock:
+async def add_image(
+    session: AsyncSession, block: ContentBlock, file, actor_id: UUID | None = None
+) -> ContentBlock:
     path, filename = await anyio.to_thread.run_sync(
         partial(
             storage.save_upload,
             file,
-            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            allowed_content_types=(
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+                "image/gif",
+                "image/svg+xml",
+            ),
             max_bytes=None,
             generate_thumbnails=True,
         )
     )
     next_sort = (max([img.sort_order for img in block.images], default=0) or 0) + 1
-    image = ContentImage(content_block_id=block.id, url=path, alt_text=filename, sort_order=next_sort)
+    image = ContentImage(
+        content_block_id=block.id, url=path, alt_text=filename, sort_order=next_sort
+    )
     session.add(image)
     await audit_chain_service.add_content_audit_log(
         session,
@@ -558,7 +651,9 @@ async def edit_image_asset(
 ) -> ContentImage:
     source_url = (getattr(image, "url", None) or "").strip()
     if not source_url:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image URL")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid image URL"
+        )
 
     try:
         source_path = storage.media_url_to_path(source_url)
@@ -566,15 +661,28 @@ async def edit_image_asset(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     if not source_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Image file not found"
+        )
 
     suffix = source_path.suffix.lower()
-    format_map = {".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".webp": "WEBP", ".gif": "GIF"}
+    format_map = {
+        ".jpg": "JPEG",
+        ".jpeg": "JPEG",
+        ".png": "PNG",
+        ".webp": "WEBP",
+        ".gif": "GIF",
+    }
     out_format = format_map.get(suffix)
     if not out_format:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported image type")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported image type"
+        )
     if out_format == "GIF":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GIF editing is not supported")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GIF editing is not supported",
+        )
 
     def _process_image() -> tuple[str, int, int]:
         with Image.open(source_path) as opened:
@@ -600,7 +708,9 @@ async def edit_image_asset(
             width, height = img.size
 
             if payload.crop_aspect_w is not None and payload.crop_aspect_h is not None:
-                target_ratio = float(payload.crop_aspect_w) / float(payload.crop_aspect_h)
+                target_ratio = float(payload.crop_aspect_w) / float(
+                    payload.crop_aspect_h
+                )
                 current_ratio = float(width) / float(height) if height else 0.0
                 if current_ratio > target_ratio:
                     crop_h = float(height)
@@ -616,7 +726,12 @@ async def edit_image_asset(
                 right = left + crop_w
                 bottom = top + crop_h
 
-                crop_box = (int(round(left)), int(round(top)), int(round(right)), int(round(bottom)))
+                crop_box = (
+                    int(round(left)),
+                    int(round(top)),
+                    int(round(right)),
+                    int(round(bottom)),
+                )
                 crop_box = (
                     max(0, min(crop_box[0], width - 1)),
                     max(0, min(crop_box[1], height - 1)),
@@ -624,7 +739,9 @@ async def edit_image_asset(
                     max(1, min(crop_box[3], height)),
                 )
                 if crop_box[2] <= crop_box[0] or crop_box[3] <= crop_box[1]:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid crop")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid crop"
+                    )
 
                 img = img.crop(crop_box)
                 fx -= crop_box[0]
@@ -675,12 +792,20 @@ async def edit_image_asset(
 
     new_url, new_focal_x, new_focal_y = await anyio.to_thread.run_sync(_process_image)
 
-    block = await session.scalar(select(ContentBlock).where(ContentBlock.id == image.content_block_id))
+    block = await session.scalar(
+        select(ContentBlock).where(ContentBlock.id == image.content_block_id)
+    )
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
+        )
 
     next_sort = (
-        await session.scalar(select(func.max(ContentImage.sort_order)).where(ContentImage.content_block_id == block.id))
+        await session.scalar(
+            select(func.max(ContentImage.sort_order)).where(
+                ContentImage.content_block_id == block.id
+            )
+        )
     ) or 0
     root_image_id = getattr(image, "root_image_id", None) or image.id
     new_image = ContentImage(
@@ -696,7 +821,9 @@ async def edit_image_asset(
     session.add(new_image)
     await session.flush()
 
-    tag_rows = await session.execute(select(ContentImageTag.tag).where(ContentImageTag.content_image_id == image.id))
+    tag_rows = await session.execute(
+        select(ContentImageTag.tag).where(ContentImageTag.content_image_id == image.id)
+    )
     tags = sorted(set(tag_rows.scalars().all()))
     for tag in tags:
         session.add(ContentImageTag(content_image_id=new_image.id, tag=tag))
@@ -722,7 +849,10 @@ async def get_asset_usage_keys(session: AsyncSession, *, url: str) -> list[str]:
         select(ContentBlock.key)
         .distinct()
         .select_from(ContentBlock)
-        .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
+        .outerjoin(
+            ContentBlockTranslation,
+            ContentBlockTranslation.content_block_id == ContentBlock.id,
+        )
         .where(
             or_(
                 ContentBlock.body_markdown.ilike(like),
@@ -743,21 +873,30 @@ async def delete_image_asset(
 ) -> None:
     image_id = getattr(image, "id", None)
     if not image_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
+        )
 
     root_id = getattr(image, "root_image_id", None) or image_id
     if delete_versions:
         images = (
             (
                 await session.execute(
-                    select(ContentImage).where(or_(ContentImage.id == root_id, ContentImage.root_image_id == root_id))
+                    select(ContentImage).where(
+                        or_(
+                            ContentImage.id == root_id,
+                            ContentImage.root_image_id == root_id,
+                        )
+                    )
                 )
             )
             .scalars()
             .all()
         )
         if not images:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Image not found"
+            )
 
         delete_ids = {img.id for img in images if getattr(img, "id", None)}
         urls: set[str] = set()
@@ -768,25 +907,37 @@ async def delete_image_asset(
                 continue
             urls.add(url)
             shared = await session.scalar(
-                select(func.count()).select_from(ContentImage).where(ContentImage.url == url, ContentImage.id.notin_(delete_ids))
+                select(func.count())
+                .select_from(ContentImage)
+                .where(ContentImage.url == url, ContentImage.id.notin_(delete_ids))
             )
             if int(shared or 0) > 0:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image file is shared by other assets")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Image file is shared by other assets",
+                )
 
             keys = await get_asset_usage_keys(session, url=url)
             if keys:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image is used")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="Image is used"
+                )
 
-        block = await session.scalar(select(ContentBlock).where(ContentBlock.id == image.content_block_id))
+        block = await session.scalar(
+            select(ContentBlock).where(ContentBlock.id == image.content_block_id)
+        )
         if not block:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
+            )
 
         remaining: dict[UUID, ContentImage] = {img.id: img for img in images if img.id}
         while remaining:
             referenced = {
                 img.source_image_id
                 for img in remaining.values()
-                if getattr(img, "source_image_id", None) and img.source_image_id in remaining
+                if getattr(img, "source_image_id", None)
+                and img.source_image_id in remaining
             }
             leaves = [img for img in remaining.values() if img.id not in referenced]
             if not leaves:
@@ -811,27 +962,45 @@ async def delete_image_asset(
 
     child_id = await session.scalar(
         select(ContentImage.id)
-        .where(or_(ContentImage.root_image_id == image_id, ContentImage.source_image_id == image_id))
+        .where(
+            or_(
+                ContentImage.root_image_id == image_id,
+                ContentImage.source_image_id == image_id,
+            )
+        )
         .limit(1)
     )
     if child_id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image has edited versions")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Image has edited versions"
+        )
 
     url = (getattr(image, "url", None) or "").strip()
     if url:
         shared = await session.scalar(
-            select(func.count()).select_from(ContentImage).where(ContentImage.url == url, ContentImage.id != image_id)
+            select(func.count())
+            .select_from(ContentImage)
+            .where(ContentImage.url == url, ContentImage.id != image_id)
         )
         if int(shared or 0) > 0:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image file is shared by other assets")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Image file is shared by other assets",
+            )
 
         keys = await get_asset_usage_keys(session, url=url)
         if keys:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Image is used")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Image is used"
+            )
 
-    block = await session.scalar(select(ContentBlock).where(ContentBlock.id == image.content_block_id))
+    block = await session.scalar(
+        select(ContentBlock).where(ContentBlock.id == image.content_block_id)
+    )
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
+        )
 
     await session.delete(image)
     await audit_chain_service.add_content_audit_log(
@@ -856,7 +1025,9 @@ async def set_translation_status(
 ) -> ContentBlock:
     block = await get_block_by_key(session, key)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
+        )
     changed = False
     if payload.needs_translation_en is not None:
         block.needs_translation_en = bool(payload.needs_translation_en)
@@ -891,15 +1062,20 @@ async def rollback_to_version(
 ) -> ContentBlock:
     block = await get_block_by_key(session, key)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
+        )
     result = await session.execute(
         select(ContentBlockVersion).where(
-            ContentBlockVersion.content_block_id == block.id, ContentBlockVersion.version == version
+            ContentBlockVersion.content_block_id == block.id,
+            ContentBlockVersion.version == version,
         )
     )
     snapshot = result.scalar_one_or_none()
     if not snapshot:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Version not found"
+        )
 
     now = datetime.now(timezone.utc)
     block.version += 1
@@ -938,7 +1114,14 @@ async def rollback_to_version(
                 tr.title = title
                 tr.body_markdown = body
             else:
-                session.add(ContentBlockTranslation(content_block_id=block.id, lang=lang, title=title, body_markdown=body))
+                session.add(
+                    ContentBlockTranslation(
+                        content_block_id=block.id,
+                        lang=lang,
+                        title=title,
+                        body_markdown=body,
+                    )
+                )
         for tr in list(block.translations):
             if tr.lang not in target_langs:
                 await session.delete(tr)
@@ -977,9 +1160,13 @@ def _sanitize_markdown(body: str) -> None:
     lower = body.lower()
     forbidden = ["<script", "<iframe", "<object", "<embed", "javascript:"]
     if any(tok in lower for tok in forbidden):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed markup")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed markup"
+        )
     if _contains_inline_event_handler(lower):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed event handlers")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Disallowed event handlers"
+        )
 
 
 def _contains_inline_event_handler(text: str) -> bool:
@@ -988,7 +1175,9 @@ def _contains_inline_event_handler(text: str) -> bool:
         prev = text[idx - 1] if idx > 0 else " "
         if not (prev.isalnum() or prev in {"_", "-"}):
             cursor = idx + 2
-            while cursor < len(text) and (text[cursor].isalnum() or text[cursor] == "_"):
+            while cursor < len(text) and (
+                text[cursor].isalnum() or text[cursor] == "_"
+            ):
                 cursor += 1
             if cursor > idx + 2:
                 while cursor < len(text) and text[cursor].isspace():
@@ -999,7 +1188,9 @@ def _contains_inline_event_handler(text: str) -> bool:
     return False
 
 
-def _find_replace_subn(text: str, find: str, replace: str, *, case_sensitive: bool) -> tuple[str, int]:
+def _find_replace_subn(
+    text: str, find: str, replace: str, *, case_sensitive: bool
+) -> tuple[str, int]:
     if not find:
         return text, 0
     if case_sensitive:
@@ -1008,14 +1199,18 @@ def _find_replace_subn(text: str, find: str, replace: str, *, case_sensitive: bo
     return pattern.subn(replace, text)
 
 
-def _find_replace_in_json(value: Any, find: str, replace: str, *, case_sensitive: bool) -> tuple[Any, int]:
+def _find_replace_in_json(
+    value: Any, find: str, replace: str, *, case_sensitive: bool
+) -> tuple[Any, int]:
     if isinstance(value, str):
         return _find_replace_subn(value, find, replace, case_sensitive=case_sensitive)
     if isinstance(value, list):
         total = 0
         out_list: list[Any] = []
         for item in value:
-            nxt, changed = _find_replace_in_json(item, find, replace, case_sensitive=case_sensitive)
+            nxt, changed = _find_replace_in_json(
+                item, find, replace, case_sensitive=case_sensitive
+            )
             total += changed
             out_list.append(nxt)
         return out_list, total
@@ -1023,7 +1218,9 @@ def _find_replace_in_json(value: Any, find: str, replace: str, *, case_sensitive
         total = 0
         out_dict: dict[Any, Any] = {}
         for k, v in value.items():
-            nxt, changed = _find_replace_in_json(v, find, replace, case_sensitive=case_sensitive)
+            nxt, changed = _find_replace_in_json(
+                v, find, replace, case_sensitive=case_sensitive
+            )
             total += changed
             out_dict[k] = nxt
         return out_dict, total
@@ -1040,13 +1237,20 @@ async def preview_find_replace(
     limit: int = 200,
 ) -> tuple[list[dict[str, object]], int, int, bool]:
     needle = f"%{find}%"
-    like = (lambda col: col.like(needle)) if case_sensitive else (lambda col: col.ilike(needle))
+    like = (
+        (lambda col: col.like(needle))
+        if case_sensitive
+        else (lambda col: col.ilike(needle))
+    )
 
     query = (
         select(ContentBlock)
         .distinct()
         .select_from(ContentBlock)
-        .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
+        .outerjoin(
+            ContentBlockTranslation,
+            ContentBlockTranslation.content_block_id == ContentBlock.id,
+        )
         .options(selectinload(ContentBlock.translations))
         .where(
             or_(
@@ -1073,23 +1277,33 @@ async def preview_find_replace(
 
     for block in blocks:
         base_matches = 0
-        _, n = _find_replace_subn(block.title or "", find, replace, case_sensitive=case_sensitive)
+        _, n = _find_replace_subn(
+            block.title or "", find, replace, case_sensitive=case_sensitive
+        )
         base_matches += n
-        _, n = _find_replace_subn(block.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+        _, n = _find_replace_subn(
+            block.body_markdown or "", find, replace, case_sensitive=case_sensitive
+        )
         base_matches += n
 
         meta = getattr(block, "meta", None)
         if meta is not None:
-            _, n = _find_replace_in_json(meta, find, replace, case_sensitive=case_sensitive)
+            _, n = _find_replace_in_json(
+                meta, find, replace, case_sensitive=case_sensitive
+            )
             base_matches += n
 
         translations_out: list[dict[str, object]] = []
         tr_total = 0
         for tr in getattr(block, "translations", None) or []:
             tr_matches = 0
-            _, n = _find_replace_subn(tr.title or "", find, replace, case_sensitive=case_sensitive)
+            _, n = _find_replace_subn(
+                tr.title or "", find, replace, case_sensitive=case_sensitive
+            )
             tr_matches += n
-            _, n = _find_replace_subn(tr.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+            _, n = _find_replace_subn(
+                tr.body_markdown or "", find, replace, case_sensitive=case_sensitive
+            )
             tr_matches += n
             if tr_matches:
                 translations_out.append({"lang": tr.lang, "matches": tr_matches})
@@ -1107,7 +1321,9 @@ async def preview_find_replace(
                 "title": block.title,
                 "matches": matches,
                 "base_matches": base_matches,
-                "translations": sorted(translations_out, key=lambda it: str(it.get("lang") or "")),
+                "translations": sorted(
+                    translations_out, key=lambda it: str(it.get("lang") or "")
+                ),
             }
         )
 
@@ -1124,13 +1340,20 @@ async def apply_find_replace(
     actor_id: UUID | None = None,
 ) -> tuple[int, int, int, list[dict[str, str]]]:
     needle = f"%{find}%"
-    like = (lambda col: col.like(needle)) if case_sensitive else (lambda col: col.ilike(needle))
+    like = (
+        (lambda col: col.like(needle))
+        if case_sensitive
+        else (lambda col: col.ilike(needle))
+    )
 
     query = (
         select(ContentBlock)
         .distinct()
         .select_from(ContentBlock)
-        .outerjoin(ContentBlockTranslation, ContentBlockTranslation.content_block_id == ContentBlock.id)
+        .outerjoin(
+            ContentBlockTranslation,
+            ContentBlockTranslation.content_block_id == ContentBlock.id,
+        )
         .options(selectinload(ContentBlock.translations))
         .where(
             or_(
@@ -1157,19 +1380,25 @@ async def apply_find_replace(
         base_changed = False
         base_matches = 0
 
-        next_title, n = _find_replace_subn(block.title or "", find, replace, case_sensitive=case_sensitive)
+        next_title, n = _find_replace_subn(
+            block.title or "", find, replace, case_sensitive=case_sensitive
+        )
         if n:
             base_matches += n
             base_changed = True
 
-        next_body, n = _find_replace_subn(block.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+        next_body, n = _find_replace_subn(
+            block.body_markdown or "", find, replace, case_sensitive=case_sensitive
+        )
         if n:
             base_matches += n
             base_changed = True
 
         next_meta = getattr(block, "meta", None)
         if next_meta is not None:
-            replaced_meta, n = _find_replace_in_json(next_meta, find, replace, case_sensitive=case_sensitive)
+            replaced_meta, n = _find_replace_in_json(
+                next_meta, find, replace, case_sensitive=case_sensitive
+            )
             if n:
                 next_meta = replaced_meta
                 base_matches += n
@@ -1184,12 +1413,16 @@ async def apply_find_replace(
             tr_changed = False
             tr_matches = 0
 
-            next_tr_title, n = _find_replace_subn(tr.title or "", find, replace, case_sensitive=case_sensitive)
+            next_tr_title, n = _find_replace_subn(
+                tr.title or "", find, replace, case_sensitive=case_sensitive
+            )
             if n:
                 tr_matches += n
                 tr_changed = True
 
-            next_tr_body, n = _find_replace_subn(tr.body_markdown or "", find, replace, case_sensitive=case_sensitive)
+            next_tr_body, n = _find_replace_subn(
+                tr.body_markdown or "", find, replace, case_sensitive=case_sensitive
+            )
             if n:
                 tr_matches += n
                 tr_changed = True
@@ -1259,7 +1492,12 @@ async def apply_find_replace(
             updated_translations += translation_rows_changed
             total_replacements += matches
         except HTTPException as exc:
-            errors.append({"key": block.key, "error": str(getattr(exc, "detail", None) or "Update failed")})
+            errors.append(
+                {
+                    "key": block.key,
+                    "error": str(getattr(exc, "detail", None) or "Update failed"),
+                }
+            )
             await session.refresh(block, attribute_names=["translations"])
 
     await session.commit()
@@ -1344,7 +1582,12 @@ def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
         if block_type == "text":
             body = block.get("body_markdown")
             if isinstance(body, str):
-                refs.extend([(k, s, f"{prefix}.body_markdown", u) for k, s, _, u in _extract_markdown_refs(body)])
+                refs.extend(
+                    [
+                        (k, s, f"{prefix}.body_markdown", u)
+                        for k, s, _, u in _extract_markdown_refs(body)
+                    ]
+                )
             continue
 
         urls: list[tuple[str, str]] = []
@@ -1380,7 +1623,9 @@ def _extract_block_refs(meta: dict | None) -> list[tuple[str, str, str, str]]:
     return refs
 
 
-def _resolve_redirect_chain(key: str, redirects: dict[str, str], *, max_hops: int = 10) -> tuple[str, str | None]:
+def _resolve_redirect_chain(
+    key: str, redirects: dict[str, str], *, max_hops: int = 10
+) -> tuple[str, str | None]:
     current = (key or "").strip()
     if not current:
         return current, None
@@ -1412,14 +1657,25 @@ def _media_url_exists(url: str) -> bool:
     return path.exists()
 
 
-async def check_content_links(session: AsyncSession, *, key: str) -> list[ContentLinkCheckIssue]:
+async def check_content_links(
+    session: AsyncSession, *, key: str
+) -> list[ContentLinkCheckIssue]:
     block = await get_block_by_key(session, key)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
+        )
 
     refs: list[tuple[str, str, str, str]] = []
-    refs.extend([(k, s, f, u) for k, s, f, u in _extract_markdown_refs(block.body_markdown)])
-    refs.extend([(k, s, f, u) for k, s, f, u in _extract_block_refs(getattr(block, "meta", None))])
+    refs.extend(
+        [(k, s, f, u) for k, s, f, u in _extract_markdown_refs(block.body_markdown)]
+    )
+    refs.extend(
+        [
+            (k, s, f, u)
+            for k, s, f, u in _extract_block_refs(getattr(block, "meta", None))
+        ]
+    )
     for img in getattr(block, "images", []) or []:
         url = _normalize_md_url(getattr(img, "url", "") or "")
         if url:
@@ -1474,20 +1730,35 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
     if product_slugs:
         product_rows = (
             await session.execute(
-                select(Product.slug, Product.status, Product.is_deleted).where(Product.slug.in_(product_slugs))
+                select(Product.slug, Product.status, Product.is_deleted).where(
+                    Product.slug.in_(product_slugs)
+                )
             )
         ).all()
-        products_by_slug = {slug: (status, bool(is_deleted)) for slug, status, is_deleted in product_rows}
+        products_by_slug = {
+            slug: (status, bool(is_deleted))
+            for slug, status, is_deleted in product_rows
+        }
 
     existing_categories: set[str] = set()
     if category_slugs:
         existing_categories = set(
-            (await session.execute(select(Category.slug).where(Category.slug.in_(category_slugs)))).scalars().all()
+            (
+                await session.execute(
+                    select(Category.slug).where(Category.slug.in_(category_slugs))
+                )
+            )
+            .scalars()
+            .all()
         )
 
     redirects: dict[str, str] = {}
-    redirects_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
-    redirects = {from_key: to_key for from_key, to_key in redirects_rows if from_key and to_key}
+    redirects_rows = (
+        await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))
+    ).all()
+    redirects = {
+        from_key: to_key for from_key, to_key in redirects_rows if from_key and to_key
+    }
 
     content_keys = page_keys | blog_keys
     resolved_keys: dict[str, tuple[str, str | None]] = {}
@@ -1497,20 +1768,30 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
         resolved_keys[k] = (resolved, err)
         resolved_targets.add(resolved)
 
-    blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = {}
+    blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = (
+        {}
+    )
     if resolved_targets:
         block_rows = (
             await session.execute(
-                select(ContentBlock.key, ContentBlock.status, ContentBlock.published_at, ContentBlock.published_until).where(
-                    ContentBlock.key.in_(resolved_targets)
-                )
+                select(
+                    ContentBlock.key,
+                    ContentBlock.status,
+                    ContentBlock.published_at,
+                    ContentBlock.published_until,
+                ).where(ContentBlock.key.in_(resolved_targets))
             )
         ).all()
         blocks_by_key = {
-            key: (status, published_at, published_until) for key, status, published_at, published_until in block_rows
+            key: (status, published_at, published_until)
+            for key, status, published_at, published_until in block_rows
         }
 
-    def is_public(status: ContentStatus, published_at: datetime | None, published_until: datetime | None) -> bool:
+    def is_public(
+        status: ContentStatus,
+        published_at: datetime | None,
+        published_until: datetime | None,
+    ) -> bool:
         if status != ContentStatus.published:
             return False
         if published_at and published_at > now:
@@ -1543,7 +1824,9 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
             continue
 
         if path.startswith("/products/"):
-            slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
+            slug = slugify_page_slug(
+                path.split("/", 3)[2] if len(path.split("/")) >= 3 else ""
+            )
             if not slug:
                 continue
             row = products_by_slug.get(slug)
@@ -1607,7 +1890,9 @@ async def check_content_links(session: AsyncSession, *, key: str) -> list[Conten
 
         if path.startswith("/pages/") or path.startswith("/blog/"):
             base = "page." if path.startswith("/pages/") else "blog."
-            slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
+            slug = slugify_page_slug(
+                path.split("/", 3)[2] if len(path.split("/")) >= 3 else ""
+            )
             if not slug:
                 continue
             original_key = f"{base}{slug}"
@@ -1723,19 +2008,34 @@ async def check_content_links_preview(
     if product_slugs:
         product_rows = (
             await session.execute(
-                select(Product.slug, Product.status, Product.is_deleted).where(Product.slug.in_(product_slugs))
+                select(Product.slug, Product.status, Product.is_deleted).where(
+                    Product.slug.in_(product_slugs)
+                )
             )
         ).all()
-        products_by_slug = {slug: (status, bool(is_deleted)) for slug, status, is_deleted in product_rows}
+        products_by_slug = {
+            slug: (status, bool(is_deleted))
+            for slug, status, is_deleted in product_rows
+        }
 
     existing_categories: set[str] = set()
     if category_slugs:
         existing_categories = set(
-            (await session.execute(select(Category.slug).where(Category.slug.in_(category_slugs)))).scalars().all()
+            (
+                await session.execute(
+                    select(Category.slug).where(Category.slug.in_(category_slugs))
+                )
+            )
+            .scalars()
+            .all()
         )
 
-    redirects_rows = (await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))).all()
-    redirects = {from_key: to_key for from_key, to_key in redirects_rows if from_key and to_key}
+    redirects_rows = (
+        await session.execute(select(ContentRedirect.from_key, ContentRedirect.to_key))
+    ).all()
+    redirects = {
+        from_key: to_key for from_key, to_key in redirects_rows if from_key and to_key
+    }
 
     content_keys = page_keys | blog_keys
     resolved_keys: dict[str, tuple[str, str | None]] = {}
@@ -1745,20 +2045,30 @@ async def check_content_links_preview(
         resolved_keys[k] = (resolved, err)
         resolved_targets.add(resolved)
 
-    blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = {}
+    blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = (
+        {}
+    )
     if resolved_targets:
         block_rows = (
             await session.execute(
-                select(ContentBlock.key, ContentBlock.status, ContentBlock.published_at, ContentBlock.published_until).where(
-                    ContentBlock.key.in_(resolved_targets)
-                )
+                select(
+                    ContentBlock.key,
+                    ContentBlock.status,
+                    ContentBlock.published_at,
+                    ContentBlock.published_until,
+                ).where(ContentBlock.key.in_(resolved_targets))
             )
         ).all()
         blocks_by_key = {
-            key: (status, published_at, published_until) for key, status, published_at, published_until in block_rows
+            key: (status, published_at, published_until)
+            for key, status, published_at, published_until in block_rows
         }
 
-    def is_public(status: ContentStatus, published_at: datetime | None, published_until: datetime | None) -> bool:
+    def is_public(
+        status: ContentStatus,
+        published_at: datetime | None,
+        published_until: datetime | None,
+    ) -> bool:
         if status != ContentStatus.published:
             return False
         if published_at and now < published_at:
@@ -1792,7 +2102,9 @@ async def check_content_links_preview(
             continue
 
         if path.startswith("/products/"):
-            slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
+            slug = slugify_page_slug(
+                path.split("/", 3)[2] if len(path.split("/")) >= 3 else ""
+            )
             if not slug:
                 continue
             row = products_by_slug.get(slug)
@@ -1856,7 +2168,9 @@ async def check_content_links_preview(
 
         if path.startswith("/pages/") or path.startswith("/blog/"):
             base = "page." if path.startswith("/pages/") else "blog."
-            slug = slugify_page_slug(path.split("/", 3)[2] if len(path.split("/")) >= 3 else "")
+            slug = slugify_page_slug(
+                path.split("/", 3)[2] if len(path.split("/")) >= 3 else ""
+            )
             if not slug:
                 continue
             original_key = f"{base}{slug}"

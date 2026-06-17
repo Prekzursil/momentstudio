@@ -27,7 +27,9 @@ describe('CmsGlobalSectionBlocksComponent', () => {
     fixture.componentInstance.loadingSkeletonCount = 4;
     fixture.detectChanges();
 
-    const loading = fixture.nativeElement.querySelector('[data-cms-global-loading="true"]') as HTMLElement | null;
+    const loading = fixture.nativeElement.querySelector(
+      '[data-cms-global-loading="true"]',
+    ) as HTMLElement | null;
     expect(loading).toBeTruthy();
     expect(loading?.className).toContain('min-h-[9rem]');
     expect(fixture.nativeElement.querySelectorAll('app-skeleton').length).toBe(4);

@@ -8,7 +8,9 @@ import { DamAssetLibraryComponent } from '../shared/dam-asset-library.component'
   standalone: true,
   imports: [CommonModule, TranslateModule, DamAssetLibraryComponent],
   template: `
-    <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
       <div class="grid gap-1">
         <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
           {{ 'adminUi.content.media.title' | translate }}
@@ -20,7 +22,6 @@ import { DamAssetLibraryComponent } from '../shared/dam-asset-library.component'
 
       <app-dam-asset-library></app-dam-asset-library>
     </section>
-  `
+  `,
 })
-export class AdminContentMediaComponent {
-}
+export class AdminContentMediaComponent {}

@@ -36,7 +36,7 @@ describe('AdminOpsComponent', () => {
       'retryWebhook',
       'getSamedaySyncStatus',
       'listSamedaySyncRuns',
-      'runSamedaySyncNow'
+      'runSamedaySyncNow',
     ]);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
 
@@ -52,8 +52,8 @@ describe('AdminOpsComponent', () => {
         oldest_queued_age_seconds: 45,
         avg_processing_seconds: null,
         status_counts: { queued: 2 },
-        type_counts: { ingest: 2 }
-      })
+        type_counts: { ingest: 2 },
+      }),
     );
     health.ready.and.returnValue(of({ status: 'ok' } as any));
     ops.getWebhookFailureStats.and.returnValue(of({ failed: 0 } as any));
@@ -70,8 +70,8 @@ describe('AdminOpsComponent', () => {
         storage: { status: 'ok', message: null },
         stripe: { status: 'ok', message: null },
         paypal: { status: 'ok', message: null },
-        netopia: { status: 'ok', message: null }
-      } as any)
+        netopia: { status: 'ok', message: null },
+      } as any),
     );
     ops.listBanners.and.returnValue(of([]));
     ops.listShippingMethods.and.returnValue(of([]));
@@ -103,9 +103,9 @@ describe('AdminOpsComponent', () => {
           upserted_count: 10,
           deactivated_count: 2,
           failure_kind: null,
-          schema_drift_detected: true
-        }
-      } as any)
+          schema_drift_detected: true,
+        },
+      } as any),
     );
     ops.listSamedaySyncRuns.and.returnValue(
       of({
@@ -119,11 +119,11 @@ describe('AdminOpsComponent', () => {
             upserted_count: 10,
             deactivated_count: 2,
             failure_kind: null,
-            schema_drift_detected: true
-          }
+            schema_drift_detected: true,
+          },
         ],
-        meta: { page: 1, limit: 8, total: 1 }
-      } as any)
+        meta: { page: 1, limit: 8, total: 1 },
+      } as any),
     );
     ops.runSamedaySyncNow.and.returnValue(of({} as any));
 
@@ -134,8 +134,11 @@ describe('AdminOpsComponent', () => {
         { provide: HealthService, useValue: health },
         { provide: OpsService, useValue: ops },
         { provide: ToastService, useValue: toast },
-        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: new Map<string, string>() } } }
-      ]
+        {
+          provide: ActivatedRoute,
+          useValue: { snapshot: { queryParamMap: new Map<string, string>() } },
+        },
+      ],
     }).compileComponents();
   });
 

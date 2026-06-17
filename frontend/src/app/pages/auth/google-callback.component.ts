@@ -14,13 +14,17 @@ const GOOGLE_FLOW_KEY = 'google_flow';
   imports: [CommonModule, TranslateModule],
   template: `
     <div class="min-h-screen flex items-center justify-center bg-slate-50 px-4 dark:bg-slate-950">
-      <div class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 w-full max-w-md grid gap-3 text-center dark:bg-slate-900 dark:border-slate-700 dark:shadow-none">
-        <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'auth.googleFinishing' | translate }}</p>
+      <div
+        class="bg-white border border-slate-200 rounded-xl shadow-sm p-6 w-full max-w-md grid gap-3 text-center dark:bg-slate-900 dark:border-slate-700 dark:shadow-none"
+      >
+        <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'auth.googleFinishing' | translate }}
+        </p>
         <p class="text-sm text-slate-600 dark:text-slate-300" *ngIf="message()">{{ message() }}</p>
         <p class="text-sm text-rose-700 dark:text-rose-300" *ngIf="error()">{{ error() }}</p>
       </div>
     </div>
-  `
+  `,
 })
 export class GoogleCallbackComponent implements OnInit {
   message = signal<string | null>(null);
@@ -32,7 +36,7 @@ export class GoogleCallbackComponent implements OnInit {
     private readonly auth: AuthService,
     private readonly googleLinkPending: GoogleLinkPendingService,
     private readonly toast: ToastService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
@@ -65,7 +69,7 @@ export class GoogleCallbackComponent implements OnInit {
           }
           this.toast.info(
             this.translate.instant('auth.completeProfileRequiredTitle'),
-            this.translate.instant('auth.completeProfileRequiredCopy')
+            this.translate.instant('auth.completeProfileRequiredCopy'),
           );
           void this.router.navigate(['/register'], { queryParams: { complete: 1 } });
           return;
@@ -93,7 +97,7 @@ export class GoogleCallbackComponent implements OnInit {
         this.error.set(message);
         this.toast.error(message);
         void this.router.navigateByUrl('/login');
-      }
+      },
     });
   }
 
@@ -105,4 +109,3 @@ export class GoogleCallbackComponent implements OnInit {
     void this.router.navigateByUrl('/account/security');
   }
 }
-

@@ -18,8 +18,8 @@ describe('RegisterComponent', () => {
     auth.register.and.returnValue(
       of({
         user: { email: 'ana@example.com', username: 'ana2005l', id: 'u1', role: 'user' },
-        tokens: { access_token: 'a', refresh_token: 'r', token_type: 'bearer' }
-      } as AuthResponse)
+        tokens: { access_token: 'a', refresh_token: 'r', token_type: 'bearer' },
+      } as AuthResponse),
     );
 
     TestBed.configureTestingModule({
@@ -28,8 +28,8 @@ describe('RegisterComponent', () => {
         { provide: AuthService, useValue: auth },
         { provide: ToastService, useValue: toast },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
-        { provide: Router, useValue: router }
-      ]
+        { provide: Router, useValue: router },
+      ],
     });
 
     const translate = TestBed.inject(TranslateService);
@@ -67,7 +67,7 @@ describe('RegisterComponent', () => {
       phone: '+40723204204',
       preferred_language: 'en',
       accept_terms: true,
-      accept_privacy: true
+      accept_privacy: true,
     });
     expect(router.navigateByUrl).toHaveBeenCalledWith('/account');
     expect(toast.success).toHaveBeenCalled();

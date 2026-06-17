@@ -13,7 +13,9 @@ import { MarkdownService } from '../../core/markdown.service';
 
 describe('HomeComponent', () => {
   afterEach(() => {
-    document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').forEach((el) => el.remove());
+    document
+      .querySelectorAll('link[rel="alternate"][data-seo-managed="true"]')
+      .forEach((el) => el.remove());
     document.querySelectorAll('script[data-seo-route-schema="true"]').forEach((el) => el.remove());
   });
 
@@ -21,9 +23,18 @@ describe('HomeComponent', () => {
     const meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     const title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     const api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
-    const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['listProducts', 'listFeaturedCollections']);
-    const recentlyViewed = jasmine.createSpyObj<RecentlyViewedService>('RecentlyViewedService', ['list']);
-    const auth = { user: () => null, isAuthenticated: () => false, isAdmin: () => false } as unknown as AuthService;
+    const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', [
+      'listProducts',
+      'listFeaturedCollections',
+    ]);
+    const recentlyViewed = jasmine.createSpyObj<RecentlyViewedService>('RecentlyViewedService', [
+      'list',
+    ]);
+    const auth = {
+      user: () => null,
+      isAuthenticated: () => false,
+      isAdmin: () => false,
+    } as unknown as AuthService;
     const markdown = { render: (s: string) => s } as unknown as MarkdownService;
 
     api.get.and.callFake(<T>(url: string, _params?: unknown, _headers?: Record<string, string>) => {
@@ -41,10 +52,10 @@ describe('HomeComponent', () => {
               { id: 'new_arrivals', enabled: false },
               { id: 'featured_collections', enabled: false },
               { id: 'story', enabled: false },
-              { id: 'recently_viewed', enabled: false }
-            ]
+              { id: 'recently_viewed', enabled: false },
+            ],
           },
-          images: []
+          images: [],
         } as unknown as T);
       }
       throw new Error(`Unexpected ApiService.get(${url})`);
@@ -59,11 +70,11 @@ describe('HomeComponent', () => {
             name: 'Product',
             base_price: 10,
             currency: 'USD',
-            images: []
-          }
+            images: [],
+          },
         ],
-        meta: { total_items: 1, total_pages: 1, page: 1, limit: 6 }
-      })
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 6 },
+      }),
     );
     catalog.listFeaturedCollections.and.returnValue(of([]));
     recentlyViewed.list.and.returnValue([]);
@@ -77,8 +88,8 @@ describe('HomeComponent', () => {
         { provide: CatalogService, useValue: catalog },
         { provide: RecentlyViewedService, useValue: recentlyViewed },
         { provide: AuthService, useValue: auth },
-        { provide: MarkdownService, useValue: markdown }
-      ]
+        { provide: MarkdownService, useValue: markdown },
+      ],
     });
 
     const translate = TestBed.inject(TranslateService);
@@ -94,11 +105,20 @@ describe('HomeComponent', () => {
           noFeatured: 'No featured products right now.',
           featuredError: { title: 'Err', copy: 'Err' },
           why: 'Why this starter',
-          cards: { strictTitle: 'A', strict: 'A', tokensTitle: 'B', tokens: 'B', primitivesTitle: 'C', primitives: 'C', shellTitle: 'D', shell: 'D' }
+          cards: {
+            strictTitle: 'A',
+            strict: 'A',
+            tokensTitle: 'B',
+            tokens: 'B',
+            primitivesTitle: 'C',
+            primitives: 'C',
+            shellTitle: 'D',
+            shell: 'D',
+          },
         },
-        shop: { retry: 'Retry' }
+        shop: { retry: 'Retry' },
       },
-      true
+      true,
     );
     translate.use('en');
 
@@ -106,24 +126,37 @@ describe('HomeComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelectorAll('h1').length).toBe(1);
-    const h2s = Array.from(fixture.nativeElement.querySelectorAll('h2') as NodeListOf<HTMLElement>).map((el) =>
-      (el.textContent || '').trim()
-    );
+    const h2s = Array.from(
+      fixture.nativeElement.querySelectorAll('h2') as NodeListOf<HTMLElement>,
+    ).map((el) => (el.textContent || '').trim());
     expect(h2s).toEqual(['Featured pieces', 'Why this starter']);
     const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     expect(canonical?.getAttribute('href')).toContain('/');
     expect(canonical?.getAttribute('href')).not.toContain('lang=en');
-    expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
-    expect((document.querySelector('script#seo-route-schema-1')?.textContent || '')).toContain('"WebPage"');
+    expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(
+      3,
+    );
+    expect(document.querySelector('script#seo-route-schema-1')?.textContent || '').toContain(
+      '"WebPage"',
+    );
   });
 
   it('loads section data for enabled CMS sections', () => {
     const meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     const title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     const api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
-    const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', ['listProducts', 'listFeaturedCollections']);
-    const recentlyViewed = jasmine.createSpyObj<RecentlyViewedService>('RecentlyViewedService', ['list']);
-    const auth = { user: () => null, isAuthenticated: () => false, isAdmin: () => false } as unknown as AuthService;
+    const catalog = jasmine.createSpyObj<CatalogService>('CatalogService', [
+      'listProducts',
+      'listFeaturedCollections',
+    ]);
+    const recentlyViewed = jasmine.createSpyObj<RecentlyViewedService>('RecentlyViewedService', [
+      'list',
+    ]);
+    const auth = {
+      user: () => null,
+      isAuthenticated: () => false,
+      isAdmin: () => false,
+    } as unknown as AuthService;
     const markdown = { render: (s: string) => s } as unknown as MarkdownService;
 
     api.get.and.callFake(<T>(url: string, params?: unknown) => {
@@ -136,15 +169,20 @@ describe('HomeComponent', () => {
               { id: 'featured_products', enabled: true },
               { id: 'new_arrivals', enabled: true },
               { id: 'featured_collections', enabled: true },
-              { id: 'story', enabled: true }
-            ]
+              { id: 'story', enabled: true },
+            ],
           },
-          images: []
+          images: [],
         } as unknown as T);
       }
       if (url === '/content/home.story') {
         expect(params).toEqual({ lang: 'en' });
-        return of({ title: 'Story', body_markdown: 'Story copy', meta: {}, images: [] } as unknown as T);
+        return of({
+          title: 'Story',
+          body_markdown: 'Story copy',
+          meta: {},
+          images: [],
+        } as unknown as T);
       }
       throw new Error(`Unexpected ApiService.get(${url})`);
     });
@@ -152,8 +190,8 @@ describe('HomeComponent', () => {
     catalog.listProducts.and.returnValue(
       of({
         items: [],
-        meta: { total_items: 0, total_pages: 1, page: 1, limit: 6 }
-      })
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 6 },
+      }),
     );
     catalog.listFeaturedCollections.and.returnValue(of([]));
     recentlyViewed.list.and.returnValue([]);
@@ -167,12 +205,19 @@ describe('HomeComponent', () => {
         { provide: CatalogService, useValue: catalog },
         { provide: RecentlyViewedService, useValue: recentlyViewed },
         { provide: AuthService, useValue: auth },
-        { provide: MarkdownService, useValue: markdown }
-      ]
+        { provide: MarkdownService, useValue: markdown },
+      ],
     });
 
     const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', { app: { tagline: 'art. handcrafted.' }, home: { metaTitle: 'Home', metaDescription: 'Home' } }, true);
+    translate.setTranslation(
+      'en',
+      {
+        app: { tagline: 'art. handcrafted.' },
+        home: { metaTitle: 'Home', metaDescription: 'Home' },
+      },
+      true,
+    );
     translate.use('en');
 
     const fixture = TestBed.createComponent(HomeComponent);
@@ -180,9 +225,11 @@ describe('HomeComponent', () => {
 
     expect(catalog.listProducts.calls.count()).toBe(2);
     expect(catalog.listProducts.calls.argsFor(0)[0]).toEqual(
-      jasmine.objectContaining({ is_featured: true, limit: 6, sort: 'newest', page: 1 })
+      jasmine.objectContaining({ is_featured: true, limit: 6, sort: 'newest', page: 1 }),
     );
-    expect(catalog.listProducts.calls.argsFor(1)[0]).toEqual(jasmine.objectContaining({ limit: 6, sort: 'newest', page: 1 }));
+    expect(catalog.listProducts.calls.argsFor(1)[0]).toEqual(
+      jasmine.objectContaining({ limit: 6, sort: 'newest', page: 1 }),
+    );
 
     expect(catalog.listFeaturedCollections.calls.count()).toBe(1);
     expect(api.get).toHaveBeenCalledWith('/content/home.sections');

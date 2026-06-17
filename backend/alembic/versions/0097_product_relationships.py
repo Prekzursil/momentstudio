@@ -43,7 +43,12 @@ def upgrade() -> None:
         ),
         sa.Column("relationship_type", relationship_type, nullable=False),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.UniqueConstraint(
             "product_id",
             "related_product_id",
@@ -51,7 +56,12 @@ def upgrade() -> None:
             name="uq_product_relationship_unique",
         ),
     )
-    op.create_index(op.f("ix_product_relationships_product_id"), "product_relationships", ["product_id"], unique=False)
+    op.create_index(
+        op.f("ix_product_relationships_product_id"),
+        "product_relationships",
+        ["product_id"],
+        unique=False,
+    )
     op.create_index(
         op.f("ix_product_relationships_related_product_id"),
         "product_relationships",
@@ -67,7 +77,15 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_product_relationships_relationship_type"), table_name="product_relationships")
-    op.drop_index(op.f("ix_product_relationships_related_product_id"), table_name="product_relationships")
-    op.drop_index(op.f("ix_product_relationships_product_id"), table_name="product_relationships")
+    op.drop_index(
+        op.f("ix_product_relationships_relationship_type"),
+        table_name="product_relationships",
+    )
+    op.drop_index(
+        op.f("ix_product_relationships_related_product_id"),
+        table_name="product_relationships",
+    )
+    op.drop_index(
+        op.f("ix_product_relationships_product_id"), table_name="product_relationships"
+    )
     op.drop_table("product_relationships")

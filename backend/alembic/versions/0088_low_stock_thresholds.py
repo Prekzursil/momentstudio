@@ -19,11 +19,14 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("categories", sa.Column("low_stock_threshold", sa.Integer(), nullable=True))
-    op.add_column("products", sa.Column("low_stock_threshold", sa.Integer(), nullable=True))
+    op.add_column(
+        "categories", sa.Column("low_stock_threshold", sa.Integer(), nullable=True)
+    )
+    op.add_column(
+        "products", sa.Column("low_stock_threshold", sa.Integer(), nullable=True)
+    )
 
 
 def downgrade() -> None:
     op.drop_column("products", "low_stock_threshold")
     op.drop_column("categories", "low_stock_threshold")
-

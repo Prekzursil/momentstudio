@@ -26,7 +26,12 @@ def save_upload(
     file: UploadFile,
     root: str | Path | None = None,
     filename: str | None = None,
-    allowed_content_types: tuple[str, ...] | None = ("image/png", "image/jpeg", "image/webp", "image/gif"),
+    allowed_content_types: tuple[str, ...] | None = (
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/gif",
+    ),
     max_bytes: int | None = 5 * 1024 * 1024,
     generate_thumbnails: bool = False,
 ) -> tuple[str, str]:
@@ -36,7 +41,9 @@ def save_upload(
     try:
         dest_root.relative_to(base_root)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
+        )
 
     admin_ceiling = int(getattr(settings, "admin_upload_max_bytes", 0) or 0)
     if max_bytes is None:
@@ -59,7 +66,9 @@ def save_upload(
     try:
         destination.relative_to(dest_root)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
+        )
 
     def _cleanup(path: Path) -> None:
         try:
@@ -78,7 +87,9 @@ def save_upload(
                     break
                 written += len(chunk)
                 if written > effective_max_bytes:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST, detail="File too large"
+                    )
                 out.write(chunk)
         return written
 
@@ -88,15 +99,21 @@ def save_upload(
         sniff_mime: str | None = None
         if allowed_content_types:
             if not file.content_type or file.content_type not in allowed_content_types:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type"
+                )
             sniff_mime = _detect_image_mime_path(destination)
             if not sniff_mime or sniff_mime not in allowed_content_types:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid file type"
+                )
 
         is_svg = sniff_mime == "image/svg+xml"
         if is_svg:
             if written > _SVG_MAX_BYTES:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large"
+                )
             raw = destination.read_bytes()
             sanitized = _sanitize_svg(raw)
             destination.write_bytes(sanitized)
@@ -117,7 +134,9 @@ def save_upload(
         raise
     except Exception as exc:
         _cleanup(destination)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Upload failed"
+        ) from exc
 
 
 def save_image_bytes(
@@ -145,7 +164,11 @@ def save_image_bytes(
         raise ValueError("Unsupported image type")
 
     pure = PurePosixPath((relative_path or "").strip())
-    if not str(pure) or pure.is_absolute() or any(part in {"", ".", ".."} for part in pure.parts):
+    if (
+        not str(pure)
+        or pure.is_absolute()
+        or any(part in {"", ".", ".."} for part in pure.parts)
+    ):
         raise ValueError("Invalid relative path")
 
     # Callers provide an extension-less deterministic key (e.g. social/<hash>).
@@ -173,7 +196,9 @@ def save_image_bytes(
             try:
                 other.unlink()
             except OSError:  # pragma: no cover
-                logger.warning("persisted_image_cleanup_failed", extra={"path": str(other)})
+                logger.warning(
+                    "persisted_image_cleanup_failed", extra={"path": str(other)}
+                )
 
     return f"{_MEDIA_URL_PREFIX}{final_rel.as_posix()}"
 
@@ -195,7 +220,9 @@ def _detect_image_mime_path(path: Path) -> str | None:
     except HTTPException:
         raise
     except Image.DecompressionBombError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large"
+        )
     except (OSError, ValueError):
         return None
 
@@ -242,7 +269,9 @@ def get_media_image_stats(url: str) -> dict[str, int | None]:
 
     for suffix in ("sm", "md", "lg"):
         thumb_path = path.with_name(f"{path.stem}-{suffix}{path.suffix}")
-        stats[f"thumb_{suffix}_bytes"] = thumb_path.stat().st_size if thumb_path.exists() else None
+        stats[f"thumb_{suffix}_bytes"] = (
+            thumb_path.stat().st_size if thumb_path.exists() else None
+        )
 
     return stats
 
@@ -292,7 +321,9 @@ def _generate_thumbnails(path: Path) -> None:
                 thumb_path = path.with_name(f"{path.stem}-{suffix}{path.suffix}")
                 thumb.save(thumb_path, optimize=True)
     except Exception as exc:  # pragma: no cover
-        logger.warning("thumbnail_generation_failed", extra={"path": str(path), "error": str(exc)})
+        logger.warning(
+            "thumbnail_generation_failed", extra={"path": str(path), "error": str(exc)}
+        )
 
 
 def _detect_image_mime(content: bytes) -> str | None:
@@ -305,7 +336,9 @@ def _detect_image_mime(content: bytes) -> str | None:
     except HTTPException:
         raise
     except Image.DecompressionBombError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large"
+        )
     except (OSError, ValueError):
         return None
 
@@ -350,11 +383,17 @@ def _validate_raster_dimensions(*, width: int, height: int) -> None:
     max_pixels = int(getattr(settings, "upload_image_max_pixels", 0) or 0)
 
     if max_width and width > max_width:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large"
+        )
     if max_height and height > max_height:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large"
+        )
     if max_pixels and (width * height) > max_pixels:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Image too large"
+        )
 
 
 def _suffix_for_mime(mime: str | None) -> str | None:
@@ -376,18 +415,24 @@ def _suffix_for_mime(mime: str | None) -> str | None:
 def _sanitize_svg(content: bytes) -> bytes:
     raw = content or b""
     if len(raw) > _SVG_MAX_BYTES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="SVG file too large"
+        )
 
     lowered = raw.lower()
     if b"<!doctype" in lowered or b"<!entity" in lowered:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported SVG content")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported SVG content"
+        )
 
     try:
         from defusedxml.ElementTree import fromstring, tostring
 
         root = fromstring(raw.decode("utf-8", errors="replace"))
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG"
+        ) from exc
 
     def _local(tag: str) -> str:
         if not isinstance(tag, str):
@@ -395,7 +440,9 @@ def _sanitize_svg(content: bytes) -> bytes:
         return tag.rsplit("}", 1)[-1].lower()
 
     if _local(getattr(root, "tag", "")) != "svg":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG"
+        )
 
     disallowed_tags = {
         "script",
@@ -423,7 +470,12 @@ def _sanitize_svg(content: bytes) -> bytes:
             low = p.lower()
             if "@import" in low:
                 continue
-            if "url(" in low and ("javascript:" in low or "data:" in low or "http://" in low or "https://" in low):
+            if "url(" in low and (
+                "javascript:" in low
+                or "data:" in low
+                or "http://" in low
+                or "https://" in low
+            ):
                 continue
             cleaned.append(p)
         return "; ".join(cleaned)
@@ -467,5 +519,7 @@ def _sanitize_svg(content: bytes) -> bytes:
     try:
         sanitized = tostring(root, encoding="utf-8", method="xml")
     except Exception as exc:  # pragma: no cover
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid SVG"
+        ) from exc
     return sanitized

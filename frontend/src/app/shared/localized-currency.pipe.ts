@@ -6,7 +6,7 @@ import { parseMoney } from './money';
 @Pipe({
   name: 'localizedCurrency',
   standalone: true,
-  pure: false
+  pure: false,
 })
 export class LocalizedCurrencyPipe implements PipeTransform {
   private readonly translate = inject(TranslateService, { optional: true });
@@ -22,7 +22,7 @@ export class LocalizedCurrencyPipe implements PipeTransform {
     locale: string,
     currency: string,
     minFractionDigits?: number,
-    maxFractionDigits?: number
+    maxFractionDigits?: number,
   ): Intl.NumberFormat {
     const key = `${locale}|${currency}|${minFractionDigits ?? ''}|${maxFractionDigits ?? ''}`;
     const existing = this.formatters.get(key);
@@ -31,7 +31,7 @@ export class LocalizedCurrencyPipe implements PipeTransform {
       style: 'currency',
       currency,
       ...(minFractionDigits !== undefined ? { minimumFractionDigits: minFractionDigits } : {}),
-      ...(maxFractionDigits !== undefined ? { maximumFractionDigits: maxFractionDigits } : {})
+      ...(maxFractionDigits !== undefined ? { maximumFractionDigits: maxFractionDigits } : {}),
     });
     this.formatters.set(key, formatter);
     return formatter;
@@ -39,14 +39,22 @@ export class LocalizedCurrencyPipe implements PipeTransform {
 
   transform(value: unknown, currency: string, locale?: string): string {
     const normalizedCurrency = (currency ?? '').toUpperCase();
-    const fromLang = this.translate?.currentLang === 'ro' ? 'ro-RO' : this.translate?.currentLang === 'en' ? 'en-US' : undefined;
-    const loc = locale || fromLang || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
+    const fromLang =
+      this.translate?.currentLang === 'ro'
+        ? 'ro-RO'
+        : this.translate?.currentLang === 'en'
+          ? 'en-US'
+          : undefined;
+    const loc =
+      locale || fromLang || (typeof navigator !== 'undefined' ? navigator.language : 'en-US');
     const amount = parseMoney(value);
-    const base = normalizedCurrency === 'RON' ? this.formatRon(amount) : this.getFormatter(loc, currency).format(amount);
+    const base =
+      normalizedCurrency === 'RON'
+        ? this.formatRon(amount)
+        : this.getFormatter(loc, currency).format(amount);
 
     const shouldApproximate =
-      (this.translate?.currentLang ?? '').toLowerCase() === 'en' &&
-      normalizedCurrency === 'RON';
+      (this.translate?.currentLang ?? '').toLowerCase() === 'en' && normalizedCurrency === 'RON';
 
     if (!shouldApproximate) {
       return base;

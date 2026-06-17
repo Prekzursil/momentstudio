@@ -7,7 +7,7 @@ export function orderStatusChipClass(status: string): string {
     shipped: 'bg-violet-100 text-violet-800 dark:bg-violet-950/40 dark:text-violet-100',
     delivered: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100',
     cancelled: 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-100',
-    refunded: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
+    refunded: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
   };
   return styles[String(status)] || styles['refunded'];
 }

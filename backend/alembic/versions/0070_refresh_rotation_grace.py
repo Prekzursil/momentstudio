@@ -18,11 +18,16 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("refresh_sessions", sa.Column("rotated_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("refresh_sessions", sa.Column("replaced_by_jti", sa.String(length=255), nullable=True))
+    op.add_column(
+        "refresh_sessions",
+        sa.Column("rotated_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "refresh_sessions",
+        sa.Column("replaced_by_jti", sa.String(length=255), nullable=True),
+    )
 
 
 def downgrade() -> None:
     op.drop_column("refresh_sessions", "replaced_by_jti")
     op.drop_column("refresh_sessions", "rotated_at")
-

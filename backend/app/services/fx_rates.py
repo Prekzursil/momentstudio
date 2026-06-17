@@ -91,7 +91,12 @@ async def get_fx_rates(*, force_refresh: bool = False) -> FxRates:
 
     async with _LOCK:
         now = datetime.now(timezone.utc)
-        if not force_refresh and _CACHE and _CACHE_EXPIRES_AT and _CACHE_EXPIRES_AT > now:
+        if (
+            not force_refresh
+            and _CACHE
+            and _CACHE_EXPIRES_AT
+            and _CACHE_EXPIRES_AT > now
+        ):
             return _CACHE
 
         xml_text = await _fetch_bnr_xml()

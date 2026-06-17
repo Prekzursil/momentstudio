@@ -19,24 +19,34 @@ export interface NewsletterUnsubscribeResponse {
 export class NewsletterService {
   constructor(private readonly api: ApiService) {}
 
-  subscribe(email: string, params: { source?: string; captcha_token?: string | null } = {}): Observable<NewsletterSubscribeResponse> {
+  subscribe(
+    email: string,
+    params: { source?: string; captcha_token?: string | null } = {},
+  ): Observable<NewsletterSubscribeResponse> {
     return this.api.post<NewsletterSubscribeResponse>(
       '/newsletter/subscribe',
       {
         email,
         source: params.source ?? 'blog',
-        captcha_token: params.captcha_token ?? null
+        captcha_token: params.captcha_token ?? null,
       },
-      { 'X-Silent': '1' }
+      { 'X-Silent': '1' },
     );
   }
 
   confirm(token: string): Observable<NewsletterConfirmResponse> {
-    return this.api.post<NewsletterConfirmResponse>('/newsletter/confirm', { token }, { 'X-Silent': '1' });
+    return this.api.post<NewsletterConfirmResponse>(
+      '/newsletter/confirm',
+      { token },
+      { 'X-Silent': '1' },
+    );
   }
 
   unsubscribe(token: string): Observable<NewsletterUnsubscribeResponse> {
-    return this.api.post<NewsletterUnsubscribeResponse>('/newsletter/unsubscribe', { token }, { 'X-Silent': '1' });
+    return this.api.post<NewsletterUnsubscribeResponse>(
+      '/newsletter/unsubscribe',
+      { token },
+      { 'X-Silent': '1' },
+    );
   }
 }
-

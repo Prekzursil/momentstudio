@@ -18,7 +18,8 @@ async def test_password_reset_blacklist_old_tokens() -> None:
 
     async with SessionLocal() as session:
         user = await auth_service.create_user(
-            session, UserCreate(email="reset2@example.com", password="password1", name="R")
+            session,
+            UserCreate(email="reset2@example.com", password="password1", name="R"),
         )
         first = await auth_service.create_reset_token(session, user.email)
         # ensure first token exists

@@ -2,16 +2,20 @@ import { ThemeService, ThemePreference } from './theme.service';
 
 function mockMatchMedia(prefersDark: boolean) {
   const listeners: Array<(event: MediaQueryListEvent) => void> = [];
-  spyOn(window, 'matchMedia').and.callFake(() => ({
-    matches: prefersDark,
-    media: '(prefers-color-scheme: dark)',
-    addEventListener: (_: string, cb: (event: MediaQueryListEvent) => void) => listeners.push(cb),
-    removeEventListener: () => {}
-  } as unknown as MediaQueryList));
+  spyOn(window, 'matchMedia').and.callFake(
+    () =>
+      ({
+        matches: prefersDark,
+        media: '(prefers-color-scheme: dark)',
+        addEventListener: (_: string, cb: (event: MediaQueryListEvent) => void) =>
+          listeners.push(cb),
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList,
+  );
   return {
     emit(matches: boolean) {
       listeners.forEach((cb) => cb({ matches } as MediaQueryListEvent));
-    }
+    },
   };
 }
 

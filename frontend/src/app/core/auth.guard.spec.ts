@@ -59,7 +59,7 @@ describe('adminSectionGuard', () => {
     authMock.canAccessAdminSection.and.returnValue(false);
     const router = TestBed.inject(Router);
     const guardResult$ = TestBed.runInInjectionContext(() =>
-      adminSectionGuard('dashboard')({} as any, { url: '/admin/dashboard' } as any)
+      adminSectionGuard('dashboard')({} as any, { url: '/admin/dashboard' } as any),
     );
 
     const result = await resolveGuardResult(guardResult$);
@@ -71,13 +71,14 @@ describe('adminSectionGuard', () => {
     authMock.checkAdminAccess.and.returnValue(
       throwError(() => ({
         headers: {
-          get: (name: string) => (name.toLowerCase() === 'x-error-code' ? 'training_readonly' : null),
+          get: (name: string) =>
+            name.toLowerCase() === 'x-error-code' ? 'training_readonly' : null,
         },
-      }))
+      })),
     );
 
     const guardResult$ = TestBed.runInInjectionContext(() =>
-      adminSectionGuard('dashboard')({} as any, { url: '/admin/dashboard' } as any)
+      adminSectionGuard('dashboard')({} as any, { url: '/admin/dashboard' } as any),
     );
 
     const result = await resolveGuardResult(guardResult$);

@@ -170,7 +170,9 @@ def _meta_cover_fit(meta: dict | None) -> str:
     return "cover"
 
 
-def _meta_summary(meta: dict | None, *, lang: str | None, base_lang: str | None) -> str | None:
+def _meta_summary(
+    meta: dict | None, *, lang: str | None, base_lang: str | None
+) -> str | None:
     if not meta:
         return None
     value = meta.get("summary")
@@ -279,14 +281,20 @@ async def list_published_posts(
 
     if not query_text and not tag_text and not series_text:
         offset = (page - 1) * limit
-        total = await session.scalar(select(func.count()).select_from(ContentBlock).where(*filters))
+        total = await session.scalar(
+            select(func.count()).select_from(ContentBlock).where(*filters)
+        )
         query = (
             select(ContentBlock)
-            .options(selectinload(ContentBlock.images), selectinload(ContentBlock.author))
+            .options(
+                selectinload(ContentBlock.images), selectinload(ContentBlock.author)
+            )
             .where(*filters)
         )
         if comment_counts is not None:
-            query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
+            query = query.outerjoin(
+                comment_counts, comment_counts.c.content_block_id == ContentBlock.id
+            )
         query = query.order_by(*ordering).limit(limit).offset(offset)
         if lang:
             query = query.options(selectinload(ContentBlock.translations))
@@ -303,7 +311,9 @@ async def list_published_posts(
         .where(*filters)
     )
     if comment_counts is not None:
-        query = query.outerjoin(comment_counts, comment_counts.c.content_block_id == ContentBlock.id)
+        query = query.outerjoin(
+            comment_counts, comment_counts.c.content_block_id == ContentBlock.id
+        )
     query = query.order_by(*ordering)
     if lang:
         query = query.options(selectinload(ContentBlock.translations))
@@ -323,10 +333,14 @@ async def list_published_posts(
                     continue
             if series_text:
                 series_value = meta.get("series")
-                if not isinstance(series_value, str) or series_text != _normalize_search_text(series_value):
+                if not isinstance(
+                    series_value, str
+                ) or series_text != _normalize_search_text(series_value):
                     continue
             if query_text:
-                haystack = _normalize_search_text(f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}")
+                haystack = _normalize_search_text(
+                    f"{block.title}\n{_plain_text_from_markdown(block.body_markdown)}"
+                )
                 if query_text not in haystack:
                     continue
             filtered.append(block)
@@ -353,7 +367,10 @@ async def get_published_post(
             ContentBlock.key == key,
             ContentBlock.status == ContentStatus.published,
             or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-            or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+            or_(
+                ContentBlock.published_until.is_(None),
+                ContentBlock.published_until > now,
+            ),
         )
     )
     if lang:
@@ -428,8 +445,12 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         cover_image = images[0]
         cover = cover_image.url
 
-    override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
-    reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
+    override_minutes = _coerce_positive_int(
+        meta.get("reading_time_minutes") or meta.get("reading_time")
+    )
+    reading_time_minutes = override_minutes or _compute_reading_time_minutes(
+        block.body_markdown
+    )
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
     excerpt = summary or _excerpt(_plain_text_from_markdown(block.body_markdown))
     series = meta.get("series")
@@ -444,7 +465,9 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
         "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
-        "series": series.strip() if isinstance(series, str) and series.strip() else None,
+        "series": (
+            series.strip() if isinstance(series, str) and series.strip() else None
+        ),
         "author_name": author_name,
         "reading_time_minutes": reading_time_minutes,
     }
@@ -454,9 +477,15 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
     images = sorted(getattr(block, "images", []) or [], key=lambda img: img.sort_order)
     meta = getattr(block, "meta", None) or {}
     cover = _meta_cover_image_url(meta) or (images[0].url if images else None)
-    cover_image = next((img for img in images if img.url == cover), None) if cover else None
-    override_minutes = _coerce_positive_int(meta.get("reading_time_minutes") or meta.get("reading_time"))
-    reading_time_minutes = override_minutes or _compute_reading_time_minutes(block.body_markdown)
+    cover_image = (
+        next((img for img in images if img.url == cover), None) if cover else None
+    )
+    override_minutes = _coerce_positive_int(
+        meta.get("reading_time_minutes") or meta.get("reading_time")
+    )
+    reading_time_minutes = override_minutes or _compute_reading_time_minutes(
+        block.body_markdown
+    )
     summary = _meta_summary(meta, lang=lang, base_lang=getattr(block, "lang", None))
     series = meta.get("series")
     author = getattr(block, "author", None)
@@ -476,7 +505,9 @@ def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:
         "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
         "cover_fit": _meta_cover_fit(meta),
         "tags": _normalize_tags(meta.get("tags")),
-        "series": series.strip() if isinstance(series, str) and series.strip() else None,
+        "series": (
+            series.strip() if isinstance(series, str) and series.strip() else None
+        ),
         "author_name": author_name,
         "author": _author_payload(author),
         "reading_time_minutes": reading_time_minutes,
@@ -500,7 +531,9 @@ async def list_comments(
         .where(BlogComment.content_block_id == content_block_id)
     )
     total = await session.scalar(
-        select(func.count()).select_from(BlogComment).where(BlogComment.content_block_id == content_block_id)
+        select(func.count())
+        .select_from(BlogComment)
+        .where(BlogComment.content_block_id == content_block_id)
     )
     result = await session.execute(
         base.order_by(BlogComment.created_at.asc()).limit(limit).offset(offset)
@@ -524,16 +557,24 @@ async def list_comment_threads(
     total_threads = await session.scalar(
         select(func.count())
         .select_from(BlogComment)
-        .where(BlogComment.content_block_id == content_block_id, BlogComment.parent_id.is_(None))
+        .where(
+            BlogComment.content_block_id == content_block_id,
+            BlogComment.parent_id.is_(None),
+        )
     )
     total_comments = await session.scalar(
-        select(func.count()).select_from(BlogComment).where(BlogComment.content_block_id == content_block_id)
+        select(func.count())
+        .select_from(BlogComment)
+        .where(BlogComment.content_block_id == content_block_id)
     )
 
     roots = (
         select(BlogComment)
         .options(selectinload(BlogComment.author))
-        .where(BlogComment.content_block_id == content_block_id, BlogComment.parent_id.is_(None))
+        .where(
+            BlogComment.content_block_id == content_block_id,
+            BlogComment.parent_id.is_(None),
+        )
     )
 
     cleaned_sort = (sort or "").strip().lower()
@@ -541,7 +582,10 @@ async def list_comment_threads(
         roots = roots.order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
     elif cleaned_sort == "top":
         reply_counts = (
-            select(BlogComment.parent_id.label("parent_id"), func.count().label("reply_count"))
+            select(
+                BlogComment.parent_id.label("parent_id"),
+                func.count().label("reply_count"),
+            )
             .where(
                 BlogComment.content_block_id == content_block_id,
                 BlogComment.parent_id.isnot(None),
@@ -551,13 +595,12 @@ async def list_comment_threads(
             .group_by(BlogComment.parent_id)
             .subquery()
         )
-        roots = (
-            roots.outerjoin(reply_counts, BlogComment.id == reply_counts.c.parent_id)
-            .order_by(
-                func.coalesce(reply_counts.c.reply_count, 0).desc(),
-                BlogComment.created_at.desc(),
-                BlogComment.id.desc(),
-            )
+        roots = roots.outerjoin(
+            reply_counts, BlogComment.id == reply_counts.c.parent_id
+        ).order_by(
+            func.coalesce(reply_counts.c.reply_count, 0).desc(),
+            BlogComment.created_at.desc(),
+            BlogComment.id.desc(),
         )
     else:
         roots = roots.order_by(BlogComment.created_at.desc(), BlogComment.id.desc())
@@ -600,7 +643,11 @@ async def list_user_comments(
     limit = max(1, min(limit, 50))
     offset = (page - 1) * limit
 
-    total = await session.scalar(select(func.count()).select_from(BlogComment).where(BlogComment.user_id == user_id))
+    total = await session.scalar(
+        select(func.count())
+        .select_from(BlogComment)
+        .where(BlogComment.user_id == user_id)
+    )
     result = await session.execute(
         select(BlogComment)
         .options(
@@ -662,7 +709,11 @@ async def list_user_comments(
         post_key = getattr(post, "key", "") if post else ""
         post_title = getattr(post, "title", "") if post else ""
 
-        status_value = "deleted" if comment.is_deleted else "hidden" if comment.is_hidden else "posted"
+        status_value = (
+            "deleted"
+            if comment.is_deleted
+            else "hidden" if comment.is_hidden else "posted"
+        )
         body_value = "" if comment.is_deleted or comment.is_hidden else comment.body
 
         parent_ctx = None
@@ -716,17 +767,23 @@ async def create_comment(
 ) -> BlogComment:
     body = (body or "").strip()
     if not body:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comment body is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Comment body is required"
+        )
 
     parent = None
     if parent_id:
         parent = await session.get(BlogComment, parent_id)
         if not parent or parent.content_block_id != content_block_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent comment")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid parent comment"
+            )
 
     max_links = int(settings.blog_comments_max_links or 0)
     if max_links >= 0 and len(_COMMENT_LINK_RE.findall(body)) > max_links:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Too many links in comment")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Too many links in comment"
+        )
 
     if getattr(user, "role", None) not in (UserRole.admin, UserRole.owner):
         limit_count = int(settings.blog_comments_rate_limit_count or 0)
@@ -767,8 +824,13 @@ async def soft_delete_comment(
 ) -> None:
     comment = await session.get(BlogComment, comment_id)
     if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
-    if actor.role not in (UserRole.admin, UserRole.owner) and comment.user_id != actor.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if (
+        actor.role not in (UserRole.admin, UserRole.owner)
+        and comment.user_id != actor.id
+    ):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     if comment.is_deleted:
         return
@@ -797,8 +859,10 @@ def to_comment_read(comment: BlogComment) -> dict:
             "name": author.name if author else None,
             "name_tag": getattr(author, "name_tag", None) if author else None,
             "username": getattr(author, "username", None) if author else None,
-            "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
-        }
+            "avatar_url": (
+                (author.avatar_url or author.google_picture_url) if author else None
+            ),
+        },
     }
 
 
@@ -839,7 +903,9 @@ def to_comment_admin_read(
             "name": author.name if author else None,
             "name_tag": getattr(author, "name_tag", None) if author else None,
             "username": getattr(author, "username", None) if author else None,
-            "avatar_url": (author.avatar_url or author.google_picture_url) if author else None,
+            "avatar_url": (
+                (author.avatar_url or author.google_picture_url) if author else None
+            ),
         },
         "flag_count": int(flag_count or 0),
         "flags": [to_flag_read(f) for f in (flags or [])],
@@ -855,18 +921,28 @@ async def flag_comment(
 ) -> BlogCommentFlag:
     comment = await session.get(BlogComment, comment_id)
     if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
     if comment.user_id == actor.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot flag your own comment")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot flag your own comment",
+        )
 
     existing = await session.scalar(
-        select(BlogCommentFlag).where(BlogCommentFlag.comment_id == comment_id, BlogCommentFlag.user_id == actor.id)
+        select(BlogCommentFlag).where(
+            BlogCommentFlag.comment_id == comment_id,
+            BlogCommentFlag.user_id == actor.id,
+        )
     )
     if existing:
         return existing
 
     cleaned_reason = (reason or "").strip() or None
-    flag = BlogCommentFlag(comment_id=comment_id, user_id=actor.id, reason=cleaned_reason)
+    flag = BlogCommentFlag(
+        comment_id=comment_id, user_id=actor.id, reason=cleaned_reason
+    )
     session.add(flag)
     await session.commit()
     await session.refresh(flag)
@@ -911,7 +987,10 @@ async def list_flagged_comments(
     comment_ids = [c.id for c, _, _ in items]
     flag_rows = await session.execute(
         select(BlogCommentFlag)
-        .where(BlogCommentFlag.comment_id.in_(comment_ids), BlogCommentFlag.resolved_at.is_(None))
+        .where(
+            BlogCommentFlag.comment_id.in_(comment_ids),
+            BlogCommentFlag.resolved_at.is_(None),
+        )
         .order_by(BlogCommentFlag.created_at.desc())
     )
     flags_by_comment: dict[UUID, list[BlogCommentFlag]] = {}
@@ -944,7 +1023,9 @@ async def set_comment_hidden(
 
     comment = await session.get(BlogComment, comment_id)
     if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
 
     if hidden:
         comment.is_hidden = True
@@ -960,23 +1041,33 @@ async def set_comment_hidden(
     session.add(comment)
     await session.execute(
         update(BlogCommentFlag)
-        .where(BlogCommentFlag.comment_id == comment_id, BlogCommentFlag.resolved_at.is_(None))
+        .where(
+            BlogCommentFlag.comment_id == comment_id,
+            BlogCommentFlag.resolved_at.is_(None),
+        )
         .values(resolved_at=datetime.now(timezone.utc), resolved_by=actor.id)
     )
     await session.commit()
     loaded = await session.execute(
-        select(BlogComment).options(selectinload(BlogComment.author)).where(BlogComment.id == comment_id)
+        select(BlogComment)
+        .options(selectinload(BlogComment.author))
+        .where(BlogComment.id == comment_id)
     )
     return loaded.scalar_one()
 
 
-async def resolve_comment_flags(session: AsyncSession, *, comment_id: UUID, actor: User) -> int:
+async def resolve_comment_flags(
+    session: AsyncSession, *, comment_id: UUID, actor: User
+) -> int:
     if actor.role not in (UserRole.admin, UserRole.owner):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     now = datetime.now(timezone.utc)
     result = await session.execute(
         update(BlogCommentFlag)
-        .where(BlogCommentFlag.comment_id == comment_id, BlogCommentFlag.resolved_at.is_(None))
+        .where(
+            BlogCommentFlag.comment_id == comment_id,
+            BlogCommentFlag.resolved_at.is_(None),
+        )
         .values(resolved_at=now, resolved_by=actor.id)
     )
     await session.commit()

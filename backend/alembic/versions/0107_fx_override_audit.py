@@ -23,18 +23,42 @@ def upgrade() -> None:
         "fx_override_audit_logs",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
         sa.Column("action", sa.String(length=24), nullable=False),
-        sa.Column("user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "user_id",
+            sa.UUID(as_uuid=True),
+            sa.ForeignKey("users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("eur_per_ron", sa.Numeric(12, 8), nullable=True),
         sa.Column("usd_per_ron", sa.Numeric(12, 8), nullable=True),
         sa.Column("as_of", sa.Date(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
-    op.create_index(op.f("ix_fx_override_audit_logs_created_at"), "fx_override_audit_logs", ["created_at"], unique=False)
-    op.create_index(op.f("ix_fx_override_audit_logs_user_id"), "fx_override_audit_logs", ["user_id"], unique=False)
+    op.create_index(
+        op.f("ix_fx_override_audit_logs_created_at"),
+        "fx_override_audit_logs",
+        ["created_at"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_fx_override_audit_logs_user_id"),
+        "fx_override_audit_logs",
+        ["user_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_fx_override_audit_logs_user_id"), table_name="fx_override_audit_logs")
-    op.drop_index(op.f("ix_fx_override_audit_logs_created_at"), table_name="fx_override_audit_logs")
+    op.drop_index(
+        op.f("ix_fx_override_audit_logs_user_id"), table_name="fx_override_audit_logs"
+    )
+    op.drop_index(
+        op.f("ix_fx_override_audit_logs_created_at"),
+        table_name="fx_override_audit_logs",
+    )
     op.drop_table("fx_override_audit_logs")
-

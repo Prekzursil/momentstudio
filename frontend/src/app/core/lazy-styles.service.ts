@@ -7,7 +7,9 @@ export class LazyStylesService {
   private readonly inflight = new Map<string, Promise<void>>();
 
   ensure(id: string, href: string): Promise<void> {
-    const existing = this.document.querySelector(`link[data-lazy-style="${id}"]`) as HTMLLinkElement | null;
+    const existing = this.document.querySelector(
+      `link[data-lazy-style="${id}"]`,
+    ) as HTMLLinkElement | null;
     if (existing) {
       return Promise.resolve();
     }
@@ -39,4 +41,3 @@ export class LazyStylesService {
     return promise;
   }
 }
-

@@ -50,7 +50,7 @@ interface LegalIndexDoc {
     CardComponent,
     TranslateModule,
     ButtonComponent,
-    CmsPageBlocksComponent
+    CmsPageBlocksComponent,
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-4xl">
@@ -80,13 +80,21 @@ interface LegalIndexDoc {
         </div>
 
         <div *ngIf="!loading() && hasError()" class="grid gap-2">
-          <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'about.errorTitle' | translate }}</p>
-          <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'about.errorCopy' | translate }}</p>
+          <p class="font-semibold text-amber-900 dark:text-amber-100">
+            {{ 'about.errorTitle' | translate }}
+          </p>
+          <p class="text-sm text-amber-800 dark:text-amber-200">
+            {{ 'about.errorCopy' | translate }}
+          </p>
         </div>
 
         <div *ngIf="!loading() && requiresLogin()" class="grid gap-2">
-          <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'page.restricted.title' | translate }}</p>
-          <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'page.restricted.copy' | translate }}</p>
+          <p class="font-semibold text-amber-900 dark:text-amber-100">
+            {{ 'page.restricted.title' | translate }}
+          </p>
+          <p class="text-sm text-amber-800 dark:text-amber-200">
+            {{ 'page.restricted.copy' | translate }}
+          </p>
           <div class="flex">
             <a
               [routerLink]="['/login']"
@@ -98,10 +106,10 @@ interface LegalIndexDoc {
           </div>
         </div>
 
-	        <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
-	          <ng-container *ngIf="pageBlocks().length; else markdownContent">
-	            <app-cms-page-blocks [blocks]="pageBlocks()"></app-cms-page-blocks>
-	          </ng-container>
+        <div *ngIf="!loading() && !hasError() && block()" class="grid gap-5">
+          <ng-container *ngIf="pageBlocks().length; else markdownContent">
+            <app-cms-page-blocks [blocks]="pageBlocks()"></app-cms-page-blocks>
+          </ng-container>
 
           <ng-template #markdownContent>
             <img
@@ -109,56 +117,74 @@ interface LegalIndexDoc {
               [src]="block()!.images[0].url"
               [alt]="block()!.images[0].alt_text || block()!.title"
               class="w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800"
-              [style.object-position]="focalPosition(block()!.images[0].focal_x, block()!.images[0].focal_y)"
+              [style.object-position]="
+                focalPosition(block()!.images[0].focal_x, block()!.images[0].focal_y)
+              "
               loading="lazy"
-	            />
-	            <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
-              <p
-                *ngIf="!hasMeaningfulBodyContent()"
-                class="text-base text-slate-700 leading-relaxed dark:text-slate-200"
-              >
-                {{ fallbackIntro() }}
-              </p>
-	          </ng-template>
+            />
+            <div
+              class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+              [innerHTML]="bodyHtml()"
+            ></div>
+            <p
+              *ngIf="!hasMeaningfulBodyContent()"
+              class="text-base text-slate-700 leading-relaxed dark:text-slate-200"
+            >
+              {{ fallbackIntro() }}
+            </p>
+          </ng-template>
 
-	          <div *ngIf="legalIndexLoading()" class="text-sm text-slate-600 dark:text-slate-300">
-	            {{ 'notifications.loading' | translate }}
-	          </div>
-	          <div *ngIf="!legalIndexLoading() && legalIndexDocs().length" class="grid gap-2">
-	            <a
-	              *ngFor="let doc of legalIndexDocs()"
-	              [routerLink]="['/pages', doc.slug]"
-	              class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900"
-	            >
-	              <span class="font-medium text-slate-900 dark:text-slate-50">{{ doc.title }}</span>
-	              <span class="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-	                {{ doc.lastUpdated ? formatLegalIndexDate(doc.lastUpdated) : '—' }}
-	              </span>
-	            </a>
-	          </div>
-	        </div>
-	      </app-card>
+          <div *ngIf="legalIndexLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'notifications.loading' | translate }}
+          </div>
+          <div *ngIf="!legalIndexLoading() && legalIndexDocs().length" class="grid gap-2">
+            <a
+              *ngFor="let doc of legalIndexDocs()"
+              [routerLink]="['/pages', doc.slug]"
+              class="flex items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+            >
+              <span class="font-medium text-slate-900 dark:text-slate-50">{{ doc.title }}</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                {{ doc.lastUpdated ? formatLegalIndexDate(doc.lastUpdated) : '—' }}
+              </span>
+            </a>
+          </div>
+        </div>
+      </app-card>
 
       <div
         *ngIf="!loading() && !hasError() && block() && showSeoLinkCluster()"
         class="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40"
       >
-        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'page.exploreMore' | translate }}</h2>
-        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'page.exploreMoreCopy' | translate }}</p>
+        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'page.exploreMore' | translate }}
+        </h2>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          {{ 'page.exploreMoreCopy' | translate }}
+        </p>
         <div class="mt-4 flex flex-wrap gap-3 text-sm">
-          <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/shop']">
+          <a
+            class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+            [routerLink]="['/shop']"
+          >
             {{ 'nav.shop' | translate }}
           </a>
-          <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/blog']">
+          <a
+            class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+            [routerLink]="['/blog']"
+          >
             {{ 'nav.blog' | translate }}
           </a>
-          <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/contact']">
+          <a
+            class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+            [routerLink]="['/contact']"
+          >
             {{ 'nav.contact' | translate }}
           </a>
         </div>
       </div>
-	    </app-container>
-	  `
+    </app-container>
+  `,
 })
 export class CmsPageComponent implements OnInit, OnDestroy {
   block = signal<ContentBlock | null>(null);
@@ -172,7 +198,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   legalIndexLoading = signal<boolean>(false);
   crumbs = signal<{ label: string; url?: string }[]>([
     { label: 'nav.home', url: '/' },
-    { label: 'nav.page' }
+    { label: 'nav.page' },
   ]);
 
   private langSub?: Subscription;
@@ -192,7 +218,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     private readonly meta: Meta,
     private readonly markdown: MarkdownService,
     private readonly seoHeadLinks: SeoHeadLinksService,
-    private readonly seoCopyFallback: SeoCopyFallbackService
+    private readonly seoCopyFallback: SeoCopyFallbackService,
   ) {}
 
   canEditPage(): boolean {
@@ -206,15 +232,17 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.slugSub = combineLatest([this.route.paramMap, this.route.queryParams]).subscribe(([params, query]) => {
-      this.slug = params.get('slug') || '';
-      this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
-      if (this.suppressNextLoad) {
-        this.suppressNextLoad = false;
-        return;
-      }
-      this.load();
-    });
+    this.slugSub = combineLatest([this.route.paramMap, this.route.queryParams]).subscribe(
+      ([params, query]) => {
+        this.slug = params.get('slug') || '';
+        this.previewToken = typeof query['preview'] === 'string' ? query['preview'] : '';
+        if (this.suppressNextLoad) {
+          this.suppressNextLoad = false;
+          return;
+        }
+        this.load();
+      },
+    );
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
   }
 
@@ -254,13 +282,19 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     this.legalIndexSub = undefined;
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = this.previewToken
-      ? this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}/preview`, { token: this.previewToken, lang })
+      ? this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}/preview`, {
+          token: this.previewToken,
+          lang,
+        })
       : this.api.get<ContentBlock>(`/content/pages/${encodeURIComponent(slug)}`, { lang });
     req.subscribe({
       next: (block) => {
         const canonicalSlug = this.slugFromKey(block.key);
         this.block.set(block);
-        const bodyMarkdown = canonicalSlug === 'terms' ? this.stripLegalIndexTable(block.body_markdown) : block.body_markdown;
+        const bodyMarkdown =
+          canonicalSlug === 'terms'
+            ? this.stripLegalIndexTable(block.body_markdown)
+            : block.body_markdown;
         this.bodyHtml.set(this.markdown.render(bodyMarkdown));
         this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
         this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, block.title || slug));
@@ -269,13 +303,15 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         this.loadLegalIndexDocs(canonicalSlug, lang);
         if (canonicalSlug && canonicalSlug !== slug) {
           this.suppressNextLoad = true;
-          void this.router.navigate(['/pages', canonicalSlug], { replaceUrl: true, queryParamsHandling: 'preserve' });
+          void this.router.navigate(['/pages', canonicalSlug], {
+            replaceUrl: true,
+            queryParamsHandling: 'preserve',
+          });
         }
-        const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : bodyMarkdown;
-        this.crumbs.set([
-          { label: 'nav.home', url: '/' },
-          { label: block.title || slug }
-        ]);
+        const metaBody = this.pageBlocks().length
+          ? pageBlocksToPlainText(this.pageBlocks())
+          : bodyMarkdown;
+        this.crumbs.set([{ label: 'nav.home', url: '/' }, { label: block.title || slug }]);
         this.setMetaTags(block.title || slug, metaBody, canonicalSlug || slug);
       },
       error: (err) => {
@@ -283,14 +319,11 @@ export class CmsPageComponent implements OnInit, OnDestroy {
           this.block.set(null);
           this.bodyHtml.set('');
           this.pageBlocks.set([]);
-        this.loading.set(false);
-        this.hasError.set(false);
-        this.requiresLogin.set(true);
-        this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
-          this.crumbs.set([
-            { label: 'nav.home', url: '/' },
-            { label: slug }
-          ]);
+          this.loading.set(false);
+          this.hasError.set(false);
+          this.requiresLogin.set(true);
+          this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
+          this.crumbs.set([{ label: 'nav.home', url: '/' }, { label: slug }]);
           return;
         }
         this.block.set(null);
@@ -300,12 +333,9 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         this.hasError.set(true);
         this.requiresLogin.set(false);
         this.fallbackIntro.set(this.seoCopyFallback.pageIntro(lang, slug));
-        this.crumbs.set([
-          { label: 'nav.home', url: '/' },
-          { label: slug }
-        ]);
+        this.crumbs.set([{ label: 'nav.home', url: '/' }, { label: slug }]);
         this.setMetaTags(slug, this.translate.instant('about.metaDescription'), slug);
-      }
+      },
     });
   }
 
@@ -319,7 +349,12 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     const dt = new Date(Date.UTC(y, m - 1, d));
     const locale = this.translate.currentLang === 'ro' ? 'ro-RO' : 'en-US';
     try {
-      return new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: '2-digit', timeZone: 'UTC' }).format(dt);
+      return new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        timeZone: 'UTC',
+      }).format(dt);
     } catch {
       return raw;
     }
@@ -334,7 +369,10 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     for (const line of lines) {
       const trimmed = line.trim().toLowerCase();
       if (!inTable) {
-        if (trimmed.startsWith('|') && (trimmed.includes('last updated') || trimmed.includes('ultima actualizare'))) {
+        if (
+          trimmed.startsWith('|') &&
+          (trimmed.includes('last updated') || trimmed.includes('ultima actualizare'))
+        ) {
           inTable = true;
           continue;
         }
@@ -353,7 +391,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     const docs = [
       { slug: 'terms-and-conditions', fallbackKey: 'nav.terms' },
       { slug: 'privacy-policy', fallbackKey: 'footer.privacyPolicy' },
-      { slug: 'anpc', fallbackKey: 'footer.anpc' }
+      { slug: 'anpc', fallbackKey: 'footer.anpc' },
     ];
 
     this.legalIndexLoading.set(true);
@@ -362,14 +400,15 @@ export class CmsPageComponent implements OnInit, OnDestroy {
       docs.map((doc) =>
         this.api
           .get<ContentBlock>(`/content/pages/${encodeURIComponent(doc.slug)}`, { lang })
-          .pipe(catchError(() => of(null)))
-      )
+          .pipe(catchError(() => of(null))),
+      ),
     ).subscribe({
       next: (blocks) => {
         const rows: LegalIndexDoc[] = docs.map((doc, idx) => {
           const block = (blocks?.[idx] as ContentBlock | null) || null;
           const meta = (block?.meta || {}) as Record<string, unknown>;
-          const lastUpdated = typeof meta['last_updated'] === 'string' ? String(meta['last_updated']) : null;
+          const lastUpdated =
+            typeof meta['last_updated'] === 'string' ? String(meta['last_updated']) : null;
           const title = (block?.title || '').trim() || this.translate.instant(doc.fallbackKey);
           return { slug: doc.slug, title, lastUpdated };
         });
@@ -379,7 +418,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
       error: () => {
         this.legalIndexDocs.set([]);
         this.legalIndexLoading.set(false);
-      }
+      },
     });
   }
 
@@ -400,7 +439,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
       lang,
       (body || '').replace(/\s+/g, ' ').trim().slice(0, 160),
       this.translate.instant('meta.descriptions.page'),
-      this.translate.instant('about.metaDescription')
+      this.translate.instant('about.metaDescription'),
     );
     const safeSlug = encodeURIComponent(String(slug || '').trim());
     const path = safeSlug ? `/pages/${safeSlug}` : '/pages';
@@ -425,4 +464,3 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     return !this.legalIndexDocs().length;
   }
 }
-

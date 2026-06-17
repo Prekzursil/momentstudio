@@ -162,39 +162,75 @@ export class AdminUsersService {
     return this.api.get<AdminUserListResponse>('/admin/dashboard/users/search', params as any);
   }
 
-  getProfile(userId: string, opts?: { include_pii?: boolean }): Observable<AdminUserProfileResponse> {
-    return this.api.get<AdminUserProfileResponse>(`/admin/dashboard/users/${userId}/profile`, opts as any);
+  getProfile(
+    userId: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminUserProfileResponse> {
+    return this.api.get<AdminUserProfileResponse>(
+      `/admin/dashboard/users/${userId}/profile`,
+      opts as any,
+    );
   }
 
-  updateInternal(userId: string, payload: { vip?: boolean; admin_note?: string | null }): Observable<AdminUserProfileUser> {
-    return this.api.patch<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/internal`, payload as any);
+  updateInternal(
+    userId: string,
+    payload: { vip?: boolean; admin_note?: string | null },
+  ): Observable<AdminUserProfileUser> {
+    return this.api.patch<AdminUserProfileUser>(
+      `/admin/dashboard/users/${userId}/internal`,
+      payload as any,
+    );
   }
 
   impersonate(userId: string): Observable<AdminUserImpersonationResponse> {
-    return this.api.post<AdminUserImpersonationResponse>(`/admin/dashboard/users/${userId}/impersonate`, {});
+    return this.api.post<AdminUserImpersonationResponse>(
+      `/admin/dashboard/users/${userId}/impersonate`,
+      {},
+    );
   }
 
   updateSecurity(
     userId: string,
-    payload: { locked_until?: string | null; locked_reason?: string | null; password_reset_required?: boolean }
+    payload: {
+      locked_until?: string | null;
+      locked_reason?: string | null;
+      password_reset_required?: boolean;
+    },
   ): Observable<AdminUserProfileUser> {
-    return this.api.patch<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/security`, payload as any);
+    return this.api.patch<AdminUserProfileUser>(
+      `/admin/dashboard/users/${userId}/security`,
+      payload as any,
+    );
   }
 
   getEmailVerificationHistory(userId: string): Observable<AdminEmailVerificationHistoryResponse> {
-    return this.api.get<AdminEmailVerificationHistoryResponse>(`/admin/dashboard/users/${userId}/email/verification`);
+    return this.api.get<AdminEmailVerificationHistoryResponse>(
+      `/admin/dashboard/users/${userId}/email/verification`,
+    );
   }
 
   resendEmailVerification(userId: string): Observable<{ detail: string }> {
-    return this.api.post<{ detail: string }>(`/admin/dashboard/users/${userId}/email/verification/resend`, {});
+    return this.api.post<{ detail: string }>(
+      `/admin/dashboard/users/${userId}/email/verification/resend`,
+      {},
+    );
   }
 
-  resendPasswordReset(userId: string, payload?: { email?: string | null }): Observable<{ detail: string }> {
-    return this.api.post<{ detail: string }>(`/admin/dashboard/users/${userId}/password-reset/resend`, payload || {});
+  resendPasswordReset(
+    userId: string,
+    payload?: { email?: string | null },
+  ): Observable<{ detail: string }> {
+    return this.api.post<{ detail: string }>(
+      `/admin/dashboard/users/${userId}/password-reset/resend`,
+      payload || {},
+    );
   }
 
   overrideEmailVerification(userId: string, password: string): Observable<AdminUserProfileUser> {
-    return this.api.post<AdminUserProfileUser>(`/admin/dashboard/users/${userId}/email/verification/override`, { password });
+    return this.api.post<AdminUserProfileUser>(
+      `/admin/dashboard/users/${userId}/email/verification/override`,
+      { password },
+    );
   }
 
   listGdprExportJobs(params: {
@@ -203,19 +239,32 @@ export class AdminUsersService {
     page?: number;
     limit?: number;
   }): Observable<AdminGdprExportJobsResponse> {
-    return this.api.get<AdminGdprExportJobsResponse>('/admin/dashboard/gdpr/exports', params as any);
+    return this.api.get<AdminGdprExportJobsResponse>(
+      '/admin/dashboard/gdpr/exports',
+      params as any,
+    );
   }
 
   retryGdprExportJob(jobId: string): Observable<AdminGdprExportJobItem> {
-    return this.api.post<AdminGdprExportJobItem>(`/admin/dashboard/gdpr/exports/${jobId}/retry`, {});
+    return this.api.post<AdminGdprExportJobItem>(
+      `/admin/dashboard/gdpr/exports/${jobId}/retry`,
+      {},
+    );
   }
 
   downloadGdprExportJob(jobId: string): Observable<Blob> {
     return this.api.getBlob(`/admin/dashboard/gdpr/exports/${jobId}/download`);
   }
 
-  listGdprDeletionRequests(params: { q?: string; page?: number; limit?: number }): Observable<AdminGdprDeletionRequestsResponse> {
-    return this.api.get<AdminGdprDeletionRequestsResponse>('/admin/dashboard/gdpr/deletions', params as any);
+  listGdprDeletionRequests(params: {
+    q?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<AdminGdprDeletionRequestsResponse> {
+    return this.api.get<AdminGdprDeletionRequestsResponse>(
+      '/admin/dashboard/gdpr/deletions',
+      params as any,
+    );
   }
 
   executeGdprDeletion(userId: string, password: string): Observable<void> {
@@ -226,8 +275,16 @@ export class AdminUsersService {
     return this.api.post<void>(`/admin/dashboard/gdpr/deletions/${userId}/cancel`, {});
   }
 
-  listRepeatBuyersSegment(params: { q?: string; min_orders?: number; page?: number; limit?: number }): Observable<AdminUserSegmentResponse> {
-    return this.api.get<AdminUserSegmentResponse>('/admin/dashboard/users/segments/repeat-buyers', params as any);
+  listRepeatBuyersSegment(params: {
+    q?: string;
+    min_orders?: number;
+    page?: number;
+    limit?: number;
+  }): Observable<AdminUserSegmentResponse> {
+    return this.api.get<AdminUserSegmentResponse>(
+      '/admin/dashboard/users/segments/repeat-buyers',
+      params as any,
+    );
   }
 
   listHighAovSegment(params: {
@@ -237,7 +294,9 @@ export class AdminUsersService {
     page?: number;
     limit?: number;
   }): Observable<AdminUserSegmentResponse> {
-    return this.api.get<AdminUserSegmentResponse>('/admin/dashboard/users/segments/high-aov', params as any);
+    return this.api.get<AdminUserSegmentResponse>(
+      '/admin/dashboard/users/segments/high-aov',
+      params as any,
+    );
   }
 }
-

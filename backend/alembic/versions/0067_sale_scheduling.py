@@ -19,11 +19,21 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("products", sa.Column("sale_start_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("products", sa.Column("sale_end_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column(
         "products",
-        sa.Column("sale_auto_publish", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("sale_start_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "products", sa.Column("sale_end_at", sa.DateTime(timezone=True), nullable=True)
+    )
+    op.add_column(
+        "products",
+        sa.Column(
+            "sale_auto_publish",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
 
     op.create_index("ix_products_sale_start_at", "products", ["sale_start_at"])
@@ -39,4 +49,3 @@ def downgrade() -> None:
     op.drop_column("products", "sale_auto_publish")
     op.drop_column("products", "sale_end_at")
     op.drop_column("products", "sale_start_at")
-

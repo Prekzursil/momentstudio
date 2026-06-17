@@ -6,7 +6,7 @@ import { AddressFormComponent } from './address-form.component';
 describe('AddressFormComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [AddressFormComponent, TranslateModule.forRoot()]
+      imports: [AddressFormComponent, TranslateModule.forRoot()],
     });
 
     const translate = TestBed.inject(TranslateService);
@@ -21,7 +21,7 @@ describe('AddressFormComponent', () => {
           defaultBilling: 'Set as default billing',
           useAsBillingToo: 'Use as billing too',
           cancel: 'Cancel',
-          save: 'Save'
+          save: 'Save',
         },
         checkout: {
           city: 'City',
@@ -29,11 +29,11 @@ describe('AddressFormComponent', () => {
           regionSelect: 'Select a county',
           postal: 'Postal code',
           country: 'Country',
-          countrySelect: 'Select a country'
+          countrySelect: 'Select a country',
         },
-        validation: { required: 'Required' }
+        validation: { required: 'Required' },
       },
-      true
+      true,
     );
     translate.use('en');
   });
@@ -68,11 +68,13 @@ describe('AddressFormComponent', () => {
       postal_code: '010203',
       country: 'RO',
       is_default_shipping: true,
-      is_default_billing: false
+      is_default_billing: false,
     };
     fixture.detectChanges();
 
-    const buttons = Array.from(fixture.nativeElement.querySelectorAll('button')) as HTMLButtonElement[];
+    const buttons = Array.from(
+      fixture.nativeElement.querySelectorAll('button'),
+    ) as HTMLButtonElement[];
     const useAsBilling = buttons.find((b) => {
       const text = (b.textContent ?? '').trim();
       return text.includes('Use as billing too') || text.includes('addressForm.useAsBillingToo');

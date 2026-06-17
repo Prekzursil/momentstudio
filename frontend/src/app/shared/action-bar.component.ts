@@ -12,9 +12,8 @@ import { Component, Input } from '@angular/core';
     >
       <ng-content></ng-content>
     </div>
-  `
+  `,
 })
 export class ActionBarComponent {
   @Input() stickyOnMobile = true;
 }
-

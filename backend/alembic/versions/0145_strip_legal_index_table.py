@@ -28,7 +28,9 @@ def _strip_last_updated_table(body: str) -> str:
     for line in lines:
         trimmed = (line or "").strip().lower()
         if not in_table:
-            if trimmed.startswith("|") and ("last updated" in trimmed or "ultima actualizare" in trimmed):
+            if trimmed.startswith("|") and (
+                "last updated" in trimmed or "ultima actualizare" in trimmed
+            ):
                 in_table = True
                 continue
             out.append(line)
@@ -71,9 +73,11 @@ def upgrade() -> None:
 
     row = (
         conn.execute(
-            sa.select(content_blocks.c.id, content_blocks.c.version, content_blocks.c.body_markdown).where(
-                content_blocks.c.key == "page.terms"
-            )
+            sa.select(
+                content_blocks.c.id,
+                content_blocks.c.version,
+                content_blocks.c.body_markdown,
+            ).where(content_blocks.c.key == "page.terms")
         )
         .mappings()
         .first()
@@ -88,7 +92,9 @@ def upgrade() -> None:
 
     tr_row = (
         conn.execute(
-            sa.select(translations.c.id, translations.c.title, translations.c.body_markdown).where(
+            sa.select(
+                translations.c.id, translations.c.title, translations.c.body_markdown
+            ).where(
                 translations.c.content_block_id == block_id,
                 translations.c.lang == "ro",
             )
@@ -98,7 +104,9 @@ def upgrade() -> None:
     )
     tr_id = tr_row["id"] if tr_row else None
     tr_title = (tr_row.get("title") or "") if tr_row else ""
-    tr_body = (tr_row.get("body_markdown") or "").replace("\r\n", "\n") if tr_row else ""
+    tr_body = (
+        (tr_row.get("body_markdown") or "").replace("\r\n", "\n") if tr_row else ""
+    )
     next_tr_body = _strip_last_updated_table(tr_body) if tr_row else ""
 
     base_changed = next_body != current_body
@@ -108,16 +116,25 @@ def upgrade() -> None:
 
     if base_changed:
         conn.execute(
-            sa.update(content_blocks).where(content_blocks.c.id == block_id).values(body_markdown=next_body, updated_at=now)
+            sa.update(content_blocks)
+            .where(content_blocks.c.id == block_id)
+            .values(body_markdown=next_body, updated_at=now)
         )
 
     if tr_changed and tr_id:
-        conn.execute(sa.update(translations).where(translations.c.id == tr_id).values(body_markdown=next_tr_body))
+        conn.execute(
+            sa.update(translations)
+            .where(translations.c.id == tr_id)
+            .values(body_markdown=next_tr_body)
+        )
 
     version_row = (
         conn.execute(
             sa.select(versions.c.body_markdown, versions.c.translations).where(
-                sa.and_(versions.c.content_block_id == block_id, versions.c.version == current_version)
+                sa.and_(
+                    versions.c.content_block_id == block_id,
+                    versions.c.version == current_version,
+                )
             )
         )
         .mappings()
@@ -147,13 +164,20 @@ def upgrade() -> None:
                 else:
                     next_list.append(item)
         if not found and tr_id:
-            next_list.append({"lang": "ro", "title": tr_title, "body_markdown": next_tr_body})
+            next_list.append(
+                {"lang": "ro", "title": tr_title, "body_markdown": next_tr_body}
+            )
         updates["translations"] = next_list
 
     if updates:
         conn.execute(
             sa.update(versions)
-            .where(sa.and_(versions.c.content_block_id == block_id, versions.c.version == current_version))
+            .where(
+                sa.and_(
+                    versions.c.content_block_id == block_id,
+                    versions.c.version == current_version,
+                )
+            )
             .values(**updates)
         )
 
@@ -161,4 +185,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: restoring the old table would overwrite user edits.
     return
-

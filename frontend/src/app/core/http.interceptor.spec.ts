@@ -19,15 +19,17 @@ describe('authAndErrorInterceptor', () => {
       clearStepUpToken: jasmine.createSpy('clearStepUpToken'),
       ensureStepUp: jasmine.createSpy('ensureStepUp').and.returnValue(of(null)),
     } as Partial<AuthService> as AuthService;
-    const handler = { handle: jasmine.createSpy('handle') } as Partial<ErrorHandlerService> as ErrorHandlerService;
+    const handler = {
+      handle: jasmine.createSpy('handle'),
+    } as Partial<ErrorHandlerService> as ErrorHandlerService;
 
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(withInterceptors([authAndErrorInterceptor])),
         provideHttpClientTesting(),
         { provide: AuthService, useValue: auth },
-        { provide: ErrorHandlerService, useValue: handler }
-      ]
+        { provide: ErrorHandlerService, useValue: handler },
+      ],
     });
 
     http = TestBed.inject(HttpClient);
@@ -47,7 +49,11 @@ describe('authAndErrorInterceptor', () => {
 
   it('does not override an explicit Authorization header', () => {
     http
-      .post('/api/v1/auth/google/complete', {}, { headers: new HttpHeaders({ Authorization: 'Bearer completion' }) })
+      .post(
+        '/api/v1/auth/google/complete',
+        {},
+        { headers: new HttpHeaders({ Authorization: 'Bearer completion' }) },
+      )
       .subscribe();
     const req = httpMock.expectOne('/api/v1/auth/google/complete');
     expect(req.request.headers.get('Authorization')).toBe('Bearer completion');
@@ -71,10 +77,17 @@ describe('authAndErrorInterceptor', () => {
     http.get('/api/v1/newsletter/admin/export', { responseType: 'blob' as 'json' }).subscribe();
     const first = httpMock.expectOne('/api/v1/newsletter/admin/export');
     first.flush(
-      new Blob([JSON.stringify({ detail: 'Step-up authentication required', code: 'step_up_required' })], {
-        type: 'application/json'
-      }),
-      { status: 403, statusText: 'Forbidden', headers: new HttpHeaders({ 'X-Error-Code': 'step_up_required' }) }
+      new Blob(
+        [JSON.stringify({ detail: 'Step-up authentication required', code: 'step_up_required' })],
+        {
+          type: 'application/json',
+        },
+      ),
+      {
+        status: 403,
+        statusText: 'Forbidden',
+        headers: new HttpHeaders({ 'X-Error-Code': 'step_up_required' }),
+      },
     );
 
     tick(0);

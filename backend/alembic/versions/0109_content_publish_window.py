@@ -19,11 +19,16 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("content_blocks", sa.Column("published_until", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("content_block_versions", sa.Column("published_until", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "content_blocks",
+        sa.Column("published_until", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "content_block_versions",
+        sa.Column("published_until", sa.DateTime(timezone=True), nullable=True),
+    )
 
 
 def downgrade() -> None:
     op.drop_column("content_block_versions", "published_until")
     op.drop_column("content_blocks", "published_until")
-

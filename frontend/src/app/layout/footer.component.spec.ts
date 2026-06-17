@@ -55,8 +55,12 @@ describe('FooterComponent', () => {
     fixture.detectChanges(false);
 
     expect(fixture.nativeElement.querySelector('[data-footer-social-loading="true"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-footer-nav-loading="handcrafted"]')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('[data-footer-nav-loading="handcrafted"]'),
+    ).toBeTruthy();
     expect(fixture.nativeElement.querySelector('[data-footer-nav-loading="legal"]')).toBeTruthy();
-    expect(fixture.nativeElement.querySelector('[data-footer-company-loading="true"]')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('[data-footer-company-loading="true"]'),
+    ).toBeTruthy();
   });
 });

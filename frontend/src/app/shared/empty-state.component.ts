@@ -9,8 +9,14 @@ import { ButtonComponent } from './button.component';
   standalone: true,
   imports: [CommonModule, RouterLink, TranslateModule, ButtonComponent],
   template: `
-    <div class="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900">
-      <div *ngIf="icon" class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-lg dark:bg-slate-800" aria-hidden="true">
+    <div
+      class="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div
+        *ngIf="icon"
+        class="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-lg dark:bg-slate-800"
+        aria-hidden="true"
+      >
         {{ icon }}
       </div>
       <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
@@ -19,7 +25,10 @@ import { ButtonComponent } from './button.component';
       <p *ngIf="copy || copyKey" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
         {{ copy || (copyKey ? (copyKey | translate) : '') }}
       </p>
-      <div *ngIf="primaryActionLabelKey || secondaryActionLabelKey" class="mt-5 flex flex-wrap justify-center gap-3">
+      <div
+        *ngIf="primaryActionLabelKey || secondaryActionLabelKey"
+        class="mt-5 flex flex-wrap justify-center gap-3"
+      >
         <app-button
           *ngIf="primaryActionLabelKey"
           [routerLink]="primaryActionUrl || null"
@@ -35,7 +44,7 @@ import { ButtonComponent } from './button.component';
         ></app-button>
       </div>
     </div>
-  `
+  `,
 })
 export class EmptyStateComponent {
   @Input() icon = '';

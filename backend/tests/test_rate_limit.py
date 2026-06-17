@@ -92,10 +92,16 @@ def test_login_rate_limiter(rate_limit_app: Dict[str, object]) -> None:
 
     limit = auth_api.settings.auth_rate_limit_login
     for _ in range(limit):
-        ok = client.post("/api/v1/auth/login", json={"email": payload["email"], "password": payload["password"]})
+        ok = client.post(
+            "/api/v1/auth/login",
+            json={"email": payload["email"], "password": payload["password"]},
+        )
         assert ok.status_code == 200, ok.text
 
-    blocked = client.post("/api/v1/auth/login", json={"email": payload["email"], "password": payload["password"]})
+    blocked = client.post(
+        "/api/v1/auth/login",
+        json={"email": payload["email"], "password": payload["password"]},
+    )
     assert blocked.status_code == 429
     assert blocked.headers.get("Retry-After")
     assert blocked.headers.get("X-Request-ID")

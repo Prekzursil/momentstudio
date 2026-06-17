@@ -10,7 +10,7 @@ describe('CartApi', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [ApiService, CartApi]
+      providers: [ApiService, CartApi],
     });
     api = TestBed.inject(CartApi);
     httpMock = TestBed.inject(HttpTestingController);
@@ -43,6 +43,9 @@ describe('CartApi', () => {
     const req = httpMock.expectOne('/api/v1/cart');
     expect(req.request.method).toBe('GET');
     expect(req.request.headers.get('X-Session-Id')).toBe('guest-test');
-    req.flush({ items: [{ id: '1' }], totals: { subtotal: '0', tax: '0', shipping: '0', total: '0' } });
+    req.flush({
+      items: [{ id: '1' }],
+      totals: { subtotal: '0', tax: '0', shipping: '0', total: '0' },
+    });
   });
 });

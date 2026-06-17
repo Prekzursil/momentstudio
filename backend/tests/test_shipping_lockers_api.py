@@ -34,7 +34,9 @@ def test_app() -> Dict[str, object]:
     app.dependency_overrides.clear()
 
 
-def test_shipping_lockers_endpoint_uses_service(test_app: Dict[str, object], monkeypatch) -> None:
+def test_shipping_lockers_endpoint_uses_service(
+    test_app: Dict[str, object], monkeypatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
     async def fake_list_lockers(**_kwargs):  # type: ignore[no-untyped-def]
@@ -58,4 +60,3 @@ def test_shipping_lockers_endpoint_uses_service(test_app: Dict[str, object], mon
     body = resp.json()
     assert body[0]["id"] == "osm:node:1"
     assert body[0]["provider"] == "sameday"
-

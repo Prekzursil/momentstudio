@@ -37,7 +37,9 @@ def test_app() -> Dict[str, object]:
     app.dependency_overrides.clear()
 
 
-async def seed_user(session_factory, email: str, role: UserRole, with_passkey: bool) -> None:
+async def seed_user(
+    session_factory, email: str, role: UserRole, with_passkey: bool
+) -> None:
     settings.maintenance_mode = False
     async with session_factory() as session:
         await session.execute(delete(User).where(User.email == email))
@@ -64,8 +66,17 @@ async def seed_user(session_factory, email: str, role: UserRole, with_passkey: b
         await session.commit()
 
 
-def auth_headers(client: TestClient, session_factory, *, email: str, role: UserRole, with_passkey: bool) -> dict:
-    asyncio.run(seed_user(session_factory, email=email, role=role, with_passkey=with_passkey))
+def auth_headers(
+    client: TestClient,
+    session_factory,
+    *,
+    email: str,
+    role: UserRole,
+    with_passkey: bool,
+) -> dict:
+    asyncio.run(
+        seed_user(session_factory, email=email, role=role, with_passkey=with_passkey)
+    )
     common_headers = {"X-Maintenance-Bypass": settings.maintenance_bypass_token}
     resp = client.post(
         "/api/v1/auth/login",
@@ -106,9 +117,30 @@ def test_admin_favorites_update_and_dedupe(test_app) -> None:
 
     payload = {
         "items": [
-            {"key": "page:/admin/orders", "type": "page", "label": "Orders", "subtitle": "", "url": "/admin/orders", "state": None},
-            {"key": "page:/admin/orders", "type": "page", "label": "Orders dup", "subtitle": "", "url": "/admin/orders", "state": None},
-            {"key": "product:abc", "type": "product", "label": "Test product", "subtitle": "abc", "url": "/admin/products", "state": {"editProductSlug": "abc"}},
+            {
+                "key": "page:/admin/orders",
+                "type": "page",
+                "label": "Orders",
+                "subtitle": "",
+                "url": "/admin/orders",
+                "state": None,
+            },
+            {
+                "key": "page:/admin/orders",
+                "type": "page",
+                "label": "Orders dup",
+                "subtitle": "",
+                "url": "/admin/orders",
+                "state": None,
+            },
+            {
+                "key": "product:abc",
+                "type": "product",
+                "label": "Test product",
+                "subtitle": "abc",
+                "url": "/admin/products",
+                "state": {"editProductSlug": "abc"},
+            },
         ]
     }
     resp = client.put("/api/v1/admin/ui/favorites", headers=headers, json=payload)

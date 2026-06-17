@@ -9,7 +9,7 @@ export class TranslatedTitleStrategy extends TitleStrategy {
 
   constructor(
     private readonly title: Title,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {
     super();
     this.translate.onLangChange.subscribe(() => {
@@ -25,4 +25,3 @@ export class TranslatedTitleStrategy extends TitleStrategy {
     this.title.setTitle(translated && translated !== raw ? translated : raw);
   }
 }
-

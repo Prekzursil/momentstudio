@@ -20,8 +20,8 @@ describe('ChangePasswordComponent', () => {
       imports: [RouterTestingModule, TranslateModule.forRoot(), ChangePasswordComponent],
       providers: [
         { provide: ToastService, useValue: toast },
-        { provide: AuthService, useValue: auth }
-      ]
+        { provide: AuthService, useValue: auth },
+      ],
     });
   });
 

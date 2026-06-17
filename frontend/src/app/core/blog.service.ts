@@ -184,7 +184,7 @@ export class BlogService {
   private readonly ttlMs = {
     list: 2 * 60 * 1000,
     post: 10 * 60 * 1000,
-    neighbors: 10 * 60 * 1000
+    neighbors: 10 * 60 * 1000,
   };
 
   private cached<T>(key: string, ttlMs: number, factory: () => Observable<T>): Observable<T> {
@@ -197,7 +197,7 @@ export class BlogService {
       catchError((err) => {
         this.cache.delete(key);
         return throwError(() => err);
-      })
+      }),
     );
     this.cache.set(key, { expires_at: now + ttlMs, value$ });
 
@@ -228,7 +228,7 @@ export class BlogService {
       tag: (params.tag || '').trim(),
       series: (params.series || '').trim(),
       author_id: (params.author_id || '').trim(),
-      sort: (params.sort || '').trim()
+      sort: (params.sort || '').trim(),
     };
     return `blog:list:${JSON.stringify(normalized)}`;
   }
@@ -253,19 +253,23 @@ export class BlogService {
         tag: params.tag,
         series: params.series,
         author_id: params.author_id,
-        sort: params.sort
-      })
+        sort: params.sort,
+      }),
     );
   }
 
   getPost(slug: string, lang?: string): Observable<BlogPost> {
     const key = `blog:post:${slug}:${(lang || '').trim()}`;
-    return this.cached(key, this.ttlMs.post, () => this.api.get<BlogPost>(`/blog/posts/${slug}`, { lang }));
+    return this.cached(key, this.ttlMs.post, () =>
+      this.api.get<BlogPost>(`/blog/posts/${slug}`, { lang }),
+    );
   }
 
   getNeighbors(slug: string, lang?: string): Observable<BlogPostNeighbors> {
     const key = `blog:neighbors:${slug}:${(lang || '').trim()}`;
-    return this.cached(key, this.ttlMs.neighbors, () => this.api.get<BlogPostNeighbors>(`/blog/posts/${slug}/neighbors`, { lang }));
+    return this.cached(key, this.ttlMs.neighbors, () =>
+      this.api.get<BlogPostNeighbors>(`/blog/posts/${slug}/neighbors`, { lang }),
+    );
   }
 
   getPreviewPost(slug: string, token: string, lang?: string): Observable<BlogPost> {
@@ -279,42 +283,70 @@ export class BlogService {
 
   createPreviewToken(
     slug: string,
-    params: { lang?: string; expires_minutes?: number } = {}
+    params: { lang?: string; expires_minutes?: number } = {},
   ): Observable<BlogPreviewTokenResponse> {
     const qs = new URLSearchParams();
     if (params.lang) qs.set('lang', params.lang);
     if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return this.api.post<BlogPreviewTokenResponse>(`/blog/posts/${slug}/preview-token${suffix}`, {});
+    return this.api.post<BlogPreviewTokenResponse>(
+      `/blog/posts/${slug}/preview-token${suffix}`,
+      {},
+    );
   }
 
-  listComments(slug: string, params: { page?: number; limit?: number } = {}): Observable<BlogCommentListResponse> {
-    return this.api.get<BlogCommentListResponse>(`/blog/posts/${slug}/comments`, {
-      page: params.page ?? 1,
-      limit: params.limit ?? 50
-    }, { 'X-Silent': '1' });
+  listComments(
+    slug: string,
+    params: { page?: number; limit?: number } = {},
+  ): Observable<BlogCommentListResponse> {
+    return this.api.get<BlogCommentListResponse>(
+      `/blog/posts/${slug}/comments`,
+      {
+        page: params.page ?? 1,
+        limit: params.limit ?? 50,
+      },
+      { 'X-Silent': '1' },
+    );
   }
 
   listCommentThreads(
     slug: string,
-    params: { page?: number; limit?: number; sort?: BlogCommentSort } = {}
+    params: { page?: number; limit?: number; sort?: BlogCommentSort } = {},
   ): Observable<BlogCommentThreadListResponse> {
-    return this.api.get<BlogCommentThreadListResponse>(`/blog/posts/${slug}/comment-threads`, {
-      sort: params.sort ?? 'newest',
-      page: params.page ?? 1,
-      limit: params.limit ?? 10
-    }, { 'X-Silent': '1' });
+    return this.api.get<BlogCommentThreadListResponse>(
+      `/blog/posts/${slug}/comment-threads`,
+      {
+        sort: params.sort ?? 'newest',
+        page: params.page ?? 1,
+        limit: params.limit ?? 10,
+      },
+      { 'X-Silent': '1' },
+    );
   }
 
   getCommentSubscription(slug: string): Observable<BlogCommentSubscriptionResponse> {
-    return this.api.get<BlogCommentSubscriptionResponse>(`/blog/posts/${slug}/comment-subscription`, {}, { 'X-Silent': '1' });
+    return this.api.get<BlogCommentSubscriptionResponse>(
+      `/blog/posts/${slug}/comment-subscription`,
+      {},
+      { 'X-Silent': '1' },
+    );
   }
 
-  setCommentSubscription(slug: string, enabled: boolean): Observable<BlogCommentSubscriptionResponse> {
-    return this.api.put<BlogCommentSubscriptionResponse>(`/blog/posts/${slug}/comment-subscription`, { enabled }, { 'X-Silent': '1' });
+  setCommentSubscription(
+    slug: string,
+    enabled: boolean,
+  ): Observable<BlogCommentSubscriptionResponse> {
+    return this.api.put<BlogCommentSubscriptionResponse>(
+      `/blog/posts/${slug}/comment-subscription`,
+      { enabled },
+      { 'X-Silent': '1' },
+    );
   }
 
-  createComment(slug: string, payload: { body: string; parent_id?: string | null; captcha_token?: string | null }): Observable<BlogComment> {
+  createComment(
+    slug: string,
+    payload: { body: string; parent_id?: string | null; captcha_token?: string | null },
+  ): Observable<BlogComment> {
     return this.api.post<BlogComment>(`/blog/posts/${slug}/comments`, payload, { 'X-Silent': '1' });
   }
 
@@ -323,25 +355,34 @@ export class BlogService {
   }
 
   flagComment(commentId: string, payload: { reason?: string | null }): Observable<BlogCommentFlag> {
-    return this.api.post<BlogCommentFlag>(`/blog/comments/${commentId}/flag`, payload, { 'X-Silent': '1' });
-  }
-
-  listFlaggedComments(params: { page?: number; limit?: number } = {}): Observable<AdminBlogCommentListResponse> {
-    return this.api.get<AdminBlogCommentListResponse>('/blog/admin/comments/flagged', {
-      page: params.page ?? 1,
-      limit: params.limit ?? 20
+    return this.api.post<BlogCommentFlag>(`/blog/comments/${commentId}/flag`, payload, {
+      'X-Silent': '1',
     });
   }
 
-  listMyComments(params: { lang?: string; page?: number; limit?: number } = {}): Observable<BlogMyCommentListResponse> {
+  listFlaggedComments(
+    params: { page?: number; limit?: number } = {},
+  ): Observable<AdminBlogCommentListResponse> {
+    return this.api.get<AdminBlogCommentListResponse>('/blog/admin/comments/flagged', {
+      page: params.page ?? 1,
+      limit: params.limit ?? 20,
+    });
+  }
+
+  listMyComments(
+    params: { lang?: string; page?: number; limit?: number } = {},
+  ): Observable<BlogMyCommentListResponse> {
     return this.api.get<BlogMyCommentListResponse>('/blog/me/comments', {
       lang: params.lang,
       page: params.page ?? 1,
-      limit: params.limit ?? 20
+      limit: params.limit ?? 20,
     });
   }
 
-  hideCommentAdmin(commentId: string, payload: { reason?: string | null } = {}): Observable<AdminBlogComment> {
+  hideCommentAdmin(
+    commentId: string,
+    payload: { reason?: string | null } = {},
+  ): Observable<AdminBlogComment> {
     return this.api.post<AdminBlogComment>(`/blog/admin/comments/${commentId}/hide`, payload);
   }
 
@@ -350,6 +391,9 @@ export class BlogService {
   }
 
   resolveCommentFlagsAdmin(commentId: string): Observable<{ resolved: number }> {
-    return this.api.post<{ resolved: number }>(`/blog/admin/comments/${commentId}/resolve-flags`, {});
+    return this.api.post<{ resolved: number }>(
+      `/blog/admin/comments/${commentId}/resolve-flags`,
+      {},
+    );
   }
 }

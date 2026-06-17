@@ -14,12 +14,27 @@ type ContentNavItem = {
 @Component({
   selector: 'app-admin-content-layout',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, PageHeaderComponent, FormSectionComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    RouterLinkActive,
+    RouterOutlet,
+    TranslateModule,
+    PageHeaderComponent,
+    FormSectionComponent,
+  ],
   template: `
     <div class="grid gap-6">
-      <app-page-header [crumbs]="crumbs" [titleKey]="'adminUi.content.title'" [subtitleKey]="'adminUi.content.subtitle'"></app-page-header>
+      <app-page-header
+        [crumbs]="crumbs"
+        [titleKey]="'adminUi.content.title'"
+        [subtitleKey]="'adminUi.content.subtitle'"
+      ></app-page-header>
 
-      <app-form-section [titleKey]="'adminUi.content.workspace.title'" [descriptionKey]="'adminUi.content.workspace.hint'">
+      <app-form-section
+        [titleKey]="'adminUi.content.workspace.title'"
+        [descriptionKey]="'adminUi.content.workspace.hint'"
+      >
         <div class="flex flex-wrap items-center justify-between gap-3">
           <nav class="flex flex-wrap gap-2" aria-label="Content sections">
             <a
@@ -34,8 +49,12 @@ type ContentNavItem = {
 
           <div class="flex flex-wrap items-center gap-4">
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.editorMode.label' | translate }}</span>
-              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                'adminUi.content.editorMode.label' | translate
+              }}</span>
+              <div
+                class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <button
                   type="button"
                   class="px-3 py-1.5 text-xs font-semibold"
@@ -62,8 +81,12 @@ type ContentNavItem = {
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.deviceLabel' | translate }}</span>
-              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                'adminUi.content.preview.deviceLabel' | translate
+              }}</span>
+              <div
+                class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <button
                   type="button"
                   class="px-3 py-1.5 text-xs font-semibold"
@@ -101,8 +124,12 @@ type ContentNavItem = {
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.layoutLabel' | translate }}</span>
-              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                'adminUi.content.preview.layoutLabel' | translate
+              }}</span>
+              <div
+                class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <button
                   type="button"
                   class="px-3 py-1.5 text-xs font-semibold"
@@ -129,8 +156,12 @@ type ContentNavItem = {
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.languageLabel' | translate }}</span>
-              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                'adminUi.content.preview.languageLabel' | translate
+              }}</span>
+              <div
+                class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <button
                   type="button"
                   class="px-3 py-1.5 text-xs font-semibold"
@@ -157,8 +188,12 @@ type ContentNavItem = {
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.preview.themeLabel' | translate }}</span>
-              <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+                'adminUi.content.preview.themeLabel' | translate
+              }}</span>
+              <div
+                class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
                 <button
                   type="button"
                   class="px-3 py-1.5 text-xs font-semibold"
@@ -190,14 +225,15 @@ type ContentNavItem = {
           {{
             (prefs.mode() === 'simple'
               ? 'adminUi.content.editorMode.simpleHint'
-              : 'adminUi.content.editorMode.advancedHint') | translate
+              : 'adminUi.content.editorMode.advancedHint'
+            ) | translate
           }}
         </p>
       </app-form-section>
 
       <router-outlet></router-outlet>
     </div>
-  `
+  `,
 })
 export class AdminContentLayoutComponent {
   constructor(public prefs: CmsEditorPrefsService) {}
@@ -205,7 +241,7 @@ export class AdminContentLayoutComponent {
   readonly crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
-    { label: 'adminUi.content.title' }
+    { label: 'adminUi.content.title' },
   ];
 
   readonly nav: ContentNavItem[] = [
@@ -214,6 +250,6 @@ export class AdminContentLayoutComponent {
     { path: '/admin/content/blog', labelKey: 'adminUi.content.nav.blog' },
     { path: '/admin/content/scheduling', labelKey: 'adminUi.content.nav.scheduling' },
     { path: '/admin/content/media', labelKey: 'adminUi.content.nav.media' },
-    { path: '/admin/content/settings', labelKey: 'adminUi.content.nav.settings' }
+    { path: '/admin/content/settings', labelKey: 'adminUi.content.nav.settings' },
   ];
 }

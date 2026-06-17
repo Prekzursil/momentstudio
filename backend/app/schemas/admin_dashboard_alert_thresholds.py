@@ -18,4 +18,3 @@ class AdminDashboardAlertThresholdsUpdateRequest(BaseModel):
     refund_requests_min_count: int = Field(ge=1, le=100_000)
     refund_requests_min_rate_pct: float | None = Field(default=None, ge=0, le=100)
     stockouts_min_count: int = Field(ge=1, le=100_000)
-

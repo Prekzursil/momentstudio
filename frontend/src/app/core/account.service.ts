@@ -75,7 +75,13 @@ export interface OrderListResponse {
   meta: OrderPaginationMeta;
 }
 
-export type ReturnRequestStatus = 'requested' | 'approved' | 'rejected' | 'received' | 'refunded' | 'closed';
+export type ReturnRequestStatus =
+  | 'requested'
+  | 'approved'
+  | 'rejected'
+  | 'received'
+  | 'refunded'
+  | 'closed';
 
 export interface ReturnRequestItemRead {
   id: string;
@@ -152,8 +158,8 @@ export class AccountService {
       items: (order?.items ?? []).map((it: any) => ({
         ...it,
         unit_price: parseMoney(it?.unit_price),
-        subtotal: parseMoney(it?.subtotal)
-      }))
+        subtotal: parseMoney(it?.subtotal),
+      })),
     };
   }
 
@@ -166,7 +172,9 @@ export class AccountService {
   }
 
   getOrders(): Observable<Order[]> {
-    return this.api.get<Order[]>('/orders').pipe(map((orders: any[]) => (orders ?? []).map((o) => this.normalizeOrder(o))));
+    return this.api
+      .get<Order[]>('/orders')
+      .pipe(map((orders: any[]) => (orders ?? []).map((o) => this.normalizeOrder(o))));
   }
 
   getOrdersPage(params: {
@@ -192,10 +200,10 @@ export class AccountService {
             total_pages: Number.isFinite(totalPages) ? totalPages : 1,
             page: Number.isFinite(page) ? page : 1,
             limit: Number.isFinite(limit) ? limit : Number(params?.limit ?? 10) || 10,
-            pending_count: Number.isFinite(pending) ? pending : 0
-          }
+            pending_count: Number.isFinite(pending) ? pending : 0,
+          },
         } satisfies OrderListResponse;
-      })
+      }),
     );
   }
 
@@ -274,4 +282,3 @@ export class AccountService {
     return this.api.delete<void>(`/me/addresses/${id}`);
   }
 }
-

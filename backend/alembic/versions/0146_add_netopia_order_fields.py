@@ -21,11 +21,15 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("orders", sa.Column("netopia_ntp_id", sa.String(length=255), nullable=True))
-    op.add_column("orders", sa.Column("netopia_payment_url", sa.String(length=2048), nullable=True))
+    op.add_column(
+        "orders", sa.Column("netopia_ntp_id", sa.String(length=255), nullable=True)
+    )
+    op.add_column(
+        "orders",
+        sa.Column("netopia_payment_url", sa.String(length=2048), nullable=True),
+    )
 
 
 def downgrade() -> None:
     op.drop_column("orders", "netopia_payment_url")
     op.drop_column("orders", "netopia_ntp_id")
-

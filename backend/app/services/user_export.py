@@ -24,12 +24,17 @@ def export_ready_copy(lang: str | None) -> tuple[str, str]:
 
 
 async def run_user_export_job(engine: AsyncEngine, *, job_id: UUID) -> None:
-    SessionLocal = async_sessionmaker(engine, expire_on_commit=False, autoflush=False, class_=AsyncSession)
+    SessionLocal = async_sessionmaker(
+        engine, expire_on_commit=False, autoflush=False, class_=AsyncSession
+    )
     async with SessionLocal() as session:
         job = await session.get(UserDataExportJob, job_id)
         if not job:
             return
-        if job.status not in (UserDataExportStatus.pending, UserDataExportStatus.running):
+        if job.status not in (
+            UserDataExportStatus.pending,
+            UserDataExportStatus.running,
+        ):
             return
 
         now = datetime.now(timezone.utc)
@@ -88,4 +93,3 @@ async def run_user_export_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             job.progress = min(int(job.progress or 0), 99)
             session.add(job)
             await session.commit()
-

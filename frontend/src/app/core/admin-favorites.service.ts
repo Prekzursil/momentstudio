@@ -30,7 +30,7 @@ export class AdminFavoritesService {
   constructor(
     private readonly api: ApiService,
     private readonly toast: ToastService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   init(): void {
@@ -51,7 +51,7 @@ export class AdminFavoritesService {
       error: () => {
         this.error.set(this.t('adminUi.favorites.errors.load'));
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -115,7 +115,7 @@ export class AdminFavoritesService {
         this.items.set(revertTo);
         this.loading.set(false);
         this.toast.error(this.t('adminUi.favorites.errors.save'));
-      }
+      },
     });
   }
 
@@ -124,5 +124,3 @@ export class AdminFavoritesService {
     return value === key ? key : value;
   }
 }
-
-

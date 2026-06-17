@@ -21,10 +21,11 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "refresh_sessions",
-        sa.Column("persistent", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column(
+            "persistent", sa.Boolean(), nullable=False, server_default=sa.text("true")
+        ),
     )
 
 
 def downgrade() -> None:
     op.drop_column("refresh_sessions", "persistent")
-

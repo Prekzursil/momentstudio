@@ -327,7 +327,9 @@ def test_admin_summary(test_app: Dict[str, object]) -> None:
     assert "products" in data and "orders" in data and "users" in data
 
 
-def test_admin_dashboard_alert_thresholds_endpoints(test_app: Dict[str, object]) -> None:
+def test_admin_dashboard_alert_thresholds_endpoints(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]
     engine = test_app["engine"]
@@ -431,7 +433,9 @@ def test_admin_lists_and_audit_and_feed(test_app: Dict[str, object]) -> None:
     assert masked_orders.json()[0]["customer"] != "user@example.com"
     assert "*" in masked_orders.json()[0]["customer"]
 
-    orders = client.get("/api/v1/admin/dashboard/orders", headers=headers, params={"include_pii": True})
+    orders = client.get(
+        "/api/v1/admin/dashboard/orders", headers=headers, params={"include_pii": True}
+    )
     assert orders.status_code == 200
     assert orders.json()[0]["customer"] == "user@example.com"
 
@@ -439,7 +443,9 @@ def test_admin_lists_and_audit_and_feed(test_app: Dict[str, object]) -> None:
     assert masked_users.status_code == 200
     assert "user@example.com" not in [u["email"] for u in masked_users.json()]
 
-    users = client.get("/api/v1/admin/dashboard/users", headers=headers, params={"include_pii": True})
+    users = client.get(
+        "/api/v1/admin/dashboard/users", headers=headers, params={"include_pii": True}
+    )
     assert users.status_code == 200
     emails = [u["email"] for u in users.json()]
     assert "admin@example.com" in emails and "user@example.com" in emails
@@ -489,7 +495,10 @@ def test_admin_global_search(test_app: Dict[str, object]) -> None:
     )
     assert resp_users_masked.status_code == 200
     masked_user_items = resp_users_masked.json()["items"]
-    masked_email = next((item.get("email") for item in masked_user_items if item["type"] == "user"), None)
+    masked_email = next(
+        (item.get("email") for item in masked_user_items if item["type"] == "user"),
+        None,
+    )
     assert masked_email is not None and masked_email != "user@example.com"
     assert "*" in masked_email
 
@@ -573,7 +582,8 @@ def test_admin_audit_entries_filters_and_export(test_app: Dict[str, object]) -> 
     items = by_action.json()["items"]
     assert items
     assert all(
-        any(token in (item.get("action") or "").lower() for token in ["update", "test"]) for item in items
+        any(token in (item.get("action") or "").lower() for token in ["update", "test"])
+        for item in items
     )
 
     csv_resp = client.get(
@@ -601,14 +611,27 @@ def test_admin_audit_retention_status_and_purge(test_app: Dict[str, object]) -> 
     async def _seed_old_audit_rows() -> None:
         async with session_factory() as session:
             admin = (
-                await session.execute(select(User).where(User.email == "admin@example.com"))
+                await session.execute(
+                    select(User).where(User.email == "admin@example.com")
+                )
             ).scalar_one()
-            product = (await session.execute(select(Product).where(Product.slug == "painting"))).scalar_one()
-            block = (await session.execute(select(ContentBlock).where(ContentBlock.key == "home-hero"))).scalar_one()
+            product = (
+                await session.execute(select(Product).where(Product.slug == "painting"))
+            ).scalar_one()
+            block = (
+                await session.execute(
+                    select(ContentBlock).where(ContentBlock.key == "home-hero")
+                )
+            ).scalar_one()
 
             old_at = datetime.now(timezone.utc) - timedelta(days=10)
             session.add(
-                ProductAuditLog(product_id=product.id, action="retention-old", user_id=admin.id, created_at=old_at)
+                ProductAuditLog(
+                    product_id=product.id,
+                    action="retention-old",
+                    user_id=admin.id,
+                    created_at=old_at,
+                )
             )
             session.add(
                 ContentAuditLog(
@@ -620,7 +643,12 @@ def test_admin_audit_retention_status_and_purge(test_app: Dict[str, object]) -> 
                 )
             )
             session.add(
-                AdminAuditLog(action="retention-old", actor_user_id=admin.id, data={"note": "user@example.com"}, created_at=old_at)
+                AdminAuditLog(
+                    action="retention-old",
+                    actor_user_id=admin.id,
+                    data={"note": "user@example.com"},
+                    created_at=old_at,
+                )
             )
             await session.commit()
 
@@ -633,7 +661,9 @@ def test_admin_audit_retention_status_and_purge(test_app: Dict[str, object]) -> 
     settings.audit_retention_days_content = 1
     settings.audit_retention_days_security = 1
     try:
-        status_resp = client.get("/api/v1/admin/dashboard/audit/retention", headers=headers_admin)
+        status_resp = client.get(
+            "/api/v1/admin/dashboard/audit/retention", headers=headers_admin
+        )
         assert status_resp.status_code == 200, status_resp.text
         status_payload = status_resp.json()
         assert status_payload["counts"]["product"]["expired"] >= 1
@@ -656,7 +686,9 @@ def test_admin_audit_retention_status_and_purge(test_app: Dict[str, object]) -> 
         assert purge_resp.status_code == 200, purge_resp.text
         assert purge_resp.json()["deleted"]["product"] >= 1
 
-        post_status = client.get("/api/v1/admin/dashboard/audit/retention", headers=headers_admin)
+        post_status = client.get(
+            "/api/v1/admin/dashboard/audit/retention", headers=headers_admin
+        )
         assert post_status.status_code == 200, post_status.text
         post_payload = post_status.json()
         assert post_payload["counts"]["product"]["expired"] == 0
@@ -917,9 +949,7 @@ def test_inventory_reserved_carts_drilldown_masks_email_by_default(
     items = body["items"]
     assert len(items) >= 1
 
-    cart_with_email = next(
-        (item for item in items if item.get("customer_email")), None
-    )
+    cart_with_email = next((item for item in items if item.get("customer_email")), None)
     assert cart_with_email is not None
     assert cart_with_email["customer_email"] != "guestbuyer@example.com"
     assert cart_with_email["customer_email"].endswith("@example.com")
@@ -932,7 +962,11 @@ def test_inventory_reserved_carts_drilldown_masks_email_by_default(
     assert resp_pii.status_code == 200, resp_pii.text
     pii_items = resp_pii.json()["items"]
     pii_match = next(
-        (item for item in pii_items if item.get("cart_id") == cart_with_email["cart_id"]),
+        (
+            item
+            for item in pii_items
+            if item.get("cart_id") == cart_with_email["cart_id"]
+        ),
         None,
     )
     assert pii_match is not None

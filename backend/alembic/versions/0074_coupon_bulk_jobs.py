@@ -42,11 +42,26 @@ def upgrade() -> None:
             sa.ForeignKey("coupons.id", ondelete="CASCADE"),
             nullable=False,
         ),
-        sa.Column("created_by_user_id", sa.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
+        sa.Column(
+            "created_by_user_id",
+            sa.UUID(as_uuid=True),
+            sa.ForeignKey("users.id"),
+            nullable=True,
+        ),
         sa.Column("action", action, nullable=False, server_default="assign"),
         sa.Column("status", status, nullable=False, server_default="pending"),
-        sa.Column("require_marketing_opt_in", sa.Boolean(), nullable=False, server_default="false"),
-        sa.Column("require_email_verified", sa.Boolean(), nullable=False, server_default="false"),
+        sa.Column(
+            "require_marketing_opt_in",
+            sa.Boolean(),
+            nullable=False,
+            server_default="false",
+        ),
+        sa.Column(
+            "require_email_verified",
+            sa.Boolean(),
+            nullable=False,
+            server_default="false",
+        ),
         sa.Column("send_email", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("revoke_reason", sa.String(length=255), nullable=True),
         sa.Column("total_candidates", sa.Integer(), nullable=False, server_default="0"),
@@ -58,11 +73,21 @@ def upgrade() -> None:
         sa.Column("already_revoked", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("not_assigned", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("error_message", sa.String(length=1000), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index(op.f("ix_coupon_bulk_jobs_coupon_id"), "coupon_bulk_jobs", ["coupon_id"], unique=False)
+    op.create_index(
+        op.f("ix_coupon_bulk_jobs_coupon_id"),
+        "coupon_bulk_jobs",
+        ["coupon_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:

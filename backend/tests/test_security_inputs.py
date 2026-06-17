@@ -32,7 +32,7 @@ def client_with_db():
 
 
 def test_catalog_search_injection_strings(client_with_db: TestClient):
-    payloads = ["' OR 1=1 --", "<script>alert(1)</script>", "\";DROP TABLE users;--"]
+    payloads = ["' OR 1=1 --", "<script>alert(1)</script>", '";DROP TABLE users;--']
     for term in payloads:
         res = client_with_db.get(f"/api/v1/catalog/products?search={term}")
         assert res.status_code == 200

@@ -72,8 +72,13 @@ def _parse_state_from_start(client: TestClient) -> str:
 
 
 def _parse_state_from_link(client: TestClient) -> str:
-    res = client.get("/api/v1/auth/google/link/start", headers={"Authorization": "Bearer fake"})
-    assert res.status_code in (200, 401)  # real token required, but this helper not used in secured call
+    res = client.get(
+        "/api/v1/auth/google/link/start", headers={"Authorization": "Bearer fake"}
+    )
+    assert res.status_code in (
+        200,
+        401,
+    )  # real token required, but this helper not used in secured call
     return ""
 
 
@@ -91,7 +96,9 @@ def test_google_start_builds_url(monkeypatch: pytest.MonkeyPatch, test_app):
     assert "scope=openid+email+profile" in url
 
 
-def test_google_oauth_smoke_with_mocked_endpoints(monkeypatch: pytest.MonkeyPatch, test_app):
+def test_google_oauth_smoke_with_mocked_endpoints(
+    monkeypatch: pytest.MonkeyPatch, test_app
+):
     client: TestClient = test_app["client"]  # type: ignore
     monkeypatch.setattr(settings, "google_client_id", "client-id")
     monkeypatch.setattr(settings, "google_client_secret", "client-secret")
@@ -102,12 +109,19 @@ def test_google_oauth_smoke_with_mocked_endpoints(monkeypatch: pytest.MonkeyPatc
     async def handler(request: httpx.Request) -> httpx.Response:
         if str(request.url) == "https://oauth2.googleapis.com/token":
             calls["token"] += 1
-            return httpx.Response(200, json={"access_token": "mock-access"}, request=request)
+            return httpx.Response(
+                200, json={"access_token": "mock-access"}, request=request
+            )
         if str(request.url) == "https://www.googleapis.com/oauth2/v3/userinfo":
             calls["userinfo"] += 1
             return httpx.Response(
                 200,
-                json={"sub": "mock-sub", "email": "mocked@example.com", "email_verified": True, "name": "Mocked User"},
+                json={
+                    "sub": "mock-sub",
+                    "email": "mocked@example.com",
+                    "email_verified": True,
+                    "name": "Mocked User",
+                },
                 request=request,
             )
         return httpx.Response(404, json={"error": "not found"}, request=request)
@@ -118,7 +132,9 @@ def test_google_oauth_smoke_with_mocked_endpoints(monkeypatch: pytest.MonkeyPatc
 
     class MockAsyncClient:
         def __init__(self, *args, **kwargs):
-            self._client = real_async_client(transport=transport, timeout=kwargs.get("timeout"))
+            self._client = real_async_client(
+                transport=transport, timeout=kwargs.get("timeout")
+            )
 
         async def __aenter__(self):
             return self._client
@@ -129,7 +145,9 @@ def test_google_oauth_smoke_with_mocked_endpoints(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(auth_service.httpx, "AsyncClient", MockAsyncClient)
 
     state = _parse_state_from_start(client)
-    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
+    res = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["user"]["email"] == "mocked@example.com"
@@ -163,14 +181,22 @@ def test_google_callback_existing_sub(monkeypatch: pytest.MonkeyPatch, test_app)
             )
             session.add(user)
             await session.commit()
+
     asyncio.run(seed_user())
 
     async def fake_exchange(code: str):
-        return {"sub": "sub-123", "email": "google@example.com", "email_verified": True, "name": "G User"}
+        return {
+            "sub": "sub-123",
+            "email": "google@example.com",
+            "email_verified": True,
+            "name": "G User",
+        }
 
     monkeypatch.setattr(auth_service, "exchange_google_code", fake_exchange)
     state = _parse_state_from_start(client)
-    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
+    res = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["user"]["google_sub"] == "sub-123"
@@ -194,14 +220,22 @@ def test_google_callback_email_collision(monkeypatch: pytest.MonkeyPatch, test_a
             )
             session.add(user)
             await session.commit()
+
     asyncio.run(seed_user())
 
     async def fake_exchange(code: str):
-        return {"sub": "new-sub", "email": "existing@example.com", "email_verified": True, "name": "Existing"}
+        return {
+            "sub": "new-sub",
+            "email": "existing@example.com",
+            "email_verified": True,
+            "name": "Existing",
+        }
 
     monkeypatch.setattr(auth_service, "exchange_google_code", fake_exchange)
     state = _parse_state_from_start(client)
-    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
+    res = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
     assert res.status_code == 409
 
 
@@ -223,7 +257,9 @@ def test_google_callback_creates_user(monkeypatch: pytest.MonkeyPatch, test_app)
 
     monkeypatch.setattr(auth_service, "exchange_google_code", fake_exchange)
     state = _parse_state_from_start(client)
-    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
+    res = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
     assert res.status_code == 200, res.text
     data = res.json()
     assert data["user"]["email"] == "newuser@example.com"
@@ -239,6 +275,7 @@ def test_google_callback_creates_user(monkeypatch: pytest.MonkeyPatch, test_app)
             user = await auth_service.get_user_by_google_sub(session, "new-sub")
             assert user is not None
             assert user.google_email == "newuser@example.com"
+
     asyncio.run(verify_db())
 
 
@@ -279,13 +316,18 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
 
     monkeypatch.setattr(auth_service, "exchange_google_code", fake_exchange)
     state = _parse_state_from_start(client)  # reuse start to build state template
+
     # rebuild state for link with correct uid
     async def get_user_id():
         async with SessionLocal() as session:
-            result = await session.execute(select(User).where(User.email == "link@example.com"))
+            result = await session.execute(
+                select(User).where(User.email == "link@example.com")
+            )
             return str(result.scalar_one().id)
+
     uid = asyncio.run(get_user_id())
     from app.api.v1.auth import _build_google_state  # type: ignore
+
     state = _build_google_state("google_link", uid)
 
     res = client.post(
@@ -302,7 +344,9 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
 
     # After linking, Google login should also work
     state_login = _parse_state_from_start(client)
-    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state_login})
+    res = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state_login}
+    )
     assert res.status_code == 200, res.text
     assert res.json()["user"]["email"] == "link@example.com"
     assert res.json()["tokens"]["access_token"]
@@ -317,7 +361,9 @@ def test_google_link_and_unlink(monkeypatch: pytest.MonkeyPatch, test_app):
     assert res.json()["google_sub"] is None
 
 
-def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.MonkeyPatch, test_app):
+def test_google_created_user_can_set_password_and_login(
+    monkeypatch: pytest.MonkeyPatch, test_app
+):
     client: TestClient = test_app["client"]  # type: ignore
     monkeypatch.setattr(settings, "google_client_id", "client-id")
     monkeypatch.setattr(settings, "google_client_secret", "client-secret")
@@ -336,7 +382,9 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
 
     monkeypatch.setattr(auth_service, "exchange_google_code", fake_exchange)
     state = _parse_state_from_start(client)
-    res = client.post("/api/v1/auth/google/callback", json={"code": "abc", "state": state})
+    res = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
     assert res.status_code == 200, res.text
     username = res.json()["user"]["username"]
     completion_token = res.json()["completion_token"]
@@ -363,20 +411,29 @@ def test_google_created_user_can_set_password_and_login(monkeypatch: pytest.Monk
     assert res.status_code == 200, res.text
     access_token = res.json()["tokens"]["access_token"]
 
-    ok = client.get("/api/v1/wishlist", headers={"Authorization": f"Bearer {access_token}"})
+    ok = client.get(
+        "/api/v1/wishlist", headers={"Authorization": f"Bearer {access_token}"}
+    )
     assert ok.status_code == 200, ok.text
 
     # Password login works after registration completion.
-    res = client.post("/api/v1/auth/login", json={"identifier": username, "password": "newpass123"})
+    res = client.post(
+        "/api/v1/auth/login", json={"identifier": username, "password": "newpass123"}
+    )
     assert res.status_code == 200, res.text
     assert res.json()["user"]["email"] == "pw@example.com"
 
-    res = client.post("/api/v1/auth/login", json={"identifier": "pw@example.com", "password": "newpass123"})
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "pw@example.com", "password": "newpass123"},
+    )
     assert res.status_code == 200, res.text
     assert res.json()["user"]["email"] == "pw@example.com"
 
 
-def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatch, test_app):
+def test_admin_cleanup_incomplete_google_accounts(
+    monkeypatch: pytest.MonkeyPatch, test_app
+):
     client: TestClient = test_app["client"]  # type: ignore
     SessionLocal = test_app["session_factory"]  # type: ignore
 
@@ -400,7 +457,11 @@ def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatc
 
     async def promote_admin_and_seed() -> None:
         async with SessionLocal() as session:
-            user = (await session.execute(select(User).where(User.email == "cleanup-admin@example.com"))).scalar_one()
+            user = (
+                await session.execute(
+                    select(User).where(User.email == "cleanup-admin@example.com")
+                )
+            ).scalar_one()
             user.role = UserRole.admin
             session.add(
                 UserPasskey(
@@ -443,7 +504,10 @@ def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatc
     asyncio.run(promote_admin_and_seed())
 
     # Login again to get an admin token
-    res = client.post("/api/v1/auth/login", json={"identifier": "cleanup-admin@example.com", "password": "adminpass"})
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "cleanup-admin@example.com", "password": "adminpass"},
+    )
     assert res.status_code == 200, res.text
     token = res.json()["tokens"]["access_token"]
 
@@ -457,17 +521,23 @@ def test_admin_cleanup_incomplete_google_accounts(monkeypatch: pytest.MonkeyPatc
 
     async def verify_deleted() -> None:
         async with SessionLocal() as session:
-            old_user = await auth_service.get_user_by_email(session, "old-incomplete@example.com")
+            old_user = await auth_service.get_user_by_email(
+                session, "old-incomplete@example.com"
+            )
             assert old_user is None
 
-            new_user = await auth_service.get_user_by_email(session, "new-incomplete@example.com")
+            new_user = await auth_service.get_user_by_email(
+                session, "new-incomplete@example.com"
+            )
             assert new_user is not None
             assert new_user.deleted_at is None
 
     asyncio.run(verify_deleted())
 
 
-def test_upload_avatar_updates_avatar_url(monkeypatch: pytest.MonkeyPatch, tmp_path, test_app):
+def test_upload_avatar_updates_avatar_url(
+    monkeypatch: pytest.MonkeyPatch, tmp_path, test_app
+):
     client: TestClient = test_app["client"]  # type: ignore
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
 
@@ -544,7 +614,9 @@ def test_google_avatar_opt_in_and_cleanup(monkeypatch: pytest.MonkeyPatch, test_
 
     async def get_user_id():
         async with SessionLocal() as session:
-            result = await session.execute(select(User).where(User.email == "avatar-google@example.com"))
+            result = await session.execute(
+                select(User).where(User.email == "avatar-google@example.com")
+            )
             return str(result.scalar_one().id)
 
     uid = asyncio.run(get_user_id())
@@ -561,18 +633,26 @@ def test_google_avatar_opt_in_and_cleanup(monkeypatch: pytest.MonkeyPatch, test_
     assert res.json()["avatar_url"] is None
 
     # Opt into using the Google picture as the site avatar.
-    res = client.post("/api/v1/auth/me/avatar/use-google", headers={"Authorization": f"Bearer {token}"})
+    res = client.post(
+        "/api/v1/auth/me/avatar/use-google",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert res.status_code == 200, res.text
     assert res.json()["avatar_url"] == "http://example.com/pic.png"
 
     # Explicit removal clears avatar_url without affecting google_picture_url.
-    res = client.delete("/api/v1/auth/me/avatar", headers={"Authorization": f"Bearer {token}"})
+    res = client.delete(
+        "/api/v1/auth/me/avatar", headers={"Authorization": f"Bearer {token}"}
+    )
     assert res.status_code == 200, res.text
     assert res.json()["avatar_url"] is None
     assert res.json()["google_picture_url"] == "http://example.com/pic.png"
 
     # If the user opts in again, unlinking should also clear avatar_url.
-    res = client.post("/api/v1/auth/me/avatar/use-google", headers={"Authorization": f"Bearer {token}"})
+    res = client.post(
+        "/api/v1/auth/me/avatar/use-google",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert res.status_code == 200, res.text
     assert res.json()["avatar_url"] == "http://example.com/pic.png"
 

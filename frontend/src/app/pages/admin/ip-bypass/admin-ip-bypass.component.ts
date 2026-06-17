@@ -16,10 +16,16 @@ import { ButtonComponent } from '../../../shared/button.component';
     <div class="grid gap-6 max-w-xl">
       <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
 
-      <div class="rounded-2xl border border-slate-200 bg-white p-5 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+      <div
+        class="rounded-2xl border border-slate-200 bg-white p-5 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <div class="grid gap-1">
-          <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ipBypass.title' | translate }}</div>
-          <div class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.ipBypass.copy' | translate }}</div>
+          <div class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'adminUi.ipBypass.title' | translate }}
+          </div>
+          <div class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'adminUi.ipBypass.copy' | translate }}
+          </div>
         </div>
 
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -48,14 +54,14 @@ import { ButtonComponent } from '../../../shared/button.component';
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class AdminIpBypassComponent {
   token = '';
   busy = signal(false);
   crumbs = signal([
     { label: 'adminUi.nav.title', url: '/admin/dashboard' },
-    { label: 'adminUi.ipBypass.title', url: '/admin/ip-bypass' }
+    { label: 'adminUi.ipBypass.title', url: '/admin/ip-bypass' },
   ]);
   private readonly returnUrl: string;
 
@@ -64,7 +70,7 @@ export class AdminIpBypassComponent {
     private readonly toast: ToastService,
     private readonly router: Router,
     route: ActivatedRoute,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {
     this.returnUrl = route.snapshot.queryParamMap.get('returnUrl') || '/admin/dashboard';
   }
@@ -82,7 +88,7 @@ export class AdminIpBypassComponent {
         const msg = err?.error?.detail || this.translate.instant('adminUi.errors.generic');
         this.toast.error(msg);
         this.busy.set(false);
-      }
+      },
     });
   }
 
@@ -98,8 +104,7 @@ export class AdminIpBypassComponent {
       error: () => {
         this.token = '';
         this.busy.set(false);
-      }
+      },
     });
   }
 }
-

@@ -1,8 +1,8 @@
 # Main vs PR #199 Baseline Contracts
 
-Date: 2026-02-16  
-Baseline PR: `#199` (`fix: return 200 for netopia webhook errors`)  
-Baseline merge commit: `5e3b438520a023ae2f3d1ce3b27fa772e10aa627`  
+Date: 2026-02-16
+Baseline PR: `#199` (`fix: return 200 for netopia webhook errors`)
+Baseline merge commit: `5e3b438520a023ae2f3d1ce3b27fa772e10aa627`
 Baseline merged at: `2026-02-12T22:06:26Z`
 
 ## PR #199 Intent (source of truth)
@@ -63,4 +63,3 @@ Evidence references:
 Evidence references:
 
 - Recent `main` runs for commit `dd589b6adcfcc295b14f0c9cae71abb949d1dbf7`
-

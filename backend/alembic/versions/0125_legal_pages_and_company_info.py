@@ -171,8 +171,12 @@ def upgrade() -> None:
     now = datetime.now(timezone.utc)
     is_postgres = conn.dialect.name == "postgresql"
 
-    content_status = postgresql.ENUM("draft", "review", "published", name="contentstatus", create_type=False)
-    published_status = sa.text("'published'::contentstatus") if is_postgres else "published"
+    content_status = postgresql.ENUM(
+        "draft", "review", "published", name="contentstatus", create_type=False
+    )
+    published_status = (
+        sa.text("'published'::contentstatus") if is_postgres else "published"
+    )
 
     content_blocks = sa.table(
         "content_blocks",
@@ -216,8 +220,12 @@ def upgrade() -> None:
         sa.column("created_at", sa.DateTime(timezone=True)),
     )
 
-    def seed_page(*, key: str, en_title: str, en_body: str, ro_title: str, ro_body: str) -> None:
-        exists = conn.execute(sa.select(content_blocks.c.id).where(content_blocks.c.key == key)).first()
+    def seed_page(
+        *, key: str, en_title: str, en_body: str, ro_title: str, ro_body: str
+    ) -> None:
+        exists = conn.execute(
+            sa.select(content_blocks.c.id).where(content_blocks.c.key == key)
+        ).first()
         if exists:
             return
 
@@ -250,7 +258,9 @@ def upgrade() -> None:
                 body_markdown=ro_body,
             )
         )
-        translations_snapshot = [{"lang": "ro", "title": ro_title, "body_markdown": ro_body}]
+        translations_snapshot = [
+            {"lang": "ro", "title": ro_title, "body_markdown": ro_body}
+        ]
         conn.execute(
             sa.insert(versions).values(
                 id=uuid.uuid4(),
@@ -269,7 +279,9 @@ def upgrade() -> None:
         )
 
     def seed_site_company() -> None:
-        exists = conn.execute(sa.select(content_blocks.c.id).where(content_blocks.c.key == "site.company")).first()
+        exists = conn.execute(
+            sa.select(content_blocks.c.id).where(content_blocks.c.key == "site.company")
+        ).first()
         if exists:
             return
         block_id = uuid.uuid4()

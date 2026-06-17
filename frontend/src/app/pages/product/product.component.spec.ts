@@ -30,7 +30,11 @@ describe('ProductComponent', () => {
       'getUpsellProducts',
       'getRelatedProducts',
     ]);
-    auth = jasmine.createSpyObj<AuthService>('AuthService', ['isAuthenticated', 'isAdmin', 'isImpersonating']);
+    auth = jasmine.createSpyObj<AuthService>('AuthService', [
+      'isAuthenticated',
+      'isAdmin',
+      'isImpersonating',
+    ]);
     auth.isAdmin.and.returnValue(false);
     auth.isImpersonating.and.returnValue(false);
     routeParam$ = new ReplaySubject(1);
@@ -46,18 +50,21 @@ describe('ProductComponent', () => {
         { provide: CatalogService, useValue: catalog },
         { provide: AuthService, useValue: auth },
         { provide: RecentlyViewedService, useValue: { add: () => [] } },
-        { provide: WishlistService, useValue: { ensureLoaded: () => {}, isWishlisted: () => false } },
+        {
+          provide: WishlistService,
+          useValue: { ensureLoaded: () => {}, isWishlisted: () => false },
+        },
         {
           provide: ActivatedRoute,
           useValue: {
             snapshot: { paramMap: convertToParamMap({ slug: 'prod' }) },
-            paramMap: routeParam$.asObservable()
-          }
+            paramMap: routeParam$.asObservable(),
+          },
         },
         { provide: Title, useValue: jasmine.createSpyObj<Title>('Title', ['setTitle']) },
         { provide: Meta, useValue: jasmine.createSpyObj<Meta>('Meta', ['updateTag']) },
-        { provide: DOCUMENT, useValue: document }
-      ]
+        { provide: DOCUMENT, useValue: document },
+      ],
     });
 
     const translate = TestBed.inject(TranslateService);
@@ -76,17 +83,19 @@ describe('ProductComponent', () => {
           notifyCanceledTitle: 'Canceled',
           notifyCanceledBody: 'Canceled',
           addedTitle: 'Added',
-          addedBody: 'Added'
-        }
+          addedBody: 'Added',
+        },
       },
-      true
+      true,
     );
     translate.use('en');
   });
 
   afterEach(() => {
     document.querySelector('link[rel="canonical"]')?.remove();
-    document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').forEach((el) => el.remove());
+    document
+      .querySelectorAll('link[rel="alternate"][data-seo-managed="true"]')
+      .forEach((el) => el.remove());
     document.querySelectorAll('script[type="application/ld+json"]').forEach((el) => el.remove());
   });
 
@@ -123,12 +132,16 @@ describe('ProductComponent', () => {
 
     cmp.addToCart();
 
-    expect(cart.addFromProduct).toHaveBeenCalledWith(jasmine.objectContaining({ variant_id: 'v1' }));
+    expect(cart.addFromProduct).toHaveBeenCalledWith(
+      jasmine.objectContaining({ variant_id: 'v1' }),
+    );
   });
 
   it('requests back-in-stock when out of stock and signed in', () => {
     auth.isAuthenticated.and.returnValue(true);
-    catalog.requestBackInStock.and.returnValue(of({ id: 'r1', created_at: '2000-01-01T00:00:00+00:00' } as any));
+    catalog.requestBackInStock.and.returnValue(
+      of({ id: 'r1', created_at: '2000-01-01T00:00:00+00:00' } as any),
+    );
 
     const cmp = TestBed.createComponent(ProductComponent).componentInstance;
     cmp.product = {
@@ -139,7 +152,7 @@ describe('ProductComponent', () => {
       currency: 'RON',
       stock_quantity: 0,
       allow_backorder: false,
-      images: []
+      images: [],
     } as any;
 
     cmp.requestBackInStock();
@@ -158,8 +171,8 @@ describe('ProductComponent', () => {
         base_price: 42,
         currency: 'RON',
         stock_quantity: 3,
-        images: []
-      } as any)
+        images: [],
+      } as any),
     );
 
     const fixture = TestBed.createComponent(ProductComponent);
@@ -168,12 +181,30 @@ describe('ProductComponent', () => {
     const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     expect(canonical?.getAttribute('href')).toContain('/products/prod');
     expect(canonical?.getAttribute('href')).not.toContain('lang=en');
-    expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
+    expect(document.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(
+      3,
+    );
   });
 
   it('ignores stale product loads when navigating quickly between slugs', () => {
-    const productA = { id: 'a', slug: 'a', name: 'A', base_price: 10, currency: 'RON', stock_quantity: 1, images: [] } as any;
-    const productB = { id: 'b', slug: 'b', name: 'B', base_price: 12, currency: 'RON', stock_quantity: 1, images: [] } as any;
+    const productA = {
+      id: 'a',
+      slug: 'a',
+      name: 'A',
+      base_price: 10,
+      currency: 'RON',
+      stock_quantity: 1,
+      images: [],
+    } as any;
+    const productB = {
+      id: 'b',
+      slug: 'b',
+      name: 'B',
+      base_price: 12,
+      currency: 'RON',
+      stock_quantity: 1,
+      images: [],
+    } as any;
 
     const productA$ = new ReplaySubject<any>(1);
     const productB$ = new ReplaySubject<any>(1);

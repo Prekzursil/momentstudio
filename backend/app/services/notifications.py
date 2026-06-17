@@ -53,14 +53,21 @@ async def list_notifications(
         if not include_dismissed:
             filters.append(UserNotification.dismissed_at.is_(None))
     else:
-        read_filter = or_(UserNotification.read_at.is_(None), UserNotification.read_at >= cutoff)
+        read_filter = or_(
+            UserNotification.read_at.is_(None), UserNotification.read_at >= cutoff
+        )
         if include_dismissed:
             filters.append(or_(UserNotification.dismissed_at.is_not(None), read_filter))
         else:
             filters.append(UserNotification.dismissed_at.is_(None))
             filters.append(read_filter)
 
-    stmt = select(UserNotification).where(*filters).order_by(UserNotification.created_at.desc()).limit(limit)
+    stmt = (
+        select(UserNotification)
+        .where(*filters)
+        .order_by(UserNotification.created_at.desc())
+        .limit(limit)
+    )
     return list((await session.execute(stmt)).scalars().all())
 
 
@@ -77,12 +84,18 @@ async def unread_count(session: AsyncSession, *, user_id: UUID) -> int:
     return int((await session.execute(stmt)).scalar_one() or 0)
 
 
-async def mark_read(session: AsyncSession, *, user_id: UUID, notification_id: UUID) -> UserNotification:
+async def mark_read(
+    session: AsyncSession, *, user_id: UUID, notification_id: UUID
+) -> UserNotification:
     record = await session.get(UserNotification, notification_id)
     if not record or record.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found"
+        )
     if record.dismissed_at is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Notification dismissed")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Notification dismissed"
+        )
     if record.read_at is None:
         record.read_at = datetime.now(timezone.utc)
         session.add(record)
@@ -91,10 +104,14 @@ async def mark_read(session: AsyncSession, *, user_id: UUID, notification_id: UU
     return record
 
 
-async def dismiss(session: AsyncSession, *, user_id: UUID, notification_id: UUID) -> UserNotification:
+async def dismiss(
+    session: AsyncSession, *, user_id: UUID, notification_id: UUID
+) -> UserNotification:
     record = await session.get(UserNotification, notification_id)
     if not record or record.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found"
+        )
     if record.dismissed_at is None:
         record.dismissed_at = datetime.now(timezone.utc)
         session.add(record)
@@ -103,10 +120,14 @@ async def dismiss(session: AsyncSession, *, user_id: UUID, notification_id: UUID
     return record
 
 
-async def restore(session: AsyncSession, *, user_id: UUID, notification_id: UUID) -> UserNotification:
+async def restore(
+    session: AsyncSession, *, user_id: UUID, notification_id: UUID
+) -> UserNotification:
     record = await session.get(UserNotification, notification_id)
     if not record or record.user_id != user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found"
+        )
     if record.dismissed_at is not None:
         record.dismissed_at = None
         session.add(record)

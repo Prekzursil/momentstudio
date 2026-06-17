@@ -21,7 +21,9 @@ describe('AboutComponent', () => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
-    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
+    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', [
+      'setLocalizedCanonical',
+    ]);
     seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/about');
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
       if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
@@ -40,24 +42,24 @@ describe('AboutComponent', () => {
         { provide: ApiService, useValue: api },
         { provide: SeoHeadLinksService, useValue: seoHeadLinks },
         { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
-        { provide: MarkdownService, useValue: markdown }
-      ]
+        { provide: MarkdownService, useValue: markdown },
+      ],
     });
 
     translate = TestBed.inject(TranslateService);
     translate.setTranslation(
       'en',
       {
-        about: { metaTitle: 'About | momentstudio', metaDescription: 'About desc' }
+        about: { metaTitle: 'About | momentstudio', metaDescription: 'About desc' },
       },
-      true
+      true,
     );
     translate.setTranslation(
       'ro',
       {
-        about: { metaTitle: 'Despre noi | momentstudio', metaDescription: 'Descriere' }
+        about: { metaTitle: 'Despre noi | momentstudio', metaDescription: 'Descriere' },
       },
-      true
+      true,
     );
     translate.use('en');
   });
@@ -69,9 +71,15 @@ describe('AboutComponent', () => {
     expect(title.setTitle).toHaveBeenCalledWith('About | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'About | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:title',
+      content: 'About | momentstudio',
+    });
     expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'en', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:url',
+      content: 'http://localhost:4200/about',
+    });
   });
 
   it('updates meta tags when language changes', () => {
@@ -88,9 +96,15 @@ describe('AboutComponent', () => {
     expect(title.setTitle).toHaveBeenCalledWith('Despre noi | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Despre noi | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:title',
+      content: 'Despre noi | momentstudio',
+    });
     expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/about', 'ro', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/about?lang=ro' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:url',
+      content: 'http://localhost:4200/about?lang=ro',
+    });
   });
 
   it('uses page blocks for meta description when present', () => {
@@ -101,18 +115,34 @@ describe('AboutComponent', () => {
           title: 'Despre noi',
           body_markdown: 'Salut',
           meta: {
-            blocks: [{ key: 'intro', type: 'text', enabled: true, title: { ro: 'Introducere' }, body_markdown: { ro: 'Bun venit' } }]
+            blocks: [
+              {
+                key: 'intro',
+                type: 'text',
+                enabled: true,
+                title: { ro: 'Introducere' },
+                body_markdown: { ro: 'Bun venit' },
+              },
+            ],
           },
-          images: []
+          images: [],
         } as any);
       }
       return of({
         title: 'About',
         body_markdown: 'Hello',
         meta: {
-          blocks: [{ key: 'intro', type: 'text', enabled: true, title: { en: 'Intro' }, body_markdown: { en: 'Welcome' } }]
+          blocks: [
+            {
+              key: 'intro',
+              type: 'text',
+              enabled: true,
+              title: { en: 'Intro' },
+              body_markdown: { en: 'Welcome' },
+            },
+          ],
         },
-        images: []
+        images: [],
       } as any);
     });
 

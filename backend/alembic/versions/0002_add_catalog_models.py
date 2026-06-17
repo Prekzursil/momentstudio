@@ -21,11 +21,18 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "categories",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("slug", sa.String(length=120), nullable=False),
         sa.Column("name", sa.String(length=120), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -39,18 +46,34 @@ def upgrade() -> None:
 
     op.create_table(
         "products",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("category_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("categories.id"), nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "category_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("categories.id"),
+            nullable=False,
+        ),
         sa.Column("slug", sa.String(length=160), nullable=False),
         sa.Column("name", sa.String(length=160), nullable=False),
         sa.Column("short_description", sa.String(length=280), nullable=True),
         sa.Column("long_description", sa.Text(), nullable=True),
         sa.Column("base_price", sa.Numeric(10, 2), nullable=False, server_default="0"),
-        sa.Column("currency", sa.String(length=3), nullable=False, server_default="USD"),
+        sa.Column(
+            "currency", sa.String(length=3), nullable=False, server_default="USD"
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("is_featured", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "is_featured", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
         sa.Column("stock_quantity", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -64,12 +87,24 @@ def upgrade() -> None:
 
     op.create_table(
         "product_images",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("product_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("products.id"), nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "product_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("products.id"),
+            nullable=False,
+        ),
         sa.Column("url", sa.String(length=500), nullable=False),
         sa.Column("alt_text", sa.String(length=255), nullable=True),
         sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
 

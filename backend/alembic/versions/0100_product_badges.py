@@ -39,12 +39,29 @@ def upgrade() -> None:
         sa.Column("badge", badge_type, nullable=False),
         sa.Column("start_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("end_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.UniqueConstraint("product_id", "badge", name="uq_product_badges_unique"),
     )
-    op.create_index(op.f("ix_product_badges_product_id"), "product_badges", ["product_id"], unique=False)
-    op.create_index(op.f("ix_product_badges_badge"), "product_badges", ["badge"], unique=False)
+    op.create_index(
+        op.f("ix_product_badges_product_id"),
+        "product_badges",
+        ["product_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_product_badges_badge"), "product_badges", ["badge"], unique=False
+    )
 
 
 def downgrade() -> None:

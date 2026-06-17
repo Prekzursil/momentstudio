@@ -24,4 +24,3 @@
     // Ignore theme bootstrap errors (e.g. blocked storage).
   }
 })();
-

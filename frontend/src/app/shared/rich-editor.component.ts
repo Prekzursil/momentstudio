@@ -1,12 +1,27 @@
 import { DOCUMENT } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild, inject } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SimpleChanges,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import Editor from '@toast-ui/editor';
 import { LazyStylesService } from '../core/lazy-styles.service';
 
 @Component({
   selector: 'app-rich-editor',
   standalone: true,
-  template: `<div #host class="rounded-lg border border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"></div>`
+  template: `<div
+    #host
+    class="rounded-lg border border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+  ></div>`,
 })
 export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy {
   @ViewChild('host', { static: true }) host!: ElementRef<HTMLDivElement>;
@@ -32,7 +47,7 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private async initEditor(): Promise<void> {
     await Promise.all([
       this.styles.ensure('toastui-editor', 'assets/vendor/toastui/toastui-editor.css'),
-      this.styles.ensure('toastui-editor-dark', 'assets/vendor/toastui/toastui-editor-dark.css')
+      this.styles.ensure('toastui-editor-dark', 'assets/vendor/toastui/toastui-editor-dark.css'),
     ]);
 
     if (this.destroyed) return;
@@ -44,14 +59,17 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
       previewStyle: 'vertical',
       hideModeSwitch: false,
       usageStatistics: false,
-      initialValue: this.value || ''
+      initialValue: this.value || '',
     });
 
     this.syncThemeClass();
     this.applyAriaLabel();
     if (typeof MutationObserver !== 'undefined') {
       this.themeObserver = new MutationObserver(() => this.syncThemeClass());
-      this.themeObserver.observe(this.document.documentElement, { attributes: true, attributeFilter: ['class'] });
+      this.themeObserver.observe(this.document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class'],
+      });
     }
     setTimeout(() => this.syncThemeClass(), 0);
     setTimeout(() => this.applyAriaLabel(), 0);
@@ -87,7 +105,9 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private syncThemeClass(): void {
     if (this.destroyed || !this.host?.nativeElement) return;
     const isDark = this.document.documentElement.classList.contains('dark');
-    const root = this.host.nativeElement.querySelector('.toastui-editor-defaultUI') as HTMLElement | null;
+    const root = this.host.nativeElement.querySelector(
+      '.toastui-editor-defaultUI',
+    ) as HTMLElement | null;
     const target = root ?? this.host.nativeElement;
     target.classList.toggle('toastui-editor-dark', isDark);
   }
@@ -96,7 +116,9 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (this.destroyed || !this.host?.nativeElement) return;
     const label = String(this.ariaLabel || '').trim();
     if (!label) return;
-    const nodes = this.host.nativeElement.querySelectorAll<HTMLElement>('[role="textbox"], textarea');
+    const nodes = this.host.nativeElement.querySelectorAll<HTMLElement>(
+      '[role="textbox"], textarea',
+    );
     nodes.forEach((node) => node.setAttribute('aria-label', label));
   }
 
@@ -108,4 +130,3 @@ export class RichEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.editor = null;
   }
 }
-

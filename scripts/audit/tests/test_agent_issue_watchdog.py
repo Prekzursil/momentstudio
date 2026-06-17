@@ -21,12 +21,20 @@ def test_split_repo_rejects_malformed_tokens() -> None:
     assert owner == "Prekzursil"
     assert repo == "AdrianaArt"
 
-    for invalid in ["bad owner/AdrianaArt", "Prekzursil/adriana/art", "onlyowner", "/repo", "owner/"]:
+    for invalid in [
+        "bad owner/AdrianaArt",
+        "Prekzursil/adriana/art",
+        "onlyowner",
+        "/repo",
+        "owner/",
+    ]:
         try:
             module._split_repo(invalid)
         except ValueError:
             continue
-        raise AssertionError(f"Expected ValueError for invalid repo identifier: {invalid}")
+        raise AssertionError(
+            f"Expected ValueError for invalid repo identifier: {invalid}"
+        )
 
 
 def test_update_labels_replaces_in_progress_with_ready() -> None:
@@ -73,7 +81,10 @@ def test_run_outputs_counters_and_applies_issue_updates(capsys) -> None:
     module._list_open_in_progress_issues = fake_list_open_in_progress_issues
     module._request = fake_request
 
-    assert module.run(repo="Prekzursil/momentstudio", stale_days=5, audit_filter="audit:*") == 0
+    assert (
+        module.run(repo="Prekzursil/momentstudio", stale_days=5, audit_filter="audit:*")
+        == 0
+    )
 
     out = capsys.readouterr().out
     assert "scanned=1" in out
@@ -82,4 +93,3 @@ def test_run_outputs_counters_and_applies_issue_updates(capsys) -> None:
 
     methods = [method for method, _, _ in calls]
     assert methods == ["POST", "PATCH", "DELETE"]
-

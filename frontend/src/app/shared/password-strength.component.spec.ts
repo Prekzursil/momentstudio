@@ -6,7 +6,7 @@ import { PasswordStrengthComponent, computePasswordStrength } from './password-s
 describe('PasswordStrengthComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [TranslateModule.forRoot(), PasswordStrengthComponent]
+      imports: [TranslateModule.forRoot(), PasswordStrengthComponent],
     });
   });
 

@@ -25,7 +25,9 @@ describe('ContactComponent', () => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
-    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
+    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', [
+      'setLocalizedCanonical',
+    ]);
     seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/contact');
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
       if (path !== '/content/pages/contact') throw new Error(`Unexpected path: ${path}`);
@@ -44,8 +46,8 @@ describe('ContactComponent', () => {
         of({
           contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
           instagramPages: [],
-          facebookPages: []
-        })
+          facebookPages: [],
+        }),
     } as unknown as SiteSocialService;
 
     TestBed.configureTestingModule({
@@ -58,24 +60,24 @@ describe('ContactComponent', () => {
         { provide: MarkdownService, useValue: markdown },
         { provide: SiteSocialService, useValue: social },
         { provide: AuthService, useValue: auth },
-        { provide: SupportService, useValue: support }
-      ]
+        { provide: SupportService, useValue: support },
+      ],
     });
 
     translate = TestBed.inject(TranslateService);
     translate.setTranslation(
       'en',
       {
-        contact: { metaTitle: 'Contact | momentstudio', metaDescription: 'Contact desc' }
+        contact: { metaTitle: 'Contact | momentstudio', metaDescription: 'Contact desc' },
       },
-      true
+      true,
     );
     translate.setTranslation(
       'ro',
       {
-        contact: { metaTitle: 'Contact | momentstudio (RO)', metaDescription: 'Descriere contact' }
+        contact: { metaTitle: 'Contact | momentstudio (RO)', metaDescription: 'Descriere contact' },
       },
-      true
+      true,
     );
     translate.use('en');
   });
@@ -87,9 +89,15 @@ describe('ContactComponent', () => {
     expect(title.setTitle).toHaveBeenCalledWith('Contact | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Hello' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Hello' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:title',
+      content: 'Contact | momentstudio',
+    });
     expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/contact', 'en', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/contact' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:url',
+      content: 'http://localhost:4200/contact',
+    });
   });
 
   it('updates meta tags when language changes', () => {
@@ -106,9 +114,15 @@ describe('ContactComponent', () => {
     expect(title.setTitle).toHaveBeenCalledWith('Contact RO | momentstudio');
     expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'Salut' });
     expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:description', content: 'Salut' });
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:title', content: 'Contact RO | momentstudio' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:title',
+      content: 'Contact RO | momentstudio',
+    });
     expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/contact', 'ro', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/contact?lang=ro' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:url',
+      content: 'http://localhost:4200/contact?lang=ro',
+    });
   });
 
   it('uses page blocks for meta description when present', () => {
@@ -120,9 +134,15 @@ describe('ContactComponent', () => {
           body_markdown: 'Salut',
           meta: {
             blocks: [
-              { key: 'intro', type: 'text', enabled: true, title: { ro: 'Introducere' }, body_markdown: { ro: 'Bun venit' } }
-            ]
-          }
+              {
+                key: 'intro',
+                type: 'text',
+                enabled: true,
+                title: { ro: 'Introducere' },
+                body_markdown: { ro: 'Bun venit' },
+              },
+            ],
+          },
         } as any);
       }
       return of({
@@ -130,9 +150,15 @@ describe('ContactComponent', () => {
         body_markdown: 'Hello',
         meta: {
           blocks: [
-            { key: 'intro', type: 'text', enabled: true, title: { en: 'Intro' }, body_markdown: { en: 'Welcome' } }
-          ]
-        }
+            {
+              key: 'intro',
+              type: 'text',
+              enabled: true,
+              title: { en: 'Intro' },
+              body_markdown: { en: 'Welcome' },
+            },
+          ],
+        },
       } as any);
     });
 

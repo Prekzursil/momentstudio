@@ -23,7 +23,9 @@ async def consent_status(
     required_versions = await legal_consents_service.required_doc_versions(session)
     accepted_versions: dict[str, int] = {}
     if current_user and current_user.id:
-        accepted_versions = await legal_consents_service.latest_accepted_versions(session, user_id=current_user.id)
+        accepted_versions = await legal_consents_service.latest_accepted_versions(
+            session, user_id=current_user.id
+        )
 
     docs: list[LegalConsentDocStatus] = []
     for key in legal_consents_service.REQUIRED_DOC_KEYS:
@@ -38,5 +40,9 @@ async def consent_status(
                 accepted=accepted_version >= required_version and required_version > 0,
             )
         )
-    return LegalConsentStatusResponse(docs=docs, satisfied=legal_consents_service.is_satisfied(required_versions, accepted_versions))
-
+    return LegalConsentStatusResponse(
+        docs=docs,
+        satisfied=legal_consents_service.is_satisfied(
+            required_versions, accepted_versions
+        ),
+    )

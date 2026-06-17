@@ -36,21 +36,28 @@ def test_app() -> Dict[str, object]:
 def test_newsletter_subscribe_idempotent(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
-    first = client.post("/api/v1/newsletter/subscribe", json={"email": "test@example.com"})
+    first = client.post(
+        "/api/v1/newsletter/subscribe", json={"email": "test@example.com"}
+    )
     assert first.status_code == 200, first.text
     assert first.json()["subscribed"] is True
     assert first.json()["already_subscribed"] is False
 
-    again = client.post("/api/v1/newsletter/subscribe", json={"email": "test@example.com"})
+    again = client.post(
+        "/api/v1/newsletter/subscribe", json={"email": "test@example.com"}
+    )
     assert again.status_code == 200, again.text
     assert again.json()["subscribed"] is True
     assert again.json()["already_subscribed"] is True
 
 
-def test_newsletter_unsubscribe_accepts_one_click_post(test_app: Dict[str, object]) -> None:
+def test_newsletter_unsubscribe_accepts_one_click_post(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     token = newsletter_tokens.create_newsletter_token(
-        email="test@example.com", purpose=newsletter_tokens.NEWSLETTER_PURPOSE_UNSUBSCRIBE
+        email="test@example.com",
+        purpose=newsletter_tokens.NEWSLETTER_PURPOSE_UNSUBSCRIBE,
     )
 
     resp = client.post(

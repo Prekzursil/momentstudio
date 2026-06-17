@@ -47,7 +47,7 @@ describe('AccountComponent', () => {
     google_email: null,
     google_picture_url: null,
     created_at: '2000-01-01T00:00:00+00:00',
-    updated_at: '2000-01-02T00:00:00+00:00'
+    updated_at: '2000-01-02T00:00:00+00:00',
   };
 
   const addresses: Address[] = [
@@ -61,8 +61,8 @@ describe('AccountComponent', () => {
       postal_code: '010203',
       country: 'RO',
       is_default_shipping: true,
-      is_default_billing: false
-    }
+      is_default_billing: false,
+    },
   ];
 
   const orders: Order[] = [
@@ -82,10 +82,10 @@ describe('AccountComponent', () => {
           product: { id: 'p1', slug: 'prod', name: 'Prod' },
           quantity: 1,
           unit_price: 20,
-          subtotal: 20
-        }
-      ]
-    }
+          subtotal: 20,
+        },
+      ],
+    },
   ];
 
   beforeEach(() => {
@@ -98,15 +98,19 @@ describe('AccountComponent', () => {
       'role',
       'isAdmin',
       'getAliases',
-      'listEmails'
+      'listEmails',
     ]);
     auth.isAuthenticated.and.returnValue(true);
     auth.role.and.returnValue('customer');
     auth.isAdmin.and.returnValue(false);
-    auth.updateNotificationPreferences.and.returnValue(of({ ...profile, notify_marketing: true } as any));
+    auth.updateNotificationPreferences.and.returnValue(
+      of({ ...profile, notify_marketing: true } as any),
+    );
     auth.logout.and.returnValue(of(void 0));
     auth.getAliases.and.returnValue(of({ usernames: [], display_names: [] } as any));
-    auth.listEmails.and.returnValue(of({ primary_email: profile.email, primary_verified: true, secondary_emails: [] } as any));
+    auth.listEmails.and.returnValue(
+      of({ primary_email: profile.email, primary_verified: true, secondary_emails: [] } as any),
+    );
 
     account = jasmine.createSpyObj<AccountService>('AccountService', [
       'getProfile',
@@ -120,7 +124,7 @@ describe('AccountComponent', () => {
       'downloadReceipt',
       'createAddress',
       'updateAddress',
-      'deleteAddress'
+      'deleteAddress',
     ]);
     account.getProfile.and.returnValue(of(profile as any));
     account.getAddresses.and.returnValue(of(addresses));
@@ -128,22 +132,42 @@ describe('AccountComponent', () => {
     account.getOrdersPage.and.returnValue(
       of({
         items: orders,
-        meta: { total_items: orders.length, total_pages: 1, page: 1, limit: 5, pending_count: 0 }
-      } as any)
+        meta: { total_items: orders.length, total_pages: 1, page: 1, limit: 5, pending_count: 0 },
+      } as any),
     );
-    account.getDeletionStatus.and.returnValue(of({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 }));
+    account.getDeletionStatus.and.returnValue(
+      of({ requested_at: null, scheduled_for: null, deleted_at: null, cooldown_hours: 24 }),
+    );
     account.reorderOrder.and.returnValue(of({}));
     account.downloadReceipt.and.returnValue(of(new Blob(['pdf'], { type: 'application/pdf' })));
 
     blog = jasmine.createSpyObj<BlogService>('BlogService', ['listMyComments']);
-    blog.listMyComments.and.returnValue(of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 } }));
+    blog.listMyComments.and.returnValue(
+      of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 } }),
+    );
 
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get', 'post', 'delete']);
     api.get.and.returnValue(of([]));
 
     const wishlistItems = [
-      { id: 'p1', slug: 'p1', name: 'P1', base_price: 10, currency: 'RON', stock_quantity: 5, images: [] },
-      { id: 'p2', slug: 'p2', name: 'P2', base_price: 12, currency: 'RON', stock_quantity: 1, images: [] }
+      {
+        id: 'p1',
+        slug: 'p1',
+        name: 'P1',
+        base_price: 10,
+        currency: 'RON',
+        stock_quantity: 5,
+        images: [],
+      },
+      {
+        id: 'p2',
+        slug: 'p2',
+        name: 'P2',
+        base_price: 12,
+        currency: 'RON',
+        stock_quantity: 1,
+        images: [],
+      },
     ];
     wishlist = {
       items: () => wishlistItems,
@@ -155,15 +179,19 @@ describe('AccountComponent', () => {
       addLocal: jasmine.createSpy('addLocal'),
       removeLocal: jasmine.createSpy('removeLocal'),
       refresh: jasmine.createSpy('refresh'),
-      clear: jasmine.createSpy('clear')
+      clear: jasmine.createSpy('clear'),
     };
 
-    coupons = jasmine.createSpyObj<CouponsService>('CouponsService', ['myCoupons', 'eligibility', 'validate']);
+    coupons = jasmine.createSpyObj<CouponsService>('CouponsService', [
+      'myCoupons',
+      'eligibility',
+      'validate',
+    ]);
     coupons.myCoupons.and.returnValue(of([] as any));
 
     notifications = {
       unreadCount: () => 0,
-      refreshUnreadCount: jasmine.createSpy('refreshUnreadCount')
+      refreshUnreadCount: jasmine.createSpy('refreshUnreadCount'),
     };
 
     const modeSig = signal<'light' | 'dark'>('light');
@@ -171,12 +199,12 @@ describe('AccountComponent', () => {
     theme = {
       mode: () => modeSig.asReadonly(),
       preference: () => prefSig.asReadonly(),
-      setPreference: (pref: 'light' | 'dark' | 'system') => prefSig.set(pref)
+      setPreference: (pref: 'light' | 'dark' | 'system') => prefSig.set(pref),
     };
 
     lang = {
       language: () => 'en',
-      setLanguage: jasmine.createSpy('setLanguage')
+      setLanguage: jasmine.createSpy('setLanguage'),
     };
 
     cart = jasmine.createSpyObj<CartStore>('CartStore', ['loadFromBackend']);
@@ -194,8 +222,8 @@ describe('AccountComponent', () => {
         { provide: NotificationsService, useValue: notifications },
         { provide: ThemeService, useValue: theme },
         { provide: LanguageService, useValue: lang },
-        { provide: CartStore, useValue: cart }
-      ]
+        { provide: CartStore, useValue: cart },
+      ],
     });
 
     const translate = TestBed.inject(TranslateService);
@@ -206,11 +234,11 @@ describe('AccountComponent', () => {
           overview: {
             lastOrderLabel: '#{{ref}} · {{status}}',
             wishlistCountOne: '1 saved item',
-            wishlistCountMany: '{{count}} saved items'
-          }
-        }
+            wishlistCountMany: '{{count}} saved items',
+          },
+        },
       },
-      true
+      true,
     );
     translate.setDefaultLang('en');
     void translate.use('en');
@@ -246,7 +274,7 @@ describe('AccountComponent', () => {
     expect(auth.updateNotificationPreferences).toHaveBeenCalledWith({
       notify_blog_comments: true,
       notify_blog_comment_replies: false,
-      notify_marketing: true
+      notify_marketing: true,
     });
     expect(cmp.notificationsMessage).toBe('account.notifications.saved');
   });

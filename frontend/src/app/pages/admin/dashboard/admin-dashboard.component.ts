@@ -1,6 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild, signal } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Router } from '@angular/router';
@@ -34,7 +42,7 @@ import {
   ScheduledPublishItem,
   AdminScheduledReportKind,
   AdminService,
-  AdminSummary
+  AdminSummary,
 } from '../../../core/admin.service';
 import { AdminOrdersService } from '../../../core/admin-orders.service';
 import { AdminCouponsV2Service, CouponBulkJobRead } from '../../../core/admin-coupons-v2.service';
@@ -64,7 +72,7 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
     SkeletonComponent,
     ErrorStateComponent,
     ModalComponent,
-    LocalizedCurrencyPipe
+    LocalizedCurrencyPipe,
   ],
   template: `
     <div class="grid gap-6">
@@ -82,436 +90,559 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
         <app-skeleton [rows]="6"></app-skeleton>
       </div>
 
-	      <ng-template #dashboardTpl>
-	        <section class="grid gap-3">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboardTitle' | translate }}</h1>
-              <div class="flex items-center gap-2">
-                <span *ngIf="lastUpdatedAt()" class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.liveRefresh.lastUpdated' | translate }}: {{ lastUpdatedAt() | date: 'shortTime' }}
-                </span>
-                <div
-                  role="radiogroup"
-                  class="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/70 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
-                  [attr.aria-label]="'adminUi.dashboard.salesMetric.aria' | translate"
-                  [attr.title]="'adminUi.dashboard.salesMetric.tooltip' | translate"
-                >
-                  <button
-                    type="button"
-                    role="radio"
-                    [attr.aria-checked]="salesMetric() === 'net'"
-                    [attr.tabindex]="salesMetric() === 'net' ? 0 : -1"
-                    class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                    [ngClass]="
-                      salesMetric() === 'net'
-                        ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
-                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
-                    "
-                    (click)="setSalesMetric('net')"
-                  >
-                    {{ 'adminUi.dashboard.salesMetric.net' | translate }}
-                  </button>
-                  <button
-                    type="button"
-                    role="radio"
-                    [attr.aria-checked]="salesMetric() === 'gross'"
-                    [attr.tabindex]="salesMetric() === 'gross' ? 0 : -1"
-                    class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                    [ngClass]="
-                      salesMetric() === 'gross'
-                        ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
-                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
-                    "
-                    (click)="setSalesMetric('gross')"
-                  >
-                    {{ 'adminUi.dashboard.salesMetric.gross' | translate }}
-                  </button>
-                </div>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="(liveRefreshEnabled() ? 'adminUi.dashboard.liveRefresh.pause' : 'adminUi.dashboard.liveRefresh.resume') | translate"
-                  (action)="toggleLiveRefresh()"
-                ></app-button>
-                <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="refreshNow()"></app-button>
-	              <app-button
-	                *ngIf="isOwner()"
-	                size="sm"
-	                variant="ghost"
-	                [label]="'adminUi.onboarding.open' | translate"
-	                (action)="openOnboarding()"
-	              ></app-button>
-	              <app-button
-	                size="sm"
-	                variant="ghost"
-	                [label]="'adminUi.dashboard.customizeWidgets' | translate"
-	                (action)="toggleCustomizeWidgets()"
-	              ></app-button>
-	              </div>
-		          </div>
-
-              <app-card
-                [title]="'adminUi.dashboard.whatsNew.title' | translate"
-                [subtitle]="'adminUi.dashboard.whatsNew.subtitle' | translate"
+      <ng-template #dashboardTpl>
+        <section class="grid gap-3">
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboardTitle' | translate }}
+            </h1>
+            <div class="flex items-center gap-2">
+              <span *ngIf="lastUpdatedAt()" class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.dashboard.liveRefresh.lastUpdated' | translate }}:
+                {{ lastUpdatedAt() | date: 'shortTime' }}
+              </span>
+              <div
+                role="radiogroup"
+                class="inline-flex items-center gap-0.5 rounded-full border border-slate-200 bg-white/70 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
+                [attr.aria-label]="'adminUi.dashboard.salesMetric.aria' | translate"
+                [attr.title]="'adminUi.dashboard.salesMetric.tooltip' | translate"
               >
-                <div class="flex justify-end">
-                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadWhatsNew(true)"></app-button>
-                </div>
+                <button
+                  type="button"
+                  role="radio"
+                  [attr.aria-checked]="salesMetric() === 'net'"
+                  [attr.tabindex]="salesMetric() === 'net' ? 0 : -1"
+                  class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  [ngClass]="
+                    salesMetric() === 'net'
+                      ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
+                  "
+                  (click)="setSalesMetric('net')"
+                >
+                  {{ 'adminUi.dashboard.salesMetric.net' | translate }}
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  [attr.aria-checked]="salesMetric() === 'gross'"
+                  [attr.tabindex]="salesMetric() === 'gross' ? 0 : -1"
+                  class="min-h-9 rounded-full px-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  [ngClass]="
+                    salesMetric() === 'gross'
+                      ? 'bg-slate-900 text-white hover:bg-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-50'
+                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/50'
+                  "
+                  (click)="setSalesMetric('gross')"
+                >
+                  {{ 'adminUi.dashboard.salesMetric.gross' | translate }}
+                </button>
+              </div>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="
+                  (liveRefreshEnabled()
+                    ? 'adminUi.dashboard.liveRefresh.pause'
+                    : 'adminUi.dashboard.liveRefresh.resume'
+                  ) | translate
+                "
+                (action)="toggleLiveRefresh()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.refresh' | translate"
+                (action)="refreshNow()"
+              ></app-button>
+              <app-button
+                *ngIf="isOwner()"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.onboarding.open' | translate"
+                (action)="openOnboarding()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.dashboard.customizeWidgets' | translate"
+                (action)="toggleCustomizeWidgets()"
+              ></app-button>
+            </div>
+          </div>
 
-                <div *ngIf="whatsNewLoading()" class="mt-3">
-                  <app-skeleton [rows]="3"></app-skeleton>
-                </div>
+          <app-card
+            [title]="'adminUi.dashboard.whatsNew.title' | translate"
+            [subtitle]="'adminUi.dashboard.whatsNew.subtitle' | translate"
+          >
+            <div class="flex justify-end">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.refresh' | translate"
+                (action)="loadWhatsNew(true)"
+              ></app-button>
+            </div>
 
-                <div *ngIf="whatsNewError()" class="mt-3 text-sm text-rose-700 dark:text-rose-200">
-                  {{ whatsNewError() }}
-                </div>
+            <div *ngIf="whatsNewLoading()" class="mt-3">
+              <app-skeleton [rows]="3"></app-skeleton>
+            </div>
 
-                <div
-                  *ngIf="!whatsNewLoading() && !whatsNewError() && whatsNewHtml()"
-                  class="mt-3 grid gap-2 text-sm text-slate-700 dark:text-slate-200"
-                  [innerHTML]="whatsNewHtml()"
-                ></div>
-              </app-card>
+            <div *ngIf="whatsNewError()" class="mt-3 text-sm text-rose-700 dark:text-rose-200">
+              {{ whatsNewError() }}
+            </div>
 
-		          <div class="grid gap-3">
-		            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-		              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
-		            </p>
+            <div
+              *ngIf="!whatsNewLoading() && !whatsNewError() && whatsNewHtml()"
+              class="mt-3 grid gap-2 text-sm text-slate-700 dark:text-slate-200"
+              [innerHTML]="whatsNewHtml()"
+            ></div>
+          </app-card>
 
-	            <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.globalSearchLabel' | translate }}</span>
-	                <div class="relative">
-	                  <input
-                      #globalSearchInput
-                      id="admin-global-search"
-                      role="combobox"
-                      aria-autocomplete="list"
-                      [attr.aria-expanded]="globalSearchOpen() ? 'true' : 'false'"
-                      [attr.aria-controls]="'admin-global-search-listbox'"
-                      [attr.aria-activedescendant]="globalSearchActiveDescendant()"
-	                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                    [placeholder]="'adminUi.dashboard.globalSearchPlaceholder' | translate"
-	                    [(ngModel)]="globalSearchQuery"
-	                    (ngModelChange)="onGlobalSearchChange()"
-	                    (focus)="openGlobalSearch()"
-	                    (blur)="onGlobalSearchBlur()"
-	                    (keydown)="onGlobalSearchKeydown($event)"
-	                  />
+          <div class="grid gap-3">
+            <p
+              class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+            >
+              {{ 'adminUi.dashboard.quickActionsTitle' | translate }}
+            </p>
 
-	                  <div
-	                    *ngIf="globalSearchOpen()"
-	                    class="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
-	                  >
-                      <div id="admin-global-search-listbox" role="listbox" class="max-h-72 overflow-auto">
+            <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+                  'adminUi.dashboard.globalSearchLabel' | translate
+                }}</span>
+                <div class="relative">
+                  <input
+                    #globalSearchInput
+                    id="admin-global-search"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    [attr.aria-expanded]="globalSearchOpen() ? 'true' : 'false'"
+                    [attr.aria-controls]="'admin-global-search-listbox'"
+                    [attr.aria-activedescendant]="globalSearchActiveDescendant()"
+                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [placeholder]="'adminUi.dashboard.globalSearchPlaceholder' | translate"
+                    [(ngModel)]="globalSearchQuery"
+                    (ngModelChange)="onGlobalSearchChange()"
+                    (focus)="openGlobalSearch()"
+                    (blur)="onGlobalSearchBlur()"
+                    (keydown)="onGlobalSearchKeydown($event)"
+                  />
+
+                  <div
+                    *ngIf="globalSearchOpen()"
+                    class="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div
+                      id="admin-global-search-listbox"
+                      role="listbox"
+                      class="max-h-72 overflow-auto"
+                    >
+                      <div
+                        *ngIf="globalSearchLoading()"
+                        role="option"
+                        aria-disabled="true"
+                        class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
+                      >
+                        {{ 'adminUi.dashboard.globalSearchLoading' | translate }}
+                      </div>
+                      <div
+                        *ngIf="globalSearchError"
+                        role="option"
+                        aria-disabled="true"
+                        class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300"
+                      >
+                        {{ globalSearchError }}
+                      </div>
+
+                      <ng-container *ngIf="!globalSearchLoading() && !globalSearchError">
                         <div
-                          *ngIf="globalSearchLoading()"
+                          *ngIf="
+                            globalSearchResults().length === 0 &&
+                            (globalSearchQuery || '').trim().length >= 2
+                          "
                           role="option"
                           aria-disabled="true"
                           class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
                         >
-                          {{ 'adminUi.dashboard.globalSearchLoading' | translate }}
+                          {{ 'adminUi.dashboard.globalSearchEmpty' | translate }}
                         </div>
-                        <div
-                          *ngIf="globalSearchError"
+                        <button
+                          *ngFor="let item of globalSearchResults(); let i = index"
+                          type="button"
                           role="option"
-                          aria-disabled="true"
-                          class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300"
+                          tabindex="-1"
+                          [id]="'admin-global-search-option-' + i"
+                          [attr.aria-selected]="i === globalSearchActiveIndex() ? 'true' : 'false'"
+                          class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                          [class.bg-slate-50]="i === globalSearchActiveIndex()"
+                          [class.dark:bg-slate-800/60]="i === globalSearchActiveIndex()"
+                          (mousedown)="selectGlobalSearch(item, $event)"
                         >
-                          {{ globalSearchError }}
-                        </div>
-
-                        <ng-container *ngIf="!globalSearchLoading() && !globalSearchError">
-                          <div
-                            *ngIf="globalSearchResults().length === 0 && (globalSearchQuery || '').trim().length >= 2"
-                            role="option"
-                            aria-disabled="true"
-                            class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
-                          >
-                            {{ 'adminUi.dashboard.globalSearchEmpty' | translate }}
+                          <div class="flex items-center justify-between gap-3">
+                            <span
+                              class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+                            >
+                              {{ globalSearchTypeLabel(item.type) }}
+                            </span>
+                            <span
+                              *ngIf="item.slug || item.email"
+                              class="text-xs text-slate-500 dark:text-slate-400 truncate"
+                            >
+                              {{ item.slug || item.email }}
+                            </span>
                           </div>
-                          <button
-                            *ngFor="let item of globalSearchResults(); let i = index"
-                            type="button"
-                            role="option"
-                            tabindex="-1"
-                            [id]="'admin-global-search-option-' + i"
-                            [attr.aria-selected]="i === globalSearchActiveIndex() ? 'true' : 'false'"
-                            class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                            [class.bg-slate-50]="i === globalSearchActiveIndex()"
-                            [class.dark:bg-slate-800/60]="i === globalSearchActiveIndex()"
-                            (mousedown)="selectGlobalSearch(item, $event)"
+                          <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">
+                            {{ item.label }}
+                          </div>
+                          <div
+                            *ngIf="item.subtitle"
+                            class="text-xs text-slate-600 dark:text-slate-300 truncate"
                           >
-                            <div class="flex items-center justify-between gap-3">
-                              <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                                {{ globalSearchTypeLabel(item.type) }}
-                              </span>
-                              <span *ngIf="item.slug || item.email" class="text-xs text-slate-500 dark:text-slate-400 truncate">
-                                {{ item.slug || item.email }}
-                              </span>
-                            </div>
-                            <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
-                            <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
-                          </button>
-                        </ng-container>
-                      </div>
-	                  </div>
-	                </div>
-	              </label>
-
-	              <div class="flex flex-wrap gap-2">
-	                <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createProduct' | translate" (action)="goToCreateProduct()"></app-button>
-	                <app-button size="sm" [label]="'adminUi.dashboard.quickActions.createCoupon' | translate" (action)="goToCreateCoupon()"></app-button>
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.dashboard.quickActions.exportOrders' | translate"
-	                  (action)="downloadOrdersExport()"
-	                ></app-button>
-	              </div>
-	            </div>
-	          </div>
-
-            <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-              <div class="flex items-start justify-between gap-3">
-                <div class="grid gap-1">
-                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.favorites.title' | translate }}</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.favorites.hint' | translate }}</div>
+                            {{ item.subtitle }}
+                          </div>
+                        </button>
+                      </ng-container>
+                    </div>
+                  </div>
                 </div>
+              </label>
+
+              <div class="flex flex-wrap gap-2">
                 <app-button
-                  *ngIf="favorites.items().length"
+                  size="sm"
+                  [label]="'adminUi.dashboard.quickActions.createProduct' | translate"
+                  (action)="goToCreateProduct()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.dashboard.quickActions.createCoupon' | translate"
+                  (action)="goToCreateCoupon()"
+                ></app-button>
+                <app-button
                   size="sm"
                   variant="ghost"
-                  [label]="'adminUi.favorites.clear' | translate"
-                  [disabled]="favorites.loading()"
-                  (action)="clearFavorites()"
+                  [label]="'adminUi.dashboard.quickActions.exportOrders' | translate"
+                  (action)="downloadOrdersExport()"
                 ></app-button>
-              </div>
-
-              <div *ngIf="favorites.items().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.favorites.empty' | translate }}
-              </div>
-
-              <div *ngIf="favorites.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <div
-                  *ngFor="let item of favorites.items()"
-                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
-                >
-                  <button type="button" class="min-w-0 text-left" (click)="openFavorite(item)">
-                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                      {{ ('adminUi.favorites.types.' + item.type) | translate }}
-                    </div>
-                    <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
-                    <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800/60"
-                    [attr.aria-label]="'adminUi.favorites.unpin' | translate"
-                    [disabled]="favorites.loading()"
-                    (click)="toggleFavorite(item, $event)"
-                  >
-                    <span aria-hidden="true" class="text-base leading-none">★</span>
-                  </button>
-                </div>
               </div>
             </div>
+          </div>
 
-            <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-              <div class="flex items-start justify-between gap-3">
-                <div class="grid gap-1">
-                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.recent.title' | translate }}</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.recent.hint' | translate }}</div>
+          <div
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.favorites.title' | translate }}
                 </div>
-                <app-button
-                  *ngIf="recent.items().length"
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.recent.clear' | translate"
-                  (action)="clearRecent()"
-                ></app-button>
-              </div>
-
-              <div *ngIf="recent.items().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.recent.empty' | translate }}
-              </div>
-
-              <div *ngIf="recent.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                <div
-                  *ngFor="let item of recent.items()"
-                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
-                >
-                  <button type="button" class="min-w-0 text-left" (click)="openRecent(item)">
-                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                      {{ ('adminUi.recent.types.' + item.type) | translate }}
-                    </div>
-                    <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.label }}</div>
-                    <div *ngIf="item.subtitle" class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.subtitle }}</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
-                    [attr.aria-label]="(favorites.isFavorite(item.key) ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
-                    [disabled]="favorites.loading()"
-                    (click)="toggleFavorite(item, $event)"
-                  >
-                    <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="favorites.isFavorite(item.key)">
-                      {{ favorites.isFavorite(item.key) ? '★' : '☆' }}
-                    </span>
-                  </button>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.favorites.hint' | translate }}
                 </div>
               </div>
+              <app-button
+                *ngIf="favorites.items().length"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.favorites.clear' | translate"
+                [disabled]="favorites.loading()"
+                (action)="clearFavorites()"
+              ></app-button>
             </div>
 
             <div
-              *ngIf="shouldShowJobsPanel()"
-              class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+              *ngIf="favorites.items().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
             >
-              <div class="flex items-start justify-between gap-3">
-                <div class="grid gap-1">
-                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.jobs.title' | translate }}</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.jobs.hint' | translate }}</div>
-                </div>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.refresh' | translate"
-                  [disabled]="jobsLoading()"
-                  (action)="loadBackgroundJobs()"
-                ></app-button>
-              </div>
-
-              <div *ngIf="jobsError()" class="text-sm text-rose-700 dark:text-rose-200">
-                {{ jobsError() }}
-              </div>
-
-              <div *ngIf="jobsLoading(); else jobsTpl">
-                <app-skeleton [rows]="4"></app-skeleton>
-              </div>
-
-              <ng-template #jobsTpl>
-                <div *ngIf="gdprExportJobs().length === 0 && couponBulkJobs().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.jobs.empty' | translate }}
-                </div>
-
-                <div *ngIf="gdprExportJobs().length" class="grid gap-2">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.jobs.sections.gdprExports' | translate }}
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.jobs.actions.openGdpr' | translate"
-                      (action)="goToGdprJobs()"
-                    ></app-button>
-                  </div>
-
-                  <div class="grid gap-2">
-                    <div
-                      *ngFor="let job of gdprExportJobs()"
-                      class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-                    >
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                          <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ job.user.email }}</div>
-                          <div class="text-xs text-slate-500 dark:text-slate-400">
-                            {{ ('adminUi.jobs.status.' + job.status) | translate }} · {{ progressPct(job.progress) }}%
-                          </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <app-button
-                            *ngIf="canManageGdprJobs() && job.status === 'failed'"
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.actions.retry' | translate"
-                            [disabled]="gdprJobBusyId() === job.id"
-                            (action)="retryGdprExport(job)"
-                          ></app-button>
-                          <app-button
-                            *ngIf="canManageGdprJobs() && job.status === 'succeeded' && job.has_file"
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.jobs.actions.download' | translate"
-                            [disabled]="gdprJobBusyId() === job.id"
-                            (action)="downloadGdprExport(job)"
-                          ></app-button>
-                        </div>
-                      </div>
-
-                      <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                        <div class="h-2 bg-indigo-500" [style.width.%]="progressPct(job.progress)"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div *ngIf="couponBulkJobs().length" class="grid gap-2">
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.jobs.sections.couponJobs' | translate }}
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.jobs.actions.openCoupons' | translate"
-                      (action)="goToCoupons()"
-                    ></app-button>
-                  </div>
-
-                  <div class="grid gap-2">
-                    <div
-                      *ngFor="let job of couponBulkJobs()"
-                      class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-                    >
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                          <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-                            {{ ('adminUi.jobs.couponActions.' + job.action) | translate }}
-                          </div>
-                          <div class="text-xs text-slate-500 dark:text-slate-400">
-                            {{ ('adminUi.jobs.status.' + job.status) | translate }} · {{ job.processed || 0 }}/{{ job.total_candidates || 0 }}
-                          </div>
-                          <div *ngIf="job.error_message" class="mt-1 text-xs text-rose-700 dark:text-rose-200 truncate">
-                            {{ job.error_message }}
-                          </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                          <app-button
-                            *ngIf="canManageCouponJobs() && (job.status === 'pending' || job.status === 'running')"
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.actions.cancel' | translate"
-                            [disabled]="couponJobBusyId() === job.id"
-                            (action)="cancelCouponJob(job)"
-                          ></app-button>
-                          <app-button
-                            *ngIf="canManageCouponJobs() && (job.status === 'failed' || job.status === 'cancelled')"
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.actions.retry' | translate"
-                            [disabled]="couponJobBusyId() === job.id"
-                            (action)="retryCouponJob(job)"
-                          ></app-button>
-                        </div>
-                      </div>
-
-                      <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                        <div class="h-2 bg-indigo-500" [style.width.%]="couponProgressPct(job)"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </ng-template>
+              {{ 'adminUi.favorites.empty' | translate }}
             </div>
 
-	          <div
-	            *ngIf="customizeWidgetsOpen()"
-	            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
-	          >
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+            <div *ngIf="favorites.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div
+                *ngFor="let item of favorites.items()"
+                class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
+              >
+                <button type="button" class="min-w-0 text-left" (click)="openFavorite(item)">
+                  <div
+                    class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.favorites.types.' + item.type | translate }}
+                  </div>
+                  <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">
+                    {{ item.label }}
+                  </div>
+                  <div
+                    *ngIf="item.subtitle"
+                    class="text-xs text-slate-600 dark:text-slate-300 truncate"
+                  >
+                    {{ item.subtitle }}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-amber-500 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+                  [attr.aria-label]="'adminUi.favorites.unpin' | translate"
+                  [disabled]="favorites.loading()"
+                  (click)="toggleFavorite(item, $event)"
+                >
+                  <span aria-hidden="true" class="text-base leading-none">★</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.recent.title' | translate }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.recent.hint' | translate }}
+                </div>
+              </div>
+              <app-button
+                *ngIf="recent.items().length"
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.recent.clear' | translate"
+                (action)="clearRecent()"
+              ></app-button>
+            </div>
+
+            <div
+              *ngIf="recent.items().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
+              {{ 'adminUi.recent.empty' | translate }}
+            </div>
+
+            <div *ngIf="recent.items().length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div
+                *ngFor="let item of recent.items()"
+                class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800/40"
+              >
+                <button type="button" class="min-w-0 text-left" (click)="openRecent(item)">
+                  <div
+                    class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.recent.types.' + item.type | translate }}
+                  </div>
+                  <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50 truncate">
+                    {{ item.label }}
+                  </div>
+                  <div
+                    *ngIf="item.subtitle"
+                    class="text-xs text-slate-600 dark:text-slate-300 truncate"
+                  >
+                    {{ item.subtitle }}
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  class="shrink-0 h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+                  [attr.aria-label]="
+                    (favorites.isFavorite(item.key)
+                      ? 'adminUi.favorites.unpin'
+                      : 'adminUi.favorites.pin'
+                    ) | translate
+                  "
+                  [disabled]="favorites.loading()"
+                  (click)="toggleFavorite(item, $event)"
+                >
+                  <span
+                    aria-hidden="true"
+                    class="text-base leading-none"
+                    [class.text-amber-500]="favorites.isFavorite(item.key)"
+                  >
+                    {{ favorites.isFavorite(item.key) ? '★' : '☆' }}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            *ngIf="shouldShowJobsPanel()"
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.jobs.title' | translate }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.jobs.hint' | translate }}
+                </div>
+              </div>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.refresh' | translate"
+                [disabled]="jobsLoading()"
+                (action)="loadBackgroundJobs()"
+              ></app-button>
+            </div>
+
+            <div *ngIf="jobsError()" class="text-sm text-rose-700 dark:text-rose-200">
+              {{ jobsError() }}
+            </div>
+
+            <div *ngIf="jobsLoading(); else jobsTpl">
+              <app-skeleton [rows]="4"></app-skeleton>
+            </div>
+
+            <ng-template #jobsTpl>
+              <div
+                *ngIf="gdprExportJobs().length === 0 && couponBulkJobs().length === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
+                {{ 'adminUi.jobs.empty' | translate }}
+              </div>
+
+              <div *ngIf="gdprExportJobs().length" class="grid gap-2">
+                <div class="flex items-center justify-between gap-3">
+                  <div
+                    class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.jobs.sections.gdprExports' | translate }}
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.jobs.actions.openGdpr' | translate"
+                    (action)="goToGdprJobs()"
+                  ></app-button>
+                </div>
+
+                <div class="grid gap-2">
+                  <div
+                    *ngFor="let job of gdprExportJobs()"
+                    class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                          {{ job.user.email }}
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.jobs.status.' + job.status | translate }} ·
+                          {{ progressPct(job.progress) }}%
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <app-button
+                          *ngIf="canManageGdprJobs() && job.status === 'failed'"
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.retry' | translate"
+                          [disabled]="gdprJobBusyId() === job.id"
+                          (action)="retryGdprExport(job)"
+                        ></app-button>
+                        <app-button
+                          *ngIf="canManageGdprJobs() && job.status === 'succeeded' && job.has_file"
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.jobs.actions.download' | translate"
+                          [disabled]="gdprJobBusyId() === job.id"
+                          (action)="downloadGdprExport(job)"
+                        ></app-button>
+                      </div>
+                    </div>
+
+                    <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        class="h-2 bg-indigo-500"
+                        [style.width.%]="progressPct(job.progress)"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="couponBulkJobs().length" class="grid gap-2">
+                <div class="flex items-center justify-between gap-3">
+                  <div
+                    class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.jobs.sections.couponJobs' | translate }}
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.jobs.actions.openCoupons' | translate"
+                    (action)="goToCoupons()"
+                  ></app-button>
+                </div>
+
+                <div class="grid gap-2">
+                  <div
+                    *ngFor="let job of couponBulkJobs()"
+                    class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                          {{ 'adminUi.jobs.couponActions.' + job.action | translate }}
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">
+                          {{ 'adminUi.jobs.status.' + job.status | translate }} ·
+                          {{ job.processed || 0 }}/{{ job.total_candidates || 0 }}
+                        </div>
+                        <div
+                          *ngIf="job.error_message"
+                          class="mt-1 text-xs text-rose-700 dark:text-rose-200 truncate"
+                        >
+                          {{ job.error_message }}
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <app-button
+                          *ngIf="
+                            canManageCouponJobs() &&
+                            (job.status === 'pending' || job.status === 'running')
+                          "
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.cancel' | translate"
+                          [disabled]="couponJobBusyId() === job.id"
+                          (action)="cancelCouponJob(job)"
+                        ></app-button>
+                        <app-button
+                          *ngIf="
+                            canManageCouponJobs() &&
+                            (job.status === 'failed' || job.status === 'cancelled')
+                          "
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.retry' | translate"
+                          [disabled]="couponJobBusyId() === job.id"
+                          (action)="retryCouponJob(job)"
+                        ></app-button>
+                      </div>
+                    </div>
+
+                    <div class="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                      <div class="h-2 bg-indigo-500" [style.width.%]="couponProgressPct(job)"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ng-template>
+          </div>
+
+          <div
+            *ngIf="customizeWidgetsOpen()"
+            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
+          >
+            <p
+              class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+            >
               {{ 'adminUi.dashboard.widgetsTitle' | translate }}
             </p>
             <div class="mt-3 grid gap-2">
@@ -526,7 +657,9 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                     [checked]="!isMetricWidgetHidden(widget)"
                     (change)="toggleMetricWidget(widget)"
                   />
-                  <span class="text-slate-800 dark:text-slate-100">{{ metricWidgetLabel(widget) }}</span>
+                  <span class="text-slate-800 dark:text-slate-100">{{
+                    metricWidgetLabel(widget)
+                  }}</span>
                 </label>
                 <div class="flex items-center gap-2">
                   <app-button
@@ -552,26 +685,45 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <ng-container *ngIf="!isMetricWidgetHidden(widget)">
               <ng-container [ngSwitch]="widget">
                 <div *ngSwitchCase="'kpis'" class="grid md:grid-cols-3 gap-4">
-                  <app-card [title]="'adminUi.cards.ordersToday' | translate" [clickable]="true" (action)="openOrdersToday()">
-                    <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_orders || 0 }}</div>
+                  <app-card
+                    [title]="'adminUi.cards.ordersToday' | translate"
+                    [clickable]="true"
+                    (action)="openOrdersToday()"
+                  >
+                    <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ summary()?.today_orders || 0 }}
+                    </div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_orders || 0 }} ·
+                      {{ 'adminUi.cards.vsYesterday' | translate }}:
+                      {{ summary()?.yesterday_orders || 0 }} ·
                       {{ deltaLabel(summary()?.orders_delta_pct) }}
                     </div>
                   </app-card>
-                  <app-card [title]="'adminUi.cards.salesToday' | translate" [clickable]="true" (action)="openSalesToday()">
+                  <app-card
+                    [title]="'adminUi.cards.salesToday' | translate"
+                    [clickable]="true"
+                    (action)="openSalesToday()"
+                  >
                     <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
-                      {{ (todaySales() || 0) | localizedCurrency : 'RON' }}
+                      {{ todaySales() || 0 | localizedCurrency: 'RON' }}
                     </div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ (yesterdaySales() || 0) | localizedCurrency : 'RON' }} ·
+                      {{ 'adminUi.cards.vsYesterday' | translate }}:
+                      {{ yesterdaySales() || 0 | localizedCurrency: 'RON' }} ·
                       {{ deltaLabel(salesDeltaPct()) }}
                     </div>
                   </app-card>
-                  <app-card [title]="'adminUi.cards.refundsToday' | translate" [clickable]="true" (action)="openRefunds()">
-                    <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ summary()?.today_refunds || 0 }}</div>
+                  <app-card
+                    [title]="'adminUi.cards.refundsToday' | translate"
+                    [clickable]="true"
+                    (action)="openRefunds()"
+                  >
+                    <div class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                      {{ summary()?.today_refunds || 0 }}
+                    </div>
                     <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                      {{ 'adminUi.cards.vsYesterday' | translate }}: {{ summary()?.yesterday_refunds || 0 }} ·
+                      {{ 'adminUi.cards.vsYesterday' | translate }}:
+                      {{ summary()?.yesterday_refunds || 0 }} ·
                       {{ deltaLabel(summary()?.refunds_delta_pct) }}
                     </div>
                   </app-card>
@@ -580,19 +732,25 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                 <div *ngSwitchCase="'counts'" class="grid md:grid-cols-3 gap-4">
                   <app-card
                     [title]="'adminUi.cards.products' | translate"
-                    [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }"
+                    [subtitle]="
+                      'adminUi.cards.countTotal' | translate: { count: summary()?.products || 0 }
+                    "
                     [clickable]="true"
                     (action)="openProducts()"
                   ></app-card>
                   <app-card
                     [title]="'adminUi.cards.orders' | translate"
-                    [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }"
+                    [subtitle]="
+                      'adminUi.cards.countTotal' | translate: { count: summary()?.orders || 0 }
+                    "
                     [clickable]="true"
                     (action)="openOrders()"
                   ></app-card>
                   <app-card
                     [title]="'adminUi.cards.users' | translate"
-                    [subtitle]="'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }"
+                    [subtitle]="
+                      'adminUi.cards.countTotal' | translate: { count: summary()?.users || 0 }
+                    "
                     [clickable]="true"
                     (action)="openUsers()"
                   ></app-card>
@@ -602,37 +760,61 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                   <div class="flex flex-wrap items-end justify-between gap-3">
                     <div class="flex flex-wrap items-end gap-3">
                       <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeLabel' | translate }}</span>
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+                          'adminUi.dashboard.rangeLabel' | translate
+                        }}</span>
                         <select
                           class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
                           [(ngModel)]="rangePreset"
                           (ngModelChange)="onRangePresetChange()"
                         >
-                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="7">
+                          <option
+                            class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                            value="7"
+                          >
                             {{ 'adminUi.dashboard.lastDays' | translate: { days: 7 } }}
                           </option>
-                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="30">
+                          <option
+                            class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                            value="30"
+                          >
                             {{ 'adminUi.dashboard.lastDays' | translate: { days: 30 } }}
                           </option>
-                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="90">
+                          <option
+                            class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                            value="90"
+                          >
                             {{ 'adminUi.dashboard.lastDays' | translate: { days: 90 } }}
                           </option>
-                          <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="custom">
+                          <option
+                            class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                            value="custom"
+                          >
                             {{ 'adminUi.dashboard.customRange' | translate }}
                           </option>
                         </select>
                       </label>
 
-                      <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeFrom' | translate }}</span>
+                      <label
+                        *ngIf="rangePreset === 'custom'"
+                        class="grid gap-1 text-sm text-slate-700 dark:text-slate-200"
+                      >
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+                          'adminUi.dashboard.rangeFrom' | translate
+                        }}</span>
                         <input
                           type="date"
                           class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
                           [(ngModel)]="rangeFrom"
                         />
                       </label>
-                      <label *ngIf="rangePreset === 'custom'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.rangeTo' | translate }}</span>
+                      <label
+                        *ngIf="rangePreset === 'custom'"
+                        class="grid gap-1 text-sm text-slate-700 dark:text-slate-200"
+                      >
+                        <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+                          'adminUi.dashboard.rangeTo' | translate
+                        }}</span>
                         <input
                           type="date"
                           class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
@@ -640,11 +822,16 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                         />
                       </label>
 
-                      <app-button size="sm" [label]="'adminUi.dashboard.applyRange' | translate" (action)="applyRange()"></app-button>
+                      <app-button
+                        size="sm"
+                        [label]="'adminUi.dashboard.applyRange' | translate"
+                        (action)="applyRange()"
+                      ></app-button>
                     </div>
 
                     <p *ngIf="summary()" class="text-xs text-slate-500 dark:text-slate-400">
-                      {{ summary()?.range_from | date: 'mediumDate' }} → {{ summary()?.range_to | date: 'mediumDate' }}
+                      {{ summary()?.range_from | date: 'mediumDate' }} →
+                      {{ summary()?.range_to | date: 'mediumDate' }}
                     </p>
                   </div>
 
@@ -655,19 +842,30 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                   <div class="grid md:grid-cols-3 gap-4">
                     <app-card
                       [title]="'adminUi.cards.lowStock' | translate"
-                      [subtitle]="'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }"
+                      [subtitle]="
+                        'adminUi.cards.countItems' | translate: { count: summary()?.low_stock || 0 }
+                      "
                       [clickable]="true"
                       (action)="openInventory()"
                     ></app-card>
                     <app-card
-                      [title]="'adminUi.cards.salesRange' | translate: { days: summary()?.range_days || 30 }"
-                      [subtitle]="(rangeSales() || 0) | localizedCurrency : 'RON'"
+                      [title]="
+                        'adminUi.cards.salesRange'
+                          | translate: { days: summary()?.range_days || 30 }
+                      "
+                      [subtitle]="rangeSales() || 0 | localizedCurrency: 'RON'"
                       [clickable]="true"
                       (action)="openSalesRange()"
                     ></app-card>
                     <app-card
-                      [title]="'adminUi.cards.ordersRange' | translate: { days: summary()?.range_days || 30 }"
-                      [subtitle]="'adminUi.cards.countOrders' | translate: { count: summary()?.orders_range || 0 }"
+                      [title]="
+                        'adminUi.cards.ordersRange'
+                          | translate: { days: summary()?.range_days || 30 }
+                      "
+                      [subtitle]="
+                        'adminUi.cards.countOrders'
+                          | translate: { count: summary()?.orders_range || 0 }
+                      "
                       [clickable]="true"
                       (action)="openOrdersRange()"
                     ></app-card>
@@ -690,23 +888,34 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                         {{ funnelError() }}
                       </div>
 
-                      <div *ngIf="!funnelLoading() && !funnelError() && funnelMetrics() as funnel" class="mt-3 grid gap-4 md:grid-cols-2">
+                      <div
+                        *ngIf="!funnelLoading() && !funnelError() && funnelMetrics() as funnel"
+                        class="mt-3 grid gap-4 md:grid-cols-2"
+                      >
                         <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
                           <div class="flex items-center justify-between">
                             <span>{{ 'adminUi.dashboard.funnel.sessions' | translate }}</span>
-                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.sessions | number: '1.0-0' }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                              funnel.counts.sessions | number: '1.0-0'
+                            }}</span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span>{{ 'adminUi.dashboard.funnel.carts' | translate }}</span>
-                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.carts | number: '1.0-0' }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                              funnel.counts.carts | number: '1.0-0'
+                            }}</span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span>{{ 'adminUi.dashboard.funnel.checkouts' | translate }}</span>
-                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.checkouts | number: '1.0-0' }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                              funnel.counts.checkouts | number: '1.0-0'
+                            }}</span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span>{{ 'adminUi.dashboard.funnel.orders' | translate }}</span>
-                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{ funnel.counts.orders | number: '1.0-0' }}</span>
+                            <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                              funnel.counts.orders | number: '1.0-0'
+                            }}</span>
                           </div>
                         </div>
 
@@ -714,19 +923,31 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                           <div class="flex items-center justify-between">
                             <span>{{ 'adminUi.dashboard.funnel.toCart' | translate }}</span>
                             <span class="font-semibold text-slate-900 dark:text-slate-50">
-                              {{ funnel.conversions.to_cart === null ? '—' : (funnel.conversions.to_cart | percent: '1.0-0') }}
+                              {{
+                                funnel.conversions.to_cart === null
+                                  ? '—'
+                                  : (funnel.conversions.to_cart | percent: '1.0-0')
+                              }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span>{{ 'adminUi.dashboard.funnel.toCheckout' | translate }}</span>
                             <span class="font-semibold text-slate-900 dark:text-slate-50">
-                              {{ funnel.conversions.to_checkout === null ? '—' : (funnel.conversions.to_checkout | percent: '1.0-0') }}
+                              {{
+                                funnel.conversions.to_checkout === null
+                                  ? '—'
+                                  : (funnel.conversions.to_checkout | percent: '1.0-0')
+                              }}
                             </span>
                           </div>
                           <div class="flex items-center justify-between">
                             <span>{{ 'adminUi.dashboard.funnel.toOrder' | translate }}</span>
                             <span class="font-semibold text-slate-900 dark:text-slate-50">
-                              {{ funnel.conversions.to_order === null ? '—' : (funnel.conversions.to_order | percent: '1.0-0') }}
+                              {{
+                                funnel.conversions.to_order === null
+                                  ? '—'
+                                  : (funnel.conversions.to_order | percent: '1.0-0')
+                              }}
                             </span>
                           </div>
                         </div>
@@ -735,7 +956,9 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                   </div>
 
                   <div class="grid gap-3">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    <p
+                      class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.dashboard.channelBreakdown.title' | translate }}
                     </p>
 
@@ -751,84 +974,151 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                     </div>
 
                     <div
-                      *ngIf="!channelBreakdownLoading() && !channelBreakdownError() && channelBreakdown() as breakdown"
+                      *ngIf="
+                        !channelBreakdownLoading() &&
+                        !channelBreakdownError() &&
+                        channelBreakdown() as breakdown
+                      "
                       class="grid gap-4 md:grid-cols-3"
                     >
-                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                      <div
+                        class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
+                      >
                         <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                           {{ 'adminUi.dashboard.channelBreakdown.paymentMethods' | translate }}
                         </div>
-                        <div *ngIf="(breakdown.payment_methods || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        <div
+                          *ngIf="(breakdown.payment_methods || []).length === 0"
+                          class="mt-2 text-xs text-slate-500 dark:text-slate-400"
+                        >
                           {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
                         </div>
-                        <table *ngIf="(breakdown.payment_methods || []).length" class="mt-3 w-full text-xs">
+                        <table
+                          *ngIf="(breakdown.payment_methods || []).length"
+                          class="mt-3 w-full text-xs"
+                        >
                           <thead>
                             <tr class="text-left text-slate-500 dark:text-slate-400">
-                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
-                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
-                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                              <th class="py-1">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}
+                              </th>
+                              <th class="py-1 text-right">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}
+                              </th>
+                              <th class="py-1 text-right">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
-                            <tr *ngFor="let row of breakdown.payment_methods" class="border-t border-slate-100 dark:border-slate-800">
-                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
-                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                            <tr
+                              *ngFor="let row of breakdown.payment_methods"
+                              class="border-t border-slate-100 dark:border-slate-800"
+                            >
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">
+                                {{ formatChannelKey(row.key) }}
+                              </td>
                               <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
-                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                                {{ row.orders }}
+                              </td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency: 'RON' }}
                               </td>
                             </tr>
                           </tbody>
                         </table>
                       </div>
 
-                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                      <div
+                        class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
+                      >
                         <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                           {{ 'adminUi.dashboard.channelBreakdown.couriers' | translate }}
                         </div>
-                        <div *ngIf="(breakdown.couriers || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        <div
+                          *ngIf="(breakdown.couriers || []).length === 0"
+                          class="mt-2 text-xs text-slate-500 dark:text-slate-400"
+                        >
                           {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
                         </div>
-                        <table *ngIf="(breakdown.couriers || []).length" class="mt-3 w-full text-xs">
+                        <table
+                          *ngIf="(breakdown.couriers || []).length"
+                          class="mt-3 w-full text-xs"
+                        >
                           <thead>
                             <tr class="text-left text-slate-500 dark:text-slate-400">
-                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
-                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
-                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                              <th class="py-1">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}
+                              </th>
+                              <th class="py-1 text-right">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}
+                              </th>
+                              <th class="py-1 text-right">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
-                            <tr *ngFor="let row of breakdown.couriers" class="border-t border-slate-100 dark:border-slate-800">
-                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
-                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                            <tr
+                              *ngFor="let row of breakdown.couriers"
+                              class="border-t border-slate-100 dark:border-slate-800"
+                            >
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">
+                                {{ formatChannelKey(row.key) }}
+                              </td>
                               <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
-                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                                {{ row.orders }}
+                              </td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency: 'RON' }}
                               </td>
                             </tr>
                           </tbody>
                         </table>
                       </div>
 
-                      <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
+                      <div
+                        class="rounded-2xl border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900"
+                      >
                         <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                           {{ 'adminUi.dashboard.channelBreakdown.deliveryTypes' | translate }}
                         </div>
-                        <div *ngIf="(breakdown.delivery_types || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        <div
+                          *ngIf="(breakdown.delivery_types || []).length === 0"
+                          class="mt-2 text-xs text-slate-500 dark:text-slate-400"
+                        >
                           {{ 'adminUi.dashboard.channelBreakdown.empty' | translate }}
                         </div>
-                        <table *ngIf="(breakdown.delivery_types || []).length" class="mt-3 w-full text-xs">
+                        <table
+                          *ngIf="(breakdown.delivery_types || []).length"
+                          class="mt-3 w-full text-xs"
+                        >
                           <thead>
                             <tr class="text-left text-slate-500 dark:text-slate-400">
-                              <th class="py-1">{{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}</th>
-                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}</th>
-                              <th class="py-1 text-right">{{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}</th>
+                              <th class="py-1">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.channel' | translate }}
+                              </th>
+                              <th class="py-1 text-right">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.orders' | translate }}
+                              </th>
+                              <th class="py-1 text-right">
+                                {{ 'adminUi.dashboard.channelBreakdown.table.sales' | translate }}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
-                            <tr *ngFor="let row of breakdown.delivery_types" class="border-t border-slate-100 dark:border-slate-800">
-                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.key) }}</td>
-                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
+                            <tr
+                              *ngFor="let row of breakdown.delivery_types"
+                              class="border-t border-slate-100 dark:border-slate-800"
+                            >
+                              <td class="py-1.5 pr-2 text-slate-700 dark:text-slate-200">
+                                {{ formatChannelKey(row.key) }}
+                              </td>
                               <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
-                                {{ channelSales(row) | localizedCurrency : 'RON' }}
+                                {{ row.orders }}
+                              </td>
+                              <td class="py-1.5 text-right text-slate-700 dark:text-slate-200">
+                                {{ channelSales(row) | localizedCurrency: 'RON' }}
                               </td>
                             </tr>
                           </tbody>
@@ -839,746 +1129,1058 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                 </div>
               </ng-container>
             </ng-container>
-	          </ng-container>
-	        </section>
+          </ng-container>
+        </section>
 
-	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.alertsTitle' | translate }}</h2>
+        <section
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.alertsTitle' | translate }}
+            </h2>
+            <app-button
+              *ngIf="isOwner()"
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.dashboard.alerts.configure' | translate"
+              (action)="openAlertThresholds()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="!hasAnomalyAlerts()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'adminUi.dashboard.alertsEmpty' | translate }}
+          </div>
+
+          <div *ngIf="hasAnomalyAlerts()" class="grid gap-4 md:grid-cols-3">
+            <button
+              *ngIf="failedPaymentsAlert() as failed"
+              type="button"
+              class="w-full text-left rounded-2xl border border-rose-200 bg-rose-50 p-4 text-slate-800 transition hover:bg-rose-100/70 focus:outline-none focus:ring-2 focus:ring-rose-400/40 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100 dark:hover:bg-rose-950/40"
+              (click)="openFailedPayments()"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-200"
+              >
+                {{ 'adminUi.dashboard.alerts.failedPayments' | translate }}
+              </p>
+              <div class="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-50">
+                {{ failed.current }}
+              </div>
+              <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">
+                {{
+                  'adminUi.dashboard.alerts.windowHours'
+                    | translate: { hours: failed.window_hours || 24 }
+                }}
+                · {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ failed.previous }} ·
+                {{ deltaLabel(failed.delta_pct) }}
+              </p>
+            </button>
+
+            <button
+              *ngIf="refundRequestsAlert() as refunds"
+              type="button"
+              class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
+              (click)="openRefundRequests()"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200"
+              >
+                {{ 'adminUi.dashboard.alerts.refundRequests' | translate }}
+              </p>
+              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">
+                {{ refunds.current }}
+              </div>
+              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+                {{
+                  'adminUi.dashboard.alerts.windowDays'
+                    | translate: { days: refunds.window_days || 7 }
+                }}
+                · {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ refunds.previous }} ·
+                {{ deltaLabel(refunds.delta_pct) }}
+              </p>
+            </button>
+
+            <button
+              *ngIf="stockoutsAlertCount() as stockouts"
+              type="button"
+              class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
+              (click)="openStockouts()"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200"
+              >
+                {{ 'adminUi.dashboard.alerts.stockouts' | translate }}
+              </p>
+              <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">
+                {{ stockouts }}
+              </div>
+              <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
+                {{ 'adminUi.dashboard.alerts.stockoutsHint' | translate }}
+              </p>
+            </button>
+          </div>
+        </section>
+
+        <section
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.systemHealthTitle' | translate }}
+            </h2>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.dashboard.systemHealth.db' | translate }}
+              </p>
+              <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">
+                {{
+                  summary()?.system?.db_ready
+                    ? ('adminUi.dashboard.systemHealth.ready' | translate)
+                    : ('adminUi.dashboard.systemHealth.unavailable' | translate)
+                }}
+              </p>
+            </div>
+
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.dashboard.systemHealth.backup' | translate }}
+              </p>
+              <ng-container
+                *ngIf="summary()?.system?.backup_last_at as backupLastAt; else backupEmpty"
+              >
+                <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">
+                  {{ backupLastAt | date: 'medium' }}
+                </p>
+              </ng-container>
+              <ng-template #backupEmpty>
+                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.systemHealth.backupNotConfigured' | translate }}
+                </p>
+              </ng-template>
+            </div>
+          </div>
+        </section>
+
+        <section
+          *ngIf="canShowPaymentsHealth()"
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.paymentsHealth.title' | translate }}
+            </h2>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.refresh' | translate"
+              [disabled]="paymentsHealthLoading()"
+              (action)="loadPaymentsHealth()"
+            ></app-button>
+          </div>
+
+          <app-error-state
+            *ngIf="paymentsHealthError()"
+            [message]="paymentsHealthError()!"
+            [requestId]="paymentsHealthRequestId()"
+            [showRetry]="true"
+            (retry)="loadPaymentsHealth()"
+          ></app-error-state>
+
+          <div *ngIf="paymentsHealthLoading()" class="grid gap-2">
+            <app-skeleton height="3rem"></app-skeleton>
+            <app-skeleton height="3rem"></app-skeleton>
+          </div>
+
+          <ng-container
+            *ngIf="!paymentsHealthLoading() && !paymentsHealthError() && paymentsHealth() as health"
+          >
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              {{
+                'adminUi.dashboard.paymentsHealth.window'
+                  | translate: { hours: health.window_hours || 24 }
+              }}
+            </div>
+
+            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div
+                *ngFor="let row of health.providers"
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <p
+                    class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                  >
+                    {{ paymentsProviderLabelKey(row.provider) | translate }}
+                  </p>
+                  <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    {{ row.success_rate === null ? '—' : (row.success_rate | percent: '1.0-0') }}
+                  </span>
+                </div>
+
+                <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.paymentsHealth.successful' | translate }}
+                    </span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                      row.successful_orders
+                    }}</span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.dashboard.paymentsHealth.pending' | translate }}
+                    </span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                      row.pending_payment_orders
+                    }}</span>
+                  </div>
+
+                  <ng-container *ngIf="supportsWebhookMetrics(row.provider)">
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.dashboard.paymentsHealth.webhookErrors' | translate }}
+                      </span>
+                      <span
+                        class="font-semibold"
+                        [ngClass]="
+                          row.webhook_errors
+                            ? 'text-rose-700 dark:text-rose-200'
+                            : 'text-slate-900 dark:text-slate-50'
+                        "
+                      >
+                        {{ row.webhook_errors }}
+                      </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                      <span class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ 'adminUi.dashboard.paymentsHealth.webhookBacklog' | translate }}
+                      </span>
+                      <span
+                        class="font-semibold"
+                        [ngClass]="
+                          row.webhook_backlog
+                            ? 'text-amber-700 dark:text-amber-200'
+                            : 'text-slate-900 dark:text-slate-50'
+                        "
+                      >
+                        {{ row.webhook_backlog }}
+                      </span>
+                    </div>
+                  </ng-container>
+                </div>
+              </div>
+            </div>
+
+            <div *ngIf="(health.recent_webhook_errors || []).length" class="grid gap-2">
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.dashboard.paymentsHealth.recentErrorsTitle' | translate }}
+              </p>
+              <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                <table class="w-full text-xs">
+                  <thead>
+                    <tr class="text-left text-slate-500 dark:text-slate-400">
+                      <th class="py-2 px-3">
+                        {{ 'adminUi.dashboard.paymentsHealth.table.provider' | translate }}
+                      </th>
+                      <th class="py-2 px-3">
+                        {{ 'adminUi.dashboard.paymentsHealth.table.event' | translate }}
+                      </th>
+                      <th class="py-2 px-3">
+                        {{ 'adminUi.dashboard.paymentsHealth.table.attempted' | translate }}
+                      </th>
+                      <th class="py-2 px-3">
+                        {{ 'adminUi.dashboard.paymentsHealth.table.error' | translate }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="let evt of health.recent_webhook_errors"
+                      class="border-t border-slate-100 dark:border-slate-800"
+                    >
+                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+                        {{ paymentsProviderLabelKey(evt.provider) | translate }}
+                      </td>
+                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200 font-mono">
+                        {{ evt.event_type || evt.event_id }}
+                      </td>
+                      <td class="py-2 px-3 text-slate-500 dark:text-slate-400">
+                        {{ evt.last_attempt_at | date: 'short' }}
+                      </td>
+                      <td class="py-2 px-3 text-rose-700 dark:text-rose-200">
+                        <span class="block max-w-[520px] truncate">{{ evt.last_error }}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </ng-container>
+        </section>
+
+        <section
+          *ngIf="canShowRefundsBreakdown()"
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.refundsBreakdown.title' | translate }}
+            </h2>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.refresh' | translate"
+              [disabled]="refundsBreakdownLoading()"
+              (action)="loadRefundsBreakdown()"
+            ></app-button>
+          </div>
+
+          <app-error-state
+            *ngIf="refundsBreakdownError()"
+            [message]="refundsBreakdownError()!"
+            [requestId]="refundsBreakdownRequestId()"
+            [showRetry]="true"
+            (retry)="loadRefundsBreakdown()"
+          ></app-error-state>
+
+          <div *ngIf="refundsBreakdownLoading()" class="grid gap-2">
+            <app-skeleton height="3rem"></app-skeleton>
+            <app-skeleton height="3rem"></app-skeleton>
+          </div>
+
+          <ng-container
+            *ngIf="
+              !refundsBreakdownLoading() &&
+              !refundsBreakdownError() &&
+              refundsBreakdown() as breakdown
+            "
+          >
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              {{
+                'adminUi.dashboard.refundsBreakdown.window'
+                  | translate: { days: breakdown.window_days || 30 }
+              }}
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-3">
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.dashboard.refundsBreakdown.missingTitle' | translate }}
+                </p>
+                <div class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                  {{ breakdown.missing_refunds.current.amount || 0 | localizedCurrency: 'RON' }}
+                </div>
+                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.refundsBreakdown.missingHint' | translate }}
+                </p>
+                <div class="mt-3 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                      'adminUi.dashboard.refundsBreakdown.table.count' | translate
+                    }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">
+                      {{ breakdown.missing_refunds.current.count }} ·
+                      {{ deltaLabel(breakdown.missing_refunds.delta_pct.count) }}
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                      'adminUi.dashboard.refundsBreakdown.table.amount' | translate
+                    }}</span>
+                    <span class="font-semibold text-slate-900 dark:text-slate-50">
+                      {{ deltaLabel(breakdown.missing_refunds.delta_pct.amount) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="lg:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.dashboard.refundsBreakdown.byProviderTitle' | translate }}
+                </p>
+                <div class="mt-3 overflow-x-auto">
+                  <table class="min-w-[640px] w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="py-2 pr-3">
+                          {{ 'adminUi.dashboard.refundsBreakdown.table.provider' | translate }}
+                        </th>
+                        <th class="py-2 pr-3 text-right">
+                          {{ 'adminUi.dashboard.refundsBreakdown.table.amount' | translate }}
+                        </th>
+                        <th class="py-2 pr-3 text-right">
+                          {{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}
+                        </th>
+                        <th class="py-2 pr-3 text-right">
+                          {{ 'adminUi.dashboard.refundsBreakdown.table.count' | translate }}
+                        </th>
+                        <th class="py-2 text-right">
+                          {{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        *ngFor="let row of breakdown.providers"
+                        class="border-t border-slate-100 dark:border-slate-800"
+                      >
+                        <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                          {{ refundProviderLabelKey(row.provider) | translate }}
+                        </td>
+                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                          {{ row.current.amount || 0 | localizedCurrency: 'RON' }}
+                        </td>
+                        <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">
+                          {{ deltaLabel(row.delta_pct.amount) }}
+                        </td>
+                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                          {{ row.current.count }}
+                        </td>
+                        <td class="py-2 text-right text-slate-500 dark:text-slate-400">
+                          {{ deltaLabel(row.delta_pct.count) }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid gap-2">
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.dashboard.refundsBreakdown.byReasonTitle' | translate }}
+              </p>
+              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <div
+                  *ngFor="let row of breakdown.reasons"
+                  class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <p
+                    class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+                  >
+                    {{ refundReasonLabelKey(row.category) | translate }}
+                  </p>
+                  <div class="mt-2 flex items-baseline justify-between gap-2">
+                    <span class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{
+                      row.current
+                    }}</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                      deltaLabel(row.delta_pct)
+                    }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </section>
+
+        <section
+          *ngIf="canShowShippingPerformance()"
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.shippingPerformance.title' | translate }}
+            </h2>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.refresh' | translate"
+              [disabled]="shippingPerformanceLoading()"
+              (action)="loadShippingPerformance()"
+            ></app-button>
+          </div>
+
+          <app-error-state
+            *ngIf="shippingPerformanceError()"
+            [message]="shippingPerformanceError()!"
+            [requestId]="shippingPerformanceRequestId()"
+            [showRetry]="true"
+            (retry)="loadShippingPerformance()"
+          ></app-error-state>
+
+          <div *ngIf="shippingPerformanceLoading()" class="grid gap-2">
+            <app-skeleton height="3rem"></app-skeleton>
+            <app-skeleton height="3rem"></app-skeleton>
+          </div>
+
+          <ng-container
+            *ngIf="
+              !shippingPerformanceLoading() &&
+              !shippingPerformanceError() &&
+              shippingPerformance() as perf
+            "
+          >
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              {{
+                'adminUi.dashboard.shippingPerformance.window'
+                  | translate: { days: perf.window_days || 30 }
+              }}
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.dashboard.shippingPerformance.timeToShip' | translate }}
+                </p>
+                <div
+                  *ngIf="(perf.time_to_ship || []).length === 0"
+                  class="mt-2 text-xs text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
+                </div>
+                <div *ngIf="(perf.time_to_ship || []).length" class="mt-3 overflow-x-auto">
+                  <table class="min-w-[520px] w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="py-2 pr-3">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}
+                        </th>
+                        <th class="py-2 pr-3 text-right">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}
+                        </th>
+                        <th class="py-2 pr-3 text-right">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}
+                        </th>
+                        <th class="py-2 text-right">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        *ngFor="let row of perf.time_to_ship"
+                        class="border-t border-slate-100 dark:border-slate-800"
+                      >
+                        <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                          {{ formatChannelKey(row.courier) }}
+                        </td>
+                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                          {{
+                            row.current.avg_hours === null
+                              ? '—'
+                              : (row.current.avg_hours | number: '1.0-1')
+                          }}
+                        </td>
+                        <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">
+                          {{ deltaLabel(row.delta_pct.avg_hours) }}
+                        </td>
+                        <td class="py-2 text-right text-slate-700 dark:text-slate-200">
+                          {{ row.current.count }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <p
+                  class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.dashboard.shippingPerformance.deliveryTime' | translate }}
+                </p>
+                <div
+                  *ngIf="(perf.delivery_time || []).length === 0"
+                  class="mt-2 text-xs text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
+                </div>
+                <div *ngIf="(perf.delivery_time || []).length" class="mt-3 overflow-x-auto">
+                  <table class="min-w-[520px] w-full text-xs">
+                    <thead>
+                      <tr class="text-left text-slate-500 dark:text-slate-400">
+                        <th class="py-2 pr-3">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}
+                        </th>
+                        <th class="py-2 pr-3 text-right">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}
+                        </th>
+                        <th class="py-2 pr-3 text-right">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}
+                        </th>
+                        <th class="py-2 text-right">
+                          {{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        *ngFor="let row of perf.delivery_time"
+                        class="border-t border-slate-100 dark:border-slate-800"
+                      >
+                        <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                          {{ formatChannelKey(row.courier) }}
+                        </td>
+                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
+                          {{
+                            row.current.avg_hours === null
+                              ? '—'
+                              : (row.current.avg_hours | number: '1.0-1')
+                          }}
+                        </td>
+                        <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">
+                          {{ deltaLabel(row.delta_pct.avg_hours) }}
+                        </td>
+                        <td class="py-2 text-right text-slate-700 dark:text-slate-200">
+                          {{ row.current.count }}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+        </section>
+
+        <section
+          *ngIf="canShowStockoutImpact()"
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.stockoutImpact.title' | translate }}
+            </h2>
+            <div class="flex items-center gap-2">
               <app-button
-                *ngIf="isOwner()"
                 size="sm"
                 variant="ghost"
-                [label]="'adminUi.dashboard.alerts.configure' | translate"
-                (action)="openAlertThresholds()"
+                [label]="'adminUi.actions.openInventory' | translate"
+                (action)="openInventory()"
               ></app-button>
-	          </div>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.refresh' | translate"
+                [disabled]="stockoutImpactLoading()"
+                (action)="loadStockoutImpact()"
+              ></app-button>
+            </div>
+          </div>
 
-	          <div *ngIf="!hasAnomalyAlerts()" class="text-sm text-slate-600 dark:text-slate-300">
-	            {{ 'adminUi.dashboard.alertsEmpty' | translate }}
-	          </div>
+          <app-error-state
+            *ngIf="stockoutImpactError()"
+            [message]="stockoutImpactError()!"
+            [requestId]="stockoutImpactRequestId()"
+            [showRetry]="true"
+            (retry)="loadStockoutImpact()"
+          ></app-error-state>
 
-	          <div *ngIf="hasAnomalyAlerts()" class="grid gap-4 md:grid-cols-3">
-                <button
-                  *ngIf="failedPaymentsAlert() as failed"
-                  type="button"
-                  class="w-full text-left rounded-2xl border border-rose-200 bg-rose-50 p-4 text-slate-800 transition hover:bg-rose-100/70 focus:outline-none focus:ring-2 focus:ring-rose-400/40 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100 dark:hover:bg-rose-950/40"
-                  (click)="openFailedPayments()"
-                >
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-200">
-                    {{ 'adminUi.dashboard.alerts.failedPayments' | translate }}
-                  </p>
-                  <div class="mt-2 text-2xl font-semibold text-rose-900 dark:text-rose-50">{{ failed.current }}</div>
-                  <p class="mt-1 text-xs text-rose-700 dark:text-rose-200">
-                    {{ 'adminUi.dashboard.alerts.windowHours' | translate: { hours: failed.window_hours || 24 } }} ·
-                    {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ failed.previous }} · {{ deltaLabel(failed.delta_pct) }}
-                  </p>
-                </button>
+          <div *ngIf="stockoutImpactLoading()" class="grid gap-2">
+            <app-skeleton height="3rem"></app-skeleton>
+            <app-skeleton height="3rem"></app-skeleton>
+          </div>
 
-                <button
-                  *ngIf="refundRequestsAlert() as refunds"
-                  type="button"
-                  class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
-                  (click)="openRefundRequests()"
-                >
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-                    {{ 'adminUi.dashboard.alerts.refundRequests' | translate }}
-                  </p>
-                  <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ refunds.current }}</div>
-                  <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-                    {{ 'adminUi.dashboard.alerts.windowDays' | translate: { days: refunds.window_days || 7 } }} ·
-                    {{ 'adminUi.dashboard.alerts.vsPrevious' | translate }}: {{ refunds.previous }} · {{ deltaLabel(refunds.delta_pct) }}
-                  </p>
-                </button>
+          <ng-container
+            *ngIf="!stockoutImpactLoading() && !stockoutImpactError() && stockoutImpact() as impact"
+          >
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              {{
+                'adminUi.dashboard.stockoutImpact.window'
+                  | translate: { days: impact.window_days || 30 }
+              }}
+            </div>
 
-                <button
-                  *ngIf="stockoutsAlertCount() as stockouts"
-                  type="button"
-                  class="w-full text-left rounded-2xl border border-amber-200 bg-amber-50 p-4 text-slate-800 transition hover:bg-amber-100/70 focus:outline-none focus:ring-2 focus:ring-amber-400/40 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100 dark:hover:bg-amber-950/40"
-                  (click)="openStockouts()"
-                >
-                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-                    {{ 'adminUi.dashboard.alerts.stockouts' | translate }}
-                  </p>
-                  <div class="mt-2 text-2xl font-semibold text-amber-900 dark:text-amber-50">{{ stockouts }}</div>
-                  <p class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-                    {{ 'adminUi.dashboard.alerts.stockoutsHint' | translate }}
-                  </p>
-                </button>
-              </div>
-            </section>
-
-		        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-		          <div class="flex items-center justify-between gap-3 flex-wrap">
-		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-		              {{ 'adminUi.dashboard.systemHealthTitle' | translate }}
-	            </h2>
-	          </div>
-
-	          <div class="grid gap-3 md:grid-cols-2">
-	            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                {{ 'adminUi.dashboard.systemHealth.db' | translate }}
-	              </p>
-	              <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">
-	                {{
-	                  summary()?.system?.db_ready
-	                    ? ('adminUi.dashboard.systemHealth.ready' | translate)
-	                    : ('adminUi.dashboard.systemHealth.unavailable' | translate)
-	                }}
-	              </p>
-	            </div>
-
-	            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-	              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-	                {{ 'adminUi.dashboard.systemHealth.backup' | translate }}
-	              </p>
-	              <ng-container *ngIf="summary()?.system?.backup_last_at as backupLastAt; else backupEmpty">
-	                <p class="mt-2 font-semibold text-slate-900 dark:text-slate-50">{{ backupLastAt | date: 'medium' }}</p>
-	              </ng-container>
-	              <ng-template #backupEmpty>
-	                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-	                  {{ 'adminUi.dashboard.systemHealth.backupNotConfigured' | translate }}
-	                </p>
-	              </ng-template>
-	            </div>
-		          </div>
-		        </section>
-
-		        <section
-		          *ngIf="canShowPaymentsHealth()"
-		          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-		        >
-		          <div class="flex items-center justify-between gap-3 flex-wrap">
-		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-		              {{ 'adminUi.dashboard.paymentsHealth.title' | translate }}
-		            </h2>
-		            <app-button
-		              size="sm"
-		              variant="ghost"
-		              [label]="'adminUi.actions.refresh' | translate"
-		              [disabled]="paymentsHealthLoading()"
-		              (action)="loadPaymentsHealth()"
-		            ></app-button>
-		          </div>
-
-		          <app-error-state
-		            *ngIf="paymentsHealthError()"
-		            [message]="paymentsHealthError()!"
-		            [requestId]="paymentsHealthRequestId()"
-		            [showRetry]="true"
-		            (retry)="loadPaymentsHealth()"
-		          ></app-error-state>
-
-		          <div *ngIf="paymentsHealthLoading()" class="grid gap-2">
-		            <app-skeleton height="3rem"></app-skeleton>
-		            <app-skeleton height="3rem"></app-skeleton>
-		          </div>
-
-		          <ng-container *ngIf="!paymentsHealthLoading() && !paymentsHealthError() && paymentsHealth() as health">
-		            <div class="text-xs text-slate-500 dark:text-slate-400">
-		              {{ 'adminUi.dashboard.paymentsHealth.window' | translate: { hours: health.window_hours || 24 } }}
-		            </div>
-
-		            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-		              <div
-		                *ngFor="let row of health.providers"
-		                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
-		              >
-		                <div class="flex items-center justify-between gap-2">
-		                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-		                    {{ paymentsProviderLabelKey(row.provider) | translate }}
-		                  </p>
-		                  <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">
-		                    {{ row.success_rate === null ? '—' : (row.success_rate | percent: '1.0-0') }}
-		                  </span>
-		                </div>
-
-		                <div class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-		                  <div class="flex items-center justify-between">
-		                    <span class="text-xs text-slate-500 dark:text-slate-400">
-		                      {{ 'adminUi.dashboard.paymentsHealth.successful' | translate }}
-		                    </span>
-		                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ row.successful_orders }}</span>
-		                  </div>
-		                  <div class="flex items-center justify-between">
-		                    <span class="text-xs text-slate-500 dark:text-slate-400">
-		                      {{ 'adminUi.dashboard.paymentsHealth.pending' | translate }}
-		                    </span>
-		                    <span class="font-semibold text-slate-900 dark:text-slate-50">{{ row.pending_payment_orders }}</span>
-		                  </div>
-
-		                  <ng-container *ngIf="supportsWebhookMetrics(row.provider)">
-		                    <div class="flex items-center justify-between">
-		                      <span class="text-xs text-slate-500 dark:text-slate-400">
-		                        {{ 'adminUi.dashboard.paymentsHealth.webhookErrors' | translate }}
-		                      </span>
-		                      <span
-		                        class="font-semibold"
-		                        [ngClass]="row.webhook_errors ? 'text-rose-700 dark:text-rose-200' : 'text-slate-900 dark:text-slate-50'"
-		                      >
-		                        {{ row.webhook_errors }}
-		                      </span>
-		                    </div>
-		                    <div class="flex items-center justify-between">
-		                      <span class="text-xs text-slate-500 dark:text-slate-400">
-		                        {{ 'adminUi.dashboard.paymentsHealth.webhookBacklog' | translate }}
-		                      </span>
-		                      <span
-		                        class="font-semibold"
-		                        [ngClass]="row.webhook_backlog ? 'text-amber-700 dark:text-amber-200' : 'text-slate-900 dark:text-slate-50'"
-		                      >
-		                        {{ row.webhook_backlog }}
-		                      </span>
-		                    </div>
-		                  </ng-container>
-		                </div>
-		              </div>
-		            </div>
-
-		            <div *ngIf="(health.recent_webhook_errors || []).length" class="grid gap-2">
-		              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-		                {{ 'adminUi.dashboard.paymentsHealth.recentErrorsTitle' | translate }}
-		              </p>
-		              <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-		                <table class="w-full text-xs">
-		                  <thead>
-		                    <tr class="text-left text-slate-500 dark:text-slate-400">
-		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.provider' | translate }}</th>
-		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.event' | translate }}</th>
-		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.attempted' | translate }}</th>
-		                      <th class="py-2 px-3">{{ 'adminUi.dashboard.paymentsHealth.table.error' | translate }}</th>
-		                    </tr>
-		                  </thead>
-		                  <tbody>
-		                    <tr
-		                      *ngFor="let evt of health.recent_webhook_errors"
-		                      class="border-t border-slate-100 dark:border-slate-800"
-		                    >
-		                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
-		                        {{ paymentsProviderLabelKey(evt.provider) | translate }}
-		                      </td>
-		                      <td class="py-2 px-3 text-slate-700 dark:text-slate-200 font-mono">
-		                        {{ evt.event_type || evt.event_id }}
-		                      </td>
-		                      <td class="py-2 px-3 text-slate-500 dark:text-slate-400">{{ evt.last_attempt_at | date: 'short' }}</td>
-		                      <td class="py-2 px-3 text-rose-700 dark:text-rose-200">
-		                        <span class="block max-w-[520px] truncate">{{ evt.last_error }}</span>
-		                      </td>
-		                    </tr>
-		                  </tbody>
-		                </table>
-		              </div>
-		            </div>
-		          </ng-container>
-		        </section>
-
-		        <section
-		          *ngIf="canShowRefundsBreakdown()"
-		          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-		        >
-		          <div class="flex items-center justify-between gap-3 flex-wrap">
-		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-		              {{ 'adminUi.dashboard.refundsBreakdown.title' | translate }}
-		            </h2>
-		            <app-button
-		              size="sm"
-		              variant="ghost"
-		              [label]="'adminUi.actions.refresh' | translate"
-		              [disabled]="refundsBreakdownLoading()"
-		              (action)="loadRefundsBreakdown()"
-		            ></app-button>
-		          </div>
-
-		          <app-error-state
-		            *ngIf="refundsBreakdownError()"
-		            [message]="refundsBreakdownError()!"
-		            [requestId]="refundsBreakdownRequestId()"
-		            [showRetry]="true"
-		            (retry)="loadRefundsBreakdown()"
-		          ></app-error-state>
-
-		          <div *ngIf="refundsBreakdownLoading()" class="grid gap-2">
-		            <app-skeleton height="3rem"></app-skeleton>
-		            <app-skeleton height="3rem"></app-skeleton>
-		          </div>
-
-		          <ng-container *ngIf="!refundsBreakdownLoading() && !refundsBreakdownError() && refundsBreakdown() as breakdown">
-		            <div class="text-xs text-slate-500 dark:text-slate-400">
-		              {{ 'adminUi.dashboard.refundsBreakdown.window' | translate: { days: breakdown.window_days || 30 } }}
-		            </div>
-
-		            <div class="grid gap-4 lg:grid-cols-3">
-		              <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-		                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-		                  {{ 'adminUi.dashboard.refundsBreakdown.missingTitle' | translate }}
-		                </p>
-		                <div class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
-		                  {{ (breakdown.missing_refunds.current.amount || 0) | localizedCurrency : 'RON' }}
-		                </div>
-		                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-		                  {{ 'adminUi.dashboard.refundsBreakdown.missingHint' | translate }}
-		                </p>
-		                <div class="mt-3 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-		                  <div class="flex items-center justify-between">
-		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.dashboard.refundsBreakdown.table.count' | translate }}</span>
-		                    <span class="font-semibold text-slate-900 dark:text-slate-50">
-		                      {{ breakdown.missing_refunds.current.count }} · {{ deltaLabel(breakdown.missing_refunds.delta_pct.count) }}
-		                    </span>
-		                  </div>
-		                  <div class="flex items-center justify-between">
-		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.dashboard.refundsBreakdown.table.amount' | translate }}</span>
-		                    <span class="font-semibold text-slate-900 dark:text-slate-50">
-		                      {{ deltaLabel(breakdown.missing_refunds.delta_pct.amount) }}
-		                    </span>
-		                  </div>
-		                </div>
-		              </div>
-
-		              <div class="lg:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-		                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-		                  {{ 'adminUi.dashboard.refundsBreakdown.byProviderTitle' | translate }}
-		                </p>
-		                <div class="mt-3 overflow-x-auto">
-		                  <table class="min-w-[640px] w-full text-xs">
-		                    <thead>
-		                      <tr class="text-left text-slate-500 dark:text-slate-400">
-		                        <th class="py-2 pr-3">{{ 'adminUi.dashboard.refundsBreakdown.table.provider' | translate }}</th>
-		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.amount' | translate }}</th>
-		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}</th>
-		                        <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.count' | translate }}</th>
-		                        <th class="py-2 text-right">{{ 'adminUi.dashboard.refundsBreakdown.table.delta' | translate }}</th>
-		                      </tr>
-		                    </thead>
-		                    <tbody>
-		                      <tr
-		                        *ngFor="let row of breakdown.providers"
-		                        class="border-t border-slate-100 dark:border-slate-800"
-		                      >
-		                        <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
-		                          {{ refundProviderLabelKey(row.provider) | translate }}
-		                        </td>
-		                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
-		                          {{ (row.current.amount || 0) | localizedCurrency : 'RON' }}
-		                        </td>
-		                        <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">
-		                          {{ deltaLabel(row.delta_pct.amount) }}
-		                        </td>
-		                        <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
-		                        <td class="py-2 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.count) }}</td>
-		                      </tr>
-		                    </tbody>
-		                  </table>
-		                </div>
-		              </div>
-		            </div>
-
-		            <div class="grid gap-2">
-		              <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-		                {{ 'adminUi.dashboard.refundsBreakdown.byReasonTitle' | translate }}
-		              </p>
-		              <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-		                <div
-		                  *ngFor="let row of breakdown.reasons"
-		                  class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
-		                >
-		                  <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-		                    {{ refundReasonLabelKey(row.category) | translate }}
-		                  </p>
-		                  <div class="mt-2 flex items-baseline justify-between gap-2">
-		                    <span class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ row.current }}</span>
-		                    <span class="text-xs text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct) }}</span>
-		                  </div>
-		                </div>
-		              </div>
-		            </div>
-		          </ng-container>
-		        </section>
-
-            <section
-              *ngIf="canShowShippingPerformance()"
-              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            <div
+              *ngIf="(impact.items || []).length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
             >
-              <div class="flex items-center justify-between gap-3 flex-wrap">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.dashboard.shippingPerformance.title' | translate }}
-                </h2>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.refresh' | translate"
-                  [disabled]="shippingPerformanceLoading()"
-                  (action)="loadShippingPerformance()"
-                ></app-button>
+              {{ 'adminUi.dashboard.stockoutImpact.empty' | translate }}
+            </div>
+
+            <div
+              *ngIf="(impact.items || []).length"
+              class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            >
+              <table class="min-w-[760px] w-full text-xs">
+                <thead>
+                  <tr class="text-left text-slate-500 dark:text-slate-400">
+                    <th class="py-2 px-3">
+                      {{ 'adminUi.dashboard.stockoutImpact.table.product' | translate }}
+                    </th>
+                    <th class="py-2 px-3 text-right">
+                      {{ 'adminUi.dashboard.stockoutImpact.table.available' | translate }}
+                    </th>
+                    <th class="py-2 px-3 text-right">
+                      {{ 'adminUi.dashboard.stockoutImpact.table.carts' | translate }}
+                    </th>
+                    <th class="py-2 px-3 text-right">
+                      {{ 'adminUi.dashboard.stockoutImpact.table.sales' | translate }}
+                    </th>
+                    <th class="py-2 px-3 text-right">
+                      {{ 'adminUi.dashboard.stockoutImpact.table.missed' | translate }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let item of impact.items"
+                    class="border-t border-slate-100 dark:border-slate-800"
+                  >
+                    <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+                      <div class="flex items-center gap-2">
+                        <span class="font-semibold">{{ item.product_name }}</span>
+                        <span
+                          *ngIf="item.allow_backorder"
+                          class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
+                        >
+                          {{ 'adminUi.dashboard.stockoutImpact.backorder' | translate }}
+                        </span>
+                      </div>
+                      <div class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                        {{ item.product_slug }}
+                      </div>
+                    </td>
+                    <td
+                      class="py-2 px-3 text-right font-semibold"
+                      [ngClass]="
+                        item.available_quantity <= 0
+                          ? 'text-rose-700 dark:text-rose-200'
+                          : 'text-slate-700 dark:text-slate-200'
+                      "
+                    >
+                      {{ item.available_quantity }}
+                    </td>
+                    <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                      {{ item.reserved_in_carts }}
+                    </td>
+                    <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                      {{ item.demand_revenue | localizedCurrency: item.currency }}
+                    </td>
+                    <td
+                      class="py-2 px-3 text-right font-semibold text-slate-900 dark:text-slate-50"
+                    >
+                      {{ item.estimated_missed_revenue | localizedCurrency: item.currency }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ng-container>
+        </section>
+
+        <section
+          *ngIf="canShowChannelAttribution()"
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.channelAttribution.title' | translate }}
+            </h2>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.refresh' | translate"
+              [disabled]="channelAttributionLoading()"
+              (action)="loadChannelAttribution()"
+            ></app-button>
+          </div>
+
+          <app-error-state
+            *ngIf="channelAttributionError()"
+            [message]="channelAttributionError()!"
+            [requestId]="channelAttributionRequestId()"
+            [showRetry]="true"
+            (retry)="loadChannelAttribution()"
+          ></app-error-state>
+
+          <div *ngIf="channelAttributionLoading()" class="grid gap-2">
+            <app-skeleton height="3rem"></app-skeleton>
+            <app-skeleton height="3rem"></app-skeleton>
+          </div>
+
+          <ng-container
+            *ngIf="
+              !channelAttributionLoading() &&
+              !channelAttributionError() &&
+              channelAttribution() as attribution
+            "
+          >
+            <div class="grid gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <div>
+                {{
+                  'adminUi.dashboard.channelAttribution.coverage'
+                    | translate
+                      : { tracked: attribution.tracked_orders, total: attribution.total_orders }
+                }}
+                ·
+                {{
+                  attribution.coverage_pct === null
+                    ? '—'
+                    : (attribution.coverage_pct | percent: '1.0-0')
+                }}
               </div>
+              <div>{{ 'adminUi.dashboard.channelAttribution.note' | translate }}</div>
+            </div>
 
-              <app-error-state
-                *ngIf="shippingPerformanceError()"
-                [message]="shippingPerformanceError()!"
-                [requestId]="shippingPerformanceRequestId()"
-                [showRetry]="true"
-                (retry)="loadShippingPerformance()"
-              ></app-error-state>
+            <div
+              *ngIf="(attribution.channels || []).length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
+              {{ 'adminUi.dashboard.channelAttribution.empty' | translate }}
+            </div>
 
-              <div *ngIf="shippingPerformanceLoading()" class="grid gap-2">
-                <app-skeleton height="3rem"></app-skeleton>
-                <app-skeleton height="3rem"></app-skeleton>
-              </div>
+            <div
+              *ngIf="(attribution.channels || []).length"
+              class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            >
+              <table class="min-w-[760px] w-full text-xs">
+                <thead>
+                  <tr class="text-left text-slate-500 dark:text-slate-400">
+                    <th class="py-2 px-3">
+                      {{ 'adminUi.dashboard.channelAttribution.table.channel' | translate }}
+                    </th>
+                    <th class="py-2 px-3 text-right">
+                      {{ 'adminUi.dashboard.channelAttribution.table.orders' | translate }}
+                    </th>
+                    <th class="py-2 px-3 text-right">
+                      {{ 'adminUi.dashboard.channelAttribution.table.sales' | translate }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let row of attribution.channels"
+                    class="border-t border-slate-100 dark:border-slate-800"
+                  >
+                    <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
+                      <div class="font-semibold">
+                        {{ row.source
+                        }}<ng-container *ngIf="row.medium"> / {{ row.medium }}</ng-container>
+                      </div>
+                      <div
+                        *ngIf="row.campaign"
+                        class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400"
+                      >
+                        {{ row.campaign }}
+                      </div>
+                    </td>
+                    <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                      {{ row.orders }}
+                    </td>
+                    <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
+                      {{ row.gross_sales | localizedCurrency: 'RON' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ng-container>
+        </section>
 
-              <ng-container
-                *ngIf="!shippingPerformanceLoading() && !shippingPerformanceError() && shippingPerformance() as perf"
+        <section
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.dashboard.scheduledTitle' | translate }}
+            </h2>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.refresh' | translate"
+              (action)="loadScheduledTasks()"
+            ></app-button>
+          </div>
+
+          <div *ngIf="scheduledError()" class="text-sm text-rose-700 dark:text-rose-300">
+            {{ scheduledError() }}
+          </div>
+
+          <div *ngIf="scheduledLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'adminUi.dashboard.scheduledLoading' | translate }}
+          </div>
+
+          <div *ngIf="!scheduledLoading()" class="grid gap-4 lg:grid-cols-2">
+            <div class="grid gap-2">
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
               >
-                <div class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.shippingPerformance.window' | translate: { days: perf.window_days || 30 } }}
-                </div>
+                {{ 'adminUi.dashboard.scheduledPublishesTitle' | translate }}
+              </p>
 
-                <div class="grid gap-4 lg:grid-cols-2">
-                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.dashboard.shippingPerformance.timeToShip' | translate }}
+              <div
+                *ngIf="scheduledTasks()?.publish_schedules?.length; else emptyPublishesTpl"
+                class="grid gap-2"
+              >
+                <div
+                  *ngFor="let item of scheduledTasks()?.publish_schedules"
+                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <div class="min-w-0">
+                    <p class="truncate font-semibold text-slate-900 dark:text-slate-50">
+                      {{ item.name }}
                     </p>
-                    <div *ngIf="(perf.time_to_ship || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
-                    </div>
-                    <div *ngIf="(perf.time_to_ship || []).length" class="mt-3 overflow-x-auto">
-                      <table class="min-w-[520px] w-full text-xs">
-                        <thead>
-                          <tr class="text-left text-slate-500 dark:text-slate-400">
-                            <th class="py-2 pr-3">{{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}</th>
-                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}</th>
-                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}</th>
-                            <th class="py-2 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr *ngFor="let row of perf.time_to_ship" class="border-t border-slate-100 dark:border-slate-800">
-                            <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.courier) }}</td>
-                            <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
-                              {{ row.current.avg_hours === null ? '—' : (row.current.avg_hours | number: '1.0-1') }}
-                            </td>
-                            <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.avg_hours) }}</td>
-                            <td class="py-2 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.dashboard.shippingPerformance.deliveryTime' | translate }}
+                    <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.dashboard.scheduledFor' | translate }}:
+                      {{ item.scheduled_for | date: 'short' }}
                     </p>
-                    <div *ngIf="(perf.delivery_time || []).length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.dashboard.shippingPerformance.empty' | translate }}
-                    </div>
-                    <div *ngIf="(perf.delivery_time || []).length" class="mt-3 overflow-x-auto">
-                      <table class="min-w-[520px] w-full text-xs">
-                        <thead>
-                          <tr class="text-left text-slate-500 dark:text-slate-400">
-                            <th class="py-2 pr-3">{{ 'adminUi.dashboard.shippingPerformance.table.courier' | translate }}</th>
-                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.avgHours' | translate }}</th>
-                            <th class="py-2 pr-3 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.delta' | translate }}</th>
-                            <th class="py-2 text-right">{{ 'adminUi.dashboard.shippingPerformance.table.count' | translate }}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr *ngFor="let row of perf.delivery_time" class="border-t border-slate-100 dark:border-slate-800">
-                            <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatChannelKey(row.courier) }}</td>
-                            <td class="py-2 pr-3 text-right text-slate-700 dark:text-slate-200">
-                              {{ row.current.avg_hours === null ? '—' : (row.current.avg_hours | number: '1.0-1') }}
-                            </td>
-                            <td class="py-2 pr-3 text-right text-slate-500 dark:text-slate-400">{{ deltaLabel(row.delta_pct.avg_hours) }}</td>
-                            <td class="py-2 text-right text-slate-700 dark:text-slate-200">{{ row.current.count }}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    <p
+                      *ngIf="item.sale_end_at"
+                      class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                    >
+                      {{ 'adminUi.dashboard.scheduledSaleEnds' | translate }}:
+                      {{ item.sale_end_at | date: 'short' }}
+                    </p>
                   </div>
-                </div>
-              </ng-container>
-            </section>
-
-            <section
-              *ngIf="canShowStockoutImpact()"
-              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <div class="flex items-center justify-between gap-3 flex-wrap">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.dashboard.stockoutImpact.title' | translate }}
-                </h2>
-                <div class="flex items-center gap-2">
-                  <app-button size="sm" variant="ghost" [label]="'adminUi.actions.openInventory' | translate" (action)="openInventory()"></app-button>
                   <app-button
                     size="sm"
                     variant="ghost"
-                    [label]="'adminUi.actions.refresh' | translate"
-                    [disabled]="stockoutImpactLoading()"
-                    (action)="loadStockoutImpact()"
+                    [label]="'adminUi.actions.open' | translate"
+                    (action)="openScheduledPublish(item)"
                   ></app-button>
                 </div>
               </div>
 
-              <app-error-state
-                *ngIf="stockoutImpactError()"
-                [message]="stockoutImpactError()!"
-                [requestId]="stockoutImpactRequestId()"
-                [showRetry]="true"
-                (retry)="loadStockoutImpact()"
-              ></app-error-state>
+              <ng-template #emptyPublishesTpl>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.scheduledEmptyPublishes' | translate }}
+                </p>
+              </ng-template>
+            </div>
 
-              <div *ngIf="stockoutImpactLoading()" class="grid gap-2">
-                <app-skeleton height="3rem"></app-skeleton>
-                <app-skeleton height="3rem"></app-skeleton>
-              </div>
-
-              <ng-container *ngIf="!stockoutImpactLoading() && !stockoutImpactError() && stockoutImpact() as impact">
-                <div class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.stockoutImpact.window' | translate: { days: impact.window_days || 30 } }}
-                </div>
-
-                <div *ngIf="(impact.items || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.dashboard.stockoutImpact.empty' | translate }}
-                </div>
-
-                <div *ngIf="(impact.items || []).length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                  <table class="min-w-[760px] w-full text-xs">
-                    <thead>
-                      <tr class="text-left text-slate-500 dark:text-slate-400">
-                        <th class="py-2 px-3">{{ 'adminUi.dashboard.stockoutImpact.table.product' | translate }}</th>
-                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.available' | translate }}</th>
-                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.carts' | translate }}</th>
-                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.sales' | translate }}</th>
-                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.stockoutImpact.table.missed' | translate }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let item of impact.items" class="border-t border-slate-100 dark:border-slate-800">
-                        <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
-                          <div class="flex items-center gap-2">
-                            <span class="font-semibold">{{ item.product_name }}</span>
-                            <span *ngIf="item.allow_backorder" class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-                              {{ 'adminUi.dashboard.stockoutImpact.backorder' | translate }}
-                            </span>
-                          </div>
-                          <div class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ item.product_slug }}</div>
-                        </td>
-                        <td class="py-2 px-3 text-right font-semibold" [ngClass]="item.available_quantity <= 0 ? 'text-rose-700 dark:text-rose-200' : 'text-slate-700 dark:text-slate-200'">
-                          {{ item.available_quantity }}
-                        </td>
-                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">{{ item.reserved_in_carts }}</td>
-                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
-                          {{ item.demand_revenue | localizedCurrency : item.currency }}
-                        </td>
-                        <td class="py-2 px-3 text-right font-semibold text-slate-900 dark:text-slate-50">
-                          {{ item.estimated_missed_revenue | localizedCurrency : item.currency }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </ng-container>
-            </section>
-
-            <section
-              *ngIf="canShowChannelAttribution()"
-              class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <div class="flex items-center justify-between gap-3 flex-wrap">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.dashboard.channelAttribution.title' | translate }}
-                </h2>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.refresh' | translate"
-                  [disabled]="channelAttributionLoading()"
-                  (action)="loadChannelAttribution()"
-                ></app-button>
-              </div>
-
-              <app-error-state
-                *ngIf="channelAttributionError()"
-                [message]="channelAttributionError()!"
-                [requestId]="channelAttributionRequestId()"
-                [showRetry]="true"
-                (retry)="loadChannelAttribution()"
-              ></app-error-state>
-
-              <div *ngIf="channelAttributionLoading()" class="grid gap-2">
-                <app-skeleton height="3rem"></app-skeleton>
-                <app-skeleton height="3rem"></app-skeleton>
-              </div>
-
-              <ng-container
-                *ngIf="!channelAttributionLoading() && !channelAttributionError() && channelAttribution() as attribution"
+            <div class="grid gap-2">
+              <p
+                class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400"
               >
-                <div class="grid gap-1 text-xs text-slate-500 dark:text-slate-400">
-                  <div>
-                    {{ 'adminUi.dashboard.channelAttribution.coverage' | translate: { tracked: attribution.tracked_orders, total: attribution.total_orders } }}
-                    · {{ attribution.coverage_pct === null ? '—' : (attribution.coverage_pct | percent: '1.0-0') }}
+                {{ 'adminUi.dashboard.scheduledPromosTitle' | translate }}
+              </p>
+
+              <div
+                *ngIf="scheduledTasks()?.promo_schedules?.length; else emptyPromosTpl"
+                class="grid gap-2"
+              >
+                <div
+                  *ngFor="let promo of scheduledTasks()?.promo_schedules"
+                  class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <div class="min-w-0">
+                    <p class="truncate font-semibold text-slate-900 dark:text-slate-50">
+                      {{ promo.name }}
+                    </p>
+                    <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      {{
+                        promo.next_event_type === 'starts_at'
+                          ? ('adminUi.dashboard.promoStartsAt' | translate)
+                          : ('adminUi.dashboard.promoEndsAt' | translate)
+                      }}: {{ promo.next_event_at | date: 'short' }}
+                    </p>
+                    <p
+                      *ngIf="promo.starts_at || promo.ends_at"
+                      class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                    >
+                      <ng-container *ngIf="promo.starts_at"
+                        >{{ 'adminUi.dashboard.promoStartsShort' | translate }}
+                        {{ promo.starts_at | date: 'short' }}</ng-container
+                      >
+                      <ng-container *ngIf="promo.starts_at && promo.ends_at"> · </ng-container>
+                      <ng-container *ngIf="promo.ends_at"
+                        >{{ 'adminUi.dashboard.promoEndsShort' | translate }}
+                        {{ promo.ends_at | date: 'short' }}</ng-container
+                      >
+                    </p>
                   </div>
-                  <div>{{ 'adminUi.dashboard.channelAttribution.note' | translate }}</div>
-                </div>
-
-                <div *ngIf="(attribution.channels || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.dashboard.channelAttribution.empty' | translate }}
-                </div>
-
-                <div *ngIf="(attribution.channels || []).length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                  <table class="min-w-[760px] w-full text-xs">
-                    <thead>
-                      <tr class="text-left text-slate-500 dark:text-slate-400">
-                        <th class="py-2 px-3">{{ 'adminUi.dashboard.channelAttribution.table.channel' | translate }}</th>
-                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.channelAttribution.table.orders' | translate }}</th>
-                        <th class="py-2 px-3 text-right">{{ 'adminUi.dashboard.channelAttribution.table.sales' | translate }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let row of attribution.channels" class="border-t border-slate-100 dark:border-slate-800">
-                        <td class="py-2 px-3 text-slate-700 dark:text-slate-200">
-                          <div class="font-semibold">{{ row.source }}<ng-container *ngIf="row.medium"> / {{ row.medium }}</ng-container></div>
-                          <div *ngIf="row.campaign" class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ row.campaign }}</div>
-                        </td>
-                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">{{ row.orders }}</td>
-                        <td class="py-2 px-3 text-right text-slate-700 dark:text-slate-200">
-                          {{ row.gross_sales | localizedCurrency : 'RON' }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </ng-container>
-            </section>
-
-		        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-		          <div class="flex items-center justify-between gap-3 flex-wrap">
-		            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.dashboard.scheduledTitle' | translate }}</h2>
-	              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="loadScheduledTasks()"></app-button>
-		          </div>
-
-            <div *ngIf="scheduledError()" class="text-sm text-rose-700 dark:text-rose-300">
-              {{ scheduledError() }}
-            </div>
-
-            <div *ngIf="scheduledLoading()" class="text-sm text-slate-600 dark:text-slate-300">
-              {{ 'adminUi.dashboard.scheduledLoading' | translate }}
-            </div>
-
-	          <div *ngIf="!scheduledLoading()" class="grid gap-4 lg:grid-cols-2">
-              <div class="grid gap-2">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.scheduledPublishesTitle' | translate }}
-                </p>
-
-                <div *ngIf="scheduledTasks()?.publish_schedules?.length; else emptyPublishesTpl" class="grid gap-2">
-                  <div
-                    *ngFor="let item of scheduledTasks()?.publish_schedules"
-                    class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
-                  >
-                    <div class="min-w-0">
-                      <p class="truncate font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
-                      <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                        {{ 'adminUi.dashboard.scheduledFor' | translate }}: {{ item.scheduled_for | date: 'short' }}
-                      </p>
-                      <p *ngIf="item.sale_end_at" class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                        {{ 'adminUi.dashboard.scheduledSaleEnds' | translate }}: {{ item.sale_end_at | date: 'short' }}
-                      </p>
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.open' | translate"
-                      (action)="openScheduledPublish(item)"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <ng-template #emptyPublishesTpl>
-                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.scheduledEmptyPublishes' | translate }}</p>
-                </ng-template>
-              </div>
-
-              <div class="grid gap-2">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.scheduledPromosTitle' | translate }}
-                </p>
-
-                <div *ngIf="scheduledTasks()?.promo_schedules?.length; else emptyPromosTpl" class="grid gap-2">
-                  <div
-                    *ngFor="let promo of scheduledTasks()?.promo_schedules"
-                    class="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
-                  >
-                    <div class="min-w-0">
-                      <p class="truncate font-semibold text-slate-900 dark:text-slate-50">{{ promo.name }}</p>
-                      <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                        {{
-                          promo.next_event_type === 'starts_at'
-                            ? ('adminUi.dashboard.promoStartsAt' | translate)
-                            : ('adminUi.dashboard.promoEndsAt' | translate)
-                        }}: {{ promo.next_event_at | date: 'short' }}
-                      </p>
-                      <p *ngIf="promo.starts_at || promo.ends_at" class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                        <ng-container *ngIf="promo.starts_at">{{ 'adminUi.dashboard.promoStartsShort' | translate }} {{ promo.starts_at | date: 'short' }}</ng-container>
-                        <ng-container *ngIf="promo.starts_at && promo.ends_at"> · </ng-container>
-                        <ng-container *ngIf="promo.ends_at">{{ 'adminUi.dashboard.promoEndsShort' | translate }} {{ promo.ends_at | date: 'short' }}</ng-container>
-                      </p>
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.open' | translate"
-                      (action)="openScheduledPromo(promo)"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <ng-template #emptyPromosTpl>
-                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.dashboard.scheduledEmptyPromos' | translate }}</p>
-                </ng-template>
-              </div>
-
-              <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm lg:col-span-2 dark:border-slate-800 dark:bg-slate-900">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <div class="grid gap-0.5">
-                    <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.dashboard.scheduledRunNow.title' | translate }}
-                    </div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.dashboard.scheduledRunNow.hint' | translate }}
-                    </div>
-                  </div>
-                  <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                    <input type="checkbox" class="h-4 w-4 accent-indigo-600" [(ngModel)]="scheduledRunForce" />
-                    {{ 'adminUi.dashboard.scheduledRunNow.force' | translate }}
-                  </label>
-                </div>
-
-                <div *ngIf="scheduledRunError()" class="text-sm text-rose-700 dark:text-rose-300">
-                  {{ scheduledRunError() }}
-                </div>
-
-                <div class="flex flex-wrap items-center gap-2">
-                  <app-button
-                    size="sm"
-                    [disabled]="scheduledRunBusy() !== null"
-                    [label]="'adminUi.dashboard.scheduledRunNow.weekly' | translate"
-                    (action)="runScheduledReport('weekly')"
-                  ></app-button>
                   <app-button
                     size="sm"
                     variant="ghost"
-                    [disabled]="scheduledRunBusy() !== null"
-                    [label]="'adminUi.dashboard.scheduledRunNow.monthly' | translate"
-                    (action)="runScheduledReport('monthly')"
+                    [label]="'adminUi.actions.open' | translate"
+                    (action)="openScheduledPromo(promo)"
                   ></app-button>
                 </div>
               </div>
-	          </div>
-	        </section>
 
-	        <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	          <div class="flex items-center justify-between gap-3 flex-wrap">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.title' | translate }}</h2>
+              <ng-template #emptyPromosTpl>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
+                  {{ 'adminUi.dashboard.scheduledEmptyPromos' | translate }}
+                </p>
+              </ng-template>
+            </div>
+
+            <div
+              class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm lg:col-span-2 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="grid gap-0.5">
+                  <div
+                    class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.dashboard.scheduledRunNow.title' | translate }}
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.dashboard.scheduledRunNow.hint' | translate }}
+                  </div>
+                </div>
+                <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 accent-indigo-600"
+                    [(ngModel)]="scheduledRunForce"
+                  />
+                  {{ 'adminUi.dashboard.scheduledRunNow.force' | translate }}
+                </label>
+              </div>
+
+              <div *ngIf="scheduledRunError()" class="text-sm text-rose-700 dark:text-rose-300">
+                {{ scheduledRunError() }}
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <app-button
+                  size="sm"
+                  [disabled]="scheduledRunBusy() !== null"
+                  [label]="'adminUi.dashboard.scheduledRunNow.weekly' | translate"
+                  (action)="runScheduledReport('weekly')"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [disabled]="scheduledRunBusy() !== null"
+                  [label]="'adminUi.dashboard.scheduledRunNow.monthly' | translate"
+                  (action)="runScheduledReport('monthly')"
+                ></app-button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section
+          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.audit.title' | translate }}
+            </h2>
             <div class="flex items-center gap-3 flex-wrap">
               <label class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                 <input
@@ -1589,9 +2191,17 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                 />
                 {{ 'adminUi.audit.redactLabel' | translate }}
               </label>
-              <span *ngIf="!isOwner()" class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.redactLocked' | translate }}</span>
-              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.audit.exportLimitNote' | translate }}</span>
-              <app-button size="sm" [label]="'adminUi.audit.export' | translate" (action)="downloadAuditCsv()"></app-button>
+              <span *ngIf="!isOwner()" class="text-xs text-slate-500 dark:text-slate-400">{{
+                'adminUi.audit.redactLocked' | translate
+              }}</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                'adminUi.audit.exportLimitNote' | translate
+              }}</span>
+              <app-button
+                size="sm"
+                [label]="'adminUi.audit.export' | translate"
+                (action)="downloadAuditCsv()"
+              ></app-button>
             </div>
           </div>
 
@@ -1599,7 +2209,11 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <button
               type="button"
               class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              [ngClass]="auditPresetActive('all') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              [ngClass]="
+                auditPresetActive('all')
+                  ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'
+              "
               (click)="applyAuditPreset('all')"
             >
               {{ 'adminUi.audit.presets.all' | translate }}
@@ -1607,7 +2221,11 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <button
               type="button"
               class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              [ngClass]="auditPresetActive('security') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              [ngClass]="
+                auditPresetActive('security')
+                  ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'
+              "
               (click)="applyAuditPreset('security')"
             >
               {{ 'adminUi.audit.presets.security' | translate }}
@@ -1615,7 +2233,11 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <button
               type="button"
               class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              [ngClass]="auditPresetActive('content') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              [ngClass]="
+                auditPresetActive('content')
+                  ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'
+              "
               (click)="applyAuditPreset('content')"
             >
               {{ 'adminUi.audit.presets.content' | translate }}
@@ -1623,7 +2245,11 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <button
               type="button"
               class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              [ngClass]="auditPresetActive('catalog') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              [ngClass]="
+                auditPresetActive('catalog')
+                  ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'
+              "
               (click)="applyAuditPreset('catalog')"
             >
               {{ 'adminUi.audit.presets.catalog' | translate }}
@@ -1631,7 +2257,11 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <button
               type="button"
               class="h-9 rounded-full border px-3 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-              [ngClass]="auditPresetActive('payments') ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'"
+              [ngClass]="
+                auditPresetActive('payments')
+                  ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-50 dark:bg-slate-50 dark:text-slate-900'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800/50'
+              "
               (click)="applyAuditPreset('payments')"
             >
               {{ 'adminUi.audit.presets.payments' | translate }}
@@ -1640,22 +2270,36 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
 
           <div class="grid gap-3 md:grid-cols-[220px_1fr_1fr_auto] items-end">
             <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-              <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.audit.filters.entity' | translate }}</span>
+              <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+                'adminUi.audit.filters.entity' | translate
+              }}</span>
               <select
                 class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
                 [(ngModel)]="auditEntity"
                 [attr.aria-label]="'adminUi.audit.filters.entity' | translate"
               >
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="all">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="all"
+                >
                   {{ 'adminUi.audit.entityAll' | translate }}
                 </option>
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="product">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="product"
+                >
                   {{ 'adminUi.audit.products' | translate }}
                 </option>
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="content">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="content"
+                >
                   {{ 'adminUi.audit.content' | translate }}
                 </option>
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="security">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="security"
+                >
                   {{ 'adminUi.audit.security' | translate }}
                 </option>
               </select>
@@ -1675,7 +2319,11 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
               [ariaLabel]="'adminUi.audit.filters.user' | translate"
             ></app-input>
 
-            <app-button size="sm" [label]="'adminUi.audit.filters.apply' | translate" (action)="applyAuditFilters()"></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.audit.filters.apply' | translate"
+              (action)="applyAuditFilters()"
+            ></app-button>
           </div>
 
           <div *ngIf="auditError()" class="text-sm text-rose-700 dark:text-rose-300">
@@ -1690,73 +2338,121 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <div *ngIf="auditEntries()?.items?.length; else auditEmptyTpl" class="grid gap-2">
               <div class="overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
                 <table class="min-w-[900px] w-full text-sm">
-	                  <thead class="bg-slate-50 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
-	                    <tr>
-	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.at' | translate }}</th>
-	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.filters.entity' | translate }}</th>
-	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.filters.action' | translate }}</th>
-	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.actor' | translate }}</th>
-	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.subject' | translate }}</th>
-	                      <th class="text-left px-3 py-2 font-semibold">{{ 'adminUi.audit.reference' | translate }}</th>
-	                      <th class="text-right px-3 py-2 font-semibold">{{ 'adminUi.actions.open' | translate }}</th>
-	                    </tr>
-	                  </thead>
-	                  <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-	                    <tr *ngFor="let entry of auditEntries()?.items" class="text-slate-800 dark:text-slate-200">
-                      <td class="px-3 py-2 whitespace-nowrap">{{ entry.created_at | date: 'short' }}</td>
+                  <thead
+                    class="bg-slate-50 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300"
+                  >
+                    <tr>
+                      <th class="text-left px-3 py-2 font-semibold">
+                        {{ 'adminUi.audit.at' | translate }}
+                      </th>
+                      <th class="text-left px-3 py-2 font-semibold">
+                        {{ 'adminUi.audit.filters.entity' | translate }}
+                      </th>
+                      <th class="text-left px-3 py-2 font-semibold">
+                        {{ 'adminUi.audit.filters.action' | translate }}
+                      </th>
+                      <th class="text-left px-3 py-2 font-semibold">
+                        {{ 'adminUi.audit.actor' | translate }}
+                      </th>
+                      <th class="text-left px-3 py-2 font-semibold">
+                        {{ 'adminUi.audit.subject' | translate }}
+                      </th>
+                      <th class="text-left px-3 py-2 font-semibold">
+                        {{ 'adminUi.audit.reference' | translate }}
+                      </th>
+                      <th class="text-right px-3 py-2 font-semibold">
+                        {{ 'adminUi.actions.open' | translate }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                    <tr
+                      *ngFor="let entry of auditEntries()?.items"
+                      class="text-slate-800 dark:text-slate-200"
+                    >
                       <td class="px-3 py-2 whitespace-nowrap">
-                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
+                        {{ entry.created_at | date: 'short' }}
+                      </td>
+                      <td class="px-3 py-2 whitespace-nowrap">
+                        <span
+                          class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700"
+                        >
                           {{ auditEntityLabel(entry.entity) }}
                         </span>
                       </td>
                       <td class="px-3 py-2">
                         <span *ngIf="entry.entity === 'security'; else rawActionTpl">
-                          {{ ('adminUi.audit.securityActions.' + entry.action) | translate }}
+                          {{ 'adminUi.audit.securityActions.' + entry.action | translate }}
                         </span>
                         <ng-template #rawActionTpl>{{ entry.action }}</ng-template>
                       </td>
-                      <td class="px-3 py-2 whitespace-nowrap">{{ entry.actor_email || entry.actor_user_id || '—' }}</td>
-                      <td class="px-3 py-2 whitespace-nowrap">{{ entry.subject_email || entry.subject_user_id || '—' }}</td>
-	                      <td class="px-3 py-2">
-	                        <span class="font-mono text-xs text-slate-600 dark:text-slate-400">
-	                          {{ entry.ref_key || entry.ref_id || '—' }}
-	                        </span>
-	                      </td>
-	                      <td class="px-3 py-2 text-right">
-	                        <app-button
-	                          size="sm"
-	                          variant="ghost"
-	                          [disabled]="!canOpenAuditEntry(entry)"
-	                          [label]="'adminUi.actions.open' | translate"
-	                          (action)="openAuditEntry(entry)"
-	                        ></app-button>
-	                      </td>
-	                    </tr>
-	                  </tbody>
-	                </table>
-	              </div>
+                      <td class="px-3 py-2 whitespace-nowrap">
+                        {{ entry.actor_email || entry.actor_user_id || '—' }}
+                      </td>
+                      <td class="px-3 py-2 whitespace-nowrap">
+                        {{ entry.subject_email || entry.subject_user_id || '—' }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <span class="font-mono text-xs text-slate-600 dark:text-slate-400">
+                          {{ entry.ref_key || entry.ref_id || '—' }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <app-button
+                          size="sm"
+                          variant="ghost"
+                          [disabled]="!canOpenAuditEntry(entry)"
+                          [label]="'adminUi.actions.open' | translate"
+                          (action)="openAuditEntry(entry)"
+                        ></app-button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
-              <div class="flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
+              <div
+                class="flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300"
+              >
                 <span>
                   {{
-                    'adminUi.audit.pagination' | translate: { page: auditEntries()?.meta?.page || 1, total: auditEntries()?.meta?.total_pages || 1 }
+                    'adminUi.audit.pagination'
+                      | translate
+                        : {
+                            page: auditEntries()?.meta?.page || 1,
+                            total: auditEntries()?.meta?.total_pages || 1,
+                          }
                   }}
                 </span>
                 <div class="flex items-center gap-2">
-                  <app-button size="sm" [disabled]="!auditHasPrev()" [label]="'adminUi.audit.prev' | translate" (action)="auditPrev()"></app-button>
-                  <app-button size="sm" [disabled]="!auditHasNext()" [label]="'adminUi.audit.next' | translate" (action)="auditNext()"></app-button>
+                  <app-button
+                    size="sm"
+                    [disabled]="!auditHasPrev()"
+                    [label]="'adminUi.audit.prev' | translate"
+                    (action)="auditPrev()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    [disabled]="!auditHasNext()"
+                    [label]="'adminUi.audit.next' | translate"
+                    (action)="auditNext()"
+                  ></app-button>
                 </div>
               </div>
             </div>
 
             <ng-template #auditEmptyTpl>
-              <div class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.audit.empty' | translate }}</div>
+              <div class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.audit.empty' | translate }}
+              </div>
             </ng-template>
           </ng-template>
 
           <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
             <div class="flex items-center justify-between gap-3 flex-wrap">
-              <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.retention.title' | translate }}</h3>
+              <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.audit.retention.title' | translate }}
+              </h3>
               <app-button
                 size="sm"
                 variant="ghost"
@@ -1764,7 +2460,9 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                 (action)="loadAuditRetention()"
               ></app-button>
             </div>
-            <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.audit.retention.hint' | translate }}</p>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.audit.retention.hint' | translate }}
+            </p>
 
             <div *ngIf="auditRetentionError()" class="text-sm text-rose-700 dark:text-rose-300">
               {{ auditRetentionError() }}
@@ -1777,46 +2475,97 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
             <ng-template #retentionTpl>
               <div *ngIf="auditRetention() as retention" class="grid gap-2 md:grid-cols-3">
                 <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
-                  <div class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.products' | translate }}</div>
-                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                    <ng-container *ngIf="retention.policies.product.enabled; else productDisabledTpl">
-                      {{ 'adminUi.audit.retention.enabled' | translate: { days: retention.policies.product.days } }}
-                    </ng-container>
-                    <ng-template #productDisabledTpl>{{ 'adminUi.audit.retention.disabled' | translate }}</ng-template>
+                  <div class="font-medium text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.audit.products' | translate }}
                   </div>
                   <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.audit.retention.counts' | translate: { total: retention.counts.product.total, expired: retention.counts.product.expired } }}
+                    <ng-container
+                      *ngIf="retention.policies.product.enabled; else productDisabledTpl"
+                    >
+                      {{
+                        'adminUi.audit.retention.enabled'
+                          | translate: { days: retention.policies.product.days }
+                      }}
+                    </ng-container>
+                    <ng-template #productDisabledTpl>{{
+                      'adminUi.audit.retention.disabled' | translate
+                    }}</ng-template>
+                  </div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    {{
+                      'adminUi.audit.retention.counts'
+                        | translate
+                          : {
+                              total: retention.counts.product.total,
+                              expired: retention.counts.product.expired,
+                            }
+                    }}
                   </div>
                 </div>
 
                 <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
-                  <div class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.content' | translate }}</div>
-                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                    <ng-container *ngIf="retention.policies.content.enabled; else contentDisabledTpl">
-                      {{ 'adminUi.audit.retention.enabled' | translate: { days: retention.policies.content.days } }}
-                    </ng-container>
-                    <ng-template #contentDisabledTpl>{{ 'adminUi.audit.retention.disabled' | translate }}</ng-template>
+                  <div class="font-medium text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.audit.content' | translate }}
                   </div>
                   <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.audit.retention.counts' | translate: { total: retention.counts.content.total, expired: retention.counts.content.expired } }}
+                    <ng-container
+                      *ngIf="retention.policies.content.enabled; else contentDisabledTpl"
+                    >
+                      {{
+                        'adminUi.audit.retention.enabled'
+                          | translate: { days: retention.policies.content.days }
+                      }}
+                    </ng-container>
+                    <ng-template #contentDisabledTpl>{{
+                      'adminUi.audit.retention.disabled' | translate
+                    }}</ng-template>
+                  </div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    {{
+                      'adminUi.audit.retention.counts'
+                        | translate
+                          : {
+                              total: retention.counts.content.total,
+                              expired: retention.counts.content.expired,
+                            }
+                    }}
                   </div>
                 </div>
 
                 <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
-                  <div class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.audit.security' | translate }}</div>
-                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                    <ng-container *ngIf="retention.policies.security.enabled; else securityDisabledTpl">
-                      {{ 'adminUi.audit.retention.enabled' | translate: { days: retention.policies.security.days } }}
-                    </ng-container>
-                    <ng-template #securityDisabledTpl>{{ 'adminUi.audit.retention.disabled' | translate }}</ng-template>
+                  <div class="font-medium text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.audit.security' | translate }}
                   </div>
                   <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.audit.retention.counts' | translate: { total: retention.counts.security.total, expired: retention.counts.security.expired } }}
+                    <ng-container
+                      *ngIf="retention.policies.security.enabled; else securityDisabledTpl"
+                    >
+                      {{
+                        'adminUi.audit.retention.enabled'
+                          | translate: { days: retention.policies.security.days }
+                      }}
+                    </ng-container>
+                    <ng-template #securityDisabledTpl>{{
+                      'adminUi.audit.retention.disabled' | translate
+                    }}</ng-template>
+                  </div>
+                  <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    {{
+                      'adminUi.audit.retention.counts'
+                        | translate
+                          : {
+                              total: retention.counts.security.total,
+                              expired: retention.counts.security.expired,
+                            }
+                    }}
                   </div>
                 </div>
 
                 <div *ngIf="isOwner()" class="grid gap-3 md:col-span-3">
-                  <div *ngIf="auditRetentionPurgeError" class="text-sm text-rose-700 dark:text-rose-300">
+                  <div
+                    *ngIf="auditRetentionPurgeError"
+                    class="text-sm text-rose-700 dark:text-rose-300"
+                  >
                     {{ auditRetentionPurgeError }}
                   </div>
                   <div class="grid gap-3 md:grid-cols-[1fr_auto_auto] items-end text-sm">
@@ -1826,8 +2575,14 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
                       [placeholder]="'adminUi.audit.retention.confirmPlaceholder' | translate"
                       [ariaLabel]="'adminUi.audit.retention.confirmLabel' | translate"
                     ></app-input>
-                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                      <input type="checkbox" class="h-4 w-4 accent-indigo-600" [(ngModel)]="auditRetentionDryRun" />
+                    <label
+                      class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"
+                    >
+                      <input
+                        type="checkbox"
+                        class="h-4 w-4 accent-indigo-600"
+                        [(ngModel)]="auditRetentionDryRun"
+                      />
                       {{ 'adminUi.audit.retention.dryRun' | translate }}
                     </label>
                     <app-button
@@ -1848,9 +2603,13 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
           class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
         >
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.ownerTransfer.title' | translate }}</h2>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.ownerTransfer.title' | translate }}
+            </h2>
           </div>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.ownerTransfer.description' | translate }}</p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'adminUi.ownerTransfer.description' | translate }}
+          </p>
 
           <div class="grid gap-3 md:grid-cols-3 items-end text-sm">
             <app-input
@@ -1887,219 +2646,250 @@ type AuditPresetId = 'all' | 'security' | 'content' | 'catalog' | 'payments';
               (action)="submitOwnerTransfer()"
             ></app-button>
           </div>
-	        </section>
+        </section>
 
-          <app-modal
-            [open]="alertThresholdsOpen()"
-            [title]="'adminUi.dashboard.alerts.config.title' | translate"
-            [subtitle]="'adminUi.dashboard.alerts.config.subtitle' | translate"
-            [confirmLabel]="'adminUi.common.save' | translate"
-            [cancelLabel]="'adminUi.common.cancel' | translate"
-            [closeLabel]="'adminUi.common.close' | translate"
-            [confirmDisabled]="alertThresholdsSaving()"
-            (confirm)="saveAlertThresholds()"
-            (closed)="closeAlertThresholds()"
-          >
-            <div class="grid gap-4">
-              <div *ngIf="alertThresholdsError()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
-                {{ alertThresholdsError() }}
+        <app-modal
+          [open]="alertThresholdsOpen()"
+          [title]="'adminUi.dashboard.alerts.config.title' | translate"
+          [subtitle]="'adminUi.dashboard.alerts.config.subtitle' | translate"
+          [confirmLabel]="'adminUi.common.save' | translate"
+          [cancelLabel]="'adminUi.common.cancel' | translate"
+          [closeLabel]="'adminUi.common.close' | translate"
+          [confirmDisabled]="alertThresholdsSaving()"
+          (confirm)="saveAlertThresholds()"
+          (closed)="closeAlertThresholds()"
+        >
+          <div class="grid gap-4">
+            <div
+              *ngIf="alertThresholdsError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ alertThresholdsError() }}
+            </div>
+
+            <div class="grid gap-3">
+              <div
+                class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.dashboard.alerts.config.sections.failedPayments' | translate }}
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <app-input
+                  type="number"
+                  [min]="1"
+                  [step]="1"
+                  [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinCount' | translate"
+                  [(value)]="alertFailedPaymentsMinCount"
+                ></app-input>
+                <app-input
+                  type="number"
+                  [min]="0"
+                  [step]="1"
+                  [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinDeltaPct' | translate"
+                  [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
+                  [(value)]="alertFailedPaymentsMinDeltaPct"
+                ></app-input>
+              </div>
+            </div>
+
+            <div class="grid gap-3">
+              <div
+                class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.dashboard.alerts.config.sections.refundRequests' | translate }}
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <app-input
+                  type="number"
+                  [min]="1"
+                  [step]="1"
+                  [label]="'adminUi.dashboard.alerts.config.refundRequestsMinCount' | translate"
+                  [(value)]="alertRefundRequestsMinCount"
+                ></app-input>
+                <app-input
+                  type="number"
+                  [min]="0"
+                  [max]="100"
+                  [step]="0.5"
+                  [label]="'adminUi.dashboard.alerts.config.refundRequestsMinRatePct' | translate"
+                  [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
+                  [(value)]="alertRefundRequestsMinRatePct"
+                ></app-input>
+              </div>
+            </div>
+
+            <div class="grid gap-3">
+              <div
+                class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.dashboard.alerts.config.sections.stockouts' | translate }}
+              </div>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <app-input
+                  type="number"
+                  [min]="1"
+                  [step]="1"
+                  [label]="'adminUi.dashboard.alerts.config.stockoutsMinCount' | translate"
+                  [(value)]="alertStockoutsMinCount"
+                ></app-input>
+              </div>
+            </div>
+          </div>
+        </app-modal>
+
+        <app-modal
+          [open]="onboardingOpen()"
+          [title]="'adminUi.onboarding.title' | translate"
+          [subtitle]="'adminUi.onboarding.subtitle' | translate"
+          [showActions]="false"
+          [closeLabel]="'adminUi.actions.cancel' | translate"
+          (closed)="dismissOnboarding()"
+        >
+          <div class="grid gap-4">
+            <p class="text-sm text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.onboarding.intro' | translate }}
+            </p>
+
+            <div class="grid gap-2">
+              <div
+                class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">
+                      {{ 'adminUi.onboarding.steps.contentTitle' | translate }}
+                    </div>
+                    <div class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.onboarding.steps.contentCopy' | translate }}
+                    </div>
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.open' | translate"
+                    (action)="goToOnboarding('/admin/content/home')"
+                  ></app-button>
+                </div>
               </div>
 
-              <div class="grid gap-3">
-                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.alerts.config.sections.failedPayments' | translate }}
-                </div>
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <app-input
-                    type="number"
-                    [min]="1"
-                    [step]="1"
-                    [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinCount' | translate"
-                    [(value)]="alertFailedPaymentsMinCount"
-                  ></app-input>
-                  <app-input
-                    type="number"
-                    [min]="0"
-                    [step]="1"
-                    [label]="'adminUi.dashboard.alerts.config.failedPaymentsMinDeltaPct' | translate"
-                    [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
-                    [(value)]="alertFailedPaymentsMinDeltaPct"
-                  ></app-input>
+              <div
+                class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">
+                      {{ 'adminUi.onboarding.steps.shippingTitle' | translate }}
+                    </div>
+                    <div class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.onboarding.steps.shippingCopy' | translate }}
+                    </div>
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.open' | translate"
+                    (action)="goToOnboarding('/admin/ops')"
+                  ></app-button>
                 </div>
               </div>
 
-              <div class="grid gap-3">
-                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.alerts.config.sections.refundRequests' | translate }}
-                </div>
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <app-input
-                    type="number"
-                    [min]="1"
-                    [step]="1"
-                    [label]="'adminUi.dashboard.alerts.config.refundRequestsMinCount' | translate"
-                    [(value)]="alertRefundRequestsMinCount"
-                  ></app-input>
-                  <app-input
-                    type="number"
-                    [min]="0"
-                    [max]="100"
-                    [step]="0.5"
-                    [label]="'adminUi.dashboard.alerts.config.refundRequestsMinRatePct' | translate"
-                    [placeholder]="'adminUi.dashboard.alerts.config.optionalPlaceholder' | translate"
-                    [(value)]="alertRefundRequestsMinRatePct"
-                  ></app-input>
+              <div
+                class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">
+                      {{ 'adminUi.onboarding.steps.paymentsTitle' | translate }}
+                    </div>
+                    <div class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.onboarding.steps.paymentsCopy' | translate }}
+                    </div>
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.open' | translate"
+                    (action)="goToOnboarding('/admin/ops')"
+                  ></app-button>
                 </div>
               </div>
 
-              <div class="grid gap-3">
-                <div class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.dashboard.alerts.config.sections.stockouts' | translate }}
-                </div>
-                <div class="grid gap-3 sm:grid-cols-2">
-                  <app-input
-                    type="number"
-                    [min]="1"
-                    [step]="1"
-                    [label]="'adminUi.dashboard.alerts.config.stockoutsMinCount' | translate"
-                    [(value)]="alertStockoutsMinCount"
-                  ></app-input>
+              <div
+                class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="grid gap-0.5 min-w-0">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50">
+                      {{ 'adminUi.onboarding.steps.taxesTitle' | translate }}
+                    </div>
+                    <div class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.onboarding.steps.taxesCopy' | translate }}
+                    </div>
+                  </div>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.actions.open' | translate"
+                    (action)="goToOnboarding('/admin/content/settings')"
+                  ></app-button>
                 </div>
               </div>
             </div>
-          </app-modal>
 
-          <app-modal
-            [open]="onboardingOpen()"
-            [title]="'adminUi.onboarding.title' | translate"
-            [subtitle]="'adminUi.onboarding.subtitle' | translate"
-            [showActions]="false"
-            [closeLabel]="'adminUi.actions.cancel' | translate"
-            (closed)="dismissOnboarding()"
-          >
-            <div class="grid gap-4">
-              <p class="text-sm text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.onboarding.intro' | translate }}
-              </p>
-
-              <div class="grid gap-2">
-                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="grid gap-0.5 min-w-0">
-                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.contentTitle' | translate }}</div>
-                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.contentCopy' | translate }}</div>
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.open' | translate"
-                      (action)="goToOnboarding('/admin/content/home')"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="grid gap-0.5 min-w-0">
-                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.shippingTitle' | translate }}</div>
-                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.shippingCopy' | translate }}</div>
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.open' | translate"
-                      (action)="goToOnboarding('/admin/ops')"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="grid gap-0.5 min-w-0">
-                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.paymentsTitle' | translate }}</div>
-                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.paymentsCopy' | translate }}</div>
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.open' | translate"
-                      (action)="goToOnboarding('/admin/ops')"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <div class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="grid gap-0.5 min-w-0">
-                      <div class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.onboarding.steps.taxesTitle' | translate }}</div>
-                      <div class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.onboarding.steps.taxesCopy' | translate }}</div>
-                    </div>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.open' | translate"
-                      (action)="goToOnboarding('/admin/content/settings')"
-                    ></app-button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="flex items-center justify-end gap-2 pt-1">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.onboarding.actions.later' | translate"
-                  (action)="dismissOnboarding()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  [label]="'adminUi.onboarding.actions.done' | translate"
-                  (action)="completeOnboarding()"
-                ></app-button>
-              </div>
+            <div class="flex items-center justify-end gap-2 pt-1">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.onboarding.actions.later' | translate"
+                (action)="dismissOnboarding()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.onboarding.actions.done' | translate"
+                (action)="completeOnboarding()"
+              ></app-button>
             </div>
-          </app-modal>
-	      </ng-template>
+          </div>
+        </app-modal>
+      </ng-template>
     </div>
-  `
+  `,
 })
 export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('globalSearchInput') globalSearchInput?: ElementRef<HTMLInputElement>;
-  readonly crumbs: Crumb[] = [
-    { label: 'adminUi.nav.dashboard', url: '/admin/dashboard' }
-  ];
+  readonly crumbs: Crumb[] = [{ label: 'adminUi.nav.dashboard', url: '/admin/dashboard' }];
 
   loading = signal(true);
   error = signal<string | null>(null);
   errorRequestId = signal<string | null>(null);
-	  whatsNewLoading = signal(false);
-	  whatsNewError = signal<string | null>(null);
-	  whatsNewHtml = signal('');
-	  summary = signal<AdminSummary | null>(null);
-	  paymentsHealth = signal<AdminDashboardPaymentsHealthResponse | null>(null);
-	  paymentsHealthLoading = signal(false);
-	  paymentsHealthError = signal<string | null>(null);
-	  paymentsHealthRequestId = signal<string | null>(null);
-	  refundsBreakdown = signal<AdminRefundsBreakdownResponse | null>(null);
-	  refundsBreakdownLoading = signal(false);
-	  refundsBreakdownError = signal<string | null>(null);
-	  refundsBreakdownRequestId = signal<string | null>(null);
-    shippingPerformance = signal<AdminShippingPerformanceResponse | null>(null);
-    shippingPerformanceLoading = signal(false);
-    shippingPerformanceError = signal<string | null>(null);
-    shippingPerformanceRequestId = signal<string | null>(null);
-    stockoutImpact = signal<AdminStockoutImpactResponse | null>(null);
-    stockoutImpactLoading = signal(false);
-    stockoutImpactError = signal<string | null>(null);
-    stockoutImpactRequestId = signal<string | null>(null);
-    channelAttribution = signal<AdminChannelAttributionResponse | null>(null);
-    channelAttributionLoading = signal(false);
-    channelAttributionError = signal<string | null>(null);
-    channelAttributionRequestId = signal<string | null>(null);
-	  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
-	  channelBreakdownLoading = signal(false);
-	  channelBreakdownError = signal<string | null>(null);
-	  funnelMetrics = signal<AdminFunnelMetricsResponse | null>(null);
+  whatsNewLoading = signal(false);
+  whatsNewError = signal<string | null>(null);
+  whatsNewHtml = signal('');
+  summary = signal<AdminSummary | null>(null);
+  paymentsHealth = signal<AdminDashboardPaymentsHealthResponse | null>(null);
+  paymentsHealthLoading = signal(false);
+  paymentsHealthError = signal<string | null>(null);
+  paymentsHealthRequestId = signal<string | null>(null);
+  refundsBreakdown = signal<AdminRefundsBreakdownResponse | null>(null);
+  refundsBreakdownLoading = signal(false);
+  refundsBreakdownError = signal<string | null>(null);
+  refundsBreakdownRequestId = signal<string | null>(null);
+  shippingPerformance = signal<AdminShippingPerformanceResponse | null>(null);
+  shippingPerformanceLoading = signal(false);
+  shippingPerformanceError = signal<string | null>(null);
+  shippingPerformanceRequestId = signal<string | null>(null);
+  stockoutImpact = signal<AdminStockoutImpactResponse | null>(null);
+  stockoutImpactLoading = signal(false);
+  stockoutImpactError = signal<string | null>(null);
+  stockoutImpactRequestId = signal<string | null>(null);
+  channelAttribution = signal<AdminChannelAttributionResponse | null>(null);
+  channelAttributionLoading = signal(false);
+  channelAttributionError = signal<string | null>(null);
+  channelAttributionRequestId = signal<string | null>(null);
+  channelBreakdown = signal<AdminChannelBreakdownResponse | null>(null);
+  channelBreakdownLoading = signal(false);
+  channelBreakdownError = signal<string | null>(null);
+  funnelMetrics = signal<AdminFunnelMetricsResponse | null>(null);
   funnelLoading = signal(false);
   funnelError = signal<string | null>(null);
   lastUpdatedAt = signal<string | null>(null);
@@ -2111,7 +2901,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   customizeWidgetsOpen = signal(false);
   metricWidgetOrder = signal<MetricWidgetId[]>(['kpis', 'counts', 'range']);
-  metricWidgetHidden = signal<Record<MetricWidgetId, boolean>>({ kpis: false, counts: false, range: false });
+  metricWidgetHidden = signal<Record<MetricWidgetId, boolean>>({
+    kpis: false,
+    counts: false,
+    range: false,
+  });
 
   rangePreset: '7' | '30' | '90' | 'custom' = '30';
   rangeFrom = '';
@@ -2184,11 +2978,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
     private readonly http: HttpClient,
-    private readonly markdown: MarkdownService
+    private readonly markdown: MarkdownService,
   ) {}
 
   ngAfterViewInit(): void {
-    const shouldFocus = Boolean((history.state)?.focusGlobalSearch);
+    const shouldFocus = Boolean(history.state?.focusGlobalSearch);
     if (!shouldFocus) return;
 
     window.setTimeout(() => {
@@ -2196,7 +2990,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       this.globalSearchInput?.nativeElement?.select();
       this.openGlobalSearch();
       try {
-        const nextState = { ...(history.state) };
+        const nextState = { ...history.state };
         delete nextState.focusGlobalSearch;
         history.replaceState(nextState, '');
       } catch {
@@ -2205,25 +2999,25 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     }, 0);
   }
 
-	  ngOnInit(): void {
-	    this.loadWidgetPrefs();
-	    this.loadLiveRefreshPreference();
-	    this.loadSalesMetricPreference();
-	    this.loadSummary();
-      this.loadWhatsNew();
-		    this.loadFunnelMetrics();
-		    this.loadChannelBreakdown();
-        if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
-        if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
-        if (this.canShowShippingPerformance()) this.loadShippingPerformance();
-        if (this.canShowStockoutImpact()) this.loadStockoutImpact();
-        if (this.canShowChannelAttribution()) this.loadChannelAttribution();
-		    this.loadScheduledTasks();
-		    this.loadBackgroundJobs();
-		    this.loadAudit(1);
-		    this.loadAuditRetention();
-		    this.maybeShowOnboarding();
-	  }
+  ngOnInit(): void {
+    this.loadWidgetPrefs();
+    this.loadLiveRefreshPreference();
+    this.loadSalesMetricPreference();
+    this.loadSummary();
+    this.loadWhatsNew();
+    this.loadFunnelMetrics();
+    this.loadChannelBreakdown();
+    if (this.canShowPaymentsHealth()) this.loadPaymentsHealth();
+    if (this.canShowRefundsBreakdown()) this.loadRefundsBreakdown();
+    if (this.canShowShippingPerformance()) this.loadShippingPerformance();
+    if (this.canShowStockoutImpact()) this.loadStockoutImpact();
+    if (this.canShowChannelAttribution()) this.loadChannelAttribution();
+    this.loadScheduledTasks();
+    this.loadBackgroundJobs();
+    this.loadAudit(1);
+    this.loadAuditRetention();
+    this.maybeShowOnboarding();
+  }
 
   clearRecent(): void {
     this.recent.clear();
@@ -2275,26 +3069,61 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   openOrdersToday(): void {
     const today = new Date().toISOString().slice(0, 10);
-    this.openOrdersWithFilters({ q: '', status: 'all', tag: '', fromDate: today, toDate: today, includeTestOrders: false, limit: 20 });
+    this.openOrdersWithFilters({
+      q: '',
+      status: 'all',
+      tag: '',
+      fromDate: today,
+      toDate: today,
+      includeTestOrders: false,
+      limit: 20,
+    });
   }
 
   openSalesToday(): void {
     const today = new Date().toISOString().slice(0, 10);
-    this.openOrdersWithFilters({ q: '', status: 'sales', tag: '', fromDate: today, toDate: today, includeTestOrders: false, limit: 20 });
+    this.openOrdersWithFilters({
+      q: '',
+      status: 'sales',
+      tag: '',
+      fromDate: today,
+      toDate: today,
+      includeTestOrders: false,
+      limit: 20,
+    });
   }
 
   openRefunds(): void {
-    this.openOrdersWithFilters({ q: '', status: 'refunded', tag: '', fromDate: '', toDate: '', includeTestOrders: false, limit: 20 });
+    this.openOrdersWithFilters({
+      q: '',
+      status: 'refunded',
+      tag: '',
+      fromDate: '',
+      toDate: '',
+      includeTestOrders: false,
+      limit: 20,
+    });
   }
 
   openFailedPayments(): void {
     const metric = this.failedPaymentsAlert();
-    const windowHours = typeof metric?.window_hours === 'number' && metric.window_hours > 0 ? metric.window_hours : 24;
+    const windowHours =
+      typeof metric?.window_hours === 'number' && metric.window_hours > 0
+        ? metric.window_hours
+        : 24;
     const now = new Date();
     const from = new Date(now.getTime() - windowHours * 60 * 60 * 1000);
     const fromDate = from.toISOString().slice(0, 10);
     const toDate = now.toISOString().slice(0, 10);
-    this.openOrdersWithFilters({ q: '', status: 'pending_payment', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+    this.openOrdersWithFilters({
+      q: '',
+      status: 'pending_payment',
+      tag: '',
+      fromDate,
+      toDate,
+      includeTestOrders: false,
+      limit: 20,
+    });
   }
 
   openRefundRequests(): void {
@@ -2313,7 +3142,15 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       this.openOrders();
       return;
     }
-    this.openOrdersWithFilters({ q: '', status: 'all', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+    this.openOrdersWithFilters({
+      q: '',
+      status: 'all',
+      tag: '',
+      fromDate,
+      toDate,
+      includeTestOrders: false,
+      limit: 20,
+    });
   }
 
   openSalesRange(): void {
@@ -2324,7 +3161,15 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       this.openOrders();
       return;
     }
-    this.openOrdersWithFilters({ q: '', status: 'sales', tag: '', fromDate, toDate, includeTestOrders: false, limit: 20 });
+    this.openOrdersWithFilters({
+      q: '',
+      status: 'sales',
+      tag: '',
+      fromDate,
+      toDate,
+      includeTestOrders: false,
+      limit: 20,
+    });
   }
 
   refreshNow(): void {
@@ -2351,7 +3196,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   private openOrdersWithFilters(filters: any): void {
     void this.router.navigateByUrl('/admin/orders', {
-      state: { adminFilterScope: 'orders', adminFilters: filters }
+      state: { adminFilterScope: 'orders', adminFilters: filters },
     });
   }
 
@@ -2385,7 +3230,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   channelSales(row: { gross_sales: number; net_sales: number }): number {
-    return this.salesMetric() === 'gross' ? Number(row?.gross_sales ?? 0) : Number(row?.net_sales ?? 0);
+    return this.salesMetric() === 'gross'
+      ? Number(row?.gross_sales ?? 0)
+      : Number(row?.net_sales ?? 0);
   }
 
   formatChannelKey(key: string): string {
@@ -2452,7 +3299,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       'size_fit',
       'delivery_issue',
       'changed_mind',
-      'other'
+      'other',
     ]);
     if (allowed.has(key)) return `adminUi.dashboard.refundsBreakdown.reasons.${key}`;
     return 'adminUi.dashboard.refundsBreakdown.reasons.other';
@@ -2493,7 +3340,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
           this.jobsError.set(this.translate.instant('adminUi.jobs.errors.load'));
           done();
         },
-        complete: done
+        complete: done,
       });
     } else {
       this.gdprExportJobs.set([]);
@@ -2510,7 +3357,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
           this.jobsError.set(this.translate.instant('adminUi.jobs.errors.load'));
           done();
         },
-        complete: done
+        complete: done,
       });
     } else {
       this.couponBulkJobs.set([]);
@@ -2554,7 +3401,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       error: () => {
         this.toast.error(this.translate.instant('adminUi.jobs.errors.retry'));
         this.gdprJobBusyId.set(null);
-      }
+      },
     });
   }
 
@@ -2577,7 +3424,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       error: () => {
         this.toast.error(this.translate.instant('adminUi.jobs.errors.download'));
         this.gdprJobBusyId.set(null);
-      }
+      },
     });
   }
 
@@ -2595,7 +3442,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       error: () => {
         this.toast.error(this.translate.instant('adminUi.jobs.errors.cancel'));
         this.couponJobBusyId.set(null);
-      }
+      },
     });
   }
 
@@ -2613,36 +3460,36 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       error: () => {
         this.toast.error(this.translate.instant('adminUi.jobs.errors.retry'));
         this.couponJobBusyId.set(null);
-      }
+      },
     });
   }
 
-	  onboardingOpen = signal(false);
-	  private readonly onboardingStorageKey = 'admin.onboarding.v1';
+  onboardingOpen = signal(false);
+  private readonly onboardingStorageKey = 'admin.onboarding.v1';
 
-    loadWhatsNew(force = false): void {
-      if (this.whatsNewLoading()) return;
-      if (!force && this.whatsNewHtml()) return;
-      this.whatsNewLoading.set(true);
-      this.whatsNewError.set(null);
-      this.http.get('assets/whats-new.md', { responseType: 'text' }).subscribe({
-        next: (md) => {
-          const raw = (md || '').trim();
-          this.whatsNewHtml.set(raw ? this.markdown.render(md) : '');
-          this.whatsNewLoading.set(false);
-        },
-        error: () => {
-          this.whatsNewHtml.set('');
-          this.whatsNewError.set(this.translate.instant('adminUi.dashboard.whatsNew.errors.load'));
-          this.whatsNewLoading.set(false);
-        }
-      });
-    }
+  loadWhatsNew(force = false): void {
+    if (this.whatsNewLoading()) return;
+    if (!force && this.whatsNewHtml()) return;
+    this.whatsNewLoading.set(true);
+    this.whatsNewError.set(null);
+    this.http.get('assets/whats-new.md', { responseType: 'text' }).subscribe({
+      next: (md) => {
+        const raw = (md || '').trim();
+        this.whatsNewHtml.set(raw ? this.markdown.render(md) : '');
+        this.whatsNewLoading.set(false);
+      },
+      error: () => {
+        this.whatsNewHtml.set('');
+        this.whatsNewError.set(this.translate.instant('adminUi.dashboard.whatsNew.errors.load'));
+        this.whatsNewLoading.set(false);
+      },
+    });
+  }
 
-	  private loadSummary(): void {
-	    this.loading.set(true);
-	    this.error.set(null);
-	    this.errorRequestId.set(null);
+  private loadSummary(): void {
+    this.loading.set(true);
+    this.error.set(null);
+    this.errorRequestId.set(null);
     this.rangeError = '';
     this.admin.summary(this.buildSummaryParams()).subscribe({
       next: (data) => {
@@ -2654,7 +3501,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.error.set(this.translate.instant('adminUi.errors.generic'));
         this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -2666,7 +3513,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       },
       error: () => {
         // ignore background refresh failures
-      }
+      },
     });
   }
 
@@ -2679,10 +3526,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.channelBreakdownLoading.set(false);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.channelBreakdown.error');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.dashboard.channelBreakdown.error');
         this.channelBreakdownError.set(msg);
         this.channelBreakdownLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2693,7 +3541,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       },
       error: () => {
         // ignore background refresh failures
-      }
+      },
     });
   }
 
@@ -2708,11 +3556,12 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.paymentsHealthLoading.set(false);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.paymentsHealth.error');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.dashboard.paymentsHealth.error');
         this.paymentsHealthError.set(msg);
         this.paymentsHealthRequestId.set(extractRequestId(err));
         this.paymentsHealthLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2727,11 +3576,12 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.refundsBreakdownLoading.set(false);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.refundsBreakdown.error');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.dashboard.refundsBreakdown.error');
         this.refundsBreakdownError.set(msg);
         this.refundsBreakdownRequestId.set(extractRequestId(err));
         this.refundsBreakdownLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2761,11 +3611,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.shippingPerformanceLoading.set(false);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.shippingPerformance.error');
+        const msg =
+          err?.error?.detail ||
+          this.translate.instant('adminUi.dashboard.shippingPerformance.error');
         this.shippingPerformanceError.set(msg);
         this.shippingPerformanceRequestId.set(extractRequestId(err));
         this.shippingPerformanceLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2780,11 +3632,12 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.stockoutImpactLoading.set(false);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.stockoutImpact.error');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.dashboard.stockoutImpact.error');
         this.stockoutImpactError.set(msg);
         this.stockoutImpactRequestId.set(extractRequestId(err));
         this.stockoutImpactLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2800,11 +3653,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.channelAttributionLoading.set(false);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.channelAttribution.error');
+        const msg =
+          err?.error?.detail ||
+          this.translate.instant('adminUi.dashboard.channelAttribution.error');
         this.channelAttributionError.set(msg);
         this.channelAttributionRequestId.set(extractRequestId(err));
         this.channelAttributionLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2820,7 +3675,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.funnel.error');
         this.funnelError.set(msg);
         this.funnelLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2831,7 +3686,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       },
       error: () => {
         // ignore background refresh failures
-      }
+      },
     });
   }
 
@@ -2853,7 +3708,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       const raw = localStorage.getItem(this.liveRefreshStorageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const enabled = Boolean((parsed)?.enabled);
+      const enabled = Boolean(parsed?.enabled);
       this.liveRefreshEnabled.set(enabled);
       if (enabled) this.startLiveRefresh();
     } catch {
@@ -2867,7 +3722,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       const raw = localStorage.getItem(this.salesMetricStorageKey);
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const metric = (parsed)?.metric;
+      const metric = parsed?.metric;
       if (metric === 'gross' || metric === 'net') this.salesMetric.set(metric);
     } catch {
       // ignore
@@ -2964,7 +3819,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.scheduledTasks.set({ publish_schedules: [], promo_schedules: [] });
         this.scheduledError.set(this.translate.instant('adminUi.dashboard.scheduledError'));
         this.scheduledLoading.set(false);
-      }
+      },
     });
   }
 
@@ -2978,7 +3833,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         if (resp?.skipped) {
           this.toast.info(
             this.translate.instant('adminUi.dashboard.scheduledRunNow.skippedTitle'),
-            this.translate.instant('adminUi.dashboard.scheduledRunNow.skippedCopy')
+            this.translate.instant('adminUi.dashboard.scheduledRunNow.skippedCopy'),
           );
           return;
         }
@@ -2986,16 +3841,21 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
           this.translate.instant('adminUi.dashboard.scheduledRunNow.successTitle'),
           this.translate.instant('adminUi.dashboard.scheduledRunNow.successCopy', {
             attempted: resp?.attempted ?? 0,
-            delivered: resp?.delivered ?? 0
-          })
+            delivered: resp?.delivered ?? 0,
+          }),
         );
       },
       error: (err) => {
         this.scheduledRunBusy.set(null);
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.scheduledRunNow.errorCopy');
+        const msg =
+          err?.error?.detail ||
+          this.translate.instant('adminUi.dashboard.scheduledRunNow.errorCopy');
         this.scheduledRunError.set(msg);
-        this.toast.error(this.translate.instant('adminUi.dashboard.scheduledRunNow.errorTitle'), msg);
-      }
+        this.toast.error(
+          this.translate.instant('adminUi.dashboard.scheduledRunNow.errorTitle'),
+          msg,
+        );
+      },
     });
   }
 
@@ -3031,7 +3891,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     if (this.canShowStockoutImpact()) this.loadStockoutImpact();
   }
 
-  private buildSummaryParams(): { range_days?: number; range_from?: string; range_to?: string } | undefined {
+  private buildSummaryParams():
+    | { range_days?: number; range_from?: string; range_to?: string }
+    | undefined {
     if (this.rangePreset === 'custom') {
       const from = (this.rangeFrom || '').trim();
       const to = (this.rangeTo || '').trim();
@@ -3146,7 +4008,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.globalSearchLoading.set(false);
         this.globalSearchActiveIndex.set(-1);
         this.globalSearchError = this.translate.instant('adminUi.errors.generic');
-      }
+      },
     });
   }
 
@@ -3211,7 +4073,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     }
 
     const email = (item.email || '').trim();
-    void this.router.navigate(['/admin/users'], { state: { prefillUserSearch: email, autoSelectFirst: true } });
+    void this.router.navigate(['/admin/users'], {
+      state: { prefillUserSearch: email, autoSelectFirst: true },
+    });
   }
 
   goToCreateProduct(): void {
@@ -3232,7 +4096,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         a.click();
         URL.revokeObjectURL(url);
       },
-      error: () => this.toast.error(this.translate.instant('adminUi.orders.errors.export'))
+      error: () => this.toast.error(this.translate.instant('adminUi.orders.errors.export')),
     });
   }
 
@@ -3255,7 +4119,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     const failedPaymentsMinCount = this.parseRequiredCount(this.alertFailedPaymentsMinCount);
     const failedPaymentsMinDeltaPct = this.parseOptionalNumber(this.alertFailedPaymentsMinDeltaPct);
     const refundRequestsMinCount = this.parseRequiredCount(this.alertRefundRequestsMinCount);
-    const refundRequestsMinRatePct = this.parseOptionalNumber(this.alertRefundRequestsMinRatePct, { max: 100 });
+    const refundRequestsMinRatePct = this.parseOptionalNumber(this.alertRefundRequestsMinRatePct, {
+      max: 100,
+    });
     const stockoutsMinCount = this.parseRequiredCount(this.alertStockoutsMinCount);
 
     if (
@@ -3265,7 +4131,9 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       failedPaymentsMinDeltaPct === undefined ||
       refundRequestsMinRatePct === undefined
     ) {
-      this.alertThresholdsError.set(this.translate.instant('adminUi.dashboard.alerts.config.errors.invalid'));
+      this.alertThresholdsError.set(
+        this.translate.instant('adminUi.dashboard.alerts.config.errors.invalid'),
+      );
       return;
     }
 
@@ -3274,7 +4142,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       failed_payments_min_delta_pct: failedPaymentsMinDeltaPct,
       refund_requests_min_count: refundRequestsMinCount,
       refund_requests_min_rate_pct: refundRequestsMinRatePct,
-      stockouts_min_count: stockoutsMinCount
+      stockouts_min_count: stockoutsMinCount,
     };
 
     this.alertThresholdsSaving.set(true);
@@ -3287,26 +4155,30 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.refreshSummarySilent();
         this.toast.success(
           this.translate.instant('adminUi.dashboard.alerts.config.successTitle'),
-          this.translate.instant('adminUi.dashboard.alerts.config.successCopy')
+          this.translate.instant('adminUi.dashboard.alerts.config.successCopy'),
         );
       },
       error: (err) => {
         this.alertThresholdsSaving.set(false);
-        const msg = err?.error?.detail || this.translate.instant('adminUi.dashboard.alerts.config.errors.save');
+        const msg =
+          err?.error?.detail ||
+          this.translate.instant('adminUi.dashboard.alerts.config.errors.save');
         this.alertThresholdsError.set(msg);
-      }
+      },
     });
   }
 
   private seedAlertThresholdForm(thresholds: AdminDashboardAlertThresholds): void {
     this.alertFailedPaymentsMinCount = Number(thresholds?.failed_payments_min_count ?? 1) || 1;
     this.alertFailedPaymentsMinDeltaPct =
-      thresholds?.failed_payments_min_delta_pct === null || thresholds?.failed_payments_min_delta_pct === undefined
+      thresholds?.failed_payments_min_delta_pct === null ||
+      thresholds?.failed_payments_min_delta_pct === undefined
         ? ''
         : Number(thresholds.failed_payments_min_delta_pct);
     this.alertRefundRequestsMinCount = Number(thresholds?.refund_requests_min_count ?? 1) || 1;
     this.alertRefundRequestsMinRatePct =
-      thresholds?.refund_requests_min_rate_pct === null || thresholds?.refund_requests_min_rate_pct === undefined
+      thresholds?.refund_requests_min_rate_pct === null ||
+      thresholds?.refund_requests_min_rate_pct === undefined
         ? ''
         : Number(thresholds.refund_requests_min_rate_pct);
     this.alertStockoutsMinCount = Number(thresholds?.stockouts_min_count ?? 1) || 1;
@@ -3322,7 +4194,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
 
   private parseOptionalNumber(
     value: string | number | null | undefined,
-    options?: { max?: number }
+    options?: { max?: number },
   ): number | null | undefined {
     if (value === null || value === undefined) return null;
     const num = typeof value === 'number' ? value : Number(value.trim());
@@ -3360,7 +4232,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   hasAnomalyAlerts(): boolean {
-    return Boolean(this.failedPaymentsAlert() || this.refundRequestsAlert() || this.stockoutsAlertCount() !== null);
+    return Boolean(
+      this.failedPaymentsAlert() ||
+      this.refundRequestsAlert() ||
+      this.stockoutsAlertCount() !== null,
+    );
   }
 
   toggleCustomizeWidgets(): void {
@@ -3411,9 +4287,14 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     try {
       const raw = localStorage.getItem(this.widgetPrefsKey());
       if (!raw) return;
-      const parsed = JSON.parse(raw) as { order?: MetricWidgetId[]; hidden?: Partial<Record<MetricWidgetId, boolean>> };
+      const parsed = JSON.parse(raw) as {
+        order?: MetricWidgetId[];
+        hidden?: Partial<Record<MetricWidgetId, boolean>>;
+      };
       const allowed: MetricWidgetId[] = ['kpis', 'counts', 'range'];
-      const order = Array.isArray(parsed?.order) ? parsed.order.filter((x): x is MetricWidgetId => allowed.includes(x)) : [];
+      const order = Array.isArray(parsed?.order)
+        ? parsed.order.filter((x): x is MetricWidgetId => allowed.includes(x))
+        : [];
       const normalizedOrder = Array.from(new Set(order));
       allowed.forEach((id) => {
         if (!normalizedOrder.includes(id)) normalizedOrder.push(id);
@@ -3423,7 +4304,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
       this.metricWidgetHidden.set({
         kpis: Boolean(hidden.kpis),
         counts: Boolean(hidden.counts),
-        range: Boolean(hidden.range)
+        range: Boolean(hidden.range),
       });
     } catch {
       // ignore
@@ -3435,7 +4316,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     try {
       localStorage.setItem(
         this.widgetPrefsKey(),
-        JSON.stringify({ order: this.metricWidgetOrder(), hidden: this.metricWidgetHidden() })
+        JSON.stringify({ order: this.metricWidgetOrder(), hidden: this.metricWidgetHidden() }),
       );
     } catch {
       // ignore
@@ -3451,7 +4332,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         action: (this.auditAction || '').trim() || undefined,
         user: (this.auditUser || '').trim() || undefined,
         page,
-        limit: 20
+        limit: 20,
       })
       .subscribe({
         next: (resp) => {
@@ -3459,10 +4340,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
           this.auditLoading.set(false);
         },
         error: () => {
-          this.auditEntries.set({ items: [], meta: { page: 1, limit: 20, total_items: 0, total_pages: 1 } });
+          this.auditEntries.set({
+            items: [],
+            meta: { page: 1, limit: 20, total_items: 0, total_pages: 1 },
+          });
           this.auditError.set(this.translate.instant('adminUi.audit.errors.loadCopy'));
           this.auditLoading.set(false);
-        }
+        },
       });
   }
 
@@ -3478,7 +4362,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
         this.auditRetention.set(null);
         this.auditRetentionError.set(this.translate.instant('adminUi.audit.retention.errors.load'));
         this.auditRetentionLoading.set(false);
-      }
+      },
     });
   }
 
@@ -3491,25 +4375,37 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.auditRetentionPurgeError = '';
     this.auditRetentionPurgeLoading = true;
     this.admin
-      .purgeAuditRetention({ confirm: this.auditRetentionConfirm, dry_run: this.auditRetentionDryRun })
+      .purgeAuditRetention({
+        confirm: this.auditRetentionConfirm,
+        dry_run: this.auditRetentionDryRun,
+      })
       .subscribe({
         next: (resp) => {
           this.auditRetentionPurgeLoading = false;
           this.auditRetention.set(resp);
           this.auditRetentionConfirm = '';
           const deleted =
-            (resp.deleted?.product || 0) + (resp.deleted?.content || 0) + (resp.deleted?.security || 0);
+            (resp.deleted?.product || 0) +
+            (resp.deleted?.content || 0) +
+            (resp.deleted?.security || 0);
           this.toast.success(
             this.translate.instant('adminUi.audit.retention.successTitle'),
-            this.translate.instant(resp.dry_run ? 'adminUi.audit.retention.successDryRunCopy' : 'adminUi.audit.retention.successCopy', {
-              deleted
-            })
+            this.translate.instant(
+              resp.dry_run
+                ? 'adminUi.audit.retention.successDryRunCopy'
+                : 'adminUi.audit.retention.successCopy',
+              {
+                deleted,
+              },
+            ),
           );
         },
         error: () => {
           this.auditRetentionPurgeLoading = false;
-          this.auditRetentionPurgeError = this.translate.instant('adminUi.audit.retention.errors.purge');
-        }
+          this.auditRetentionPurgeError = this.translate.instant(
+            'adminUi.audit.retention.errors.purge',
+          );
+        },
       });
   }
 
@@ -3522,7 +4418,10 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     if (preset === 'content') return { entity: 'content', action: '' };
     if (preset === 'catalog') return { entity: 'product', action: '' };
     if (preset === 'payments') {
-      return { entity: 'security', action: 'stripe,paypal,netopia,refund,payment,webhook,coupon,checkout' };
+      return {
+        entity: 'security',
+        action: 'stripe,paypal,netopia,refund,payment,webhook,coupon,checkout',
+      };
     }
     return { entity: 'all', action: '' };
   }
@@ -3578,7 +4477,8 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   openAuditEntry(entry: AdminAuditEntryUnified): void {
     if (entry.entity === 'product') {
       const slug = (entry.ref_key || '').trim();
-      if (slug) void this.router.navigate(['/admin/products'], { state: { editProductSlug: slug } });
+      if (slug)
+        void this.router.navigate(['/admin/products'], { state: { editProductSlug: slug } });
       return;
     }
 
@@ -3630,8 +4530,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
           setTimeout(() => URL.revokeObjectURL(url), 1000);
         },
         error: () => {
-          this.toast.error(this.translate.instant('adminUi.audit.errors.loadTitle'), this.translate.instant('adminUi.audit.errors.loadCopy'));
-        }
+          this.toast.error(
+            this.translate.instant('adminUi.audit.errors.loadTitle'),
+            this.translate.instant('adminUi.audit.errors.loadCopy'),
+          );
+        },
       });
   }
 
@@ -3658,14 +4561,13 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
           this.ownerTransferPassword = '';
           this.toast.success(
             this.translate.instant('adminUi.ownerTransfer.successTitle'),
-            this.translate.instant('adminUi.ownerTransfer.successCopy')
+            this.translate.instant('adminUi.ownerTransfer.successCopy'),
           );
         },
         error: () => {
           this.ownerTransferLoading = false;
           this.ownerTransferError = this.translate.instant('adminUi.ownerTransfer.errors.generic');
-        }
+        },
       });
   }
 }
-

@@ -33,14 +33,14 @@ describe('BlogListComponent SEO', () => {
     routeStub = {
       snapshot: { params: {}, queryParams: {} },
       params: routeParams$.asObservable(),
-      queryParams: routeQueryParams$.asObservable()
+      queryParams: routeQueryParams$.asObservable(),
     };
 
     blog.listPosts.and.returnValue(
       of({
         items: [],
-        meta: { total_items: 0, total_pages: 1, page: 1, limit: 9 }
-      })
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 9 },
+      }),
     );
 
     TestBed.configureTestingModule({
@@ -51,14 +51,18 @@ describe('BlogListComponent SEO', () => {
         { provide: BlogService, useValue: blog },
         { provide: ActivatedRoute, useValue: routeStub },
         { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
-        { provide: DOCUMENT, useValue: doc }
-      ]
+        { provide: DOCUMENT, useValue: doc },
+      ],
     });
   });
 
   it('sets canonical and meta tags based on language', () => {
     const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', { blog: { metaTitle: 'Blog | Test', metaDescription: 'Desc', title: 'Blog' } }, true);
+    translate.setTranslation(
+      'en',
+      { blog: { metaTitle: 'Blog | Test', metaDescription: 'Desc', title: 'Blog' } },
+      true,
+    );
     translate.use('en');
 
     const fixture = TestBed.createComponent(BlogListComponent);
@@ -73,7 +77,9 @@ describe('BlogListComponent SEO', () => {
     expect(canonical?.getAttribute('href')).toContain('/blog');
     expect(canonical?.getAttribute('href')).not.toContain('lang=en');
 
-    const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
+    const alternates = Array.from(
+      doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'),
+    );
     expect(alternates.length).toBe(3);
 
     const routeSchema = doc.querySelector('script#seo-route-schema-1');
@@ -98,10 +104,10 @@ describe('BlogListComponent SEO', () => {
           slug: 'new-post',
           title: 'New Post',
           excerpt: 'Excerpt',
-          tags: []
-        }
+          tags: [],
+        },
       ],
-      meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 }
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 },
     });
     second$.complete();
 
@@ -115,10 +121,10 @@ describe('BlogListComponent SEO', () => {
           slug: 'old-post',
           title: 'Old Post',
           excerpt: 'Excerpt',
-          tags: []
-        }
+          tags: [],
+        },
       ],
-      meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 }
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 },
     });
     first$.complete();
 
@@ -137,8 +143,8 @@ describe('BlogListComponent SEO', () => {
       jasmine.objectContaining({
         q: 'brosa',
         tag: 'featured',
-        page: 2
-      })
+        page: 2,
+      }),
     );
   });
 
@@ -152,16 +158,18 @@ describe('BlogListComponent SEO', () => {
             excerpt: 'Excerpt',
             cover_image_url: '/media/hero.jpg',
             cover_fit: 'contain',
-            tags: []
-          }
+            tags: [],
+          },
         ],
-        meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 }
-      })
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 9 },
+      }),
     );
     const fixture = TestBed.createComponent(BlogListComponent);
     fixture.detectChanges();
 
-    const heroImage = fixture.nativeElement.querySelector('img[alt="Hero post"]') as HTMLImageElement | null;
+    const heroImage = fixture.nativeElement.querySelector(
+      'img[alt="Hero post"]',
+    ) as HTMLImageElement | null;
     expect(heroImage).toBeTruthy();
     expect(heroImage?.className).not.toContain('opacity-0');
     expect((fixture.componentInstance as any).markImageLoaded).toBeUndefined();

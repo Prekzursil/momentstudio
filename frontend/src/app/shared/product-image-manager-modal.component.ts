@@ -25,7 +25,14 @@ type ImageMetaByLang = {
 @Component({
   selector: 'app-product-image-manager-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, ModalComponent, ButtonComponent, InputComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TranslateModule,
+    ModalComponent,
+    ButtonComponent,
+    InputComponent,
+  ],
   template: `
     <app-modal
       [open]="open"
@@ -49,7 +56,7 @@ type ImageMetaByLang = {
             class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
             [ngClass]="{
               'cursor-move': canReorder(),
-              'ring-2 ring-indigo-400': dragOverImageId === (img.id || '')
+              'ring-2 ring-indigo-400': dragOverImageId === (img.id || ''),
             }"
             [attr.draggable]="canReorder() ? 'true' : null"
             (dragstart)="onDragStart($event, img.id)"
@@ -66,7 +73,10 @@ type ImageMetaByLang = {
               <div class="grid gap-1 flex-1 min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
                   <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                    {{ 'adminUi.storefront.products.images.imageLabel' | translate : { index: idx + 1 } }}
+                    {{
+                      'adminUi.storefront.products.images.imageLabel'
+                        | translate: { index: idx + 1 }
+                    }}
                   </p>
                   <span
                     *ngIf="idx === 0"
@@ -90,7 +100,11 @@ type ImageMetaByLang = {
               <app-button
                 size="sm"
                 variant="ghost"
-                [label]="editingImageId === img.id ? ('adminUi.common.cancel' | translate) : ('adminUi.common.edit' | translate)"
+                [label]="
+                  editingImageId === img.id
+                    ? ('adminUi.common.cancel' | translate)
+                    : ('adminUi.common.edit' | translate)
+                "
                 [disabled]="metaBusy || orderSaving"
                 (action)="toggleMeta(img.id)"
               ></app-button>
@@ -105,17 +119,25 @@ type ImageMetaByLang = {
               </div>
 
               <div *ngIf="!metaBusy" class="grid gap-3">
-                <p *ngIf="metaError" class="text-xs text-rose-700 dark:text-rose-300">{{ metaError }}</p>
+                <p *ngIf="metaError" class="text-xs text-rose-700 dark:text-rose-300">
+                  {{ metaError }}
+                </p>
                 <div class="grid gap-4 sm:grid-cols-2">
                   <div class="grid gap-2">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">RO</p>
+                    <p
+                      class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+                    >
+                      RO
+                    </p>
                     <app-input
                       [label]="'adminUi.products.form.imageAltText' | translate"
                       [value]="imageMeta.ro.alt_text"
                       [disabled]="metaSaving"
                       (valueChange)="imageMeta.ro.alt_text = String($event ?? '')"
                     ></app-input>
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
                       <span>{{ 'adminUi.products.form.imageCaption' | translate }}</span>
                       <textarea
                         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
@@ -127,14 +149,20 @@ type ImageMetaByLang = {
                   </div>
 
                   <div class="grid gap-2">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">EN</p>
+                    <p
+                      class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
+                    >
+                      EN
+                    </p>
                     <app-input
                       [label]="'adminUi.products.form.imageAltText' | translate"
                       [value]="imageMeta.en.alt_text"
                       [disabled]="metaSaving"
                       (valueChange)="imageMeta.en.alt_text = String($event ?? '')"
                     ></app-input>
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
                       <span>{{ 'adminUi.products.form.imageCaption' | translate }}</span>
                       <textarea
                         class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
@@ -152,7 +180,11 @@ type ImageMetaByLang = {
                   </span>
                   <app-button
                     size="sm"
-                    [label]="metaSaving ? ('adminUi.common.saving' | translate) : ('adminUi.common.save' | translate)"
+                    [label]="
+                      metaSaving
+                        ? ('adminUi.common.saving' | translate)
+                        : ('adminUi.common.save' | translate)
+                    "
                     [disabled]="metaSaving"
                     (action)="saveMeta()"
                   ></app-button>
@@ -165,7 +197,7 @@ type ImageMetaByLang = {
         <p *ngIf="orderError" class="text-xs text-rose-700 dark:text-rose-300">{{ orderError }}</p>
       </div>
     </app-modal>
-  `
+  `,
 })
 export class ProductImageManagerModalComponent implements OnChanges {
   @Input() open = false;
@@ -189,7 +221,11 @@ export class ProductImageManagerModalComponent implements OnChanges {
   imageMeta: ImageMetaByLang = this.blankImageMeta();
   metaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
 
-  constructor(private readonly admin: AdminService, private toast: ToastService, private translate: TranslateService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private toast: ToastService,
+    private translate: TranslateService,
+  ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!('open' in changes) && !('images' in changes)) return;
@@ -294,14 +330,22 @@ export class ProductImageManagerModalComponent implements OnChanges {
         const caption = (this.imageMeta[lang].caption || '').trim();
         if (!alt && !caption) {
           if (this.metaExists[lang]) {
-            return this.admin.deleteProductImageTranslation(slug, imageId, lang, { source: 'storefront' });
+            return this.admin.deleteProductImageTranslation(slug, imageId, lang, {
+              source: 'storefront',
+            });
           }
           return null;
         }
-        return this.admin.upsertProductImageTranslation(slug, imageId, lang, {
-          alt_text: alt || null,
-          caption: caption || null
-        }, { source: 'storefront' });
+        return this.admin.upsertProductImageTranslation(
+          slug,
+          imageId,
+          lang,
+          {
+            alt_text: alt || null,
+            caption: caption || null,
+          },
+          { source: 'storefront' },
+        );
       })
       .filter(Boolean);
 
@@ -318,7 +362,7 @@ export class ProductImageManagerModalComponent implements OnChanges {
       error: () => {
         this.metaSaving = false;
         this.metaError = this.translate.instant('adminUi.products.form.imageMetaSaveError');
-      }
+      },
     });
   }
 
@@ -333,9 +377,12 @@ export class ProductImageManagerModalComponent implements OnChanges {
       .map((img) => ({
         id: typeof img?.id === 'string' ? img.id : undefined,
         url: String(img?.url || '').trim(),
-        alt_text: typeof img?.alt_text === 'string' ? img.alt_text : img?.alt_text ?? null,
-        caption: typeof img?.caption === 'string' ? img.caption : img?.caption ?? null,
-        sort_order: typeof img?.sort_order === 'number' && Number.isFinite(img.sort_order) ? img.sort_order : 0
+        alt_text: typeof img?.alt_text === 'string' ? img.alt_text : (img?.alt_text ?? null),
+        caption: typeof img?.caption === 'string' ? img.caption : (img?.caption ?? null),
+        sort_order:
+          typeof img?.sort_order === 'number' && Number.isFinite(img.sort_order)
+            ? img.sort_order
+            : 0,
       }))
       .filter((img) => Boolean(img.url));
     normalized.sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0));
@@ -373,13 +420,17 @@ export class ProductImageManagerModalComponent implements OnChanges {
 
     const updates = this.draftImages.map((img, idx) => ({
       id: String(img.id || '').trim(),
-      sort_order: idx + 1
+      sort_order: idx + 1,
     }));
     this.orderSaving = true;
     this.orderError = '';
     this.draggingImageId = null;
     this.dragOverImageId = null;
-    forkJoin(updates.map((row) => this.admin.reorderProductImage(slug, row.id, row.sort_order, { source: 'storefront' }))).subscribe({
+    forkJoin(
+      updates.map((row) =>
+        this.admin.reorderProductImage(slug, row.id, row.sort_order, { source: 'storefront' }),
+      ),
+    ).subscribe({
       next: () => {
         this.orderSaving = false;
         for (const row of updates) {
@@ -387,19 +438,21 @@ export class ProductImageManagerModalComponent implements OnChanges {
           if (match) match.sort_order = row.sort_order;
         }
         this.imagesChange.emit([...this.draftImages]);
-        const currentIds = this.draftImages.map((img) => String(img.id || '').trim()).filter(Boolean);
+        const currentIds = this.draftImages
+          .map((img) => String(img.id || '').trim())
+          .filter(Boolean);
         this.toast.action(
           this.translate.instant('adminUi.storefront.products.images.reorderSuccess'),
           this.translate.instant('adminUi.common.undo'),
           () => this.undoImageOrder(previousIds, currentIds),
-          { tone: 'success' }
+          { tone: 'success' },
         );
       },
       error: () => {
         this.orderSaving = false;
         this.orderError = this.translate.instant('adminUi.storefront.products.images.reorderError');
         this.restoreDraftOrder(previousIds);
-      }
+      },
     });
   }
 
@@ -414,7 +467,11 @@ export class ProductImageManagerModalComponent implements OnChanges {
     const updates = ids.map((id, idx) => ({ id, sort_order: idx + 1 }));
     this.orderSaving = true;
     this.orderError = '';
-    forkJoin(updates.map((row) => this.admin.reorderProductImage(slug, row.id, row.sort_order, { source: 'storefront' }))).subscribe({
+    forkJoin(
+      updates.map((row) =>
+        this.admin.reorderProductImage(slug, row.id, row.sort_order, { source: 'storefront' }),
+      ),
+    ).subscribe({
       next: () => {
         this.orderSaving = false;
         for (const row of updates) {
@@ -428,7 +485,7 @@ export class ProductImageManagerModalComponent implements OnChanges {
         this.orderSaving = false;
         this.restoreDraftOrder(currentIds);
         this.toast.error(this.translate.instant('adminUi.storefront.undoFailed'));
-      }
+      },
     });
   }
 
@@ -471,7 +528,7 @@ export class ProductImageManagerModalComponent implements OnChanges {
       error: () => {
         this.metaBusy = false;
         this.metaError = this.translate.instant('adminUi.storefront.products.images.metaLoadError');
-      }
+      },
     });
   }
 
@@ -496,4 +553,3 @@ export class ProductImageManagerModalComponent implements OnChanges {
     this.clearMeta();
   }
 }
-

@@ -1,5 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { Component, EffectRef, HostListener, Injector, OnDestroy, OnInit, effect, inject } from '@angular/core';
+import {
+  Component,
+  EffectRef,
+  HostListener,
+  Injector,
+  OnDestroy,
+  OnInit,
+  effect,
+  inject,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -49,40 +58,53 @@ type AdminNavItemView = AdminNavItem & {
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive, RouterOutlet, TranslateModule, ContainerComponent, ModalComponent],
-	  template: `
-	    <app-container classes="py-8">
-        <div class="mb-3 flex lg:hidden items-center justify-between gap-3">
-          <button
-            type="button"
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-            (click)="toggleMobileSidebar()"
-            [attr.aria-expanded]="mobileSidebarOpen"
-            [attr.aria-label]="'adminUi.nav.openMenu' | translate"
-          >
-            ☰
-            <span>{{ 'adminUi.nav.title' | translate }}</span>
-          </button>
-        </div>
-
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    RouterLinkActive,
+    RouterOutlet,
+    TranslateModule,
+    ContainerComponent,
+    ModalComponent,
+  ],
+  template: `
+    <app-container classes="py-8">
+      <div class="mb-3 flex lg:hidden items-center justify-between gap-3">
         <button
-          *ngIf="!isDesktop && mobileSidebarOpen"
           type="button"
-          class="fixed inset-0 z-[130] bg-slate-950/40 backdrop-blur-[1px] lg:hidden"
-          [attr.aria-label]="'adminUi.actions.cancel' | translate"
-          (click)="closeMobileSidebar()"
-        ></button>
+          class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          (click)="toggleMobileSidebar()"
+          [attr.aria-expanded]="mobileSidebarOpen"
+          [attr.aria-label]="'adminUi.nav.openMenu' | translate"
+        >
+          ☰
+          <span>{{ 'adminUi.nav.title' | translate }}</span>
+        </button>
+      </div>
 
-	      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
-	        <aside
-	          class="rounded-2xl border border-slate-200 bg-white grid text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 lg:self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
-            [ngClass]="[
-              uiPrefs.sidebarCompact() ? 'p-3 gap-0.5 text-xs' : 'p-4 gap-1 text-sm',
-              !isDesktop && !mobileSidebarOpen ? 'hidden' : '',
-              !isDesktop && mobileSidebarOpen ? 'fixed inset-y-0 left-0 z-[140] w-[86vw] max-w-xs max-h-none overflow-y-auto shadow-2xl' : ''
-            ]"
-	        >
-          <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 pb-2">
+      <button
+        *ngIf="!isDesktop && mobileSidebarOpen"
+        type="button"
+        class="fixed inset-0 z-[130] bg-slate-950/40 backdrop-blur-[1px] lg:hidden"
+        [attr.aria-label]="'adminUi.actions.cancel' | translate"
+        (click)="closeMobileSidebar()"
+      ></button>
+
+      <div class="grid lg:grid-cols-[260px_1fr] gap-6">
+        <aside
+          class="rounded-2xl border border-slate-200 bg-white grid text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 lg:self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto"
+          [ngClass]="[
+            uiPrefs.sidebarCompact() ? 'p-3 gap-0.5 text-xs' : 'p-4 gap-1 text-sm',
+            !isDesktop && !mobileSidebarOpen ? 'hidden' : '',
+            !isDesktop && mobileSidebarOpen
+              ? 'fixed inset-y-0 left-0 z-[140] w-[86vw] max-w-xs max-h-none overflow-y-auto shadow-2xl'
+              : '',
+          ]"
+        >
+          <div
+            class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400 pb-2"
+          >
             {{ 'adminUi.nav.title' | translate }}
           </div>
 
@@ -109,121 +131,164 @@ type AdminNavItemView = AdminNavItem & {
             </div>
           </label>
 
-          <div *ngIf="navQuery.trim() && filteredNavItemsView.length === 0" class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400">
+          <div
+            *ngIf="navQuery.trim() && filteredNavItemsView.length === 0"
+            class="px-3 pb-2 text-xs text-slate-500 dark:text-slate-400"
+          >
             {{ 'adminUi.nav.searchEmpty' | translate }}
           </div>
 
-            <details *ngIf="!navQuery.trim()" class="group pb-2">
-              <summary
-                class="flex items-center justify-between gap-3 px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 cursor-pointer select-none dark:text-slate-400 [&::-webkit-details-marker]:hidden"
+          <details *ngIf="!navQuery.trim()" class="group pb-2">
+            <summary
+              class="flex items-center justify-between gap-3 px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 cursor-pointer select-none dark:text-slate-400 [&::-webkit-details-marker]:hidden"
+            >
+              <span>{{ 'adminUi.nav.preferences' | translate }}</span>
+              <span aria-hidden="true" class="text-slate-400 transition group-open:rotate-90"
+                >▸</span
               >
-                <span>{{ 'adminUi.nav.preferences' | translate }}</span>
-                <span aria-hidden="true" class="text-slate-400 transition group-open:rotate-90">▸</span>
-              </summary>
+            </summary>
 
-              <div class="px-3 pt-2 grid gap-3">
-                <label class="flex items-center justify-between gap-3 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  <span>{{ 'adminUi.nav.compactSidebar' | translate }}</span>
-                  <input type="checkbox" [checked]="uiPrefs.sidebarCompact()" (change)="toggleSidebarCompact($event)" />
-                </label>
+            <div class="px-3 pt-2 grid gap-3">
+              <label
+                class="flex items-center justify-between gap-3 text-xs font-medium text-slate-600 dark:text-slate-300"
+              >
+                <span>{{ 'adminUi.nav.compactSidebar' | translate }}</span>
+                <input
+                  type="checkbox"
+                  [checked]="uiPrefs.sidebarCompact()"
+                  (change)="toggleSidebarCompact($event)"
+                />
+              </label>
 
-                <div *ngIf="auth.role() === 'owner'">
-                  <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                    <span>{{ 'adminUi.uiPreset.title' | translate }}</span>
-                  </div>
-                  <div class="mt-1 flex items-center justify-between gap-3">
-                    <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                      <button
-                        type="button"
-                        class="px-3 py-1.5 text-xs font-semibold"
-                        [class.bg-slate-900]="uiPrefs.preset() === 'owner_basic'"
-                        [class.text-white]="uiPrefs.preset() === 'owner_basic'"
-                        [class.text-slate-700]="uiPrefs.preset() !== 'owner_basic'"
-                        [class.dark:text-slate-200]="uiPrefs.preset() !== 'owner_basic'"
-                        (click)="uiPrefs.setPreset('owner_basic')"
-                      >
-                        {{ 'adminUi.uiPreset.ownerBasic' | translate }}
-                      </button>
-                      <button
-                        type="button"
-                        class="px-3 py-1.5 text-xs font-semibold"
-                        [class.bg-slate-900]="uiPrefs.preset() === 'custom'"
-                        [class.text-white]="uiPrefs.preset() === 'custom'"
-                        [class.text-slate-700]="uiPrefs.preset() !== 'custom'"
-                        [class.dark:text-slate-200]="uiPrefs.preset() !== 'custom'"
-                        (click)="uiPrefs.setPreset('custom')"
-                      >
-                        {{ 'adminUi.uiPreset.custom' | translate }}
-                      </button>
-                    </div>
-                  </div>
-                  <div *ngIf="!uiPrefs.sidebarCompact()" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.uiPreset.hint' | translate }}
+              <div *ngIf="auth.role() === 'owner'">
+                <div
+                  class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  <span>{{ 'adminUi.uiPreset.title' | translate }}</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between gap-3">
+                  <div
+                    class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="uiPrefs.preset() === 'owner_basic'"
+                      [class.text-white]="uiPrefs.preset() === 'owner_basic'"
+                      [class.text-slate-700]="uiPrefs.preset() !== 'owner_basic'"
+                      [class.dark:text-slate-200]="uiPrefs.preset() !== 'owner_basic'"
+                      (click)="uiPrefs.setPreset('owner_basic')"
+                    >
+                      {{ 'adminUi.uiPreset.ownerBasic' | translate }}
+                    </button>
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="uiPrefs.preset() === 'custom'"
+                      [class.text-white]="uiPrefs.preset() === 'custom'"
+                      [class.text-slate-700]="uiPrefs.preset() !== 'custom'"
+                      [class.dark:text-slate-200]="uiPrefs.preset() !== 'custom'"
+                      (click)="uiPrefs.setPreset('custom')"
+                    >
+                      {{ 'adminUi.uiPreset.custom' | translate }}
+                    </button>
                   </div>
                 </div>
-
-                <div>
-                  <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                    <span>{{ 'adminUi.uiMode.title' | translate }}</span>
-                  </div>
-                  <div class="mt-1 flex items-center justify-between gap-3">
-                    <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                      <button
-                        type="button"
-                        class="px-3 py-1.5 text-xs font-semibold"
-                        [class.bg-slate-900]="uiPrefs.mode() === 'simple'"
-                        [class.text-white]="uiPrefs.mode() === 'simple'"
-                        [class.text-slate-700]="uiPrefs.mode() !== 'simple'"
-                        [class.dark:text-slate-200]="uiPrefs.mode() !== 'simple'"
-                        (click)="uiPrefs.setMode('simple')"
-                      >
-                        {{ 'adminUi.uiMode.simple' | translate }}
-                      </button>
-                      <button
-                        type="button"
-                        class="px-3 py-1.5 text-xs font-semibold"
-                        [class.bg-slate-900]="uiPrefs.mode() === 'advanced'"
-                        [class.text-white]="uiPrefs.mode() === 'advanced'"
-                        [class.text-slate-700]="uiPrefs.mode() !== 'advanced'"
-                        [class.dark:text-slate-200]="uiPrefs.mode() !== 'advanced'"
-                        (click)="uiPrefs.setMode('advanced')"
-                      >
-                        {{ 'adminUi.uiMode.advanced' | translate }}
-                      </button>
-                    </div>
-                  </div>
-                  <div *ngIf="!uiPrefs.sidebarCompact()" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {{ (uiPrefs.mode() === 'simple' ? 'adminUi.uiMode.simpleHint' : 'adminUi.uiMode.advancedHint') | translate }}
-                  </div>
-                </div>
-
-                <div>
-                  <div class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                    <span>{{ 'adminUi.trainingMode.title' | translate }}</span>
-                    <label class="inline-flex items-center gap-2 text-xs font-medium normal-case text-slate-600 dark:text-slate-300">
-                      <input
-                        type="checkbox"
-                        [checked]="isTrainingMode()"
-                        [disabled]="trainingSaving"
-                        (change)="toggleTrainingMode($event)"
-                      />
-                      <span>{{ isTrainingMode() ? ('adminUi.trainingMode.on' | translate) : ('adminUi.trainingMode.off' | translate) }}</span>
-                    </label>
-                  </div>
-                  <div *ngIf="isTrainingMode() && !uiPrefs.sidebarCompact()" class="mt-1 text-xs text-amber-700 dark:text-amber-200">
-                    {{ 'adminUi.trainingMode.hint' | translate }}
-                  </div>
-                  <div *ngIf="trainingError" class="mt-1 text-xs text-rose-700 dark:text-rose-200">
-                    {{ trainingError }}
-                  </div>
+                <div
+                  *ngIf="!uiPrefs.sidebarCompact()"
+                  class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.uiPreset.hint' | translate }}
                 </div>
               </div>
 
-              <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
-            </details>
+              <div>
+                <div
+                  class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  <span>{{ 'adminUi.uiMode.title' | translate }}</span>
+                </div>
+                <div class="mt-1 flex items-center justify-between gap-3">
+                  <div
+                    class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="uiPrefs.mode() === 'simple'"
+                      [class.text-white]="uiPrefs.mode() === 'simple'"
+                      [class.text-slate-700]="uiPrefs.mode() !== 'simple'"
+                      [class.dark:text-slate-200]="uiPrefs.mode() !== 'simple'"
+                      (click)="uiPrefs.setMode('simple')"
+                    >
+                      {{ 'adminUi.uiMode.simple' | translate }}
+                    </button>
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 text-xs font-semibold"
+                      [class.bg-slate-900]="uiPrefs.mode() === 'advanced'"
+                      [class.text-white]="uiPrefs.mode() === 'advanced'"
+                      [class.text-slate-700]="uiPrefs.mode() !== 'advanced'"
+                      [class.dark:text-slate-200]="uiPrefs.mode() !== 'advanced'"
+                      (click)="uiPrefs.setMode('advanced')"
+                    >
+                      {{ 'adminUi.uiMode.advanced' | translate }}
+                    </button>
+                  </div>
+                </div>
+                <div
+                  *ngIf="!uiPrefs.sidebarCompact()"
+                  class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                >
+                  {{
+                    (uiPrefs.mode() === 'simple'
+                      ? 'adminUi.uiMode.simpleHint'
+                      : 'adminUi.uiMode.advancedHint'
+                    ) | translate
+                  }}
+                </div>
+              </div>
+
+              <div>
+                <div
+                  class="flex items-center justify-between gap-3 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  <span>{{ 'adminUi.trainingMode.title' | translate }}</span>
+                  <label
+                    class="inline-flex items-center gap-2 text-xs font-medium normal-case text-slate-600 dark:text-slate-300"
+                  >
+                    <input
+                      type="checkbox"
+                      [checked]="isTrainingMode()"
+                      [disabled]="trainingSaving"
+                      (change)="toggleTrainingMode($event)"
+                    />
+                    <span>{{
+                      isTrainingMode()
+                        ? ('adminUi.trainingMode.on' | translate)
+                        : ('adminUi.trainingMode.off' | translate)
+                    }}</span>
+                  </label>
+                </div>
+                <div
+                  *ngIf="isTrainingMode() && !uiPrefs.sidebarCompact()"
+                  class="mt-1 text-xs text-amber-700 dark:text-amber-200"
+                >
+                  {{ 'adminUi.trainingMode.hint' | translate }}
+                </div>
+                <div *ngIf="trainingError" class="mt-1 text-xs text-rose-700 dark:text-rose-200">
+                  {{ trainingError }}
+                </div>
+              </div>
+            </div>
+
+            <div class="my-2 h-px bg-slate-200 dark:bg-slate-800/70"></div>
+          </details>
 
           <div *ngIf="shouldShowAlerts()" class="pb-2">
-            <div class="flex items-center justify-between px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <div
+              class="flex items-center justify-between px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               <span>{{ 'adminUi.alerts.title' | translate }}</span>
               <button
                 type="button"
@@ -253,7 +318,9 @@ type AdminNavItemView = AdminNavItem & {
                 (click)="goToInventory()"
               >
                 <span class="truncate">{{ 'adminUi.alerts.lowStock' | translate }}</span>
-                <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-100">
+                <span
+                  class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+                >
                   {{ lowStockCount }}
                 </span>
               </button>
@@ -266,7 +333,9 @@ type AdminNavItemView = AdminNavItem & {
                 (click)="goToOps('webhooks')"
               >
                 <span class="truncate">{{ 'adminUi.alerts.failedWebhooks' | translate }}</span>
-                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100">
+                <span
+                  class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100"
+                >
                   {{ failedWebhooksCount }}
                 </span>
               </button>
@@ -279,7 +348,9 @@ type AdminNavItemView = AdminNavItem & {
                 (click)="goToOps('emails')"
               >
                 <span class="truncate">{{ 'adminUi.alerts.failedEmails' | translate }}</span>
-                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100">
+                <span
+                  class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100"
+                >
                   {{ failedEmailsCount }}
                 </span>
               </button>
@@ -289,7 +360,9 @@ type AdminNavItemView = AdminNavItem & {
           </div>
 
           <div *ngIf="!navQuery.trim() && favoriteNavItemsView.length" class="pb-2">
-            <div class="px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <div
+              class="px-3 pb-1 text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               {{ 'adminUi.favorites.title' | translate }}
             </div>
             <div class="grid gap-1">
@@ -316,7 +389,10 @@ type AdminNavItemView = AdminNavItem & {
               {{ group.labelKey | translate }}
             </div>
 
-            <div *ngFor="let item of group.items; trackBy: trackByNavPath" class="flex items-center gap-1">
+            <div
+              *ngFor="let item of group.items; trackBy: trackByNavPath"
+              class="flex items-center gap-1"
+            >
               <a
                 [routerLink]="item.path"
                 routerLinkActive="bg-slate-100 text-slate-900 dark:bg-slate-800/70 dark:text-white"
@@ -327,7 +403,9 @@ type AdminNavItemView = AdminNavItem & {
               >
                 <ng-container *ngIf="navQuery.trim(); else fullLabel">
                   <span>{{ item.highlightBefore }}</span>
-                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{ item.highlightMatch }}</span>
+                  <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                    item.highlightMatch
+                  }}</span>
                   <span>{{ item.highlightAfter }}</span>
                 </ng-container>
                 <ng-template #fullLabel>{{ item.label }}</ng-template>
@@ -335,78 +413,91 @@ type AdminNavItemView = AdminNavItem & {
               <button
                 type="button"
                 class="h-9 w-9 rounded-lg border border-transparent text-slate-400 hover:bg-slate-50 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
-                [attr.aria-label]="(item.isFavorite ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin') | translate"
+                [attr.aria-label]="
+                  (item.isFavorite ? 'adminUi.favorites.unpin' : 'adminUi.favorites.pin')
+                    | translate
+                "
                 (click)="toggleNavFavorite(item, $event)"
               >
-                <span aria-hidden="true" class="text-base leading-none" [class.text-amber-500]="item.isFavorite">
+                <span
+                  aria-hidden="true"
+                  class="text-base leading-none"
+                  [class.text-amber-500]="item.isFavorite"
+                >
                   {{ item.isFavorite ? '★' : '☆' }}
                 </span>
               </button>
             </div>
           </ng-container>
 
-            <div class="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-              <button
-                type="button"
-                class="w-full rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
-                [ngClass]="uiPrefs.sidebarCompact() ? 'px-2.5 py-1.5 text-xs font-semibold' : 'px-3 py-2 text-sm font-semibold'"
-                (click)="openFeedback(); handleNavSelection()"
-              >
-                {{ 'adminUi.feedback.open' | translate }}
-              </button>
-            </div>
-	        </aside>
-	
-	        <main class="min-w-0">
-	          <router-outlet></router-outlet>
-	        </main>
-	      </div>
-
-        <app-modal
-          [open]="feedbackOpen"
-          [title]="'adminUi.feedback.title' | translate"
-          [subtitle]="'adminUi.feedback.subtitle' | translate"
-          [cancelLabel]="'adminUi.actions.cancel' | translate"
-          [confirmLabel]="'adminUi.feedback.submit' | translate"
-          [confirmDisabled]="feedbackSending || !(feedbackMessage || '').trim()"
-          (confirm)="submitFeedback()"
-          (closed)="closeFeedback()"
-        >
-          <div class="grid gap-3">
-            <p class="text-xs text-slate-600 dark:text-slate-300">
-              {{ 'adminUi.feedback.hint' | translate }}
-            </p>
-
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'adminUi.feedback.messageLabel' | translate }}
-              <textarea
-                class="min-h-[120px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [placeholder]="'adminUi.feedback.messagePlaceholder' | translate"
-                [(ngModel)]="feedbackMessage"
-              ></textarea>
-            </label>
-
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'adminUi.feedback.contextLabel' | translate }}
-              <textarea
-                class="min-h-[84px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [placeholder]="'adminUi.feedback.contextPlaceholder' | translate"
-                [(ngModel)]="feedbackContext"
-              ></textarea>
-            </label>
-
-            <label class="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-              <input type="checkbox" [(ngModel)]="feedbackIncludePage" />
-              {{ 'adminUi.feedback.includePage' | translate }}
-            </label>
-
-            <div *ngIf="feedbackError" class="text-sm text-rose-700 dark:text-rose-200">
-              {{ feedbackError }}
-            </div>
+          <div class="mt-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              class="w-full rounded-lg hover:bg-slate-50 hover:text-slate-900 dark:hover:bg-slate-800/60 dark:hover:text-white"
+              [ngClass]="
+                uiPrefs.sidebarCompact()
+                  ? 'px-2.5 py-1.5 text-xs font-semibold'
+                  : 'px-3 py-2 text-sm font-semibold'
+              "
+              (click)="openFeedback(); handleNavSelection()"
+            >
+              {{ 'adminUi.feedback.open' | translate }}
+            </button>
           </div>
-        </app-modal>
-	    </app-container>
-	  `
+        </aside>
+
+        <main class="min-w-0">
+          <router-outlet></router-outlet>
+        </main>
+      </div>
+
+      <app-modal
+        [open]="feedbackOpen"
+        [title]="'adminUi.feedback.title' | translate"
+        [subtitle]="'adminUi.feedback.subtitle' | translate"
+        [cancelLabel]="'adminUi.actions.cancel' | translate"
+        [confirmLabel]="'adminUi.feedback.submit' | translate"
+        [confirmDisabled]="feedbackSending || !(feedbackMessage || '').trim()"
+        (confirm)="submitFeedback()"
+        (closed)="closeFeedback()"
+      >
+        <div class="grid gap-3">
+          <p class="text-xs text-slate-600 dark:text-slate-300">
+            {{ 'adminUi.feedback.hint' | translate }}
+          </p>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.feedback.messageLabel' | translate }}
+            <textarea
+              class="min-h-[120px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [placeholder]="'adminUi.feedback.messagePlaceholder' | translate"
+              [(ngModel)]="feedbackMessage"
+            ></textarea>
+          </label>
+
+          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'adminUi.feedback.contextLabel' | translate }}
+            <textarea
+              class="min-h-[84px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              [placeholder]="'adminUi.feedback.contextPlaceholder' | translate"
+              [(ngModel)]="feedbackContext"
+            ></textarea>
+          </label>
+
+          <label
+            class="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300"
+          >
+            <input type="checkbox" [(ngModel)]="feedbackIncludePage" />
+            {{ 'adminUi.feedback.includePage' | translate }}
+          </label>
+
+          <div *ngIf="feedbackError" class="text-sm text-rose-700 dark:text-rose-200">
+            {{ feedbackError }}
+          </div>
+        </div>
+      </app-modal>
+    </app-container>
+  `,
 })
 export class AdminLayoutComponent implements OnInit, OnDestroy {
   constructor(
@@ -419,7 +510,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     private readonly admin: AdminService,
     private readonly ops: OpsService,
     private readonly support: AdminSupportService,
-    private readonly toast: ToastService
+    private readonly toast: ToastService,
   ) {}
 
   private readonly injector = inject(Injector);
@@ -452,7 +543,12 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   groupedFilteredNavItemsView: AdminNavGroup[] = [];
 
   private readonly allNavItems: AdminNavItem[] = [
-    { path: '/admin/dashboard', labelKey: 'adminUi.nav.dashboard', section: 'dashboard', exact: true },
+    {
+      path: '/admin/dashboard',
+      labelKey: 'adminUi.nav.dashboard',
+      section: 'dashboard',
+      exact: true,
+    },
     { path: '/admin/content', labelKey: 'adminUi.nav.content', section: 'content' },
     { path: '/admin/products', labelKey: 'adminUi.nav.products', section: 'products' },
     { path: '/admin/inventory', labelKey: 'adminUi.nav.inventory', section: 'inventory' },
@@ -461,9 +557,16 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     { path: '/admin/coupons', labelKey: 'adminUi.nav.coupons', section: 'coupons' },
     { path: '/admin/users', labelKey: 'adminUi.nav.users', section: 'users' },
     { path: '/admin/support', labelKey: 'adminUi.nav.support', section: 'support' },
-    { path: '/admin/ops', labelKey: 'adminUi.nav.ops', section: 'ops' }
+    { path: '/admin/ops', labelKey: 'adminUi.nav.ops', section: 'ops' },
   ];
-  private readonly ownerBasicSections = new Set(['dashboard', 'content', 'products', 'orders', 'returns', 'support']);
+  private readonly ownerBasicSections = new Set([
+    'dashboard',
+    'content',
+    'products',
+    'orders',
+    'returns',
+    'support',
+  ]);
   private readonly sectionGroupMap: Record<string, AdminNavGroupKey> = {
     dashboard: 'overview',
     orders: 'ordersFulfillment',
@@ -474,7 +577,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     users: 'customersSupport',
     support: 'customersSupport',
     coupons: 'marketing',
-    ops: 'operationsSecurity'
+    ops: 'operationsSecurity',
   };
   private readonly groupOrder: AdminNavGroupKey[] = [
     'overview',
@@ -483,7 +586,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     'content',
     'customersSupport',
     'marketing',
-    'operationsSecurity'
+    'operationsSecurity',
   ];
   private readonly groupLabelKey: Record<AdminNavGroupKey, string> = {
     overview: 'adminUi.navGroup.overview',
@@ -492,7 +595,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     content: 'adminUi.navGroup.content',
     customersSupport: 'adminUi.navGroup.customersSupport',
     marketing: 'adminUi.navGroup.marketing',
-    operationsSecurity: 'adminUi.navGroup.operationsSecurity'
+    operationsSecurity: 'adminUi.navGroup.operationsSecurity',
   };
 
   get navItems(): AdminNavItem[] {
@@ -510,7 +613,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
         this.auth.user();
         this.recomputeNavViews();
       },
-      { injector: this.injector }
+      { injector: this.injector },
     );
     this.langSub = this.translate.onLangChange.subscribe(() => this.recomputeNavViews());
     this.recomputeNavViews();
@@ -603,7 +706,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       error: () => {
         this.feedbackSending = false;
         this.feedbackError = this.translate.instant('adminUi.feedback.errors.send');
-      }
+      },
     });
   }
 
@@ -624,7 +727,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       error: () => {
         this.trainingSaving = false;
         this.trainingError = this.translate.instant('adminUi.trainingMode.errors.save');
-      }
+      },
     });
   }
 
@@ -644,7 +747,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       label,
       subtitle: '',
       url: item.path,
-      state: null
+      state: null,
     });
     this.recomputeNavViews();
   }
@@ -763,14 +866,16 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     const query = this.navQuery.trim().toLowerCase();
     const isOwnerBasic = this.uiPrefs.preset() === 'owner_basic';
     const allowAdvanced = this.uiPrefs.mode() === 'advanced' && !isOwnerBasic;
-    const visibleBaseItems = allowAdvanced ? this.navItems : this.navItems.filter((item) => this.ownerBasicSections.has(item.section));
+    const visibleBaseItems = allowAdvanced
+      ? this.navItems
+      : this.navItems.filter((item) => this.ownerBasicSections.has(item.section));
 
     const favoritePaths = new Set(
       this.favorites
         .items()
         .filter((item) => item?.type === 'page')
         .map((item) => (item?.url || '').trim())
-        .filter(Boolean)
+        .filter(Boolean),
     );
 
     const toView = (item: AdminNavItem): AdminNavItemView => {
@@ -786,7 +891,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
         highlightBefore,
         highlightMatch,
         highlightAfter,
-        isFavorite: favoritePaths.has(item.path)
+        isFavorite: favoritePaths.has(item.path),
       };
     };
 
@@ -815,7 +920,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       .map((key) => ({
         key,
         labelKey: this.groupLabelKey[key],
-        items: grouped.get(key) ?? []
+        items: grouped.get(key) ?? [],
       }))
       .filter((group) => group.items.length > 0);
   }
@@ -840,7 +945,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       pending += 1;
       this.admin.summary({ range_days: 30 }).subscribe({
         next: (res) => {
-          const count = Number((res)?.low_stock ?? 0);
+          const count = Number(res?.low_stock ?? 0);
           this.lowStockCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
         },
         error: () => {
@@ -848,7 +953,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
           this.alertsError = this.translate.instant('adminUi.alerts.errors.load');
           done();
         },
-        complete: done
+        complete: done,
       });
     } else {
       this.lowStockCount = 0;
@@ -858,7 +963,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       pending += 1;
       this.ops.getWebhookFailureStats({ since_hours: 24 }).subscribe({
         next: (res) => {
-          const count = Number((res)?.failed ?? 0);
+          const count = Number(res?.failed ?? 0);
           this.failedWebhooksCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
         },
         error: () => {
@@ -866,13 +971,13 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
           this.alertsError = this.translate.instant('adminUi.alerts.errors.load');
           done();
         },
-        complete: done
+        complete: done,
       });
 
       pending += 1;
       this.ops.getEmailFailureStats({ since_hours: 24 }).subscribe({
         next: (res) => {
-          const count = Number((res)?.failed ?? 0);
+          const count = Number(res?.failed ?? 0);
           this.failedEmailsCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
         },
         error: () => {
@@ -880,7 +985,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
           this.alertsError = this.translate.instant('adminUi.alerts.errors.load');
           done();
         },
-        complete: done
+        complete: done,
       });
     } else {
       this.failedWebhooksCount = 0;
@@ -899,7 +1004,9 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     if (!normalized) return;
     if (/^\/admin\/orders\/[^/]+$/.test(normalized)) return;
 
-    const candidates = this.navItems.filter((item) => normalized === item.path || normalized.startsWith(`${item.path}/`));
+    const candidates = this.navItems.filter(
+      (item) => normalized === item.path || normalized.startsWith(`${item.path}/`),
+    );
     if (!candidates.length) return;
     const match = candidates.sort((a, b) => b.path.length - a.path.length)[0];
     if (!match) return;
@@ -924,8 +1031,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       label,
       subtitle,
       url: normalized,
-      state: null
+      state: null,
     });
   }
 }
-

@@ -58,7 +58,10 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_staff_token(session_factory, *, email: str, role: UserRole) -> str:
     async def create_and_token() -> str:
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email=email, password="password123", name="DAM staff"))
+            user = await create_user(
+                session,
+                UserCreate(email=email, password="password123", name="DAM staff"),
+            )
             user.role = role
             if role in (UserRole.admin, UserRole.owner):
                 session.add(
@@ -84,12 +87,18 @@ def _jpeg_bytes() -> bytes:
     return buf.getvalue()
 
 
-def test_media_dam_upload_finalize_and_lifecycle(test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_media_dam_upload_finalize_and_lifecycle(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin@example.com", role=UserRole.admin)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin@example.com", role=UserRole.admin
+    )
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
     queued_job_ids: list[str] = []
 
@@ -110,7 +119,9 @@ def test_media_dam_upload_finalize_and_lifecycle(test_app: Dict[str, object], tm
     assert asset["public_url"].startswith("/media/originals/")
     asset_id = asset["id"]
 
-    listed = client.get("/api/v1/content/admin/media/assets", headers=auth_headers(admin_token))
+    listed = client.get(
+        "/api/v1/content/admin/media/assets", headers=auth_headers(admin_token)
+    )
     assert listed.status_code == 200, listed.text
     assert any(row["id"] == asset_id for row in listed.json()["items"])
 
@@ -132,7 +143,9 @@ def test_media_dam_upload_finalize_and_lifecycle(test_app: Dict[str, object], tm
     listed_job_types = {item["job_type"] for item in listed_jobs.json()["items"]}
     assert {"ingest", "ai_tag", "duplicate_scan"}.issubset(listed_job_types)
 
-    job = client.get(f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token))
+    job = client.get(
+        f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token)
+    )
     assert job.status_code == 200, job.text
     assert job.json()["job_type"] == "ingest"
 
@@ -152,29 +165,52 @@ def test_media_dam_upload_finalize_and_lifecycle(test_app: Dict[str, object], tm
     assert approve.status_code == 200, approve.text
     assert approve.json()["status"] == "approved"
 
-    usage = client.get(f"/api/v1/content/admin/media/assets/{asset_id}/usage", headers=auth_headers(admin_token))
+    usage = client.get(
+        f"/api/v1/content/admin/media/assets/{asset_id}/usage",
+        headers=auth_headers(admin_token),
+    )
     assert usage.status_code == 200, usage.text
     assert usage.json()["asset_id"] == asset_id
 
-    to_trash = client.delete(f"/api/v1/content/admin/media/assets/{asset_id}", headers=auth_headers(admin_token))
+    to_trash = client.delete(
+        f"/api/v1/content/admin/media/assets/{asset_id}",
+        headers=auth_headers(admin_token),
+    )
     assert to_trash.status_code == 204, to_trash.text
 
-    restore = client.post(f"/api/v1/content/admin/media/assets/{asset_id}/restore", headers=auth_headers(admin_token))
+    restore = client.post(
+        f"/api/v1/content/admin/media/assets/{asset_id}/restore",
+        headers=auth_headers(admin_token),
+    )
     assert restore.status_code == 200, restore.text
     assert restore.json()["status"] == "draft"
 
-    client.delete(f"/api/v1/content/admin/media/assets/{asset_id}", headers=auth_headers(admin_token))
-    purge = client.post(f"/api/v1/content/admin/media/assets/{asset_id}/purge", headers=auth_headers(admin_token))
+    client.delete(
+        f"/api/v1/content/admin/media/assets/{asset_id}",
+        headers=auth_headers(admin_token),
+    )
+    purge = client.post(
+        f"/api/v1/content/admin/media/assets/{asset_id}/purge",
+        headers=auth_headers(admin_token),
+    )
     assert purge.status_code == 204, purge.text
 
 
-def test_media_dam_owner_admin_restrictions(test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_media_dam_owner_admin_restrictions(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-2@example.com", role=UserRole.admin)
-    content_token = create_staff_token(SessionLocal, email="dam-content@example.com", role=UserRole.content)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-2@example.com", role=UserRole.admin
+    )
+    content_token = create_staff_token(
+        SessionLocal, email="dam-content@example.com", role=UserRole.content
+    )
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
     upload = client.post(
         "/api/v1/content/admin/media/assets/upload",
@@ -198,12 +234,18 @@ def test_media_dam_owner_admin_restrictions(test_app: Dict[str, object], tmp_pat
     assert purge_forbidden.status_code == 403, purge_forbidden.text
 
 
-def test_media_dam_jobs_telemetry_and_reconcile(test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_media_dam_jobs_telemetry_and_reconcile(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-telemetry@example.com", role=UserRole.admin)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-telemetry@example.com", role=UserRole.admin
+    )
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
     upload = client.post(
         "/api/v1/content/admin/media/assets/upload",
@@ -214,13 +256,17 @@ def test_media_dam_jobs_telemetry_and_reconcile(test_app: Dict[str, object], tmp
     assert upload.status_code == 201, upload.text
     asset_id = upload.json()["id"]
 
-    list_jobs = client.get("/api/v1/content/admin/media/jobs?limit=10", headers=auth_headers(admin_token))
+    list_jobs = client.get(
+        "/api/v1/content/admin/media/jobs?limit=10", headers=auth_headers(admin_token)
+    )
     assert list_jobs.status_code == 200, list_jobs.text
     payload = list_jobs.json()
     assert payload["meta"]["total_items"] >= 1
     assert any(item["asset_id"] == asset_id for item in payload["items"])
 
-    telemetry = client.get("/api/v1/content/admin/media/telemetry", headers=auth_headers(admin_token))
+    telemetry = client.get(
+        "/api/v1/content/admin/media/telemetry", headers=auth_headers(admin_token)
+    )
     assert telemetry.status_code == 200, telemetry.text
     telemetry_payload = telemetry.json()
     assert "queue_depth" in telemetry_payload
@@ -228,7 +274,9 @@ def test_media_dam_jobs_telemetry_and_reconcile(test_app: Dict[str, object], tmp
     assert "status_counts" in telemetry_payload
     assert "type_counts" in telemetry_payload
 
-    queued = client.post("/api/v1/content/admin/media/usage/reconcile", headers=auth_headers(admin_token))
+    queued = client.post(
+        "/api/v1/content/admin/media/usage/reconcile", headers=auth_headers(admin_token)
+    )
     assert queued.status_code == 200, queued.text
     queued_payload = queued.json()
     assert queued_payload["job_type"] == "usage_reconcile"
@@ -247,15 +295,15 @@ def test_media_dam_jobs_telemetry_and_reconcile(test_app: Dict[str, object], tmp
     assert invalid_range.status_code == 400, invalid_range.text
 
 
-
-
 def test_media_dam_telemetry_scans_heartbeat_keys_with_limit(
     test_app: Dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-scan@example.com", role=UserRole.admin)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-scan@example.com", role=UserRole.admin
+    )
 
     prefix = "media:workers:heartbeat:test"
     monkeypatch.setattr(settings, "media_dam_worker_heartbeat_prefix", prefix)
@@ -266,27 +314,33 @@ def test_media_dam_telemetry_scans_heartbeat_keys_with_limit(
     class FakeRedis:
         def __init__(self) -> None:
             self.payloads = {
-                f"{prefix}:worker-1": json.dumps({
-                    "worker_id": "worker-1",
-                    "hostname": "host-1",
-                    "pid": 1001,
-                    "app_version": "v1",
-                    "last_seen_at": now.isoformat(),
-                }),
-                f"{prefix}:worker-2": json.dumps({
-                    "worker_id": "worker-2",
-                    "hostname": "host-2",
-                    "pid": 1002,
-                    "app_version": "v1",
-                    "last_seen_at": now.isoformat(),
-                }),
-                f"{prefix}:worker-3": json.dumps({
-                    "worker_id": "worker-3",
-                    "hostname": "host-3",
-                    "pid": 1003,
-                    "app_version": "v1",
-                    "last_seen_at": now.isoformat(),
-                }),
+                f"{prefix}:worker-1": json.dumps(
+                    {
+                        "worker_id": "worker-1",
+                        "hostname": "host-1",
+                        "pid": 1001,
+                        "app_version": "v1",
+                        "last_seen_at": now.isoformat(),
+                    }
+                ),
+                f"{prefix}:worker-2": json.dumps(
+                    {
+                        "worker_id": "worker-2",
+                        "hostname": "host-2",
+                        "pid": 1002,
+                        "app_version": "v1",
+                        "last_seen_at": now.isoformat(),
+                    }
+                ),
+                f"{prefix}:worker-3": json.dumps(
+                    {
+                        "worker_id": "worker-3",
+                        "hostname": "host-3",
+                        "pid": 1003,
+                        "app_version": "v1",
+                        "last_seen_at": now.isoformat(),
+                    }
+                ),
             }
             self.scan_calls = 0
 
@@ -308,20 +362,29 @@ def test_media_dam_telemetry_scans_heartbeat_keys_with_limit(
     fake_redis = FakeRedis()
     monkeypatch.setattr(media_dam, "get_redis", lambda: fake_redis)
 
-    telemetry = client.get("/api/v1/content/admin/media/telemetry", headers=auth_headers(admin_token))
+    telemetry = client.get(
+        "/api/v1/content/admin/media/telemetry", headers=auth_headers(admin_token)
+    )
     assert telemetry.status_code == 200, telemetry.text
     payload = telemetry.json()
 
     assert payload["online_workers"] == 2
     assert len(payload["workers"]) == 2
-    assert [worker["worker_id"] for worker in payload["workers"]] == ["worker-1", "worker-2"]
+    assert [worker["worker_id"] for worker in payload["workers"]] == [
+        "worker-1",
+        "worker-2",
+    ]
     assert fake_redis.scan_calls == 1
 
 
-def test_media_dam_private_preview_and_public_serving_gate(test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_media_dam_private_preview_and_public_serving_gate(
+    test_app: Dict[str, object], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-preview@example.com", role=UserRole.admin)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-preview@example.com", role=UserRole.admin
+    )
     monkeypatch.setattr(settings, "media_private_preview_ttl_seconds", 600)
 
     private_upload = client.post(
@@ -373,9 +436,14 @@ def test_media_dam_private_preview_and_public_serving_gate(test_app: Dict[str, o
     assert approve.status_code == 200, approve.text
     assert approve.json()["status"] == "approved"
 
-    listed_after = client.get("/api/v1/content/admin/media/assets", headers=auth_headers(admin_token))
+    listed_after = client.get(
+        "/api/v1/content/admin/media/assets", headers=auth_headers(admin_token)
+    )
     assert listed_after.status_code == 200, listed_after.text
-    listed_asset = next((row for row in listed_after.json()["items"] if row["id"] == public_asset_id), None)
+    listed_asset = next(
+        (row for row in listed_after.json()["items"] if row["id"] == public_asset_id),
+        None,
+    )
     assert listed_asset is not None
     assert listed_asset["preview_url"] == listed_asset["public_url"]
 
@@ -388,9 +456,13 @@ def test_media_dam_retry_dead_letter_triage_and_events_v2(
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-retry@example.com", role=UserRole.admin)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-retry@example.com", role=UserRole.admin
+    )
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
     async def _fail_variant(*_args, **_kwargs):
         raise RuntimeError("variant failed on purpose")
@@ -448,7 +520,9 @@ def test_media_dam_retry_dead_letter_triage_and_events_v2(
 
     asyncio.run(_exhaust_attempts())
 
-    after_exhaust = client.get(f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token))
+    after_exhaust = client.get(
+        f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token)
+    )
     assert after_exhaust.status_code == 200, after_exhaust.text
     exhausted_payload = after_exhaust.json()
     assert exhausted_payload["status"] == "dead_letter"
@@ -463,11 +537,17 @@ def test_media_dam_retry_dead_letter_triage_and_events_v2(
     assert filtered.status_code == 200, filtered.text
     assert any(row["id"] == job_id for row in filtered.json()["items"])
 
-    retry_now = client.post(f"/api/v1/content/admin/media/jobs/{job_id}/retry", headers=auth_headers(admin_token))
+    retry_now = client.post(
+        f"/api/v1/content/admin/media/jobs/{job_id}/retry",
+        headers=auth_headers(admin_token),
+    )
     assert retry_now.status_code == 200, retry_now.text
     assert retry_now.json()["status"] == "queued"
 
-    events = client.get(f"/api/v1/content/admin/media/jobs/{job_id}/events?limit=200", headers=auth_headers(admin_token))
+    events = client.get(
+        f"/api/v1/content/admin/media/jobs/{job_id}/events?limit=200",
+        headers=auth_headers(admin_token),
+    )
     assert events.status_code == 200, events.text
     actions = [row["action"] for row in events.json()["items"]]
     assert "retry_scheduled" in actions
@@ -481,9 +561,13 @@ def test_media_dam_due_retry_sweep_requeues_failed_jobs(
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-retry-sweep@example.com", role=UserRole.admin)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-retry-sweep@example.com", role=UserRole.admin
+    )
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
     upload = client.post(
         "/api/v1/content/admin/media/assets/upload",
@@ -517,7 +601,9 @@ def test_media_dam_due_retry_sweep_requeues_failed_jobs(
 
     asyncio.run(_mark_failed_and_sweep())
 
-    job_after = client.get(f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token))
+    job_after = client.get(
+        f"/api/v1/content/admin/media/jobs/{job_id}", headers=auth_headers(admin_token)
+    )
     assert job_after.status_code == 200, job_after.text
     assert job_after.json()["status"] == "queued"
 
@@ -527,12 +613,21 @@ def test_media_dam_retry_policy_endpoints_and_permissions(
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-policy@example.com", role=UserRole.admin)
-    content_token = create_staff_token(SessionLocal, email="dam-content-policy@example.com", role=UserRole.content)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-policy@example.com", role=UserRole.admin
+    )
+    content_token = create_staff_token(
+        SessionLocal, email="dam-content-policy@example.com", role=UserRole.content
+    )
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
-    listed = client.get("/api/v1/content/admin/media/retry-policies", headers=auth_headers(content_token))
+    listed = client.get(
+        "/api/v1/content/admin/media/retry-policies",
+        headers=auth_headers(content_token),
+    )
     assert listed.status_code == 200, listed.text
     by_type = {row["job_type"]: row for row in listed.json()["items"]}
     assert "ingest" in by_type
@@ -652,9 +747,13 @@ def test_media_dam_retry_policy_snapshot_and_jitter_schedule(
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
-    admin_token = create_staff_token(SessionLocal, email="dam-admin-jitter@example.com", role=UserRole.admin)
+    admin_token = create_staff_token(
+        SessionLocal, email="dam-admin-jitter@example.com", role=UserRole.admin
+    )
     monkeypatch.setattr(settings, "media_root", str(tmp_path / "uploads"))
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
     async def _fail_variant(*_args, **_kwargs):
         raise RuntimeError("variant failed for jitter test")
@@ -664,7 +763,12 @@ def test_media_dam_retry_policy_snapshot_and_jitter_schedule(
 
     update_policy = client.patch(
         "/api/v1/content/admin/media/retry-policies/variant",
-        json={"max_attempts": 4, "backoff_schedule_seconds": [100], "jitter_ratio": 0.5, "enabled": True},
+        json={
+            "max_attempts": 4,
+            "backoff_schedule_seconds": [100],
+            "jitter_ratio": 0.5,
+            "enabled": True,
+        },
         headers=auth_headers(admin_token),
     )
     assert update_policy.status_code == 200, update_policy.text
@@ -688,8 +792,12 @@ def test_media_dam_retry_policy_snapshot_and_jitter_schedule(
     assert payload["status"] == "failed"
     assert payload["max_attempts"] == 4
     assert payload["next_retry_at"] is not None
-    completed_at = datetime.fromisoformat(payload["completed_at"].replace("Z", "+00:00"))
-    next_retry_at = datetime.fromisoformat(payload["next_retry_at"].replace("Z", "+00:00"))
+    completed_at = datetime.fromisoformat(
+        payload["completed_at"].replace("Z", "+00:00")
+    )
+    next_retry_at = datetime.fromisoformat(
+        payload["next_retry_at"].replace("Z", "+00:00")
+    )
     retry_delay_seconds = int(round((next_retry_at - completed_at).total_seconds()))
     assert retry_delay_seconds == 150
 

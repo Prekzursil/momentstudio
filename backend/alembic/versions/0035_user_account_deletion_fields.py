@@ -18,9 +18,17 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("deletion_requested_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("users", sa.Column("deletion_scheduled_for", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("users", sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "users",
+        sa.Column("deletion_requested_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "users",
+        sa.Column("deletion_scheduled_for", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "users", sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True)
+    )
     op.create_index("ix_users_deleted_at", "users", ["deleted_at"])
 
 
@@ -29,4 +37,3 @@ def downgrade() -> None:
     op.drop_column("users", "deleted_at")
     op.drop_column("users", "deletion_scheduled_for")
     op.drop_column("users", "deletion_requested_at")
-

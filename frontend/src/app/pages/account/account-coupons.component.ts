@@ -13,9 +13,13 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
   standalone: true,
   imports: [CommonModule, RouterLink, TranslateModule, ButtonComponent, SkeletonComponent],
   template: `
-    <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.myCoupons' | translate }}</h2>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'nav.myCoupons' | translate }}
+        </h2>
         <app-button
           size="sm"
           variant="ghost"
@@ -54,7 +58,10 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
               <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                 {{ c.promotion?.name || ('account.coupons.coupon' | translate) }}
               </p>
-              <p *ngIf="c.promotion?.description" class="text-sm text-slate-600 dark:text-slate-300">
+              <p
+                *ngIf="c.promotion?.description"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ c.promotion?.description }}
               </p>
               <div class="flex flex-wrap gap-2 pt-1">
@@ -67,7 +74,8 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
                   *ngIf="c.promotion?.min_subtotal"
                   class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                 >
-                  {{ 'account.coupons.minSubtotal' | translate }}: {{ c.promotion?.min_subtotal }} RON
+                  {{ 'account.coupons.minSubtotal' | translate }}:
+                  {{ c.promotion?.min_subtotal }} RON
                 </span>
                 <span
                   *ngIf="c.promotion"
@@ -92,8 +100,18 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             <div class="flex flex-col items-start sm:items-end gap-2 shrink-0">
               <div class="font-mono text-sm text-slate-900 dark:text-slate-50">{{ c.code }}</div>
               <div class="flex gap-2">
-                <app-button size="sm" variant="ghost" [label]="'account.coupons.copy' | translate" (action)="copyCode(c.code)"></app-button>
-                <app-button size="sm" [label]="'account.coupons.useInCheckout' | translate" routerLink="/checkout" [queryParams]="{ promo: c.code }"></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.coupons.copy' | translate"
+                  (action)="copyCode(c.code)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  [label]="'account.coupons.useInCheckout' | translate"
+                  routerLink="/checkout"
+                  [queryParams]="{ promo: c.code }"
+                ></app-button>
               </div>
               <p *ngIf="c.ends_at" class="text-xs text-slate-500 dark:text-slate-400">
                 {{ 'account.coupons.validUntil' | translate }} {{ c.ends_at | date: 'yyyy-MM-dd' }}
@@ -103,7 +121,7 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         </div>
       </div>
     </section>
-  `
+  `,
 })
 export class AccountCouponsComponent implements OnInit {
   protected readonly coupons = signal<CouponRead[]>([]);
@@ -113,7 +131,7 @@ export class AccountCouponsComponent implements OnInit {
   constructor(
     private readonly couponsService: CouponsService,
     private readonly toast: ToastService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
@@ -126,7 +144,7 @@ export class AccountCouponsComponent implements OnInit {
         const detail = err?.error?.detail;
         this.error.set(detail || this.translate.instant('account.coupons.loadError'));
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -155,14 +173,16 @@ export class AccountCouponsComponent implements OnInit {
     if (endsAt && endsAt < now) {
       return {
         label: this.translate.instant('account.coupons.expired'),
-        className: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
+        className:
+          'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200',
       };
     }
 
     if (!coupon.is_active || (promo && !promo.is_active)) {
       return {
         label: this.translate.instant('account.coupons.inactive'),
-        className: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100'
+        className:
+          'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100',
       };
     }
 
@@ -175,12 +195,13 @@ export class AccountCouponsComponent implements OnInit {
 
     try {
       await navigator.clipboard.writeText(value);
-      this.toast.success(this.translate.instant('account.coupons.copiedTitle'), this.translate.instant('account.coupons.copiedCopy'));
+      this.toast.success(
+        this.translate.instant('account.coupons.copiedTitle'),
+        this.translate.instant('account.coupons.copiedCopy'),
+      );
     } catch {
       // Clipboard might be blocked; still show the code in UI.
       this.toast.info(this.translate.instant('account.coupons.copy'), value);
     }
   }
 }
-
-

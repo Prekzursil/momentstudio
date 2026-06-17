@@ -36,8 +36,8 @@ Build/config checks:
 ### Backend (pre-fix observation)
 
 `PAYMENTS_PROVIDER=mock`:
-- `37 passed, 1 failed`  
-- failure: `test_authenticated_checkout_paypal_flow_requires_auth_to_capture`  
+- `37 passed, 1 failed`
+- failure: `test_authenticated_checkout_paypal_flow_requires_auth_to_capture`
 - reason: assertion assumed providers-mode capture ID (`CAPTURE-1`) while mock mode produced `paypal_mock_capture_*`.
 
 `PAYMENTS_PROVIDER=providers`:
@@ -74,4 +74,3 @@ Compose config:
 3. Two parity traps were addressed:
    - providers-vs-mock test assertion ambiguity.
    - dev locker defaults that could make shipping look broken.
-

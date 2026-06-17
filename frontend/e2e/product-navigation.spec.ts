@@ -12,7 +12,13 @@ test('product details load on first click', async ({ page, request: apiRequest }
   const listPayload = (await listRes.json()) as any;
 
   const items = Array.isArray(listPayload?.items) ? listPayload.items : [];
-  const product = items.find((p: any) => typeof p?.slug === 'string' && p.slug.length > 0 && typeof p?.name === 'string' && p.name.length > 0);
+  const product = items.find(
+    (p: any) =>
+      typeof p?.slug === 'string' &&
+      p.slug.length > 0 &&
+      typeof p?.name === 'string' &&
+      p.name.length > 0,
+  );
   if (!product) {
     test.skip(true, 'No products available for product navigation e2e.');
     return;

@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -90,13 +99,23 @@ def _submission_to_ticket(submission, *, include_thread: bool) -> TicketRead:
     )
 
 
-def _mask_contact_submission_read(record: ContactSubmissionRead) -> ContactSubmissionRead:
+def _mask_contact_submission_read(
+    record: ContactSubmissionRead,
+) -> ContactSubmissionRead:
     masked_email = pii_service.mask_email(record.email) or record.email
     masked_name = pii_service.mask_text(record.name, keep=1) or record.name
     masked_message = pii_service.redact_emails_in_text(record.message) or record.message
-    masked_admin_note = pii_service.redact_emails_in_text(record.admin_note) if record.admin_note else None
+    masked_admin_note = (
+        pii_service.redact_emails_in_text(record.admin_note)
+        if record.admin_note
+        else None
+    )
     masked_messages = [
-        m.model_copy(update={"message": pii_service.redact_emails_in_text(m.message) or m.message})
+        m.model_copy(
+            update={
+                "message": pii_service.redact_emails_in_text(m.message) or m.message
+            }
+        )
         for m in (record.messages or [])
     ]
     return record.model_copy(
@@ -110,7 +129,11 @@ def _mask_contact_submission_read(record: ContactSubmissionRead) -> ContactSubmi
     )
 
 
-@router.post("/contact", response_model=ContactSubmissionRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/contact",
+    response_model=ContactSubmissionRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def submit_contact(
     payload: ContactSubmissionCreate,
     background_tasks: BackgroundTasks,
@@ -120,8 +143,12 @@ async def submit_contact(
     current_user: User | None = Depends(get_current_user_optional),
 ) -> ContactSubmissionRead:
     if payload.topic == ContactSubmissionTopic.feedback:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic")
-    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic"
+        )
+    await captcha_service.verify(
+        payload.captcha_token, remote_ip=request.client.host if request.client else None
+    )
     record = await support_service.create_contact_submission(
         session,
         topic=payload.topic,
@@ -133,7 +160,9 @@ async def submit_contact(
     )
 
     owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    admin_to = (
+        owner.email if owner and owner.email else None
+    ) or settings.admin_alert_email
     if admin_to:
         background_tasks.add_task(
             email_service.send_contact_submission_notification,
@@ -147,7 +176,9 @@ async def submit_contact(
             lang=owner.preferred_language if owner else None,
         )
 
-    hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
+    hydrated = await support_service.get_contact_submission_with_messages(
+        session, record.id
+    )
     return ContactSubmissionRead.model_validate(hydrated or record)
 
 
@@ -160,15 +191,23 @@ async def list_my_tickets(
     return [TicketListItemRead.model_validate(r) for r in rows]
 
 
-@router.post("/me/submissions", response_model=TicketRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/me/submissions", response_model=TicketRead, status_code=status.HTTP_201_CREATED
+)
 async def create_my_ticket(
     payload: TicketCreate,
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TicketRead:
     if payload.topic == ContactSubmissionTopic.feedback:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic")
-    display_name = (getattr(user, "name", None) or "").strip() or (getattr(user, "username", None) or "").strip() or "Customer"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported topic"
+        )
+    display_name = (
+        (getattr(user, "name", None) or "").strip()
+        or (getattr(user, "username", None) or "").strip()
+        or "Customer"
+    )
     record = await support_service.create_contact_submission(
         session,
         topic=payload.topic,
@@ -178,9 +217,13 @@ async def create_my_ticket(
         order_reference=payload.order_reference,
         user=user,
     )
-    hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
+    hydrated = await support_service.get_contact_submission_with_messages(
+        session, record.id
+    )
     if not hydrated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     return _submission_to_ticket(hydrated, include_thread=True)
 
 
@@ -190,9 +233,13 @@ async def get_my_ticket(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TicketRead:
-    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    record = await support_service.get_contact_submission_with_messages(
+        session, submission_id
+    )
     if not record or not record.user_id or record.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     return _submission_to_ticket(record, include_thread=True)
 
 
@@ -203,9 +250,13 @@ async def reply_my_ticket(
     session: AsyncSession = Depends(get_session),
     user: User = Depends(get_current_user),
 ) -> TicketRead:
-    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    record = await support_service.get_contact_submission_with_messages(
+        session, submission_id
+    )
     if not record or not record.user_id or record.user_id != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     updated = await support_service.add_contact_submission_message(
         session,
         submission=record,
@@ -251,15 +302,25 @@ async def admin_list_contact_submissions(
                 id=r.id,
                 topic=r.topic,
                 status=r.status,
-                name=r.name if include_pii else (pii_service.mask_text(r.name, keep=1) or r.name),
-                email=r.email if include_pii else (pii_service.mask_email(r.email) or r.email),
+                name=(
+                    r.name
+                    if include_pii
+                    else (pii_service.mask_text(r.name, keep=1) or r.name)
+                ),
+                email=(
+                    r.email
+                    if include_pii
+                    else (pii_service.mask_email(r.email) or r.email)
+                ),
                 order_reference=r.order_reference,
                 assignee=getattr(r, "assignee", None),
                 created_at=r.created_at,
             )
             for r in rows
         ],
-        meta=AdminPaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+        meta=AdminPaginationMeta(
+            total_items=total_items, total_pages=total_pages, page=page, limit=limit
+        ),
     )
 
 
@@ -272,13 +333,21 @@ async def admin_list_support_assignees(
     return [SupportAgentRef.model_validate(r) for r in rows]
 
 
-@router.post("/admin/feedback", response_model=ContactSubmissionRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/feedback",
+    response_model=ContactSubmissionRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def admin_submit_feedback(
     payload: AdminFeedbackCreate,
     session: AsyncSession = Depends(get_session),
     staff: User = Depends(require_admin_section("dashboard")),
 ) -> ContactSubmissionRead:
-    display_name = (getattr(staff, "name", None) or "").strip() or (getattr(staff, "username", None) or "").strip() or "Staff"
+    display_name = (
+        (getattr(staff, "name", None) or "").strip()
+        or (getattr(staff, "username", None) or "").strip()
+        or "Staff"
+    )
     context = (payload.context or "").strip() or None
     record = await support_service.create_contact_submission(
         session,
@@ -289,9 +358,13 @@ async def admin_submit_feedback(
         admin_note=context,
         user=staff,
     )
-    hydrated = await support_service.get_contact_submission_with_messages(session, record.id)
+    hydrated = await support_service.get_contact_submission_with_messages(
+        session, record.id
+    )
     if not hydrated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     return ContactSubmissionRead.model_validate(hydrated)
 
 
@@ -301,11 +374,17 @@ async def admin_list_canned_responses(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("support")),
 ) -> list[SupportCannedResponseRead]:
-    rows = await support_service.list_canned_responses(session, include_inactive=include_inactive)
+    rows = await support_service.list_canned_responses(
+        session, include_inactive=include_inactive
+    )
     return [SupportCannedResponseRead.model_validate(r) for r in rows]
 
 
-@router.post("/admin/canned-responses", response_model=SupportCannedResponseRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/canned-responses",
+    response_model=SupportCannedResponseRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def admin_create_canned_response(
     payload: SupportCannedResponseCreate,
     session: AsyncSession = Depends(get_session),
@@ -322,7 +401,9 @@ async def admin_create_canned_response(
     return SupportCannedResponseRead.model_validate(record)
 
 
-@router.patch("/admin/canned-responses/{response_id}", response_model=SupportCannedResponseRead)
+@router.patch(
+    "/admin/canned-responses/{response_id}", response_model=SupportCannedResponseRead
+)
 async def admin_update_canned_response(
     response_id: UUID,
     payload: SupportCannedResponseUpdate,
@@ -331,7 +412,9 @@ async def admin_update_canned_response(
 ) -> SupportCannedResponseRead:
     record = await support_service.get_canned_response(session, response_id)
     if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Canned response not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Canned response not found"
+        )
     updated = await support_service.update_canned_response(
         session,
         record=record,
@@ -344,7 +427,9 @@ async def admin_update_canned_response(
     return SupportCannedResponseRead.model_validate(updated)
 
 
-@router.delete("/admin/canned-responses/{response_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/admin/canned-responses/{response_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def admin_delete_canned_response(
     response_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -352,7 +437,9 @@ async def admin_delete_canned_response(
 ) -> Response:
     record = await support_service.get_canned_response(session, response_id)
     if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Canned response not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Canned response not found"
+        )
     await support_service.delete_canned_response(session, record=record, actor=admin)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -367,14 +454,20 @@ async def admin_get_contact_submission(
 ) -> ContactSubmissionRead:
     if include_pii:
         pii_service.require_pii_reveal(admin, request=request)
-    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    record = await support_service.get_contact_submission_with_messages(
+        session, submission_id
+    )
     if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     out = ContactSubmissionRead.model_validate(record)
     return out if include_pii else _mask_contact_submission_read(out)
 
 
-@router.patch("/admin/submissions/{submission_id}", response_model=ContactSubmissionRead)
+@router.patch(
+    "/admin/submissions/{submission_id}", response_model=ContactSubmissionRead
+)
 async def admin_update_contact_submission(
     submission_id: UUID,
     payload: ContactSubmissionUpdate,
@@ -385,9 +478,13 @@ async def admin_update_contact_submission(
 ) -> ContactSubmissionRead:
     if include_pii:
         pii_service.require_pii_reveal(admin, request=request)
-    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    record = await support_service.get_contact_submission_with_messages(
+        session, submission_id
+    )
     if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     updated = await support_service.update_contact_submission(
         session,
         submission=record,
@@ -397,14 +494,20 @@ async def admin_update_contact_submission(
         assignee_set="assignee_id" in payload.model_fields_set,
         actor=admin,
     )
-    hydrated = await support_service.get_contact_submission_with_messages(session, updated.id)
+    hydrated = await support_service.get_contact_submission_with_messages(
+        session, updated.id
+    )
     if not hydrated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     out = ContactSubmissionRead.model_validate(hydrated)
     return out if include_pii else _mask_contact_submission_read(out)
 
 
-@router.post("/admin/submissions/{submission_id}/messages", response_model=ContactSubmissionRead)
+@router.post(
+    "/admin/submissions/{submission_id}/messages", response_model=ContactSubmissionRead
+)
 async def admin_reply_contact_submission(
     submission_id: UUID,
     payload: TicketMessageCreate,
@@ -416,9 +519,13 @@ async def admin_reply_contact_submission(
 ) -> ContactSubmissionRead:
     if include_pii:
         pii_service.require_pii_reveal(admin, request=request)
-    record = await support_service.get_contact_submission_with_messages(session, submission_id)
+    record = await support_service.get_contact_submission_with_messages(
+        session, submission_id
+    )
     if not record:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
     updated = await support_service.add_contact_submission_message(
         session,
         submission=record,
@@ -461,11 +568,21 @@ async def admin_support_sla_settings(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("support")),
 ) -> SupportSlaSettingsRead:
-    block = await content_service.get_published_by_key_following_redirects(session, _SUPPORT_SLA_SETTINGS_KEY)
+    block = await content_service.get_published_by_key_following_redirects(
+        session, _SUPPORT_SLA_SETTINGS_KEY
+    )
     meta = (getattr(block, "meta", None) or {}) if block else {}
-    first_reply = _parse_sla_hours(meta.get("support_sla_first_reply_hours"), fallback=_DEFAULT_SUPPORT_FIRST_REPLY_HOURS)
-    resolution = _parse_sla_hours(meta.get("support_sla_resolution_hours"), fallback=_DEFAULT_SUPPORT_RESOLUTION_HOURS)
-    return SupportSlaSettingsRead(first_reply_hours=first_reply, resolution_hours=resolution)
+    first_reply = _parse_sla_hours(
+        meta.get("support_sla_first_reply_hours"),
+        fallback=_DEFAULT_SUPPORT_FIRST_REPLY_HOURS,
+    )
+    resolution = _parse_sla_hours(
+        meta.get("support_sla_resolution_hours"),
+        fallback=_DEFAULT_SUPPORT_RESOLUTION_HOURS,
+    )
+    return SupportSlaSettingsRead(
+        first_reply_hours=first_reply, resolution_hours=resolution
+    )
 
 
 @router.patch("/admin/sla-settings", response_model=SupportSlaSettingsRead)
@@ -490,6 +607,14 @@ async def admin_update_support_sla_settings(
         actor_id=admin.id,
     )
     merged_meta = (getattr(updated, "meta", None) or {}) if updated else {}
-    first_reply = _parse_sla_hours(merged_meta.get("support_sla_first_reply_hours"), fallback=_DEFAULT_SUPPORT_FIRST_REPLY_HOURS)
-    resolution = _parse_sla_hours(merged_meta.get("support_sla_resolution_hours"), fallback=_DEFAULT_SUPPORT_RESOLUTION_HOURS)
-    return SupportSlaSettingsRead(first_reply_hours=first_reply, resolution_hours=resolution)
+    first_reply = _parse_sla_hours(
+        merged_meta.get("support_sla_first_reply_hours"),
+        fallback=_DEFAULT_SUPPORT_FIRST_REPLY_HOURS,
+    )
+    resolution = _parse_sla_hours(
+        merged_meta.get("support_sla_resolution_hours"),
+        fallback=_DEFAULT_SUPPORT_RESOLUTION_HOURS,
+    )
+    return SupportSlaSettingsRead(
+        first_reply_hours=first_reply, resolution_hours=resolution
+    )

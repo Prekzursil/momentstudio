@@ -9,7 +9,10 @@ import { CommonModule, NgClass } from '@angular/common';
     <div *ngIf="rows > 1; else singleTpl" class="grid gap-2">
       <div
         *ngFor="let i of rowIndexes()"
-        [ngClass]="[shape === 'circle' ? 'rounded-full' : 'rounded-lg', 'bg-slate-200/70 animate-pulse']"
+        [ngClass]="[
+          shape === 'circle' ? 'rounded-full' : 'rounded-lg',
+          'bg-slate-200/70 animate-pulse',
+        ]"
         [style.height]="height"
         [style.width]="rowWidth(i)"
       ></div>
@@ -17,12 +20,15 @@ import { CommonModule, NgClass } from '@angular/common';
 
     <ng-template #singleTpl>
       <div
-        [ngClass]="[shape === 'circle' ? 'rounded-full' : 'rounded-lg', 'bg-slate-200/70 animate-pulse']"
+        [ngClass]="[
+          shape === 'circle' ? 'rounded-full' : 'rounded-lg',
+          'bg-slate-200/70 animate-pulse',
+        ]"
         [style.height]="height"
         [style.width]="width"
       ></div>
     </ng-template>
-  `
+  `,
 })
 export class SkeletonComponent {
   @Input() rows = 1;

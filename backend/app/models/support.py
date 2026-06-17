@@ -27,7 +27,9 @@ class ContactSubmissionStatus(str, enum.Enum):
 class ContactSubmission(Base):
     __tablename__ = "contact_submissions"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     topic: Mapped[ContactSubmissionTopic] = mapped_column(
         Enum(ContactSubmissionTopic, name="contact_submission_topic"),
         nullable=False,
@@ -43,9 +45,13 @@ class ContactSubmission(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    order_reference: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    order_reference: Mapped[str | None] = mapped_column(
+        String(50), nullable=True, index=True
+    )
 
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
     assignee_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -58,18 +64,33 @@ class ContactSubmission(Base):
         nullable=True,
         index=True,
     )
-    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    assigned_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     admin_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
-    user: Mapped[User | None] = relationship("User", foreign_keys=[user_id], lazy="joined")
-    assignee: Mapped[User | None] = relationship("User", foreign_keys=[assignee_user_id], lazy="joined")
-    assigned_by: Mapped[User | None] = relationship("User", foreign_keys=[assigned_by_user_id], lazy="joined")
+    user: Mapped[User | None] = relationship(
+        "User", foreign_keys=[user_id], lazy="joined"
+    )
+    assignee: Mapped[User | None] = relationship(
+        "User", foreign_keys=[assignee_user_id], lazy="joined"
+    )
+    assigned_by: Mapped[User | None] = relationship(
+        "User", foreign_keys=[assigned_by_user_id], lazy="joined"
+    )
     messages: Mapped[list["ContactSubmissionMessage"]] = relationship(
         "ContactSubmissionMessage",
         back_populates="submission",
@@ -82,25 +103,38 @@ class ContactSubmission(Base):
 class ContactSubmissionMessage(Base):
     __tablename__ = "contact_submission_messages"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     submission_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("contact_submissions.id", ondelete="CASCADE"), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("contact_submissions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     from_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
-    submission: Mapped[ContactSubmission] = relationship("ContactSubmission", back_populates="messages")
+    submission: Mapped[ContactSubmission] = relationship(
+        "ContactSubmission", back_populates="messages"
+    )
 
 
 class SupportCannedResponse(Base):
     __tablename__ = "support_canned_responses"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     title: Mapped[str] = mapped_column(String(120), nullable=False)
     body_en: Mapped[str] = mapped_column(Text, nullable=False)
     body_ro: Mapped[str] = mapped_column(Text, nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true", index=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true", index=True
+    )
 
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -112,10 +146,19 @@ class SupportCannedResponse(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
-    created_by: Mapped[User | None] = relationship("User", foreign_keys=[created_by_user_id], lazy="joined")
-    updated_by: Mapped[User | None] = relationship("User", foreign_keys=[updated_by_user_id], lazy="joined")
+    created_by: Mapped[User | None] = relationship(
+        "User", foreign_keys=[created_by_user_id], lazy="joined"
+    )
+    updated_by: Mapped[User | None] = relationship(
+        "User", foreign_keys=[updated_by_user_id], lazy="joined"
+    )

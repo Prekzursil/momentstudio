@@ -24,8 +24,8 @@ describe('CheckoutComponent', () => {
       currency: 'RON',
       quantity: 1,
       stock: 5,
-      image: '/img.png'
-    }
+      image: '/img.png',
+    },
   ]);
   const subtotalSignal = signal(20);
 
@@ -40,7 +40,9 @@ describe('CheckoutComponent', () => {
     cartApi.headers.and.returnValue({});
 
     apiService = jasmine.createSpyObj('ApiService', ['post', 'get']);
-    apiService.post.and.returnValue(of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }));
+    apiService.post.and.returnValue(
+      of({ order_id: 'order1', reference_code: 'REF', client_secret: 'pi_secret' }),
+    );
     apiService.get.and.callFake((path: string) => {
       if (path === '/legal/consents/status') {
         return of({
@@ -50,11 +52,17 @@ describe('CheckoutComponent', () => {
               slug: 'terms-and-conditions',
               required_version: 1,
               accepted_version: 1,
-              accepted: true
+              accepted: true,
             },
-            { doc_key: 'page.privacy-policy', slug: 'privacy-policy', required_version: 1, accepted_version: 1, accepted: true }
+            {
+              doc_key: 'page.privacy-policy',
+              slug: 'privacy-policy',
+              required_version: 1,
+              accepted_version: 1,
+              accepted: true,
+            },
           ],
-          satisfied: true
+          satisfied: true,
         });
       }
       return of({ eligible: [], ineligible: [] });
@@ -72,13 +80,27 @@ describe('CheckoutComponent', () => {
     TestBed.configureTestingModule({
       imports: [RouterTestingModule, CheckoutComponent, TranslateModule.forRoot()],
       providers: [
-        { provide: CartStore, useValue: { items: itemsSignal, subtotal: subtotalSignal, clear: jasmine.createSpy('clear'), hydrateFromBackend: jasmine.createSpy('hydrateFromBackend') } },
+        {
+          provide: CartStore,
+          useValue: {
+            items: itemsSignal,
+            subtotal: subtotalSignal,
+            clear: jasmine.createSpy('clear'),
+            hydrateFromBackend: jasmine.createSpy('hydrateFromBackend'),
+          },
+        },
         { provide: CartApi, useValue: cartApi },
         { provide: ApiService, useValue: apiService },
         { provide: AccountService, useValue: accountService },
         { provide: AuthService, useValue: auth },
-        { provide: ActivatedRoute, useValue: { snapshot: { params: {}, queryParamMap: emptyQueryParamMap }, queryParamMap: of(emptyQueryParamMap) } }
-      ]
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { params: {}, queryParamMap: emptyQueryParamMap },
+            queryParamMap: of(emptyQueryParamMap),
+          },
+        },
+      ],
     });
   });
 

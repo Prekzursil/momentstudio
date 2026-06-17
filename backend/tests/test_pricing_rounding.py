@@ -4,9 +4,15 @@ from app.services import pricing
 
 
 def test_quantize_money_rounding_modes() -> None:
-    assert pricing.quantize_money(Decimal("1.005"), rounding="half_up") == Decimal("1.01")
-    assert pricing.quantize_money(Decimal("1.005"), rounding="half_even") == Decimal("1.00")
-    assert pricing.quantize_money(Decimal("1.015"), rounding="half_even") == Decimal("1.02")
+    assert pricing.quantize_money(Decimal("1.005"), rounding="half_up") == Decimal(
+        "1.01"
+    )
+    assert pricing.quantize_money(Decimal("1.005"), rounding="half_even") == Decimal(
+        "1.00"
+    )
+    assert pricing.quantize_money(Decimal("1.015"), rounding="half_even") == Decimal(
+        "1.02"
+    )
     assert pricing.quantize_money(Decimal("1.001"), rounding="up") == Decimal("1.01")
     assert pricing.quantize_money(Decimal("1.009"), rounding="down") == Decimal("1.00")
 

@@ -44,7 +44,9 @@ async def test_backpressure_rejects_under_saturation() -> None:
         blocked = await client.get("/slow")
         ok = await first
 
-    rejected = blocked if blocked.status_code == status.HTTP_429_TOO_MANY_REQUESTS else ok
+    rejected = (
+        blocked if blocked.status_code == status.HTTP_429_TOO_MANY_REQUESTS else ok
+    )
     assert rejected.status_code == status.HTTP_429_TOO_MANY_REQUESTS
     assert rejected.headers.get("Retry-After") == "1"
     assert rejected.headers.get("X-Request-ID")
@@ -87,7 +89,9 @@ async def test_backpressure_releases_tokens_on_exceptions() -> None:
 
     @app.get("/boom")
     async def boom() -> dict[str, bool]:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="boom")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="boom"
+        )
 
     @app.get("/slow")
     async def slow() -> dict[str, bool]:
@@ -100,4 +104,3 @@ async def test_backpressure_releases_tokens_on_exceptions() -> None:
         assert res.status_code == 500, res.text
         after = await client.get("/slow")
         assert after.status_code == 200, after.text
-

@@ -25,21 +25,45 @@ DEFAULT_HEADER_LINKS: list[dict[str, object]] = [
     {"id": "home", "url": "/", "label": {"en": "Home", "ro": "Acasă"}},
     {"id": "blog", "url": "/blog", "label": {"en": "Blog", "ro": "Blog"}},
     {"id": "shop", "url": "/shop", "label": {"en": "Shop", "ro": "Magazin"}},
-    {"id": "about", "url": "/about", "label": {"en": "Our story", "ro": "Povestea noastră"}},
+    {
+        "id": "about",
+        "url": "/about",
+        "label": {"en": "Our story", "ro": "Povestea noastră"},
+    },
     {"id": "contact", "url": "/contact", "label": {"en": "Contact", "ro": "Contact"}},
-    {"id": "terms", "url": "/pages/terms", "label": {"en": "Terms & Conditions", "ro": "Termeni și condiții"}},
+    {
+        "id": "terms",
+        "url": "/pages/terms",
+        "label": {"en": "Terms & Conditions", "ro": "Termeni și condiții"},
+    },
 ]
 
 DEFAULT_FOOTER_HANDCRAFTED_LINKS: list[dict[str, object]] = [
     {"id": "shop", "url": "/shop", "label": {"en": "Shop", "ro": "Magazin"}},
-    {"id": "about", "url": "/about", "label": {"en": "Our story", "ro": "Povestea noastră"}},
+    {
+        "id": "about",
+        "url": "/about",
+        "label": {"en": "Our story", "ro": "Povestea noastră"},
+    },
     {"id": "contact", "url": "/contact", "label": {"en": "Contact", "ro": "Contact"}},
-    {"id": "terms", "url": "/pages/terms", "label": {"en": "Terms & Conditions", "ro": "Termeni și condiții"}},
+    {
+        "id": "terms",
+        "url": "/pages/terms",
+        "label": {"en": "Terms & Conditions", "ro": "Termeni și condiții"},
+    },
 ]
 
 DEFAULT_FOOTER_LEGAL_LINKS: list[dict[str, object]] = [
-    {"id": "terms", "url": "/pages/terms", "label": {"en": "Terms & Conditions", "ro": "Termeni și condiții"}},
-    {"id": "privacy", "url": "/pages/privacy-policy", "label": {"en": "Privacy Policy", "ro": "Politica de confidențialitate"}},
+    {
+        "id": "terms",
+        "url": "/pages/terms",
+        "label": {"en": "Terms & Conditions", "ro": "Termeni și condiții"},
+    },
+    {
+        "id": "privacy",
+        "url": "/pages/privacy-policy",
+        "label": {"en": "Privacy Policy", "ro": "Politica de confidențialitate"},
+    },
     {"id": "anpc", "url": "/pages/anpc", "label": {"en": "ANPC", "ro": "ANPC"}},
 ]
 
@@ -80,9 +104,9 @@ def upgrade() -> None:
 
     row = (
         conn.execute(
-            sa.select(content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta).where(
-                content_blocks.c.key == "site.navigation"
-            )
+            sa.select(
+                content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta
+            ).where(content_blocks.c.key == "site.navigation")
         )
         .mappings()
         .first()
@@ -99,12 +123,21 @@ def upgrade() -> None:
     meta["footer_handcrafted_links"] = DEFAULT_FOOTER_HANDCRAFTED_LINKS
     meta["footer_legal_links"] = DEFAULT_FOOTER_LEGAL_LINKS
 
-    conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta, updated_at=now))
+    conn.execute(
+        sa.update(content_blocks)
+        .where(content_blocks.c.id == row["id"])
+        .values(meta=meta, updated_at=now)
+    )
 
     current_version = int(row.get("version") or 1)
     conn.execute(
         sa.update(versions)
-        .where(sa.and_(versions.c.content_block_id == row["id"], versions.c.version == current_version))
+        .where(
+            sa.and_(
+                versions.c.content_block_id == row["id"],
+                versions.c.version == current_version,
+            )
+        )
         .values(meta=meta)
     )
 
@@ -112,4 +145,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing seeded navigation links would overwrite user edits.
     return
-

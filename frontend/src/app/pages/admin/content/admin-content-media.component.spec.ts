@@ -9,7 +9,7 @@ import { AdminContentMediaComponent } from './admin-content-media.component';
 @Component({
   selector: 'app-dam-asset-library',
   standalone: true,
-  template: ''
+  template: '',
 })
 class DamAssetLibraryStubComponent {
   @Input() mode = '';
@@ -18,11 +18,11 @@ class DamAssetLibraryStubComponent {
 describe('AdminContentMediaComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [TranslateModule.forRoot(), AdminContentMediaComponent]
+      imports: [TranslateModule.forRoot(), AdminContentMediaComponent],
     })
       .overrideComponent(AdminContentMediaComponent, {
         remove: { imports: [DamAssetLibraryComponent] },
-        add: { imports: [DamAssetLibraryStubComponent] }
+        add: { imports: [DamAssetLibraryStubComponent] },
       })
       .compileComponents();
 
@@ -35,12 +35,12 @@ describe('AdminContentMediaComponent', () => {
             media: {
               title: 'Media library',
               hint: 'Manage all site images',
-              libraryTitle: 'All media assets'
-            }
-          }
-        }
+              libraryTitle: 'All media assets',
+            },
+          },
+        },
       },
-      true
+      true,
     );
     translate.use('en');
   });

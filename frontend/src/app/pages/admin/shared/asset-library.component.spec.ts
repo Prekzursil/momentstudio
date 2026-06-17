@@ -19,7 +19,7 @@ describe('AssetLibraryComponent', () => {
     focal_y: 50,
     created_at: '2026-02-16T00:00:00Z',
     content_key: 'site.assets',
-    tags: ['hero']
+    tags: ['hero'],
   };
 
   beforeEach(() => {
@@ -31,15 +31,15 @@ describe('AssetLibraryComponent', () => {
       'deleteContentImage',
       'getContentImageUsage',
       'updateContentImageFocalPoint',
-      'editContentImage'
+      'editContentImage',
     ]);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
 
     admin.listContentImages.and.returnValue(
       of({
         items: [],
-        meta: { total_items: 0, total_pages: 1, page: 1, limit: 24 }
-      })
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 24 },
+      }),
     );
     admin.updateContentImage.and.returnValue(of({ ...baseImage, alt_text: 'Renamed image' }));
 
@@ -47,8 +47,8 @@ describe('AssetLibraryComponent', () => {
       imports: [TranslateModule.forRoot(), AssetLibraryComponent],
       providers: [
         { provide: AdminService, useValue: admin },
-        { provide: ToastService, useValue: toast }
-      ]
+        { provide: ToastService, useValue: toast },
+      ],
     });
 
     const translate = TestBed.inject(TranslateService);
@@ -63,14 +63,14 @@ describe('AssetLibraryComponent', () => {
                 success: { renamed: 'Renamed.' },
                 errors: {
                   rename: 'Rename failed.',
-                  invalidDateRange: 'Invalid date range.'
-                }
-              }
-            }
-          }
-        }
+                  invalidDateRange: 'Invalid date range.',
+                },
+              },
+            },
+          },
+        },
       },
-      true
+      true,
     );
     translate.use('en');
   });
@@ -89,8 +89,8 @@ describe('AssetLibraryComponent', () => {
         sort: 'key_desc',
         created_from: '2026-02-01T00:00:00.000Z',
         created_to: '2026-02-02T23:59:59.999Z',
-        page: 1
-      })
+        page: 1,
+      }),
     );
   });
 

@@ -26,8 +26,12 @@ def validate_production_settings() -> None:
 
     problems: list[str] = []
 
-    if (settings.secret_key or "").strip() in {"", "dev-secret-key"} or len((settings.secret_key or "").strip()) < 32:
-        problems.append("SECRET_KEY must be set to a strong random value (not the dev default).")
+    if (settings.secret_key or "").strip() in {"", "dev-secret-key"} or len(
+        (settings.secret_key or "").strip()
+    ) < 32:
+        problems.append(
+            "SECRET_KEY must be set to a strong random value (not the dev default)."
+        )
 
     if (settings.maintenance_bypass_token or "").strip() in {"", "bypass-token"}:
         problems.append("MAINTENANCE_BYPASS_TOKEN must be changed from the default.")
@@ -52,7 +56,9 @@ def validate_production_settings() -> None:
 
     # External URLs should not point at localhost in production.
     if _looks_like_localhost(settings.frontend_origin):
-        problems.append("FRONTEND_ORIGIN must be set to the public site origin (not localhost) in production.")
+        problems.append(
+            "FRONTEND_ORIGIN must be set to the public site origin (not localhost) in production."
+        )
 
     # Email: avoid silent production deployments where emails can't be sent.
     if bool(getattr(settings, "smtp_enabled", False)):
@@ -62,7 +68,10 @@ def validate_production_settings() -> None:
             problems.append("SMTP_FROM_EMAIL must be set when SMTP_ENABLED=1.")
 
     # CAPTCHA: ensure secret key is present when enabled.
-    if bool(getattr(settings, "captcha_enabled", False)) and (settings.captcha_provider or "").strip().lower() == "turnstile":
+    if (
+        bool(getattr(settings, "captcha_enabled", False))
+        and (settings.captcha_provider or "").strip().lower() == "turnstile"
+    ):
         if not (getattr(settings, "turnstile_secret_key", "") or "").strip():
             problems.append("TURNSTILE_SECRET_KEY must be set when CAPTCHA_ENABLED=1.")
 
@@ -75,7 +84,9 @@ def validate_production_settings() -> None:
             if not configured:
                 problems.append(reason or "Netopia is enabled but not configured.")
         except Exception:
-            problems.append("Netopia is enabled but configuration could not be validated.")
+            problems.append(
+                "Netopia is enabled but configuration could not be validated."
+            )
 
     # Stripe: prevent accidentally pointing a production env at test credentials.
     try:
@@ -85,10 +96,14 @@ def validate_production_settings() -> None:
         if stripe_env in {"live", "prod", "production"}:
             key = (stripe_payments.stripe_secret_key() or "").strip()
             if key.startswith("sk_test"):
-                problems.append("STRIPE_ENV=live but STRIPE secret key looks like a test key (sk_test...).")
+                problems.append(
+                    "STRIPE_ENV=live but STRIPE secret key looks like a test key (sk_test...)."
+                )
     except Exception:
         # Never crash production checks due to optional Stripe library issues; missing Stripe config is handled elsewhere.
         pass
 
     if problems:
-        raise RuntimeError("Production configuration checks failed:\n- " + "\n- ".join(problems))
+        raise RuntimeError(
+            "Production configuration checks failed:\n- " + "\n- ".join(problems)
+        )

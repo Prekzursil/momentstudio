@@ -20,9 +20,16 @@ depends_on: Sequence[str] | None = None
 
 def upgrade() -> None:
     op.add_column("content_block_versions", sa.Column("meta", sa.JSON(), nullable=True))
-    op.add_column("content_block_versions", sa.Column("lang", sa.String(length=10), nullable=True))
-    op.add_column("content_block_versions", sa.Column("published_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("content_block_versions", sa.Column("translations", sa.JSON(), nullable=True))
+    op.add_column(
+        "content_block_versions", sa.Column("lang", sa.String(length=10), nullable=True)
+    )
+    op.add_column(
+        "content_block_versions",
+        sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "content_block_versions", sa.Column("translations", sa.JSON(), nullable=True)
+    )
 
     conn = op.get_bind()
     is_postgres = conn.dialect.name == "postgresql"
@@ -50,7 +57,14 @@ def upgrade() -> None:
         sa.column("translations", sa.JSON()),
     )
 
-    blocks = conn.execute(sa.select(content_blocks.c.id, content_blocks.c.meta, content_blocks.c.lang, content_blocks.c.published_at)).all()
+    blocks = conn.execute(
+        sa.select(
+            content_blocks.c.id,
+            content_blocks.c.meta,
+            content_blocks.c.lang,
+            content_blocks.c.published_at,
+        )
+    ).all()
     translations = conn.execute(
         sa.select(
             content_translations.c.content_block_id,

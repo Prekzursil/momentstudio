@@ -48,10 +48,13 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    exists = conn.execute(sa.text("SELECT 1 FROM tags WHERE slug = 'highlight'")).first()
+    exists = conn.execute(
+        sa.text("SELECT 1 FROM tags WHERE slug = 'highlight'")
+    ).first()
     if exists:
         return
     op.execute(
-        sa.text("INSERT INTO tags (id, name, slug) VALUES (:id, :name, :slug)")
-        .bindparams(id=uuid.uuid4(), name="Highlight", slug="highlight")
+        sa.text(
+            "INSERT INTO tags (id, name, slug) VALUES (:id, :name, :slug)"
+        ).bindparams(id=uuid.uuid4(), name="Highlight", slug="highlight")
     )

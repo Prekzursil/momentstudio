@@ -35,8 +35,15 @@ _MAX_HTML_BYTES: Final[int] = 1_000_000
 _MAX_IMAGE_BYTES: Final[int] = 5 * 1024 * 1024
 _CACHE_TTL: Final[timedelta] = timedelta(hours=6)
 _UA: Final[str] = "momentstudio/1.0 (+https://momentstudio.ro)"
-_INSTAGRAM_UA: Final[str] = "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
-_PERSISTABLE_IMAGE_MIMES: Final[tuple[str, ...]] = ("image/jpeg", "image/png", "image/webp", "image/gif")
+_INSTAGRAM_UA: Final[str] = (
+    "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"
+)
+_PERSISTABLE_IMAGE_MIMES: Final[tuple[str, ...]] = (
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+)
 _INSTAGRAM_PROFILE_IMAGE_RE: Final[re.Pattern[str]] = re.compile(
     r'"profile_pic_url_hd"\s*:\s*"([^"]+)"|"profile_pic_url"\s*:\s*"([^"]+)"'
 )
@@ -148,7 +155,10 @@ def _normalize_source_url(raw_url: str) -> str:
 
     normalized_query = urlencode(kept_query, doseq=True)
     netloc = host
-    if parsed.port and not ((scheme == "https" and parsed.port == 443) or (scheme == "http" and parsed.port == 80)):
+    if parsed.port and not (
+        (scheme == "https" and parsed.port == 443)
+        or (scheme == "http" and parsed.port == 80)
+    ):
         netloc = f"{host}:{parsed.port}"
 
     return urlunparse((scheme, netloc, normalized_path, "", normalized_query, ""))
@@ -216,7 +226,9 @@ def _is_local_thumbnail_url(url: str | None) -> bool:
         return False
     if value.startswith(_SOCIAL_MEDIA_PREFIX):
         return True
-    public_media_prefix = f"{settings.frontend_origin.rstrip('/')}{_SOCIAL_MEDIA_PREFIX}"
+    public_media_prefix = (
+        f"{settings.frontend_origin.rstrip('/')}{_SOCIAL_MEDIA_PREFIX}"
+    )
     return value.startswith(public_media_prefix)
 
 
@@ -258,10 +270,15 @@ def thumbnail_requires_local_persist(url: str | None) -> bool:
 
 async def _fetch_page_thumbnail_candidate(source_url: str) -> str | None:
     parsed = urlparse(source_url)
-    headers = {"User-Agent": _user_agent_for_host(parsed.hostname), "Accept": "text/html,application/xhtml+xml"}
+    headers = {
+        "User-Agent": _user_agent_for_host(parsed.hostname),
+        "Accept": "text/html,application/xhtml+xml",
+    }
     timeout = httpx.Timeout(8.0, connect=5.0)
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout, headers=headers) as client:
+    async with httpx.AsyncClient(
+        follow_redirects=True, timeout=timeout, headers=headers
+    ) as client:
         async with client.stream("GET", source_url) as resp:
             resp.raise_for_status()
             chunks: list[bytes] = []
@@ -277,7 +294,9 @@ async def _fetch_page_thumbnail_candidate(source_url: str) -> str | None:
     thumb = _extract_first_image(html, base_url=base_url)
     if thumb:
         return thumb
-    if parsed.hostname and (parsed.hostname == "instagram.com" or parsed.hostname.endswith(".instagram.com")):
+    if parsed.hostname and (
+        parsed.hostname == "instagram.com" or parsed.hostname.endswith(".instagram.com")
+    ):
         return _extract_instagram_profile_image(html, base_url=base_url)
     return None
 
@@ -291,7 +310,9 @@ async def _download_thumbnail_bytes(url: str) -> bytes:
 
     timeout = httpx.Timeout(8.0, connect=5.0)
     headers = {"User-Agent": _UA, "Accept": "image/*"}
-    async with httpx.AsyncClient(follow_redirects=True, timeout=timeout, headers=headers) as client:
+    async with httpx.AsyncClient(
+        follow_redirects=True, timeout=timeout, headers=headers
+    ) as client:
         resp = await client.get(parsed.geturl())
         resp.raise_for_status()
 
@@ -305,7 +326,9 @@ async def _download_thumbnail_bytes(url: str) -> bytes:
     if len(body) > _MAX_IMAGE_BYTES:
         raise ValueError("Thumbnail image too large")
 
-    content_type = (resp.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    content_type = (
+        (resp.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    )
     if content_type and content_type not in _PERSISTABLE_IMAGE_MIMES:
         raise ValueError("Unsupported thumbnail content type")
     return body
@@ -353,17 +376,25 @@ async def fetch_social_thumbnail_url(
     thumb = await _fetch_page_thumbnail_candidate(normalized_source_url)
     resolved: str | None = thumb
     if persist_local:
-        local = await _persist_thumbnail(normalized_source_url, thumb or "") if thumb else None
+        local = (
+            await _persist_thumbnail(normalized_source_url, thumb or "")
+            if thumb
+            else None
+        )
         if local:
             resolved = local
         elif not allow_remote_fallback:
             resolved = None
 
-    _cache[normalized_source_url] = _CacheEntry(expires_at=now + _CACHE_TTL, thumbnail_url=resolved)
+    _cache[normalized_source_url] = _CacheEntry(
+        expires_at=now + _CACHE_TTL, thumbnail_url=resolved
+    )
     return resolved
 
 
-async def hydrate_site_social_meta(meta: dict[str, Any] | None) -> dict[str, Any] | None:
+async def hydrate_site_social_meta(
+    meta: dict[str, Any] | None
+) -> dict[str, Any] | None:
     if not isinstance(meta, dict):
         return meta
 

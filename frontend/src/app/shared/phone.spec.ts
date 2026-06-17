@@ -17,4 +17,3 @@ describe('phone utils', () => {
     expect(buildE164('RO', '123')).toBeNull();
   });
 });
-

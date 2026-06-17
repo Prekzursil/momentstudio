@@ -19,11 +19,16 @@ repos:
     hooks:
       - id: black
 
+  # mirrors-prettier is archived; v3.1.0 is its last real tag (the prior
+  # v3.3.3 pin was a nonexistent tag that short-circuited the whole gate).
+  # additional_dependencies pins prettier to the frontend's actual version
+  # (frontend/package.json prettier ^3.8.1) so CI formats identically to devs.
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.3.3
+    rev: v3.1.0
     hooks:
       - id: prettier
         files: ^frontend/
+        additional_dependencies: ["prettier@3.8.1"]
 
   # --- Gate 5 (lean charter): secrets (gitleaks 8.30.1, pinned) ---
   # Additive: the lean reusable-quality.yml runs the secrets gate via this

@@ -15,10 +15,10 @@ describe('RouteHeadingFocusService', () => {
         {
           provide: Router,
           useValue: {
-            events: routerEvents$.asObservable()
-          }
-        }
-      ]
+            events: routerEvents$.asObservable(),
+          },
+        },
+      ],
     });
   });
 

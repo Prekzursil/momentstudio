@@ -32,4 +32,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column("content_images", "focal_y")
     op.drop_column("content_images", "focal_x")
-

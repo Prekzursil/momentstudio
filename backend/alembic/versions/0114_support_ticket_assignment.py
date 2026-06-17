@@ -47,13 +47,25 @@ def upgrade() -> None:
         ),
     )
 
-    op.create_index("ix_contact_submissions_assignee_user_id", "contact_submissions", ["assignee_user_id"])
-    op.create_index("ix_contact_submissions_assigned_by_user_id", "contact_submissions", ["assigned_by_user_id"])
+    op.create_index(
+        "ix_contact_submissions_assignee_user_id",
+        "contact_submissions",
+        ["assignee_user_id"],
+    )
+    op.create_index(
+        "ix_contact_submissions_assigned_by_user_id",
+        "contact_submissions",
+        ["assigned_by_user_id"],
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_contact_submissions_assigned_by_user_id", table_name="contact_submissions")
-    op.drop_index("ix_contact_submissions_assignee_user_id", table_name="contact_submissions")
+    op.drop_index(
+        "ix_contact_submissions_assigned_by_user_id", table_name="contact_submissions"
+    )
+    op.drop_index(
+        "ix_contact_submissions_assignee_user_id", table_name="contact_submissions"
+    )
     op.drop_column("contact_submissions", "assigned_at")
     op.drop_column("contact_submissions", "assigned_by_user_id")
     op.drop_column("contact_submissions", "assignee_user_id")

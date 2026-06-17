@@ -63,11 +63,17 @@ export class AdminProductsService {
     page?: number;
     limit?: number;
   }): Observable<AdminProductListResponse> {
-    return this.api.get<AdminProductListResponse>('/admin/dashboard/products/search', params as any);
+    return this.api.get<AdminProductListResponse>(
+      '/admin/dashboard/products/search',
+      params as any,
+    );
   }
 
   restore(productId: string): Observable<AdminProductListItem> {
-    return this.api.post<AdminProductListItem>(`/admin/dashboard/products/${productId}/restore`, {});
+    return this.api.post<AdminProductListItem>(
+      `/admin/dashboard/products/${productId}/restore`,
+      {},
+    );
   }
 
   byIds(ids: string[]): Observable<AdminProductListItem[]> {
@@ -79,7 +85,9 @@ export class AdminProductsService {
     sku?: string;
     exclude_slug?: string;
   }): Observable<AdminProductDuplicateCheckResponse> {
-    return this.api.get<AdminProductDuplicateCheckResponse>('/admin/dashboard/products/duplicate-check', params as any);
+    return this.api.get<AdminProductDuplicateCheckResponse>(
+      '/admin/dashboard/products/duplicate-check',
+      params as any,
+    );
   }
 }
-

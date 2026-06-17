@@ -19,15 +19,15 @@ describe('CartStore', () => {
         name: 'Prod',
         slug: 'prod',
         image_url: '/media/img.png',
-        currency: 'RON'
-      }
+        currency: 'RON',
+      },
     ],
-    totals: { subtotal: '20.00', tax: '2.00', shipping: '5.00', total: '27.00', currency: 'RON' }
+    totals: { subtotal: '20.00', tax: '2.00', shipping: '5.00', total: '27.00', currency: 'RON' },
   };
 
   const mockApi = {
     get: () => of(apiResponse),
-    sync: () => of(apiResponse)
+    sync: () => of(apiResponse),
   } as any;
 
   it('maps backend cart response to store items', () => {
@@ -55,20 +55,34 @@ describe('CartStore', () => {
         slug: 'cup',
         image_url: '/img.png',
         currency: 'RON',
-        max_quantity: 5
-      })
+        max_quantity: 5,
+      }),
     );
     const deleteSpy = jasmine.createSpy().and.returnValue(throwError(() => new Error('fail')));
     const api = {
       get: () => of(apiResponse),
       sync: () => of(apiResponse),
       addItem: addSpy,
-      deleteItem: deleteSpy
+      deleteItem: deleteSpy,
     } as any;
 
     const store = new CartStore(api);
-    store.addFromProduct({ product_id: 'p1', quantity: 1, name: 'Cup', slug: 'cup', stock: 5, currency: 'RON' });
-    store.addFromProduct({ product_id: 'p1', quantity: 1, name: 'Cup', slug: 'cup', stock: 5, currency: 'RON' });
+    store.addFromProduct({
+      product_id: 'p1',
+      quantity: 1,
+      name: 'Cup',
+      slug: 'cup',
+      stock: 5,
+      currency: 'RON',
+    });
+    store.addFromProduct({
+      product_id: 'p1',
+      quantity: 1,
+      name: 'Cup',
+      slug: 'cup',
+      stock: 5,
+      currency: 'RON',
+    });
     const items = store.items();
     expect(addSpy).toHaveBeenCalled();
     expect(items.length).toBe(1);

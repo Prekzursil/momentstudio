@@ -21,7 +21,9 @@ def upgrade() -> None:
     bind = op.get_bind()
     if bind.dialect.name == "postgresql":
         with op.get_context().autocommit_block():
-            op.execute("ALTER TYPE contact_submission_topic ADD VALUE IF NOT EXISTS 'feedback'")
+            op.execute(
+                "ALTER TYPE contact_submission_topic ADD VALUE IF NOT EXISTS 'feedback'"
+            )
     else:
         # SQLite stores SQLAlchemy enums as strings and doesn't require enum DDL.
         pass
@@ -30,5 +32,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     # PostgreSQL does not support removing enum values from a type. We remap
     # feedback rows back to 'support' so older code paths continue to work.
-    op.execute("UPDATE contact_submissions SET topic = 'support' WHERE topic = 'feedback'")
-
+    op.execute(
+        "UPDATE contact_submissions SET topic = 'support' WHERE topic = 'feedback'"
+    )

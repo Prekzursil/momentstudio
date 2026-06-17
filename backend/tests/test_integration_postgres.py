@@ -22,7 +22,10 @@ if os.environ.get("RUN_POSTGRES_INTEGRATION") != "1":
     pytest.skip("Postgres integration tests are opt-in", allow_module_level=True)
 
 if not settings.database_url.startswith("postgresql"):
-    pytest.skip("Postgres integration test requires DATABASE_URL pointing to Postgres", allow_module_level=True)
+    pytest.skip(
+        "Postgres integration test requires DATABASE_URL pointing to Postgres",
+        allow_module_level=True,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -82,19 +85,25 @@ async def test_postgres_core_flow_wishlist() -> None:
         product_id = await seed()
 
         # Public catalog endpoints should work under Postgres
-        products = await client.get("/api/v1/catalog/products", params={"search": "Postgres"})
+        products = await client.get(
+            "/api/v1/catalog/products", params={"search": "Postgres"}
+        )
         assert products.status_code == 200, products.text
         assert any(item["id"] == product_id for item in products.json()["items"])
 
         # Wishlist API flow under Postgres
-        add = await client.post(f"/api/v1/wishlist/{product_id}", headers=auth_headers(token))
+        add = await client.post(
+            f"/api/v1/wishlist/{product_id}", headers=auth_headers(token)
+        )
         assert add.status_code == 201, add.text
 
         listed = await client.get("/api/v1/wishlist", headers=auth_headers(token))
         assert listed.status_code == 200, listed.text
         assert any(item["id"] == product_id for item in listed.json())
 
-        removed = await client.delete(f"/api/v1/wishlist/{product_id}", headers=auth_headers(token))
+        removed = await client.delete(
+            f"/api/v1/wishlist/{product_id}", headers=auth_headers(token)
+        )
         assert removed.status_code == 204, removed.text
 
 
@@ -131,7 +140,13 @@ async def test_postgres_coupon_global_cap_reservation_race() -> None:
 
     from fastapi import HTTPException
 
-    from app.models.coupons_v2 import Coupon, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+    from app.models.coupons_v2 import (
+        Coupon,
+        CouponReservation,
+        CouponVisibility,
+        Promotion,
+        PromotionDiscountType,
+    )
     from app.models.order import Order, OrderStatus
     from app.models.user import User
     from app.schemas.user import UserCreate
@@ -218,7 +233,9 @@ async def test_postgres_coupon_global_cap_reservation_race() -> None:
 
         # Hold a lock and stage an uncommitted reservation to force a race window.
         now = datetime.now(timezone.utc)
-        await session.execute(select(Coupon).where(Coupon.id == coupon.id).with_for_update())
+        await session.execute(
+            select(Coupon).where(Coupon.id == coupon.id).with_for_update()
+        )
         session.add(
             CouponReservation(
                 coupon_id=coupon.id,
@@ -291,8 +308,20 @@ async def test_postgres_stock_reservation_prevents_oversell() -> None:
         await session.flush()
         session.add_all(
             [
-                CartItem(cart_id=cart1.id, product_id=product_id, variant_id=None, quantity=1, unit_price_at_add=product.base_price),
-                CartItem(cart_id=cart2.id, product_id=product_id, variant_id=None, quantity=1, unit_price_at_add=product.base_price),
+                CartItem(
+                    cart_id=cart1.id,
+                    product_id=product_id,
+                    variant_id=None,
+                    quantity=1,
+                    unit_price_at_add=product.base_price,
+                ),
+                CartItem(
+                    cart_id=cart2.id,
+                    product_id=product_id,
+                    variant_id=None,
+                    quantity=1,
+                    unit_price_at_add=product.base_price,
+                ),
             ]
         )
         await session.commit()
@@ -304,7 +333,9 @@ async def test_postgres_stock_reservation_prevents_oversell() -> None:
             cart = (
                 (
                     await session.execute(
-                        select(Cart).options(selectinload(Cart.items)).where(Cart.id == cart_id)
+                        select(Cart)
+                        .options(selectinload(Cart.items))
+                        .where(Cart.id == cart_id)
                     )
                 )
                 .scalars()
@@ -323,7 +354,9 @@ async def test_postgres_stock_reservation_prevents_oversell() -> None:
             )
             return str(order.id)
 
-    results = await asyncio.gather(_create_order(cart1_id), _create_order(cart2_id), return_exceptions=True)
+    results = await asyncio.gather(
+        _create_order(cart1_id), _create_order(cart2_id), return_exceptions=True
+    )
 
     successes = [r for r in results if isinstance(r, str)]
     failures = [r for r in results if not isinstance(r, str)]
@@ -372,7 +405,10 @@ async def test_postgres_blog_flow() -> None:
                     status=ContentStatus.published,
                     lang="ro",
                     published_at=now - timedelta(days=1),
-                    meta={"summary": {"ro": "Rezumat", "en": "Summary"}, "tags": ["News"]},
+                    meta={
+                        "summary": {"ro": "Rezumat", "en": "Summary"},
+                        "tags": ["News"],
+                    },
                 )
                 session.add(block)
                 await session.flush()
@@ -404,22 +440,32 @@ async def test_postgres_blog_flow() -> None:
         assert slug in slugs
         assert scheduled_slug not in slugs
 
-        detail_en = await client.get(f"/api/v1/blog/posts/{slug}", params={"lang": "en"})
+        detail_en = await client.get(
+            f"/api/v1/blog/posts/{slug}", params={"lang": "en"}
+        )
         assert detail_en.status_code == 200, detail_en.text
         assert detail_en.json()["title"] == "Hello"
 
-        detail_ro = await client.get(f"/api/v1/blog/posts/{slug}", params={"lang": "ro"})
+        detail_ro = await client.get(
+            f"/api/v1/blog/posts/{slug}", params={"lang": "ro"}
+        )
         assert detail_ro.status_code == 200, detail_ro.text
         assert detail_ro.json()["title"] == "Salut"
 
-        scheduled_detail = await client.get(f"/api/v1/blog/posts/{scheduled_slug}", params={"lang": "en"})
+        scheduled_detail = await client.get(
+            f"/api/v1/blog/posts/{scheduled_slug}", params={"lang": "en"}
+        )
         assert scheduled_detail.status_code == 404, scheduled_detail.text
 
-        og = await client.get(f"/api/v1/blog/posts/{slug}/og.png", params={"lang": "en"})
+        og = await client.get(
+            f"/api/v1/blog/posts/{slug}/og.png", params={"lang": "en"}
+        )
         assert og.status_code == 200, og.text
         assert og.headers.get("content-type", "").startswith("image/png")
 
-        scheduled_og = await client.get(f"/api/v1/blog/posts/{scheduled_slug}/og.png", params={"lang": "en"})
+        scheduled_og = await client.get(
+            f"/api/v1/blog/posts/{scheduled_slug}/og.png", params={"lang": "en"}
+        )
         assert scheduled_og.status_code == 404, scheduled_og.text
 
         created = await client.post(

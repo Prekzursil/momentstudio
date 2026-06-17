@@ -21,7 +21,9 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "tags",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("name", sa.String(length=50), nullable=False),
         sa.Column("slug", sa.String(length=80), nullable=False),
         sa.UniqueConstraint("name", name="uq_tags_name"),
@@ -32,38 +34,84 @@ def upgrade() -> None:
 
     op.create_table(
         "product_options",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("product_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("products.id"), nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "product_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("products.id"),
+            nullable=False,
+        ),
         sa.Column("option_name", sa.String(length=50), nullable=False),
         sa.Column("option_value", sa.String(length=120), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
     op.create_table(
         "product_reviews",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("product_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("products.id"), nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=True),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "product_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("products.id"),
+            nullable=False,
+        ),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id"),
+            nullable=True,
+        ),
         sa.Column("author_name", sa.String(length=160), nullable=False),
         sa.Column("rating", sa.Integer(), nullable=False),
         sa.Column("title", sa.String(length=160), nullable=True),
         sa.Column("body", sa.Text(), nullable=True),
-        sa.Column("is_approved", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "is_approved", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
     op.add_column(
         "products",
-        sa.Column("rating_average", sa.Numeric(3, 2), nullable=False, server_default="0"),
+        sa.Column(
+            "rating_average", sa.Numeric(3, 2), nullable=False, server_default="0"
+        ),
     )
-    op.add_column("products", sa.Column("rating_count", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column(
+        "products",
+        sa.Column("rating_count", sa.Integer(), nullable=False, server_default="0"),
+    )
     op.alter_column("products", "rating_average", server_default=None)
     op.alter_column("products", "rating_count", server_default=None)
 
     op.create_table(
         "product_tags",
-        sa.Column("product_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("products.id"), primary_key=True),
-        sa.Column("tag_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("tags.id"), primary_key=True),
+        sa.Column(
+            "product_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("products.id"),
+            primary_key=True,
+        ),
+        sa.Column(
+            "tag_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("tags.id"),
+            primary_key=True,
+        ),
     )
 
 

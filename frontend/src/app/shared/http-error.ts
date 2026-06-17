@@ -22,4 +22,3 @@ export function extractRequestId(error: unknown): string | null {
 
   return null;
 }
-

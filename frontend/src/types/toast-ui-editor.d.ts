@@ -18,4 +18,3 @@ declare module '@toast-ui/editor' {
     destroy(): void;
   }
 }
-

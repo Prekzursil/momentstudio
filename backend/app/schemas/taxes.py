@@ -62,4 +62,3 @@ class TaxGroupRead(BaseModel):
     created_at: datetime
     updated_at: datetime
     rates: list[TaxRateRead] = Field(default_factory=list)
-

@@ -27,15 +27,27 @@ describe('CmsPageComponent', () => {
     meta = jasmine.createSpyObj<Meta>('Meta', ['updateTag']);
     title = jasmine.createSpyObj<Title>('Title', ['setTitle']);
     api = jasmine.createSpyObj<ApiService>('ApiService', ['get']);
-    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', ['setLocalizedCanonical']);
+    seoHeadLinks = jasmine.createSpyObj<SeoHeadLinksService>('SeoHeadLinksService', [
+      'setLocalizedCanonical',
+    ]);
     seoHeadLinks.setLocalizedCanonical.and.returnValue('http://localhost:4200/pages/about');
 
     api.get.and.callFake((path: string, params?: Record<string, unknown>) => {
       if (path === '/content/pages/about') {
         if (params?.['lang'] === 'ro') {
-          return of({ key: 'page.about', title: 'Despre', body_markdown: 'Salut', images: [] } as any);
+          return of({
+            key: 'page.about',
+            title: 'Despre',
+            body_markdown: 'Salut',
+            images: [],
+          } as any);
         }
-        return of({ key: 'page.about', title: 'About page', body_markdown: 'Hello', images: [] } as any);
+        return of({
+          key: 'page.about',
+          title: 'About page',
+          body_markdown: 'Hello',
+          images: [],
+        } as any);
       }
       throw new Error(`Unexpected path: ${path}`);
     });
@@ -62,8 +74,16 @@ describe('CmsPageComponent', () => {
     });
 
     translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', { about: { metaDescription: 'About desc' }, nav: { home: 'Home', page: 'Page' } }, true);
-    translate.setTranslation('ro', { about: { metaDescription: 'Descriere' }, nav: { home: 'Acasă', page: 'Pagină' } }, true);
+    translate.setTranslation(
+      'en',
+      { about: { metaDescription: 'About desc' }, nav: { home: 'Home', page: 'Page' } },
+      true,
+    );
+    translate.setTranslation(
+      'ro',
+      { about: { metaDescription: 'Descriere' }, nav: { home: 'Acasă', page: 'Pagină' } },
+      true,
+    );
     translate.use('en');
   });
 
@@ -73,7 +93,10 @@ describe('CmsPageComponent', () => {
 
     expect(title.setTitle).toHaveBeenCalledWith('About page | momentstudio');
     expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'en', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/pages/about' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:url',
+      content: 'http://localhost:4200/pages/about',
+    });
   });
 
   it('updates canonical language when translation changes', () => {
@@ -89,6 +112,9 @@ describe('CmsPageComponent', () => {
 
     expect(title.setTitle).toHaveBeenCalledWith('Despre | momentstudio');
     expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'ro', {});
-    expect(meta.updateTag).toHaveBeenCalledWith({ property: 'og:url', content: 'http://localhost:4200/pages/about?lang=ro' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:url',
+      content: 'http://localhost:4200/pages/about?lang=ro',
+    });
   });
 });

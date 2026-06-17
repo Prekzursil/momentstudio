@@ -35,9 +35,15 @@ def upgrade() -> None:
 
     op.create_table(
         "contact_submissions",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("topic", contact_topic, nullable=False, server_default=sa.text("'contact'")),
-        sa.Column("status", contact_status, nullable=False, server_default=sa.text("'new'")),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "topic", contact_topic, nullable=False, server_default=sa.text("'contact'")
+        ),
+        sa.Column(
+            "status", contact_status, nullable=False, server_default=sa.text("'new'")
+        ),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("message", sa.Text(), nullable=False),
@@ -49,14 +55,30 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("admin_note", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("resolved_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_contact_submissions_email", "contact_submissions", ["email"])
-    op.create_index("ix_contact_submissions_order_reference", "contact_submissions", ["order_reference"])
+    op.create_index(
+        "ix_contact_submissions_order_reference",
+        "contact_submissions",
+        ["order_reference"],
+    )
     op.create_index("ix_contact_submissions_status", "contact_submissions", ["status"])
-    op.create_index("ix_contact_submissions_created_at", "contact_submissions", ["created_at"])
+    op.create_index(
+        "ix_contact_submissions_created_at", "contact_submissions", ["created_at"]
+    )
 
     return_status = sa.Enum(
         "requested",
@@ -69,7 +91,9 @@ def upgrade() -> None:
     )
     op.create_table(
         "return_requests",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column(
             "order_id",
             postgresql.UUID(as_uuid=True),
@@ -82,7 +106,12 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="SET NULL"),
             nullable=True,
         ),
-        sa.Column("status", return_status, nullable=False, server_default=sa.text("'requested'")),
+        sa.Column(
+            "status",
+            return_status,
+            nullable=False,
+            server_default=sa.text("'requested'"),
+        ),
         sa.Column("reason", sa.Text(), nullable=False),
         sa.Column("customer_message", sa.Text(), nullable=True),
         sa.Column("admin_note", sa.Text(), nullable=True),
@@ -98,8 +127,18 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="SET NULL"),
             nullable=True,
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("closed_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_return_requests_order_id", "return_requests", ["order_id"])
@@ -109,7 +148,9 @@ def upgrade() -> None:
 
     op.create_table(
         "return_request_items",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column(
             "return_request_id",
             postgresql.UUID(as_uuid=True),
@@ -122,16 +163,43 @@ def upgrade() -> None:
             sa.ForeignKey("order_items.id", ondelete="SET NULL"),
             nullable=True,
         ),
-        sa.Column("quantity", sa.Integer(), nullable=False, server_default=sa.text("1")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "quantity", sa.Integer(), nullable=False, server_default=sa.text("1")
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
-    op.create_index("ix_return_request_items_return_request_id", "return_request_items", ["return_request_id"])
-    op.create_index("ix_return_request_items_order_item_id", "return_request_items", ["order_item_id"])
+    op.create_index(
+        "ix_return_request_items_return_request_id",
+        "return_request_items",
+        ["return_request_id"],
+    )
+    op.create_index(
+        "ix_return_request_items_order_item_id",
+        "return_request_items",
+        ["order_item_id"],
+    )
 
-    op.add_column("orders", sa.Column("tracking_url", sa.String(length=255), nullable=True))
-    op.add_column("orders", sa.Column("shipping_label_path", sa.String(length=255), nullable=True))
-    op.add_column("orders", sa.Column("shipping_label_filename", sa.String(length=255), nullable=True))
-    op.add_column("orders", sa.Column("shipping_label_uploaded_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "orders", sa.Column("tracking_url", sa.String(length=255), nullable=True)
+    )
+    op.add_column(
+        "orders", sa.Column("shipping_label_path", sa.String(length=255), nullable=True)
+    )
+    op.add_column(
+        "orders",
+        sa.Column("shipping_label_filename", sa.String(length=255), nullable=True),
+    )
+    op.add_column(
+        "orders",
+        sa.Column(
+            "shipping_label_uploaded_at", sa.DateTime(timezone=True), nullable=True
+        ),
+    )
 
 
 def downgrade() -> None:
@@ -140,8 +208,12 @@ def downgrade() -> None:
     op.drop_column("orders", "shipping_label_path")
     op.drop_column("orders", "tracking_url")
 
-    op.drop_index("ix_return_request_items_order_item_id", table_name="return_request_items")
-    op.drop_index("ix_return_request_items_return_request_id", table_name="return_request_items")
+    op.drop_index(
+        "ix_return_request_items_order_item_id", table_name="return_request_items"
+    )
+    op.drop_index(
+        "ix_return_request_items_return_request_id", table_name="return_request_items"
+    )
     op.drop_table("return_request_items")
 
     op.drop_index("ix_return_requests_created_at", table_name="return_requests")
@@ -152,7 +224,9 @@ def downgrade() -> None:
 
     op.drop_index("ix_contact_submissions_created_at", table_name="contact_submissions")
     op.drop_index("ix_contact_submissions_status", table_name="contact_submissions")
-    op.drop_index("ix_contact_submissions_order_reference", table_name="contact_submissions")
+    op.drop_index(
+        "ix_contact_submissions_order_reference", table_name="contact_submissions"
+    )
     op.drop_index("ix_contact_submissions_email", table_name="contact_submissions")
     op.drop_table("contact_submissions")
 
@@ -161,4 +235,3 @@ def downgrade() -> None:
         op.execute("DROP TYPE IF EXISTS return_request_status")
         op.execute("DROP TYPE IF EXISTS contact_submission_status")
         op.execute("DROP TYPE IF EXISTS contact_submission_topic")
-

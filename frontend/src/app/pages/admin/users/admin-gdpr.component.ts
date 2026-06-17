@@ -4,7 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AdminPaginationMeta } from '../../../core/admin-orders.service';
-import { AdminGdprDeletionRequestItem, AdminGdprExportJobItem, AdminUsersService } from '../../../core/admin-users.service';
+import {
+  AdminGdprDeletionRequestItem,
+  AdminGdprExportJobItem,
+  AdminUsersService,
+} from '../../../core/admin-users.service';
 import { AuthService } from '../../../core/auth.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
@@ -26,18 +30,24 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
     ButtonComponent,
     InputComponent,
     ModalComponent,
-    SkeletonComponent
+    SkeletonComponent,
   ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
       <div class="grid gap-1">
-        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.gdpr.title' | translate }}</h1>
-        <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.gdpr.hint' | translate }}</p>
+        <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'adminUi.gdpr.title' | translate }}
+        </h1>
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          {{ 'adminUi.gdpr.hint' | translate }}
+        </p>
       </div>
 
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+      <section
+        class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <div class="grid gap-3 lg:grid-cols-[1fr_240px_auto] items-end">
           <app-input [label]="'adminUi.gdpr.search' | translate" [(value)]="q"></app-input>
 
@@ -56,17 +66,30 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
           </label>
 
           <div class="flex items-center gap-2">
-            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.actions.refresh' | translate"
+              (action)="applyFilters()"
+            ></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.reset' | translate"
+              (action)="resetFilters()"
+            ></app-button>
           </div>
         </div>
       </section>
 
       <section class="grid gap-4 lg:grid-cols-2 items-start">
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <div
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <div class="flex items-center justify-between gap-3">
             <div class="grid gap-1">
-              <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.gdpr.exportsTitle' | translate }}</h2>
+              <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.gdpr.exportsTitle' | translate }}
+              </h2>
               <p class="text-xs text-slate-600 dark:text-slate-300">{{ exportsMetaText() }}</p>
             </div>
             <div class="flex items-center gap-2">
@@ -87,7 +110,10 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
             </div>
           </div>
 
-          <div *ngIf="exportsError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+          <div
+            *ngIf="exportsError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
             {{ exportsError() }}
           </div>
 
@@ -99,58 +125,105 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
               {{ 'adminUi.gdpr.exportsEmpty' | translate }}
             </div>
 
-            <div *ngIf="exports().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <div
+              *ngIf="exports().length > 0"
+              class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            >
               <table class="min-w-[860px] w-full text-sm">
                 <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                   <tr>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.user' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.status' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.requested' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.slaDue' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.expires' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.actions' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.user' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.status' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.requested' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.slaDue' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.expires' | translate }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.actions' | translate }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let job of exports(); trackBy: trackExportJob" class="border-t border-slate-200 dark:border-slate-800">
+                  <tr
+                    *ngFor="let job of exports(); trackBy: trackExportJob"
+                    class="border-t border-slate-200 dark:border-slate-800"
+                  >
                     <td class="px-3 py-2">
                       <div class="grid gap-0.5">
-                        <button class="text-left font-medium text-indigo-700 hover:underline dark:text-indigo-200" (click)="openUser(job.user.email)">
+                        <button
+                          class="text-left font-medium text-indigo-700 hover:underline dark:text-indigo-200"
+                          (click)="openUser(job.user.email)"
+                        >
                           {{ job.user.email }}
                         </button>
-                        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ job.user.username }}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {{ job.user.username }}
+                        </div>
                       </div>
                     </td>
                     <td class="px-3 py-2">
                       <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPill(job.status)">
-                          {{ ('adminUi.gdpr.status.' + job.status) | translate }}
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                          [ngClass]="statusPill(job.status)"
+                        >
+                          {{ 'adminUi.gdpr.status.' + job.status | translate }}
                         </span>
-                        <span *ngIf="job.sla_breached" class="inline-flex items-center rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100">
+                        <span
+                          *ngIf="job.sla_breached"
+                          class="inline-flex items-center rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100"
+                        >
                           {{ 'adminUi.gdpr.slaBreached' | translate }}
                         </span>
                       </div>
                       <div class="mt-1 h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
-                        <div class="h-1.5 rounded-full bg-indigo-500" [style.width.%]="progressPct(job)"></div>
+                        <div
+                          class="h-1.5 rounded-full bg-indigo-500"
+                          [style.width.%]="progressPct(job)"
+                        ></div>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ job.created_at | date: 'short' }}</td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ job.sla_due_at | date: 'shortDate' }}</td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ job.expires_at ? (job.expires_at | date: 'shortDate') : '—' }}</td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ job.created_at | date: 'short' }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ job.sla_due_at | date: 'shortDate' }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ job.expires_at ? (job.expires_at | date: 'shortDate') : '—' }}
+                    </td>
                     <td class="px-3 py-2">
                       <div class="flex justify-end gap-2">
                         <app-button
                           size="sm"
                           variant="ghost"
                           [label]="'adminUi.gdpr.download' | translate"
-                          [disabled]="!canAdminActions() || !job.has_file || job.status !== 'succeeded' || downloadingJobId() === job.id"
+                          [disabled]="
+                            !canAdminActions() ||
+                            !job.has_file ||
+                            job.status !== 'succeeded' ||
+                            downloadingJobId() === job.id
+                          "
                           (action)="downloadExport(job)"
                         ></app-button>
                         <app-button
                           size="sm"
                           variant="ghost"
                           [label]="'adminUi.gdpr.retry' | translate"
-                          [disabled]="!canAdminActions() || job.status === 'running' || retryingJobId() === job.id"
+                          [disabled]="
+                            !canAdminActions() ||
+                            job.status === 'running' ||
+                            retryingJobId() === job.id
+                          "
                           (action)="retryExport(job)"
                         ></app-button>
                       </div>
@@ -162,10 +235,14 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
           </ng-template>
         </div>
 
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <div
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <div class="flex items-center justify-between gap-3">
             <div class="grid gap-1">
-              <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.gdpr.deletionsTitle' | translate }}</h2>
+              <h2 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.gdpr.deletionsTitle' | translate }}
+              </h2>
               <p class="text-xs text-slate-600 dark:text-slate-300">{{ deletionsMetaText() }}</p>
             </div>
             <div class="flex items-center gap-2">
@@ -180,13 +257,18 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
                 size="sm"
                 variant="ghost"
                 [label]="'adminUi.actions.next' | translate"
-                [disabled]="deletionsLoading() || deletionsMeta()?.page === deletionsMeta()?.total_pages"
+                [disabled]="
+                  deletionsLoading() || deletionsMeta()?.page === deletionsMeta()?.total_pages
+                "
                 (action)="deletionsNext()"
               ></app-button>
             </div>
           </div>
 
-          <div *ngIf="deletionsError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+          <div
+            *ngIf="deletionsError()"
+            class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+          >
             {{ deletionsError() }}
           </div>
 
@@ -194,45 +276,83 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
             <app-skeleton [rows]="8"></app-skeleton>
           </div>
           <ng-template #deletionsTpl>
-            <div *ngIf="deletions().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+            <div
+              *ngIf="deletions().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.gdpr.deletionsEmpty' | translate }}
             </div>
 
-            <div *ngIf="deletions().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+            <div
+              *ngIf="deletions().length > 0"
+              class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            >
               <table class="min-w-[860px] w-full text-sm">
                 <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                   <tr>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.user' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.status' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.requested' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.scheduledFor' | translate }}</th>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.slaDue' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.gdpr.table.actions' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.user' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.status' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.requested' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.scheduledFor' | translate }}
+                    </th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.slaDue' | translate }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">
+                      {{ 'adminUi.gdpr.table.actions' | translate }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let item of deletions(); trackBy: trackDeletion" class="border-t border-slate-200 dark:border-slate-800">
+                  <tr
+                    *ngFor="let item of deletions(); trackBy: trackDeletion"
+                    class="border-t border-slate-200 dark:border-slate-800"
+                  >
                     <td class="px-3 py-2">
                       <div class="grid gap-0.5">
-                        <button class="text-left font-medium text-indigo-700 hover:underline dark:text-indigo-200" (click)="openUser(item.user.email)">
+                        <button
+                          class="text-left font-medium text-indigo-700 hover:underline dark:text-indigo-200"
+                          (click)="openUser(item.user.email)"
+                        >
                           {{ item.user.email }}
                         </button>
-                        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ item.user.username }}</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {{ item.user.username }}
+                        </div>
                       </div>
                     </td>
                     <td class="px-3 py-2">
                       <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="deletionStatusPill(item.status)">
-                          {{ ('adminUi.gdpr.deletionStatus.' + item.status) | translate }}
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                          [ngClass]="deletionStatusPill(item.status)"
+                        >
+                          {{ 'adminUi.gdpr.deletionStatus.' + item.status | translate }}
                         </span>
-                        <span *ngIf="item.sla_breached" class="inline-flex items-center rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100">
+                        <span
+                          *ngIf="item.sla_breached"
+                          class="inline-flex items-center rounded-full bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-900 dark:bg-rose-900/30 dark:text-rose-100"
+                        >
                           {{ 'adminUi.gdpr.slaBreached' | translate }}
                         </span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ item.requested_at | date: 'short' }}</td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ item.scheduled_for ? (item.scheduled_for | date: 'short' ) : '—' }}</td>
-                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ item.sla_due_at | date: 'shortDate' }}</td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ item.requested_at | date: 'short' }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ item.scheduled_for ? (item.scheduled_for | date: 'short') : '—' }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ item.sla_due_at | date: 'shortDate' }}
+                    </td>
                     <td class="px-3 py-2">
                       <div class="flex justify-end gap-2">
                         <app-button
@@ -271,7 +391,10 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
         (closed)="closeExecuteDeletionModal()"
       >
         <div class="grid gap-3">
-          <div *ngIf="executeDeletionTarget() as target" class="text-sm text-slate-700 dark:text-slate-200">
+          <div
+            *ngIf="executeDeletionTarget() as target"
+            class="text-sm text-slate-700 dark:text-slate-200"
+          >
             {{ target.user.email }}
           </div>
 
@@ -289,14 +412,14 @@ type ExportStatusFilter = 'all' | 'pending' | 'running' | 'succeeded' | 'failed'
         </div>
       </app-modal>
     </div>
-  `
+  `,
 })
 export class AdminGdprComponent implements OnInit {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
     { label: 'adminUi.users.title', url: '/admin/users' },
-    { label: 'adminUi.gdpr.title' }
+    { label: 'adminUi.gdpr.title' },
   ];
 
   q = '';
@@ -329,7 +452,7 @@ export class AdminGdprComponent implements OnInit {
     private readonly auth: AuthService,
     private readonly router: Router,
     private readonly toast: ToastService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
@@ -391,22 +514,28 @@ export class AdminGdprComponent implements OnInit {
   }
 
   statusPill(status: string): string {
-    if (status === 'succeeded') return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
-    if (status === 'failed') return 'bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100';
-    if (status === 'running') return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100';
+    if (status === 'succeeded')
+      return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
+    if (status === 'failed')
+      return 'bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100';
+    if (status === 'running')
+      return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100';
     return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
   }
 
   deletionStatusPill(status: string): string {
     if (status === 'due') return 'bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100';
-    if (status === 'cooldown') return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100';
+    if (status === 'cooldown')
+      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100';
     return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
   }
 
   openUser(prefill: string): void {
     const needle = (prefill || '').trim();
     if (!needle) return;
-    void this.router.navigateByUrl('/admin/users', { state: { prefillUserSearch: needle, autoSelectFirst: true } });
+    void this.router.navigateByUrl('/admin/users', {
+      state: { prefillUserSearch: needle, autoSelectFirst: true },
+    });
   }
 
   retryExport(job: AdminGdprExportJobItem): void {
@@ -423,7 +552,7 @@ export class AdminGdprComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.gdpr.errors.retryExport'));
         this.retryingJobId.set(null);
-      }
+      },
     });
   }
 
@@ -446,7 +575,7 @@ export class AdminGdprComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.gdpr.errors.download'));
         this.downloadingJobId.set(null);
-      }
+      },
     });
   }
 
@@ -501,10 +630,12 @@ export class AdminGdprComponent implements OnInit {
       error: (err) => {
         const detail = err?.error?.detail;
         this.executeDeletionModalError =
-          typeof detail === 'string' && detail ? detail : this.t('adminUi.gdpr.errors.executeDeletion');
+          typeof detail === 'string' && detail
+            ? detail
+            : this.t('adminUi.gdpr.errors.executeDeletion');
         this.toast.error(this.executeDeletionModalError);
         this.deletionBusyUserId.set(null);
-      }
+      },
     });
   }
 
@@ -523,7 +654,7 @@ export class AdminGdprComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.gdpr.errors.cancelDeletion'));
         this.deletionBusyUserId.set(null);
-      }
+      },
     });
   }
 
@@ -543,7 +674,7 @@ export class AdminGdprComponent implements OnInit {
         q: this.q.trim() ? this.q.trim() : undefined,
         status: this.exportStatus === 'all' ? undefined : this.exportStatus,
         page: this.exportsPage,
-        limit: this.exportsLimit
+        limit: this.exportsLimit,
       })
       .subscribe({
         next: (res) => {
@@ -554,7 +685,7 @@ export class AdminGdprComponent implements OnInit {
         error: () => {
           this.exportsError.set(this.t('adminUi.gdpr.errors.loadExports'));
           this.exportsLoading.set(false);
-        }
+        },
       });
   }
 
@@ -565,7 +696,7 @@ export class AdminGdprComponent implements OnInit {
       .listGdprDeletionRequests({
         q: this.q.trim() ? this.q.trim() : undefined,
         page: this.deletionsPage,
-        limit: this.deletionsLimit
+        limit: this.deletionsLimit,
       })
       .subscribe({
         next: (res) => {
@@ -576,7 +707,7 @@ export class AdminGdprComponent implements OnInit {
         error: () => {
           this.deletionsError.set(this.t('adminUi.gdpr.errors.loadDeletions'));
           this.deletionsLoading.set(false);
-        }
+        },
       });
   }
 
@@ -584,4 +715,3 @@ export class AdminGdprComponent implements OnInit {
     return this.translate.instant(key) as string;
   }
 }
-

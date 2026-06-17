@@ -19,13 +19,19 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("coupon_bulk_jobs", sa.Column("bucket_total", sa.Integer(), nullable=True))
-    op.add_column("coupon_bulk_jobs", sa.Column("bucket_index", sa.Integer(), nullable=True))
-    op.add_column("coupon_bulk_jobs", sa.Column("bucket_seed", sa.String(length=80), nullable=True))
+    op.add_column(
+        "coupon_bulk_jobs", sa.Column("bucket_total", sa.Integer(), nullable=True)
+    )
+    op.add_column(
+        "coupon_bulk_jobs", sa.Column("bucket_index", sa.Integer(), nullable=True)
+    )
+    op.add_column(
+        "coupon_bulk_jobs",
+        sa.Column("bucket_seed", sa.String(length=80), nullable=True),
+    )
 
 
 def downgrade() -> None:
     op.drop_column("coupon_bulk_jobs", "bucket_seed")
     op.drop_column("coupon_bulk_jobs", "bucket_index")
     op.drop_column("coupon_bulk_jobs", "bucket_total")
-

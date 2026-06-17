@@ -25,4 +25,3 @@ class ScheduledPromoItem(BaseModel):
 class AdminDashboardScheduledTasksResponse(BaseModel):
     publish_schedules: list[ScheduledPublishItem]
     promo_schedules: list[ScheduledPromoItem]
-

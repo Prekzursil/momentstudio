@@ -61,9 +61,15 @@ def _maybe_set_ro(value: object | None, *, en_expected: str, ro_value: str) -> b
 
 def _fix_slide(slide: dict) -> bool:
     changed = False
-    changed |= _maybe_set_ro(slide.get("headline"), en_expected=EN_HEADLINE, ro_value=RO_HEADLINE)
-    changed |= _maybe_set_ro(slide.get("subheadline"), en_expected=EN_SUBHEADLINE, ro_value=RO_SUBHEADLINE)
-    changed |= _maybe_set_ro(slide.get("cta_label"), en_expected=EN_CTA, ro_value=RO_CTA)
+    changed |= _maybe_set_ro(
+        slide.get("headline"), en_expected=EN_HEADLINE, ro_value=RO_HEADLINE
+    )
+    changed |= _maybe_set_ro(
+        slide.get("subheadline"), en_expected=EN_SUBHEADLINE, ro_value=RO_SUBHEADLINE
+    )
+    changed |= _maybe_set_ro(
+        slide.get("cta_label"), en_expected=EN_CTA, ro_value=RO_CTA
+    )
     return changed
 
 
@@ -88,9 +94,9 @@ def upgrade() -> None:
 
     row = (
         conn.execute(
-            sa.select(content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta).where(
-                content_blocks.c.key == "home.sections"
-            )
+            sa.select(
+                content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta
+            ).where(content_blocks.c.key == "home.sections")
         )
         .mappings()
         .first()
@@ -125,12 +131,21 @@ def upgrade() -> None:
 
     meta["blocks"] = blocks
 
-    conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta, updated_at=now))
+    conn.execute(
+        sa.update(content_blocks)
+        .where(content_blocks.c.id == row["id"])
+        .values(meta=meta, updated_at=now)
+    )
 
     current_version = int(row.get("version") or 1)
     conn.execute(
         sa.update(versions)
-        .where(sa.and_(versions.c.content_block_id == row["id"], versions.c.version == current_version))
+        .where(
+            sa.and_(
+                versions.c.content_block_id == row["id"],
+                versions.c.version == current_version,
+            )
+        )
         .values(meta=meta)
     )
 
@@ -138,4 +153,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: reverting localized homepage strings would overwrite user edits.
     return
-

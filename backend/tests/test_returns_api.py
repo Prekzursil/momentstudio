@@ -44,9 +44,15 @@ def test_app() -> Dict[str, object]:
 async def _seed_admin(session_factory) -> None:
     settings.maintenance_mode = False
     async with session_factory() as session:
-        existing = (await session.execute(select(User).where(User.email == "admin@example.com"))).scalar_one_or_none()
+        existing = (
+            await session.execute(select(User).where(User.email == "admin@example.com"))
+        ).scalar_one_or_none()
         if existing:
-            existing_passkey = await session.scalar(select(UserPasskey.id).where(UserPasskey.user_id == existing.id).limit(1))
+            existing_passkey = await session.scalar(
+                select(UserPasskey.id)
+                .where(UserPasskey.user_id == existing.id)
+                .limit(1)
+            )
             if existing_passkey:
                 return
             session.add(
@@ -95,7 +101,10 @@ def _auth_headers(client: TestClient, session_factory) -> dict[str, str]:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    return {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
 
 
 async def _seed_order(session_factory) -> tuple[uuid.UUID, uuid.UUID]:
@@ -155,7 +164,9 @@ async def _seed_order(session_factory) -> tuple[uuid.UUID, uuid.UUID]:
         return order.id, item.id
 
 
-async def _seed_order_for_user(session_factory, *, email: str, status: OrderStatus) -> tuple[uuid.UUID, uuid.UUID]:
+async def _seed_order_for_user(
+    session_factory, *, email: str, status: OrderStatus
+) -> tuple[uuid.UUID, uuid.UUID]:
     async with session_factory() as session:
         suffix = uuid.uuid4().hex[:8]
         user = User(
@@ -212,7 +223,9 @@ async def _seed_order_for_user(session_factory, *, email: str, status: OrderStat
         return order.id, item.id
 
 
-def test_admin_can_create_list_and_update_return_request(test_app: Dict[str, object]) -> None:
+def test_admin_can_create_list_and_update_return_request(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
 
@@ -251,7 +264,10 @@ def test_admin_can_create_list_and_update_return_request(test_app: Dict[str, obj
     assert updated.status_code == 200, updated.text
     assert updated.json()["status"] == "approved"
 
-def test_create_return_request_rejects_duplicate_order_items(test_app: Dict[str, object]) -> None:
+
+def test_create_return_request_rejects_duplicate_order_items(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
 
@@ -274,12 +290,16 @@ def test_create_return_request_rejects_duplicate_order_items(test_app: Dict[str,
     assert created.status_code == 400, created.text
 
 
-def test_customer_can_request_return_for_delivered_order(test_app: Dict[str, object]) -> None:
+def test_customer_can_request_return_for_delivered_order(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
 
     email = f"cust-{uuid.uuid4().hex[:8]}@example.com"
-    order_id, order_item_id = asyncio.run(_seed_order_for_user(session_factory, email=email, status=OrderStatus.delivered))
+    order_id, order_item_id = asyncio.run(
+        _seed_order_for_user(session_factory, email=email, status=OrderStatus.delivered)
+    )
 
     common_headers = {"X-Maintenance-Bypass": settings.maintenance_bypass_token}
     resp = client.post(
@@ -289,7 +309,10 @@ def test_customer_can_request_return_for_delivered_order(test_app: Dict[str, obj
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    user_headers = {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    user_headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
 
     created = client.post(
         "/api/v1/returns",
@@ -318,12 +341,16 @@ def test_customer_can_request_return_for_delivered_order(test_app: Dict[str, obj
     assert duplicate.status_code == 409, duplicate.text
 
 
-def test_customer_return_request_rejects_non_delivered(test_app: Dict[str, object]) -> None:
+def test_customer_return_request_rejects_non_delivered(
+    test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
 
     email = f"cust-{uuid.uuid4().hex[:8]}@example.com"
-    order_id, order_item_id = asyncio.run(_seed_order_for_user(session_factory, email=email, status=OrderStatus.paid))
+    order_id, order_item_id = asyncio.run(
+        _seed_order_for_user(session_factory, email=email, status=OrderStatus.paid)
+    )
 
     common_headers = {"X-Maintenance-Bypass": settings.maintenance_bypass_token}
     resp = client.post(
@@ -333,7 +360,10 @@ def test_customer_return_request_rejects_non_delivered(test_app: Dict[str, objec
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    user_headers = {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    user_headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
 
     created = client.post(
         "/api/v1/returns",
@@ -373,7 +403,10 @@ def test_returns_admin_endpoints_require_admin(test_app: Dict[str, object]) -> N
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    user_headers = {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    user_headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
 
     forbidden = client.get("/api/v1/returns/admin", headers=user_headers)
     assert forbidden.status_code == 403, forbidden.text

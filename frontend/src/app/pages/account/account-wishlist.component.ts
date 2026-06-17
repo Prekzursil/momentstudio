@@ -6,7 +6,12 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, finalize } from 'rxjs/operators';
 
 import { CartStore } from '../../core/cart.store';
-import { BackInStockRequest, BackInStockStatus, CatalogService, Product } from '../../core/catalog.service';
+import {
+  BackInStockRequest,
+  BackInStockStatus,
+  CatalogService,
+  Product,
+} from '../../core/catalog.service';
 import { ToastService } from '../../core/toast.service';
 import { ProductCardComponent } from '../../shared/product-card.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -24,13 +29,19 @@ import { AccountComponent } from './account.component';
     ProductCardComponent,
     SkeletonComponent,
     ButtonComponent,
-    LocalizedCurrencyPipe
+    LocalizedCurrencyPipe,
   ],
   template: `
-    <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
       <div class="flex items-center justify-between">
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.myWishlist' | translate }}</h2>
-        <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'account.wishlist.browse' | translate }}</a>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+          {{ 'nav.myWishlist' | translate }}
+        </h2>
+        <a routerLink="/shop" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{
+          'account.wishlist.browse' | translate
+        }}</a>
       </div>
 
       <div *ngIf="!account.wishlist.isLoaded()" class="grid gap-3">
@@ -50,7 +61,9 @@ import { AccountComponent } from './account.component';
           {{ 'account.wishlist.empty' | translate }}
         </div>
         <ng-container *ngIf="account.wishlist.items().length">
-          <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40"
+          >
             <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
               <input
                 type="checkbox"
@@ -62,7 +75,7 @@ import { AccountComponent } from './account.component';
             </label>
             <div class="flex flex-wrap items-center gap-2">
               <span class="text-sm text-slate-600 dark:text-slate-300" *ngIf="selectedCount()">{{
-                'account.wishlist.selectedCount' | translate : { count: selectedCount() }
+                'account.wishlist.selectedCount' | translate: { count: selectedCount() }
               }}</span>
               <app-button
                 size="sm"
@@ -116,8 +129,12 @@ import { AccountComponent } from './account.component';
                   *ngIf="priceChange(item) as p"
                   class="rounded-full bg-indigo-600/90 px-3 py-1 text-xs font-semibold text-white shadow"
                 >
-                  {{ p.direction === 'up' ? ('account.wishlist.priceUp' | translate) : ('account.wishlist.priceDown' | translate) }}
-                  {{ p.delta | localizedCurrency : item.currency }}
+                  {{
+                    p.direction === 'up'
+                      ? ('account.wishlist.priceUp' | translate)
+                      : ('account.wishlist.priceDown' | translate)
+                  }}
+                  {{ p.delta | localizedCurrency: item.currency }}
                 </span>
               </div>
               <app-product-card [product]="item"></app-product-card>
@@ -147,7 +164,7 @@ import { AccountComponent } from './account.component';
         </ng-container>
       </ng-container>
     </section>
-  `
+  `,
 })
 export class AccountWishlistComponent {
   protected readonly account = inject(AccountComponent);
@@ -210,7 +227,7 @@ export class AccountWishlistComponent {
         price: product.sale_price != null ? product.sale_price : product.base_price,
         currency: product.currency,
         stock: product.stock_quantity ?? undefined,
-        image: product.images?.[0]?.url
+        image: product.images?.[0]?.url,
       });
     }
     this.toast.success(this.translate.instant('account.wishlist.messages.addedToCart'));
@@ -221,18 +238,20 @@ export class AccountWishlistComponent {
     if (!ids.length) return;
     if (!confirm(this.translate.instant('account.wishlist.confirm.removeSelected'))) return;
     this.bulkBusy = true;
-    forkJoin(ids.map((id) => this.account.wishlist.remove(id).pipe(catchError(() => of(undefined)))))
+    forkJoin(
+      ids.map((id) => this.account.wishlist.remove(id).pipe(catchError(() => of(undefined)))),
+    )
       .pipe(
         finalize(() => {
           this.bulkBusy = false;
           this.clearSelection();
-        })
+        }),
       )
       .subscribe({
         next: () => {
           for (const id of ids) this.account.wishlist.removeLocal(id);
           this.toast.success(this.translate.instant('account.wishlist.messages.removedSelected'));
-        }
+        },
       });
   }
 
@@ -253,7 +272,7 @@ export class AccountWishlistComponent {
       .subscribe({
         next: (status) => {
           this.backInStockById.set(item.id, status);
-        }
+        },
       });
   }
 
@@ -279,12 +298,15 @@ export class AccountWishlistComponent {
           this.backInStockById.set(item.id, { in_stock: false, request: req });
           this.toast.success(
             this.translate.instant('product.notifyRequestedTitle'),
-            this.translate.instant('product.notifyRequestedBody', { name: item.name })
+            this.translate.instant('product.notifyRequestedBody', { name: item.name }),
           );
         },
         error: () => {
-          this.toast.error(this.translate.instant('product.loadErrorTitle'), this.translate.instant('product.loadErrorCopy'));
-        }
+          this.toast.error(
+            this.translate.instant('product.loadErrorTitle'),
+            this.translate.instant('product.loadErrorCopy'),
+          );
+        },
       });
   }
 
@@ -301,12 +323,15 @@ export class AccountWishlistComponent {
           this.backInStockById.set(item.id, { in_stock: false, request: null });
           this.toast.success(
             this.translate.instant('product.notifyCanceledTitle'),
-            this.translate.instant('product.notifyCanceledBody', { name: item.name })
+            this.translate.instant('product.notifyCanceledBody', { name: item.name }),
           );
         },
         error: () => {
-          this.toast.error(this.translate.instant('product.loadErrorTitle'), this.translate.instant('product.loadErrorCopy'));
-        }
+          this.toast.error(
+            this.translate.instant('product.loadErrorTitle'),
+            this.translate.instant('product.loadErrorCopy'),
+          );
+        },
       });
   }
 

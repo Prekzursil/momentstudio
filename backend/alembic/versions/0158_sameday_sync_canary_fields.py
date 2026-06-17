@@ -39,7 +39,12 @@ def upgrade() -> None:
     )
     op.add_column(
         "shipping_locker_sync_runs",
-        sa.Column("schema_drift_detected", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "schema_drift_detected",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
     )
     op.add_column(
         "shipping_locker_sync_runs",
@@ -47,7 +52,9 @@ def upgrade() -> None:
     )
     op.add_column(
         "shipping_locker_sync_runs",
-        sa.Column("challenge_failure", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column(
+            "challenge_failure", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
     )
 
     op.create_index(
@@ -71,9 +78,18 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_shipping_locker_sync_runs_challenge_failure", table_name="shipping_locker_sync_runs")
-    op.drop_index("ix_shipping_locker_sync_runs_failure_kind", table_name="shipping_locker_sync_runs")
-    op.drop_index("ix_shipping_locker_sync_runs_schema_drift_detected", table_name="shipping_locker_sync_runs")
+    op.drop_index(
+        "ix_shipping_locker_sync_runs_challenge_failure",
+        table_name="shipping_locker_sync_runs",
+    )
+    op.drop_index(
+        "ix_shipping_locker_sync_runs_failure_kind",
+        table_name="shipping_locker_sync_runs",
+    )
+    op.drop_index(
+        "ix_shipping_locker_sync_runs_schema_drift_detected",
+        table_name="shipping_locker_sync_runs",
+    )
 
     op.drop_column("shipping_locker_sync_runs", "challenge_failure")
     op.drop_column("shipping_locker_sync_runs", "failure_kind")

@@ -66,4 +66,3 @@ export class StorefrontAdminModeService {
     return Boolean(value);
   }
 }
-

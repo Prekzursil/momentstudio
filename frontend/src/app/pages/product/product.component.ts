@@ -2,7 +2,12 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { BackInStockRequest, CatalogService, Product, ProductVariant } from '../../core/catalog.service';
+import {
+  BackInStockRequest,
+  CatalogService,
+  Product,
+  ProductVariant,
+} from '../../core/catalog.service';
 import { CartStore } from '../../core/cart.store';
 import { RecentlyViewedService } from '../../core/recently-viewed.service';
 import { ContainerComponent } from '../../layout/container.component';
@@ -41,7 +46,7 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
     BreadcrumbComponent,
     TranslateModule,
     ImgFallbackDirective,
-    ProductImageManagerModalComponent
+    ProductImageManagerModalComponent,
   ],
   template: `
     <app-container classes="py-10">
@@ -60,379 +65,461 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
       <ng-template #content>
         <ng-container *ngIf="loadError; else maybeProduct">
           <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-          <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
-            <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.loadErrorTitle' | translate }}</p>
-            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'product.loadErrorCopy' | translate }}</p>
+          <div
+            class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800"
+          >
+            <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'product.loadErrorTitle' | translate }}
+            </p>
+            <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              {{ 'product.loadErrorCopy' | translate }}
+            </p>
             <div class="mt-6 flex items-center justify-center gap-3">
-              <app-button [label]="'product.retry' | translate" variant="ghost" (action)="retryLoad()"></app-button>
-              <app-button [label]="'product.backToShop' | translate" variant="ghost" (action)="backToShop()"></app-button>
+              <app-button
+                [label]="'product.retry' | translate"
+                variant="ghost"
+                (action)="retryLoad()"
+              ></app-button>
+              <app-button
+                [label]="'product.backToShop' | translate"
+                variant="ghost"
+                (action)="backToShop()"
+              ></app-button>
             </div>
           </div>
         </ng-container>
 
         <ng-template #maybeProduct>
-        <ng-container *ngIf="product; else missing">
-          <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
-          <div class="grid gap-10 lg:grid-cols-2">
-            <div class="space-y-4">
-              <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-zoom-in dark:border-slate-800 dark:bg-slate-900" (click)="openPreview()">
-                <img
-                  [ngSrc]="activeImage"
-                  [alt]="product.name"
-                  class="w-full object-cover"
-                  width="960"
-                  height="960"
-                  loading="lazy"
-                  decoding="async"
-                  sizes="(min-width: 1024px) 50vw, 100vw"
-                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-                />
-              </div>
-              <div class="flex gap-3">
-                <button
-                  *ngFor="let image of product.images ?? []; let idx = index"
-                  class="h-20 w-20 rounded-xl border border-slate-200 dark:border-slate-700"
-                  [ngClass]="idx === activeImageIndex ? 'border-slate-900 dark:border-slate-50' : ''"
-                  type="button"
-                  (click)="setActiveImage(idx)"
+          <ng-container *ngIf="product; else missing">
+            <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
+            <div class="grid gap-10 lg:grid-cols-2">
+              <div class="space-y-4">
+                <div
+                  class="overflow-hidden rounded-2xl border border-slate-200 bg-white cursor-zoom-in dark:border-slate-800 dark:bg-slate-900"
+                  (click)="openPreview()"
                 >
                   <img
-                    [ngSrc]="image.url"
-                    [alt]="image.alt_text ?? product.name"
-                    class="h-full w-full object-cover"
-                    width="96"
-                    height="96"
+                    [ngSrc]="activeImage"
+                    [alt]="product.name"
+                    class="w-full object-cover"
+                    width="960"
+                    height="960"
                     loading="lazy"
                     decoding="async"
+                    sizes="(min-width: 1024px) 50vw, 100vw"
                     [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
                   />
+                </div>
+                <div class="flex gap-3">
+                  <button
+                    *ngFor="let image of product.images ?? []; let idx = index"
+                    class="h-20 w-20 rounded-xl border border-slate-200 dark:border-slate-700"
+                    [ngClass]="
+                      idx === activeImageIndex ? 'border-slate-900 dark:border-slate-50' : ''
+                    "
+                    type="button"
+                    (click)="setActiveImage(idx)"
+                  >
+                    <img
+                      [ngSrc]="image.url"
+                      [alt]="image.alt_text ?? product.name"
+                      class="h-full w-full object-cover"
+                      width="96"
+                      height="96"
+                      loading="lazy"
+                      decoding="async"
+                      [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+                    />
+                  </button>
+                </div>
+                <div *ngIf="showStorefrontEdit()" class="flex justify-end">
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.storefront.products.images.manageCta' | translate"
+                    (action)="openImageManager()"
+                  ></app-button>
+                </div>
+              </div>
+
+              <div class="space-y-5">
+                <div class="space-y-2">
+                  <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                    {{ 'product.handmade' | translate }}
+                  </p>
+                  <h1
+                    class="text-3xl font-semibold text-slate-900 dark:text-slate-50"
+                    data-route-heading="true"
+                    tabindex="-1"
+                  >
+                    {{ product.name }}
+                  </h1>
+                  <div class="flex items-baseline gap-3">
+                    <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ displayPrice(product) | localizedCurrency: product.currency }}
+                    </p>
+                    <p
+                      *ngIf="isOnSale(product)"
+                      class="text-sm text-slate-500 line-through dark:text-slate-300"
+                    >
+                      {{ product.base_price | localizedCurrency: product.currency }}
+                    </p>
+                  </div>
+                  <div
+                    class="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300"
+                    *ngIf="product.rating_count"
+                  >
+                    ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
+                    {{ 'product.reviews' | translate: { count: product.rating_count } }}
+                  </div>
+                </div>
+
+                <div
+                  class="markdown text-sm text-slate-700 dark:text-slate-200 leading-relaxed"
+                  *ngIf="descriptionHtml"
+                  [innerHTML]="descriptionHtml"
+                ></div>
+                <p
+                  *ngIf="!descriptionHtml"
+                  class="text-sm text-slate-700 leading-relaxed dark:text-slate-200"
+                >
+                  {{ seoFallbackDescription }}
+                </p>
+
+                <div
+                  class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-100"
+                >
+                  {{ 'product.uniqueness' | translate }}
+                </div>
+
+                <div class="space-y-3">
+                  <label
+                    *ngIf="product.variants?.length"
+                    class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200"
+                  >
+                    {{ 'product.variant' | translate }}
+                    <select
+                      class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="selectedVariantId"
+                    >
+                      <option *ngFor="let variant of product.variants" [value]="variant.id">
+                        {{ variant.name }}
+                        <span *ngIf="variant.stock_quantity !== null"
+                          >({{ variant.stock_quantity }} left)</span
+                        >
+                      </option>
+                    </select>
+                  </label>
+
+                  <label class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                    {{ 'product.quantity' | translate }}
+                    <input
+                      type="number"
+                      min="1"
+                      class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="quantity"
+                    />
+                  </label>
+                </div>
+
+                <div class="flex gap-3">
+                  <app-button
+                    [label]="'product.addToCart' | translate"
+                    size="lg"
+                    (action)="addToCart()"
+                    [disabled]="isOutOfStock()"
+                  ></app-button>
+                  <app-button
+                    *ngIf="isOutOfStock()"
+                    [label]="
+                      backInStockRequest
+                        ? ('product.notifyRequested' | translate)
+                        : ('product.notifyBackInStock' | translate)
+                    "
+                    variant="ghost"
+                    (action)="requestBackInStock()"
+                    [disabled]="backInStockLoading || !!backInStockRequest"
+                  ></app-button>
+                  <app-button
+                    *ngIf="isOutOfStock() && backInStockRequest"
+                    [label]="'product.notifyCancel' | translate"
+                    variant="ghost"
+                    (action)="cancelBackInStock()"
+                    [disabled]="backInStockLoading"
+                  ></app-button>
+                  <app-button
+                    *ngIf="showStorefrontEdit()"
+                    [label]="'adminUi.common.duplicate' | translate"
+                    variant="ghost"
+                    (action)="duplicateFromStorefront()"
+                    [disabled]="duplicateSaving"
+                  ></app-button>
+                  <app-button
+                    [label]="'product.backToShop' | translate"
+                    variant="ghost"
+                    (action)="backToShop()"
+                  ></app-button>
+                  <app-button
+                    [label]="
+                      wishlisted ? ('wishlist.saved' | translate) : ('wishlist.save' | translate)
+                    "
+                    variant="ghost"
+                    (action)="toggleWishlist()"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      class="mr-2 h-4 w-4"
+                      [attr.fill]="wishlisted ? 'currentColor' : 'none'"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"
+                      />
+                    </svg>
+                  </app-button>
+                </div>
+
+                <div class="flex flex-wrap gap-2" *ngIf="product.tags?.length">
+                  <span
+                    *ngFor="let tag of product.tags"
+                    class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  >
+                    {{ tag.name ?? tag }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="upsellProducts.length" class="mt-12 grid gap-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'product.upsells' | translate }}
+                </h3>
+                <button
+                  type="button"
+                  class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                  (click)="backToShop()"
+                >
+                  {{ 'product.backToShop' | translate }}
                 </button>
               </div>
-              <div *ngIf="showStorefrontEdit()" class="flex justify-end">
+              <div class="flex gap-4 overflow-x-auto pb-2">
                 <app-button
-                  size="sm"
+                  *ngFor="let item of upsellProducts"
+                  class="min-w-[220px]"
                   variant="ghost"
-                  [label]="'adminUi.storefront.products.images.manageCta' | translate"
-                  (action)="openImageManager()"
-                ></app-button>
+                  [routerLink]="['/products', item.slug]"
+                >
+                  <div class="flex items-center gap-3 text-left">
+                    <img
+                      [ngSrc]="
+                        item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'
+                      "
+                      [alt]="item.name"
+                      class="h-14 w-14 rounded-xl object-cover"
+                      width="96"
+                      height="96"
+                      loading="lazy"
+                      decoding="async"
+                      [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+                    />
+                    <div class="grid gap-1">
+                      <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                        {{ item.name }}
+                      </p>
+                      <p class="text-sm text-slate-600 dark:text-slate-300">
+                        {{ displayPrice(item) | localizedCurrency: item.currency }}
+                      </p>
+                    </div>
+                  </div>
+                </app-button>
               </div>
             </div>
 
-            <div class="space-y-5">
-              <div class="space-y-2">
-                <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'product.handmade' | translate }}</p>
-                <h1 class="text-3xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
-                  {{ product.name }}
-                </h1>
-                <div class="flex items-baseline gap-3">
-                  <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                    {{ displayPrice(product) | localizedCurrency : product.currency }}
-                  </p>
-                  <p
-                    *ngIf="isOnSale(product)"
-                    class="text-sm text-slate-500 line-through dark:text-slate-300"
-                  >
-                    {{ product.base_price | localizedCurrency : product.currency }}
-                  </p>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-300" *ngIf="product.rating_count">
-                  ★ {{ product.rating_average?.toFixed(1) ?? '0.0' }} ·
-                  {{ 'product.reviews' | translate : { count: product.rating_count } }}
-                </div>
-              </div>
-
-              <div
-                class="markdown text-sm text-slate-700 dark:text-slate-200 leading-relaxed"
-                *ngIf="descriptionHtml"
-                [innerHTML]="descriptionHtml"
-              ></div>
-              <p
-                *ngIf="!descriptionHtml"
-                class="text-sm text-slate-700 leading-relaxed dark:text-slate-200"
-              >
-                {{ seoFallbackDescription }}
-              </p>
-
-              <div class="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:border-amber-900/40 dark:text-amber-100">
-                {{ 'product.uniqueness' | translate }}
-              </div>
-
-              <div class="space-y-3">
-                <label *ngIf="product.variants?.length" class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-                  {{ 'product.variant' | translate }}
-                  <select
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="selectedVariantId"
-                  >
-                    <option *ngFor="let variant of product.variants" [value]="variant.id">
-                      {{ variant.name }} <span *ngIf="variant.stock_quantity !== null">({{ variant.stock_quantity }} left)</span>
-                    </option>
-                  </select>
-                </label>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200">
-                  {{ 'product.quantity' | translate }}
-                  <input
-                    type="number"
-                    min="1"
-                    class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="quantity"
-                  />
-                </label>
-              </div>
-
-              <div class="flex gap-3">
-                <app-button
-                  [label]="'product.addToCart' | translate"
-                  size="lg"
-                  (action)="addToCart()"
-                  [disabled]="isOutOfStock()"
-                ></app-button>
-                <app-button
-                  *ngIf="isOutOfStock()"
-                  [label]="
-                    backInStockRequest
-                      ? ('product.notifyRequested' | translate)
-                      : ('product.notifyBackInStock' | translate)
-                  "
-                  variant="ghost"
-                  (action)="requestBackInStock()"
-                  [disabled]="backInStockLoading || !!backInStockRequest"
-                ></app-button>
-                <app-button
-                  *ngIf="isOutOfStock() && backInStockRequest"
-                  [label]="'product.notifyCancel' | translate"
-                  variant="ghost"
-                  (action)="cancelBackInStock()"
-                  [disabled]="backInStockLoading"
-                ></app-button>
-                <app-button
-                  *ngIf="showStorefrontEdit()"
-                  [label]="'adminUi.common.duplicate' | translate"
-                  variant="ghost"
-                  (action)="duplicateFromStorefront()"
-                  [disabled]="duplicateSaving"
-                ></app-button>
-                <app-button [label]="'product.backToShop' | translate" variant="ghost" (action)="backToShop()"></app-button>
-                <app-button
-                  [label]="wishlisted ? ('wishlist.saved' | translate) : ('wishlist.save' | translate)"
-                  variant="ghost"
-                  (action)="toggleWishlist()"
-	                >
-	                  <svg viewBox="0 0 24 24" class="mr-2 h-4 w-4" [attr.fill]="wishlisted ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-	                    <path
-	                      stroke-linecap="round"
-	                      stroke-linejoin="round"
-	                      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78Z"
-	                    />
-	                  </svg>
-	                </app-button>
-	              </div>
-
-              <div class="flex flex-wrap gap-2" *ngIf="product.tags?.length">
-                <span
-                  *ngFor="let tag of product.tags"
-                  class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            <div *ngIf="relatedProducts.length" class="mt-12 grid gap-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'product.relatedProducts' | translate }}
+                </h3>
+                <button
+                  type="button"
+                  class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                  (click)="backToShop()"
                 >
-                  {{ tag.name ?? tag }}
-                </span>
-	              </div>
-	            </div>
-	          </div>
-		      <div *ngIf="upsellProducts.length" class="mt-12 grid gap-4">
-		        <div class="flex items-center justify-between">
-		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.upsells' | translate }}</h3>
-		          <button
-                type="button"
-                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
-                (click)="backToShop()"
-              >
-                {{ 'product.backToShop' | translate }}
-              </button>
-		        </div>
-		        <div class="flex gap-4 overflow-x-auto pb-2">
-	          <app-button
-	            *ngFor="let item of upsellProducts"
-	            class="min-w-[220px]"
-	            variant="ghost"
-	            [routerLink]="['/products', item.slug]"
-	          >
-	            <div class="flex items-center gap-3 text-left">
-	              <img
-	                [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
-	                [alt]="item.name"
-	                class="h-14 w-14 rounded-xl object-cover"
-		                width="96"
-		                height="96"
-		                loading="lazy"
-		                decoding="async"
-		                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-		              />
-	                <div class="grid gap-1">
-	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
-	                <p class="text-sm text-slate-600 dark:text-slate-300">
-	                  {{ displayPrice(item) | localizedCurrency : item.currency }}
-	                </p>
-	              </div>
-	            </div>
-	          </app-button>
-		        </div>
-		      </div>
+                  {{ 'product.backToShop' | translate }}
+                </button>
+              </div>
+              <div class="flex gap-4 overflow-x-auto pb-2">
+                <app-button
+                  *ngFor="let item of relatedProducts"
+                  class="min-w-[220px]"
+                  variant="ghost"
+                  [routerLink]="['/products', item.slug]"
+                >
+                  <div class="flex items-center gap-3 text-left">
+                    <img
+                      [ngSrc]="
+                        item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'
+                      "
+                      [alt]="item.name"
+                      class="h-14 w-14 rounded-xl object-cover"
+                      width="96"
+                      height="96"
+                      loading="lazy"
+                      decoding="async"
+                      [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+                    />
+                    <div class="grid gap-1">
+                      <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                        {{ item.name }}
+                      </p>
+                      <p class="text-sm text-slate-600 dark:text-slate-300">
+                        {{ displayPrice(item) | localizedCurrency: item.currency }}
+                      </p>
+                    </div>
+                  </div>
+                </app-button>
+              </div>
+            </div>
 
-		      <div *ngIf="relatedProducts.length" class="mt-12 grid gap-4">
-		        <div class="flex items-center justify-between">
-		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.relatedProducts' | translate }}</h3>
-		          <button
-                type="button"
-                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
-                (click)="backToShop()"
-              >
-                {{ 'product.backToShop' | translate }}
-              </button>
-		        </div>
-		        <div class="flex gap-4 overflow-x-auto pb-2">
-	          <app-button
-	            *ngFor="let item of relatedProducts"
-	            class="min-w-[220px]"
-	            variant="ghost"
-	            [routerLink]="['/products', item.slug]"
-	          >
-	            <div class="flex items-center gap-3 text-left">
-	              <img
-	                [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
-	                [alt]="item.name"
-	                class="h-14 w-14 rounded-xl object-cover"
-		                width="96"
-		                height="96"
-		                loading="lazy"
-		                decoding="async"
-		                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-		              />
-	                <div class="grid gap-1">
-	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
-	                <p class="text-sm text-slate-600 dark:text-slate-300">
-	                  {{ displayPrice(item) | localizedCurrency : item.currency }}
-	                </p>
-	              </div>
-	            </div>
-	          </app-button>
-		        </div>
-		      </div>
+            <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'product.recentlyViewed' | translate }}
+                </h3>
+                <button
+                  type="button"
+                  class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                  (click)="backToShop()"
+                >
+                  {{ 'product.backToShop' | translate }}
+                </button>
+              </div>
+              <div class="flex gap-4 overflow-x-auto pb-2">
+                <app-button
+                  *ngFor="let item of recentlyViewed"
+                  class="min-w-[220px]"
+                  variant="ghost"
+                  [routerLink]="['/products', item.slug]"
+                >
+                  <div class="flex items-center gap-3 text-left">
+                    <img
+                      [ngSrc]="
+                        item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'
+                      "
+                      [alt]="item.name"
+                      class="h-14 w-14 rounded-xl object-cover"
+                      width="96"
+                      height="96"
+                      loading="lazy"
+                      decoding="async"
+                      [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+                    />
+                    <div class="grid gap-1">
+                      <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                        {{ item.name }}
+                      </p>
+                      <p class="text-sm text-slate-600 dark:text-slate-300">
+                        {{ displayPrice(item) | localizedCurrency: item.currency || 'RON' }}
+                      </p>
+                    </div>
+                  </div>
+                </app-button>
+              </div>
+            </div>
 
-	      <div *ngIf="recentlyViewed.length" class="mt-12 grid gap-4">
-		        <div class="flex items-center justify-between">
-		          <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h3>
-		          <button
-                type="button"
-                class="bg-transparent p-0 text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-300"
-                (click)="backToShop()"
-              >
-                {{ 'product.backToShop' | translate }}
-              </button>
-	        </div>
-	        <div class="flex gap-4 overflow-x-auto pb-2">
-          <app-button
-            *ngFor="let item of recentlyViewed"
-            class="min-w-[220px]"
-            variant="ghost"
-            [routerLink]="['/products', item.slug]"
-          >
-            <div class="flex items-center gap-3 text-left">
-              <img
-                [ngSrc]="item.images?.[0]?.url ?? 'assets/placeholder/product-placeholder.svg'"
-                [alt]="item.name"
-                class="h-14 w-14 rounded-xl object-cover"
-	                width="96"
-	                height="96"
-	                loading="lazy"
-	                decoding="async"
-	                [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-	              />
-	                <div class="grid gap-1">
-	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ item.name }}</p>
-	                <p class="text-sm text-slate-600 dark:text-slate-300">
-	                  {{ displayPrice(item) | localizedCurrency : (item.currency || 'RON') }}
-	                </p>
-	              </div>
-	            </div>
-	          </app-button>
-	        </div>
-	      </div>
-
-        <div
-          *ngIf="showFallbackNavigationLinks()"
-          class="mt-10 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40"
-        >
-          <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'product.exploreMore' | translate }}</h3>
-          <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'product.exploreMoreCopy' | translate }}</p>
-          <div class="mt-4 flex flex-wrap gap-3 text-sm">
-            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/shop']">
-              {{ 'nav.shop' | translate }}
-            </a>
-            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/blog']">
-              {{ 'nav.blog' | translate }}
-            </a>
-            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/contact']">
-              {{ 'nav.contact' | translate }}
-            </a>
-          </div>
-        </div>
-	
-	      <div
-	        *ngIf="previewOpen"
-        class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
-        (click)="closePreview()"
-      >
-        <div class="relative max-w-5xl w-full" (click)="$event.stopPropagation()">
-          <button
-            class="absolute -top-10 right-0 text-white text-sm font-semibold underline"
-            type="button"
-            (click)="closePreview()"
-          >
-            Close
-          </button>
-          <img
-            [ngSrc]="activeImage"
-            [alt]="product?.name"
-            class="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
-            width="1600"
-            height="1200"
-	            loading="lazy"
-	            decoding="async"
-	            sizes="100vw"
-	            [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-	          />
-	        </div>
-	      </div>
-
-        <app-product-image-manager-modal
-          [open]="imageManagerOpen"
-          [slug]="product.slug"
-          [productNameFallback]="product.name"
-          [currentLang]="uiLang"
-          [images]="product.images ?? []"
-          (closed)="imageManagerOpen = false"
-          (imagesChange)="onImagesChange($event)"
-        ></app-product-image-manager-modal>
-
-	      </ng-container>
-	
-	      <ng-template #missing>
-	        <div class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800">
-	          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'product.notFound' | translate }}</p>
-	          <button
-              type="button"
-              class="bg-transparent p-0 font-medium text-indigo-600 hover:underline dark:text-indigo-300"
-              (click)="backToShop()"
+            <div
+              *ngIf="showFallbackNavigationLinks()"
+              class="mt-10 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40"
             >
-              {{ 'product.backToShop' | translate }}
-            </button>
-        </div>
-      </ng-template>
-      </ng-template>
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'product.exploreMore' | translate }}
+              </h3>
+              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                {{ 'product.exploreMoreCopy' | translate }}
+              </p>
+              <div class="mt-4 flex flex-wrap gap-3 text-sm">
+                <a
+                  class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                  [routerLink]="['/shop']"
+                >
+                  {{ 'nav.shop' | translate }}
+                </a>
+                <a
+                  class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                  [routerLink]="['/blog']"
+                >
+                  {{ 'nav.blog' | translate }}
+                </a>
+                <a
+                  class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                  [routerLink]="['/contact']"
+                >
+                  {{ 'nav.contact' | translate }}
+                </a>
+              </div>
+            </div>
+
+            <div
+              *ngIf="previewOpen"
+              class="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6"
+              (click)="closePreview()"
+            >
+              <div class="relative max-w-5xl w-full" (click)="$event.stopPropagation()">
+                <button
+                  class="absolute -top-10 right-0 text-white text-sm font-semibold underline"
+                  type="button"
+                  (click)="closePreview()"
+                >
+                  Close
+                </button>
+                <img
+                  [ngSrc]="activeImage"
+                  [alt]="product?.name"
+                  class="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl"
+                  width="1600"
+                  height="1200"
+                  loading="lazy"
+                  decoding="async"
+                  sizes="100vw"
+                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+                />
+              </div>
+            </div>
+
+            <app-product-image-manager-modal
+              [open]="imageManagerOpen"
+              [slug]="product.slug"
+              [productNameFallback]="product.name"
+              [currentLang]="uiLang"
+              [images]="product.images ?? []"
+              (closed)="imageManagerOpen = false"
+              (imagesChange)="onImagesChange($event)"
+            ></app-product-image-manager-modal>
+          </ng-container>
+
+          <ng-template #missing>
+            <div
+              class="border border-dashed border-slate-200 rounded-2xl p-10 text-center dark:border-slate-800"
+            >
+              <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'product.notFound' | translate }}
+              </p>
+              <button
+                type="button"
+                class="bg-transparent p-0 font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+                (click)="backToShop()"
+              >
+                {{ 'product.backToShop' | translate }}
+              </button>
+            </div>
+          </ng-template>
+        </ng-template>
       </ng-template>
     </app-container>
-  `
+  `,
 })
 export class ProductComponent implements OnInit, OnDestroy {
   product: Product | null = null;
@@ -461,7 +548,7 @@ export class ProductComponent implements OnInit, OnDestroy {
   private shopReturnUrl: string | null = null;
   crumbs = [
     { label: 'nav.home', url: '/' },
-    { label: 'nav.shop', url: '/shop' }
+    { label: 'nav.shop', url: '/shop' },
   ];
 
   constructor(
@@ -481,7 +568,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     private readonly storefrontAdminMode: StorefrontAdminModeService,
     private readonly admin: AdminService,
     private readonly seoHeadLinks: SeoHeadLinksService,
-    private readonly seoCopyFallback: SeoCopyFallbackService
+    private readonly seoCopyFallback: SeoCopyFallbackService,
   ) {}
 
   ngOnDestroy(): void {
@@ -500,7 +587,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.shopReturnUrl = this.readShopReturnUrl();
     this.crumbs = [
       { label: 'nav.home', url: '/' },
-      { label: 'nav.shop', url: this.shopReturnUrl || '/shop' }
+      { label: 'nav.shop', url: this.shopReturnUrl || '/shop' },
     ];
     this.routeSub = this.route.paramMap.subscribe((params) => {
       const slug = params.get('slug');
@@ -518,19 +605,19 @@ export class ProductComponent implements OnInit, OnDestroy {
     });
   }
 
-	  backToShop(): void {
-	    const url = this.shopReturnUrl;
-	    if (url) {
-	      void this.router.navigateByUrl(url);
-	      return;
-	    }
-	    void this.router.navigate(['/shop']);
-	  }
+  backToShop(): void {
+    const url = this.shopReturnUrl;
+    if (url) {
+      void this.router.navigateByUrl(url);
+      return;
+    }
+    void this.router.navigate(['/shop']);
+  }
 
-	  private readShopReturnUrl(): string | null {
-	    if (typeof sessionStorage === 'undefined') return null;
-	    try {
-	      const pending = sessionStorage.getItem('shop_return_pending');
+  private readShopReturnUrl(): string | null {
+    if (typeof sessionStorage === 'undefined') return null;
+    try {
+      const pending = sessionStorage.getItem('shop_return_pending');
       if (pending !== '1') return null;
       const url = (sessionStorage.getItem('shop_return_url') || '').trim();
       if (!url.startsWith('/shop')) return null;
@@ -575,7 +662,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.admin.duplicateProduct(slug, { source: 'storefront' }).subscribe({
       next: (created) => {
         this.duplicateSaving = false;
-        const newSlug = String((created)?.slug || '').trim();
+        const newSlug = String(created?.slug || '').trim();
         this.toast.success(this.translate.instant('adminUi.products.success.duplicate'));
         if (!newSlug) return;
         void this.router.navigate(['/admin/products'], { state: { editProductSlug: newSlug } });
@@ -583,7 +670,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       error: () => {
         this.duplicateSaving = false;
         this.toast.error(this.translate.instant('adminUi.products.errors.duplicate'));
-      }
+      },
     });
   }
 
@@ -613,15 +700,17 @@ export class ProductComponent implements OnInit, OnDestroy {
         if (this.slug !== slug) return;
         if (Array.isArray(product.images)) {
           product.images = [...product.images].sort(
-            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0)
+            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0),
           );
         }
         this.product = product;
-        this.descriptionHtml = product.long_description ? this.markdown.render(product.long_description) : '';
+        this.descriptionHtml = product.long_description
+          ? this.markdown.render(product.long_description)
+          : '';
         this.seoFallbackDescription = this.seoCopyFallback.productIntro(
           lang,
           product.name,
-          product.tags?.[0]?.name ?? null
+          product.tags?.[0]?.name ?? null,
         );
         this.selectedVariantId = product.variants?.[0]?.id ?? null;
         this.loading = false;
@@ -630,22 +719,22 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.crumbs = [
           { label: 'nav.home', url: '/' },
           { label: 'nav.shop', url: this.shopReturnUrl || '/shop' },
-          { label: product.name, url: `/products/${product.slug}` }
+          { label: product.name, url: `/products/${product.slug}` },
         ];
-	        this.updateMeta(product);
-	        this.updateStructuredData(product);
-	        const updated = this.recentlyViewedService.add(product);
-	        const currentSlug = (product.slug || slug || '').trim();
-	        this.recentlyViewed = updated
-	          .filter((p) => {
-	            const candidateSlug = (p?.slug || '').trim();
-	            return candidateSlug !== '' && candidateSlug !== currentSlug;
-	          })
-	          .slice(0, 8);
-	        this.loadBackInStockStatus();
-	        this.loadUpsells(product.slug, lang);
-	        this.loadRelated(product.slug, lang);
-	      },
+        this.updateMeta(product);
+        this.updateStructuredData(product);
+        const updated = this.recentlyViewedService.add(product);
+        const currentSlug = (product.slug || slug || '').trim();
+        this.recentlyViewed = updated
+          .filter((p) => {
+            const candidateSlug = (p?.slug || '').trim();
+            return candidateSlug !== '' && candidateSlug !== currentSlug;
+          })
+          .slice(0, 8);
+        this.loadBackInStockStatus();
+        this.loadUpsells(product.slug, lang);
+        this.loadRelated(product.slug, lang);
+      },
       error: (err) => {
         if (this.slug !== slug) return;
         this.product = null;
@@ -653,7 +742,7 @@ export class ProductComponent implements OnInit, OnDestroy {
         const status = typeof err?.status === 'number' ? err.status : 0;
         this.loadError = status !== 404;
         this.cdr.detectChanges();
-      }
+      },
     });
   }
 
@@ -667,7 +756,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       error: () => {
         if (!this.product || this.product.slug !== slug) return;
         this.upsellProducts = [];
-      }
+      },
     });
   }
 
@@ -681,7 +770,7 @@ export class ProductComponent implements OnInit, OnDestroy {
       error: () => {
         if (!this.product || this.product.slug !== slug) return;
         this.relatedProducts = [];
-      }
+      },
     });
   }
 
@@ -707,7 +796,10 @@ export class ProductComponent implements OnInit, OnDestroy {
   addToCart(): void {
     if (!this.product) return;
     if (this.isOutOfStock()) {
-      this.toast.error(this.translate.instant('product.soldOut'), this.translate.instant('product.notifyBackInStock'));
+      this.toast.error(
+        this.translate.instant('product.soldOut'),
+        this.translate.instant('product.notifyBackInStock'),
+      );
       return;
     }
     const variant = this.selectedVariant(this.product);
@@ -720,11 +812,11 @@ export class ProductComponent implements OnInit, OnDestroy {
       image: this.product.images?.[0]?.url,
       price: Number(this.displayPrice(this.product)),
       currency: this.product.currency,
-      stock: (variant?.stock_quantity ?? this.product.stock_quantity ?? 99) || 0
+      stock: (variant?.stock_quantity ?? this.product.stock_quantity ?? 99) || 0,
     });
     this.toast.success(
       this.translate.instant('product.addedTitle'),
-      this.translate.instant('product.addedBody', { qty: this.quantity, name: this.product.name })
+      this.translate.instant('product.addedBody', { qty: this.quantity, name: this.product.name }),
     );
   }
 
@@ -735,7 +827,10 @@ export class ProductComponent implements OnInit, OnDestroy {
   toggleWishlist(): void {
     if (!this.product) return;
     if (!this.auth.isAuthenticated()) {
-      this.toast.info(this.translate.instant('wishlist.signInTitle'), this.translate.instant('wishlist.signInBody'));
+      this.toast.info(
+        this.translate.instant('wishlist.signInTitle'),
+        this.translate.instant('wishlist.signInBody'),
+      );
       void this.router.navigateByUrl('/login');
       return;
     }
@@ -746,9 +841,9 @@ export class ProductComponent implements OnInit, OnDestroy {
           this.wishlist.removeLocal(this.product!.id);
           this.toast.success(
             this.translate.instant('wishlist.removedTitle'),
-            this.translate.instant('wishlist.removedBody', { name: this.product!.name })
+            this.translate.instant('wishlist.removedBody', { name: this.product!.name }),
           );
-        }
+        },
       });
       return;
     }
@@ -758,9 +853,9 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.wishlist.addLocal(product);
         this.toast.success(
           this.translate.instant('wishlist.addedTitle'),
-          this.translate.instant('wishlist.addedBody', { name: this.product!.name })
+          this.translate.instant('wishlist.addedBody', { name: this.product!.name }),
         );
-      }
+      },
     });
   }
 
@@ -773,14 +868,14 @@ export class ProductComponent implements OnInit, OnDestroy {
       product.short_description,
       product.long_description,
       this.translate.instant('meta.descriptions.product'),
-      this.translate.instant('product.metaDescriptionFallback', { name: product.name })
+      this.translate.instant('product.metaDescriptionFallback', { name: product.name }),
     );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
     this.meta.updateTag({ property: 'og:title', content: title });
     this.meta.updateTag({
       property: 'og:description',
-      content: description
+      content: description,
     });
     if (product.images?.[0]?.url) {
       this.meta.updateTag({ property: 'og:image', content: product.images[0].url });
@@ -795,7 +890,9 @@ export class ProductComponent implements OnInit, OnDestroy {
       this.ldScript.remove();
     }
     const availability =
-      (product.stock_quantity ?? 0) > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock';
+      (product.stock_quantity ?? 0) > 0
+        ? 'https://schema.org/InStock'
+        : 'https://schema.org/OutOfStock';
     const productLd = {
       '@context': 'https://schema.org',
       '@type': 'Product',
@@ -807,16 +904,16 @@ export class ProductComponent implements OnInit, OnDestroy {
         '@type': 'Offer',
         price: this.displayPrice(product),
         priceCurrency: product.currency,
-        availability
+        availability,
       },
       aggregateRating:
         product.rating_count && product.rating_count > 0
           ? {
               '@type': 'AggregateRating',
               ratingValue: product.rating_average ?? 0,
-              reviewCount: product.rating_count
+              reviewCount: product.rating_count,
             }
-          : undefined
+          : undefined,
     };
     const breadcrumbLd = {
       '@context': 'https://schema.org',
@@ -824,8 +921,8 @@ export class ProductComponent implements OnInit, OnDestroy {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: `${window.location.origin}/` },
         { '@type': 'ListItem', position: 2, name: 'Shop', item: `${window.location.origin}/shop` },
-        { '@type': 'ListItem', position: 3, name: product.name, item: `${window.location.href}` }
-      ]
+        { '@type': 'ListItem', position: 3, name: product.name, item: `${window.location.href}` },
+      ],
     };
     const script = document.createElement('script');
     script.type = 'application/ld+json';
@@ -836,12 +933,18 @@ export class ProductComponent implements OnInit, OnDestroy {
 
   private setCanonical(product: Product): void {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    const href = this.seoHeadLinks.setLocalizedCanonical(`/products/${encodeURIComponent(product.slug)}`, lang, {});
+    const href = this.seoHeadLinks.setLocalizedCanonical(
+      `/products/${encodeURIComponent(product.slug)}`,
+      lang,
+      {},
+    );
     this.meta.updateTag({ property: 'og:url', content: href });
   }
 
   showFallbackNavigationLinks(): boolean {
-    return !this.upsellProducts.length && !this.relatedProducts.length && !this.recentlyViewed.length;
+    return (
+      !this.upsellProducts.length && !this.relatedProducts.length && !this.recentlyViewed.length
+    );
   }
 
   isOutOfStock(): boolean {
@@ -877,7 +980,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     this.catalog.getBackInStockStatus(product.slug).subscribe({
       next: (status) => {
         this.backInStockRequest = status.request ?? null;
-      }
+      },
     });
   }
 
@@ -887,7 +990,7 @@ export class ProductComponent implements OnInit, OnDestroy {
     if (!this.auth.isAuthenticated()) {
       this.toast.info(
         this.translate.instant('product.notifyRequiresSignInTitle'),
-        this.translate.instant('product.notifyRequiresSignInBody')
+        this.translate.instant('product.notifyRequiresSignInBody'),
       );
       void this.router.navigateByUrl('/login');
       return;
@@ -900,13 +1003,16 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.backInStockRequest = req;
         this.toast.success(
           this.translate.instant('product.notifyRequestedTitle'),
-          this.translate.instant('product.notifyRequestedBody', { name: product.name })
+          this.translate.instant('product.notifyRequestedBody', { name: product.name }),
         );
       },
       error: () => {
         this.backInStockLoading = false;
-        this.toast.error(this.translate.instant('product.loadErrorTitle'), this.translate.instant('product.loadErrorCopy'));
-      }
+        this.toast.error(
+          this.translate.instant('product.loadErrorTitle'),
+          this.translate.instant('product.loadErrorCopy'),
+        );
+      },
     });
   }
 
@@ -920,15 +1026,16 @@ export class ProductComponent implements OnInit, OnDestroy {
         this.backInStockRequest = null;
         this.toast.success(
           this.translate.instant('product.notifyCanceledTitle'),
-          this.translate.instant('product.notifyCanceledBody', { name: product.name })
+          this.translate.instant('product.notifyCanceledBody', { name: product.name }),
         );
       },
       error: () => {
         this.backInStockLoading = false;
-        this.toast.error(this.translate.instant('product.loadErrorTitle'), this.translate.instant('product.loadErrorCopy'));
-      }
+        this.toast.error(
+          this.translate.instant('product.loadErrorTitle'),
+          this.translate.instant('product.loadErrorCopy'),
+        );
+      },
     });
   }
-
 }
-

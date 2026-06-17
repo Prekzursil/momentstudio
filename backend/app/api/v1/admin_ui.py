@@ -4,7 +4,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import require_admin_section
 from app.db.session import get_session
 from app.models.user import User
-from app.schemas.admin_ui import AdminFavoriteItem, AdminFavoritesResponse, AdminFavoritesUpdateRequest
+from app.schemas.admin_ui import (
+    AdminFavoriteItem,
+    AdminFavoritesResponse,
+    AdminFavoritesUpdateRequest,
+)
 
 router = APIRouter(prefix="/admin/ui", tags=["admin"])
 
@@ -35,7 +39,9 @@ def _parse_favorites(raw: object) -> list[AdminFavoriteItem]:
 async def get_admin_favorites(
     admin: User = Depends(require_admin_section("dashboard")),
 ) -> AdminFavoritesResponse:
-    return AdminFavoritesResponse(items=_parse_favorites(getattr(admin, "admin_favorites", None)))
+    return AdminFavoritesResponse(
+        items=_parse_favorites(getattr(admin, "admin_favorites", None))
+    )
 
 
 @router.put("/favorites", response_model=AdminFavoritesResponse)
@@ -58,4 +64,3 @@ async def update_admin_favorites(
     session.add(admin)
     await session.commit()
     return AdminFavoritesResponse(items=items)
-

@@ -101,7 +101,9 @@ def main() -> int:
 
     if not api_key:
         if dependabot_origin:
-            return skip("Skipping Applitools for Dependabot because APPLITOOLS_API_KEY is unavailable in this context.")
+            return skip(
+                "Skipping Applitools for Dependabot because APPLITOOLS_API_KEY is unavailable in this context."
+            )
         return fail("APPLITOOLS_API_KEY is not configured for this repository.")
 
     status = probe(server_url, api_key)
@@ -110,10 +112,11 @@ def main() -> int:
         return 0
 
     if dependabot_origin:
-        return skip(f"Skipping Applitools for Dependabot because credentials/server validation failed with HTTP {status}.")
+        return skip(
+            f"Skipping Applitools for Dependabot because credentials/server validation failed with HTTP {status}."
+        )
     return fail(f"Applitools credentials/server validation failed with HTTP {status}.")
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

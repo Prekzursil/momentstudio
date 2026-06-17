@@ -24,7 +24,7 @@ type ContentBlockRead = {
         <div class="markdown text-sm leading-relaxed" [innerHTML]="html()"></div>
       </div>
     </div>
-  `
+  `,
 })
 export class CmsAnnouncementBarComponent implements OnInit, OnDestroy {
   html = signal<string | null>(null);
@@ -34,7 +34,7 @@ export class CmsAnnouncementBarComponent implements OnInit, OnDestroy {
   constructor(
     private readonly api: ApiService,
     private readonly markdown: MarkdownService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
@@ -51,16 +51,20 @@ export class CmsAnnouncementBarComponent implements OnInit, OnDestroy {
     const lang: UiLang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     this.api.get<ContentBlockRead>(`/content/${encodeURIComponent(key)}`, { lang }).subscribe({
       next: (block) => {
-        const meta = ((block as { meta?: Record<string, unknown> | null })?.meta || {}) as Record<string, unknown>;
+        const meta = ((block as { meta?: Record<string, unknown> | null })?.meta || {}) as Record<
+          string,
+          unknown
+        >;
         const blocks = parsePageBlocks(meta, lang, (md) => this.markdown.render(md));
-        const firstText = blocks.find((b) => b.type === 'text') as (PageBlock & { type: 'text'; body_html: string }) | undefined;
+        const firstText = blocks.find((b) => b.type === 'text') as
+          | (PageBlock & { type: 'text'; body_html: string })
+          | undefined;
         const html = (firstText?.body_html || '').trim();
         this.html.set(html || null);
       },
       error: () => {
         this.html.set(null);
-      }
+      },
     });
   }
 }
-

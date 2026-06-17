@@ -24,7 +24,12 @@ from app.models.shipping_locker import (
     ShippingLockerSyncRun,
     ShippingLockerSyncStatus,
 )
-from app.schemas.shipping import LockerCityRead, LockerMirrorSnapshotRead, LockerProvider, LockerRead
+from app.schemas.shipping import (
+    LockerCityRead,
+    LockerMirrorSnapshotRead,
+    LockerProvider,
+    LockerRead,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +81,12 @@ _JSON_ENDPOINT_TEMPLATES = (
     _SAMEDAY_ORIGIN + "/api/easybox/locations?search={q}&limit=1000",
     _SAMEDAY_ORIGIN + "/api/pudo/locations?search={q}&limit=1000&type=locker",
 )
-_PLAYWRIGHT_SCRIPT = Path(__file__).resolve().parents[3] / "frontend" / "scripts" / "fetch-sameday-lockers.mjs"
+_PLAYWRIGHT_SCRIPT = (
+    Path(__file__).resolve().parents[3]
+    / "frontend"
+    / "scripts"
+    / "fetch-sameday-lockers.mjs"
+)
 _ALLOWED_HOSTS = {"sameday.ro", "www.sameday.ro"}
 _SCHEMA_DRIFT_ALERT_CODE = "schema_drift"
 _CHALLENGE_STREAK_ALERT_CODE = "challenge_failure_streak"
@@ -149,14 +159,26 @@ def _to_lat_lng(candidate: dict[str, Any]) -> tuple[float, float] | None:
         if isinstance(coords, (list, tuple)) and len(coords) >= 2:
             lng = _to_float(coords[0])
             lat = _to_float(coords[1])
-            if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
+            if (
+                lat is not None
+                and lng is not None
+                and -90 <= lat <= 90
+                and -180 <= lng <= 180
+            ):
                 return lat, lng
 
     location = candidate.get("location")
     if isinstance(location, dict):
         lat = _to_float(location.get("lat") or location.get("latitude"))
-        lng = _to_float(location.get("lng") or location.get("lon") or location.get("longitude"))
-        if lat is not None and lng is not None and -90 <= lat <= 90 and -180 <= lng <= 180:
+        lng = _to_float(
+            location.get("lng") or location.get("lon") or location.get("longitude")
+        )
+        if (
+            lat is not None
+            and lng is not None
+            and -90 <= lat <= 90
+            and -180 <= lng <= 180
+        ):
             return lat, lng
 
     return None
@@ -175,7 +197,16 @@ def _collect_candidate_rows(payload: Any) -> list[dict[str, Any]]:
             return
         if isinstance(node, dict):
             for key, value in node.items():
-                if key in {"features", "items", "data", "rows", "locations", "lockers", "result", "results"}:
+                if key in {
+                    "features",
+                    "items",
+                    "data",
+                    "rows",
+                    "locations",
+                    "lockers",
+                    "result",
+                    "results",
+                }:
                     _walk(value)
                 elif isinstance(value, (dict, list)):
                     _walk(value)
@@ -229,10 +260,15 @@ def _normalize_row(row: dict[str, Any]) -> _NormalizedLocker | None:
         or source.get("judet"),
         max_len=120,
     )
-    postal_code = _clean_text(source.get("postalCode") or source.get("postcode") or source.get("zip"), max_len=32)
+    postal_code = _clean_text(
+        source.get("postalCode") or source.get("postcode") or source.get("zip"),
+        max_len=32,
+    )
 
     if not external_id:
-        external_id = hashlib.sha1(f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8")).hexdigest()[:40]
+        external_id = hashlib.sha1(
+            f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8")
+        ).hexdigest()[:40]
     if not name:
         name = f"Easybox {external_id[:8]}"
 
@@ -266,7 +302,9 @@ def _dedupe_lockers(items: list[_NormalizedLocker]) -> list[_NormalizedLocker]:
 
 def _payload_hash(payload: Any) -> str:
     try:
-        raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        raw = json.dumps(
+            payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        )
     except Exception:
         raw = str(payload)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -289,9 +327,17 @@ async def _fetch_json_url(client: httpx.AsyncClient, url: str) -> Any:
 
 
 async def _fetch_via_known_endpoints(timeout_seconds: int) -> tuple[Any, str]:
-    headers = {"User-Agent": _FETCH_UA, "Accept": "application/json,text/plain,*/*", "Referer": _SAMEDAY_ORIGIN}
-    timeout = httpx.Timeout(float(timeout_seconds), connect=min(10.0, float(timeout_seconds)))
-    async with httpx.AsyncClient(headers=headers, timeout=timeout, follow_redirects=True) as client:
+    headers = {
+        "User-Agent": _FETCH_UA,
+        "Accept": "application/json,text/plain,*/*",
+        "Referer": _SAMEDAY_ORIGIN,
+    }
+    timeout = httpx.Timeout(
+        float(timeout_seconds), connect=min(10.0, float(timeout_seconds))
+    )
+    async with httpx.AsyncClient(
+        headers=headers, timeout=timeout, follow_redirects=True
+    ) as client:
         for template in _JSON_ENDPOINT_TEMPLATES:
             collected: list[dict[str, Any]] = []
             successes = 0
@@ -328,12 +374,16 @@ async def _fetch_via_playwright(timeout_seconds: int) -> tuple[Any, str]:
         stderr=asyncio.subprocess.PIPE,
     )
     try:
-        out, err = await asyncio.wait_for(proc.communicate(), timeout=max(20, int(timeout_seconds) + 20))
+        out, err = await asyncio.wait_for(
+            proc.communicate(), timeout=max(20, int(timeout_seconds) + 20)
+        )
     except asyncio.TimeoutError:
         proc.kill()
         raise RuntimeError("Playwright fetch timed out")
     if proc.returncode != 0:
-        raise RuntimeError((err.decode("utf-8", errors="ignore") or "Playwright fetch failed").strip())
+        raise RuntimeError(
+            (err.decode("utf-8", errors="ignore") or "Playwright fetch failed").strip()
+        )
 
     try:
         payload = json.loads(out.decode("utf-8", errors="ignore"))
@@ -347,11 +397,15 @@ async def _fetch_via_playwright(timeout_seconds: int) -> tuple[Any, str]:
 
 
 async def _fetch_raw_payload() -> tuple[Any, str]:
-    timeout_seconds = max(5, int(getattr(settings, "sameday_mirror_fetch_timeout_seconds", 30) or 30))
+    timeout_seconds = max(
+        5, int(getattr(settings, "sameday_mirror_fetch_timeout_seconds", 30) or 30)
+    )
     try:
         return await _fetch_via_known_endpoints(timeout_seconds)
     except Exception as direct_exc:
-        logger.warning("sameday_easybox_direct_fetch_failed", extra={"error": str(direct_exc)})
+        logger.warning(
+            "sameday_easybox_direct_fetch_failed", extra={"error": str(direct_exc)}
+        )
     return await _fetch_via_playwright(timeout_seconds)
 
 
@@ -387,9 +441,14 @@ def _schema_signature_from_rows(rows: list[dict[str, Any]]) -> str | None:
         if isinstance(props, dict):
             keys.extend(f"properties.{str(key)}" for key in sorted(props.keys()))
         shape_count["|".join(keys)] += 1
-    payload = [{"shape": shape, "count": int(count)} for shape, count in sorted(shape_count.items())]
+    payload = [
+        {"shape": shape, "count": int(count)}
+        for shape, count in sorted(shape_count.items())
+    ]
     digest = hashlib.sha256(
-        json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        json.dumps(
+            payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+        ).encode("utf-8")
     ).hexdigest()
     return digest[:40]
 
@@ -431,11 +490,24 @@ def _detect_schema_drift(
         return False
     prev_signature = str(previous_success.schema_signature or "").strip() or None
     prev_ratio = float(previous_success.normalization_ratio or 0.0)
-    ratio_drop_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_ratio_drop", 0.20) or 0.20))
-    min_ratio_threshold = max(0.0, float(getattr(settings, "sameday_mirror_schema_drift_min_ratio", 0.80) or 0.80))
-    signature_changed = bool(prev_signature and schema_signature and prev_signature != schema_signature)
+    ratio_drop_threshold = max(
+        0.0,
+        float(
+            getattr(settings, "sameday_mirror_schema_drift_ratio_drop", 0.20) or 0.20
+        ),
+    )
+    min_ratio_threshold = max(
+        0.0,
+        float(getattr(settings, "sameday_mirror_schema_drift_min_ratio", 0.80) or 0.80),
+    )
+    signature_changed = bool(
+        prev_signature and schema_signature and prev_signature != schema_signature
+    )
     ratio_drop = prev_ratio - float(normalization_ratio)
-    ratio_alert = ratio_drop >= ratio_drop_threshold and float(normalization_ratio) < min_ratio_threshold
+    ratio_alert = (
+        ratio_drop >= ratio_drop_threshold
+        and float(normalization_ratio) < min_ratio_threshold
+    )
     return bool(signature_changed or ratio_alert)
 
 
@@ -471,7 +543,9 @@ def _build_canary_alerts(
     messages: list[str] = []
     if schema_drift_detected:
         codes.append(_SCHEMA_DRIFT_ALERT_CODE)
-        messages.append("Sameday payload schema drift detected. Verify parser compatibility before next sync.")
+        messages.append(
+            "Sameday payload schema drift detected. Verify parser compatibility before next sync."
+        )
     threshold = max(
         1,
         int(getattr(settings, "sameday_mirror_challenge_failure_alert_streak", 3) or 3),
@@ -484,11 +558,15 @@ def _build_canary_alerts(
     return codes, messages
 
 
-async def _upsert_snapshot(session: AsyncSession, items: list[_NormalizedLocker], *, now: datetime) -> tuple[int, int]:
+async def _upsert_snapshot(
+    session: AsyncSession, items: list[_NormalizedLocker], *, now: datetime
+) -> tuple[int, int]:
     existing_rows = (
         (
             await session.execute(
-                select(ShippingLockerMirror).where(ShippingLockerMirror.provider == ShippingLockerProvider.sameday)
+                select(ShippingLockerMirror).where(
+                    ShippingLockerMirror.provider == ShippingLockerProvider.sameday
+                )
             )
         )
         .scalars()
@@ -565,11 +643,16 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     r = 6371.0
     dlat = radians(lat2 - lat1)
     dlng = radians(lng2 - lng1)
-    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    a = (
+        sin(dlat / 2) ** 2
+        + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng / 2) ** 2
+    )
     return float(2 * r * asin(sqrt(a)))
 
 
-def _row_to_locker_read(row: ShippingLockerMirror, *, lat: float, lng: float) -> LockerRead:
+def _row_to_locker_read(
+    row: ShippingLockerMirror, *, lat: float, lng: float
+) -> LockerRead:
     address = _clean_text(" · ".join(filter(None, [row.address, row.city])))
     return LockerRead(
         id=f"sameday:{row.external_id}",
@@ -609,7 +692,9 @@ async def sync_now(session: AsyncSession, *, trigger: str) -> ShippingLockerSync
             schema_signature=schema_signature,
             normalization_ratio=normalization_ratio,
         )
-        upserted_count, deactivated_count = await _upsert_snapshot(session, normalized_items, now=now)
+        upserted_count, deactivated_count = await _upsert_snapshot(
+            session, normalized_items, now=now
+        )
 
         run.status = ShippingLockerSyncStatus.success
         run.finished_at = now
@@ -665,7 +750,9 @@ async def sync_now(session: AsyncSession, *, trigger: str) -> ShippingLockerSync
         return run
 
 
-async def list_sync_runs(session: AsyncSession, *, page: int, limit: int) -> tuple[list[ShippingLockerSyncRun], int]:
+async def list_sync_runs(
+    session: AsyncSession, *, page: int, limit: int
+) -> tuple[list[ShippingLockerSyncRun], int]:
     safe_page = max(1, int(page or 1))
     safe_limit = max(1, min(100, int(limit or 20)))
     total = int(
@@ -747,7 +834,12 @@ async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead
         schema_drift_detected=schema_drift_detected,
         challenge_failure_streak=challenge_failure_streak,
     )
-    stale_after = max(60, int(getattr(settings, "sameday_mirror_stale_after_seconds", 2592000) or 2592000))
+    stale_after = max(
+        60,
+        int(
+            getattr(settings, "sameday_mirror_stale_after_seconds", 2592000) or 2592000
+        ),
+    )
     age_seconds: int | None = None
     stale = True
     finished_at = _as_utc(last_success.finished_at) if last_success else None
@@ -763,7 +855,9 @@ async def get_snapshot_status(session: AsyncSession) -> LockerMirrorSnapshotRead
         stale_age_seconds=age_seconds,
         challenge_failure_streak=challenge_failure_streak,
         schema_drift_detected=schema_drift_detected,
-        last_schema_drift_at=_as_utc(latest_schema_drift.started_at) if latest_schema_drift else None,
+        last_schema_drift_at=(
+            _as_utc(latest_schema_drift.started_at) if latest_schema_drift else None
+        ),
         canary_alert_codes=canary_alert_codes,
         canary_alert_messages=canary_alert_messages,
     )
@@ -781,7 +875,13 @@ async def get_latest_run(session: AsyncSession) -> ShippingLockerSyncRun | None:
 async def should_run_scheduled_sync(session: AsyncSession) -> bool:
     if not bool(getattr(settings, "sameday_mirror_enabled", True)):
         return False
-    interval = max(300, int(getattr(settings, "sameday_mirror_sync_interval_seconds", 2592000) or 2592000))
+    interval = max(
+        300,
+        int(
+            getattr(settings, "sameday_mirror_sync_interval_seconds", 2592000)
+            or 2592000
+        ),
+    )
     latest_success = await session.scalar(
         select(ShippingLockerSyncRun)
         .where(
@@ -797,7 +897,9 @@ async def should_run_scheduled_sync(session: AsyncSession) -> bool:
     return (_now() - finished_at).total_seconds() >= interval
 
 
-async def list_city_suggestions(session: AsyncSession, *, q: str, limit: int) -> list[LockerCityRead]:
+async def list_city_suggestions(
+    session: AsyncSession, *, q: str, limit: int
+) -> list[LockerCityRead]:
     stmt = (
         select(
             ShippingLockerMirror.city,

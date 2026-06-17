@@ -30,36 +30,42 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
     BreadcrumbComponent,
     CardComponent,
     ButtonComponent,
-    SkeletonComponent
+    SkeletonComponent,
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-	      <div class="flex items-center justify-between gap-4">
-	        <div class="flex flex-wrap items-baseline gap-3">
-	          <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50" data-route-heading="true" tabindex="-1">
-              {{ 'blog.title' | translate }}
-            </h1>
-	          <span
-	            *ngIf="routeTag"
-	            class="text-sm font-semibold rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
-	          >
-	            #{{ routeTag }}
-	          </span>
-	          <span
-	            *ngIf="routeSeries"
-	            class="text-sm font-semibold rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
-	          >
-	            {{ 'blog.seriesPill' | translate : { series: routeSeries } }}
-	          </span>
-	        </div>
-	      </div>
+      <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-wrap items-baseline gap-3">
+          <h1
+            class="text-2xl font-semibold text-slate-900 dark:text-slate-50"
+            data-route-heading="true"
+            tabindex="-1"
+          >
+            {{ 'blog.title' | translate }}
+          </h1>
+          <span
+            *ngIf="routeTag"
+            class="text-sm font-semibold rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
+          >
+            #{{ routeTag }}
+          </span>
+          <span
+            *ngIf="routeSeries"
+            class="text-sm font-semibold rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-200"
+          >
+            {{ 'blog.seriesPill' | translate: { series: routeSeries } }}
+          </span>
+        </div>
+      </div>
 
       <p class="text-sm text-slate-600 dark:text-slate-300">{{ seoIntro() }}</p>
 
       <div>
-        <div class="grid gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+        <div
+          class="grid gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90"
+        >
           <div class="grid gap-3 md:grid-cols-[1fr_240px_240px_240px_auto] items-end">
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
               <span>{{ 'blog.searchLabel' | translate }}</span>
@@ -106,7 +112,11 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
               </select>
             </label>
             <div class="flex items-center justify-end gap-2">
-              <app-button size="sm" [label]="'blog.searchCta' | translate" (action)="applyFilters()"></app-button>
+              <app-button
+                size="sm"
+                [label]="'blog.searchCta' | translate"
+                (action)="applyFilters()"
+              ></app-button>
               <app-button
                 size="sm"
                 variant="ghost"
@@ -117,14 +127,17 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
             </div>
           </div>
 
-          <div *ngIf="searchQuery.trim() || tagQuery.trim() || seriesQuery.trim()" class="flex flex-wrap gap-2">
+          <div
+            *ngIf="searchQuery.trim() || tagQuery.trim() || seriesQuery.trim()"
+            class="flex flex-wrap gap-2"
+          >
             <button
               *ngIf="searchQuery.trim()"
               type="button"
               class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
               (click)="clearSearchChip()"
             >
-              {{ 'blog.chipSearch' | translate : { q: searchQuery.trim() } }}
+              {{ 'blog.chipSearch' | translate: { q: searchQuery.trim() } }}
               <span aria-hidden="true">✕</span>
             </button>
             <button
@@ -133,7 +146,7 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
               class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
               (click)="clearTagChip()"
             >
-              {{ 'blog.chipTag' | translate : { tag: tagQuery.trim() } }}
+              {{ 'blog.chipTag' | translate: { tag: tagQuery.trim() } }}
               <span aria-hidden="true">✕</span>
             </button>
             <button
@@ -142,7 +155,7 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
               class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
               (click)="clearSeriesChip()"
             >
-              {{ 'blog.chipSeries' | translate : { series: seriesQuery.trim() } }}
+              {{ 'blog.chipSeries' | translate: { series: seriesQuery.trim() } }}
               <span aria-hidden="true">✕</span>
             </button>
           </div>
@@ -157,7 +170,9 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
         *ngIf="!loading() && hasError()"
         class="border border-amber-200 bg-amber-50 rounded-2xl p-6 text-center grid gap-2 dark:border-amber-900/40 dark:bg-amber-950/30"
       >
-        <p class="text-lg font-semibold text-amber-900 dark:text-amber-100">{{ 'blog.errorTitle' | translate }}</p>
+        <p class="text-lg font-semibold text-amber-900 dark:text-amber-100">
+          {{ 'blog.errorTitle' | translate }}
+        </p>
         <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'blog.errorCopy' | translate }}</p>
         <div class="flex justify-center">
           <app-button [label]="'blog.retry' | translate" size="sm" (action)="load()"></app-button>
@@ -169,23 +184,45 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
         class="border border-dashed border-slate-200 rounded-2xl p-10 text-center grid gap-2 dark:border-slate-800"
       >
         <ng-container *ngIf="hasActiveFilters(); else blogEmptyAllTpl">
-          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.noResultsTitle' | translate }}</p>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.noResultsCopy' | translate }}</p>
+          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'blog.noResultsTitle' | translate }}
+          </p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'blog.noResultsCopy' | translate }}
+          </p>
           <div class="flex justify-center pt-2">
-            <app-button size="sm" variant="ghost" [label]="'blog.clearFilters' | translate" (action)="clearFilters()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'blog.clearFilters' | translate"
+              (action)="clearFilters()"
+            ></app-button>
           </div>
         </ng-container>
         <ng-template #blogEmptyAllTpl>
-          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'blog.emptyTitle' | translate }}</p>
-          <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'blog.emptyCopy' | translate }}</p>
+          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'blog.emptyTitle' | translate }}
+          </p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            {{ 'blog.emptyCopy' | translate }}
+          </p>
           <div class="flex flex-wrap justify-center gap-3 pt-2 text-sm">
-            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/shop']">
+            <a
+              class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+              [routerLink]="['/shop']"
+            >
               {{ 'nav.shop' | translate }}
             </a>
-            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/about']">
+            <a
+              class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+              [routerLink]="['/about']"
+            >
               {{ 'nav.about' | translate }}
             </a>
-            <a class="font-medium text-indigo-600 hover:underline dark:text-indigo-300" [routerLink]="['/contact']">
+            <a
+              class="font-medium text-indigo-600 hover:underline dark:text-indigo-300"
+              [routerLink]="['/contact']"
+            >
               {{ 'nav.contact' | translate }}
             </a>
           </div>
@@ -217,7 +254,9 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
               [src]="thumb"
               [alt]="heroPost.title"
               class="absolute inset-0 h-full w-full object-cover blur-xl scale-110 opacity-80"
-              [style.object-position]="focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)"
+              [style.object-position]="
+                focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)
+              "
               (error)="markThumbFailed(thumb)"
               loading="lazy"
               decoding="async"
@@ -227,22 +266,26 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
               [alt]="heroPost.title"
               class="absolute inset-0 h-full w-full"
               [ngClass]="coverImageClass(heroPost.cover_fit)"
-              [style.object-position]="focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)"
+              [style.object-position]="
+                focalPosition(heroPost.cover_focal_x, heroPost.cover_focal_y)
+              "
               loading="eager"
               decoding="async"
             />
           </div>
           <div class="p-6 md:p-8 grid gap-3">
-            <p class="text-xs font-semibold tracking-wide uppercase text-indigo-600 dark:text-indigo-300">
+            <p
+              class="text-xs font-semibold tracking-wide uppercase text-indigo-600 dark:text-indigo-300"
+            >
               {{ 'blog.featuredLabel' | translate }}
             </p>
             <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="heroPost.published_at">
               {{ heroPost.published_at | date: 'mediumDate' }}
               <ng-container *ngIf="heroPost.reading_time_minutes">
-                · {{ 'blog.minutesRead' | translate : { minutes: heroPost.reading_time_minutes } }}
+                · {{ 'blog.minutesRead' | translate: { minutes: heroPost.reading_time_minutes } }}
               </ng-container>
               <ng-container *ngIf="heroPost.author_name">
-                · {{ 'blog.byAuthor' | translate : { author: heroPost.author_name } }}
+                · {{ 'blog.byAuthor' | translate: { author: heroPost.author_name } }}
               </ng-container>
             </p>
             <button
@@ -251,9 +294,11 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
               class="justify-self-start text-xs font-semibold rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
               (click)="filterBySeries($event, heroPost.series!)"
             >
-              {{ 'blog.seriesPill' | translate : { series: heroPost.series } }}
+              {{ 'blog.seriesPill' | translate: { series: heroPost.series } }}
             </button>
-            <h2 class="text-2xl md:text-3xl font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+            <h2
+              class="text-2xl md:text-3xl font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300"
+            >
               {{ heroPost.title }}
             </h2>
             <p class="text-sm md:text-base text-slate-600 dark:text-slate-300 line-clamp-4">
@@ -281,7 +326,9 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
           (mouseenter)="prefetchPost(post.slug)"
           (focusin)="prefetchPost(post.slug)"
         >
-          <div class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5">
+          <div
+            class="h-full transition-transform duration-200 ease-out group-hover:-translate-y-0.5"
+          >
             <app-card class="h-full">
               <div class="relative">
                 <button
@@ -294,14 +341,18 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
                 </button>
 
                 <div class="grid gap-4 md:grid-cols-[240px_1fr] md:items-start">
-                  <div class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800">
+                  <div
+                    class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
+                  >
                     <ng-container *ngIf="post.cover_image_url; else blogCoverPlaceholderTpl">
                       <img
                         *ngIf="thumbUrl(post.cover_image_url) as thumb"
                         [src]="thumb"
                         [alt]="post.title"
                         class="absolute inset-0 h-full w-full object-cover blur-xl scale-110 opacity-80"
-                        [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
+                        [style.object-position]="
+                          focalPosition(post.cover_focal_x, post.cover_focal_y)
+                        "
                         (error)="markThumbFailed(thumb)"
                         loading="lazy"
                         decoding="async"
@@ -311,7 +362,9 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
                         [alt]="post.title"
                         class="relative w-full aspect-[16/9]"
                         [ngClass]="coverImageClass(post.cover_fit)"
-                        [style.object-position]="focalPosition(post.cover_focal_x, post.cover_focal_y)"
+                        [style.object-position]="
+                          focalPosition(post.cover_focal_x, post.cover_focal_y)
+                        "
                         loading="lazy"
                         decoding="async"
                       />
@@ -320,7 +373,9 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
                       <div
                         class="aspect-[16/9] w-full grid place-items-center bg-gradient-to-br from-indigo-500/15 via-sky-500/10 to-fuchsia-500/15 text-slate-600 dark:text-slate-300"
                       >
-                        <span class="text-xs font-semibold tracking-wide uppercase px-3 py-1 rounded-full border border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/60">
+                        <span
+                          class="text-xs font-semibold tracking-wide uppercase px-3 py-1 rounded-full border border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/60"
+                        >
                           {{ 'blog.title' | translate }}
                         </span>
                       </div>
@@ -331,10 +386,11 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
                     <p class="text-sm text-slate-500 dark:text-slate-400" *ngIf="post.published_at">
                       {{ post.published_at | date: 'mediumDate' }}
                       <ng-container *ngIf="post.reading_time_minutes">
-                        · {{ 'blog.minutesRead' | translate : { minutes: post.reading_time_minutes } }}
+                        ·
+                        {{ 'blog.minutesRead' | translate: { minutes: post.reading_time_minutes } }}
                       </ng-container>
                       <ng-container *ngIf="post.author_name">
-                        · {{ 'blog.byAuthor' | translate : { author: post.author_name } }}
+                        · {{ 'blog.byAuthor' | translate: { author: post.author_name } }}
                       </ng-container>
                     </p>
                     <button
@@ -343,9 +399,11 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
                       class="justify-self-start text-xs font-semibold rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700 hover:border-slate-300 hover:bg-white dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-200 dark:hover:border-slate-600"
                       (click)="filterBySeries($event, post.series!)"
                     >
-                      {{ 'blog.seriesPill' | translate : { series: post.series } }}
+                      {{ 'blog.seriesPill' | translate: { series: post.series } }}
                     </button>
-                    <h2 class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300">
+                    <h2
+                      class="text-lg font-semibold text-slate-900 group-hover:text-indigo-600 dark:text-slate-50 dark:group-hover:text-indigo-300"
+                    >
                       {{ post.title }}
                     </h2>
                     <p class="text-sm text-slate-600 dark:text-slate-300 line-clamp-3">
@@ -369,12 +427,29 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
         </a>
       </div>
 
-      <div *ngIf="pageMeta" class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300">
+      <div
+        *ngIf="pageMeta"
+        class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-300"
+      >
         <div>
-          {{ 'blog.pageMeta' | translate : { page: pageMeta.page, totalPages: pageMeta.total_pages, totalItems: pageMeta.total_items } }}
+          {{
+            'blog.pageMeta'
+              | translate
+                : {
+                    page: pageMeta.page,
+                    totalPages: pageMeta.total_pages,
+                    totalItems: pageMeta.total_items,
+                  }
+          }}
         </div>
         <div class="flex gap-2">
-          <app-button [label]="'blog.prev' | translate" size="sm" variant="ghost" [disabled]="pageMeta.page <= 1" (action)="changePage(-1)">
+          <app-button
+            [label]="'blog.prev' | translate"
+            size="sm"
+            variant="ghost"
+            [disabled]="pageMeta.page <= 1"
+            (action)="changePage(-1)"
+          >
           </app-button>
           <app-button
             [label]="'blog.next' | translate"
@@ -387,13 +462,10 @@ import { SeoCopyFallbackService } from '../../core/seo-copy-fallback.service';
         </div>
       </div>
     </app-container>
-  `
+  `,
 })
 export class BlogListComponent implements OnInit, OnDestroy {
-  crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'nav.blog' }
-  ];
+  crumbs = [{ label: 'nav.home', url: '/' }, { label: 'nav.blog' }];
 
   posts: BlogPostListItem[] = [];
   heroPost: BlogPostListItem | null = null;
@@ -428,13 +500,13 @@ export class BlogListComponent implements OnInit, OnDestroy {
     private readonly meta: Meta,
     private readonly seoHeadLinks: SeoHeadLinksService,
     private readonly structuredData: StructuredDataService,
-    private readonly seoCopyFallback: SeoCopyFallbackService
+    private readonly seoCopyFallback: SeoCopyFallbackService,
   ) {}
 
   ngOnInit(): void {
     this.loadFromRoute(this.route.snapshot.params || {}, this.route.snapshot.queryParams || {});
-    this.sub = combineLatest([this.route.params, this.route.queryParams]).subscribe(([routeParams, queryParams]) =>
-      this.loadFromRoute(routeParams, queryParams)
+    this.sub = combineLatest([this.route.params, this.route.queryParams]).subscribe(
+      ([routeParams, queryParams]) => this.loadFromRoute(routeParams, queryParams),
     );
     this.langSub = this.translate.onLangChange.subscribe(() => this.load());
   }
@@ -459,7 +531,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
             'blog',
             this.translate.currentLang === 'ro' ? 'ro' : 'en',
             this.translate.instant('meta.descriptions.blog'),
-            this.translate.instant('blog.metaDescription')
+            this.translate.instant('blog.metaDescription'),
           );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
@@ -482,8 +554,8 @@ export class BlogListComponent implements OnInit, OnDestroy {
         name: title,
         description,
         url: canonical,
-        inLanguage: lang
-      }
+        inLanguage: lang,
+      },
     ]);
   }
 
@@ -513,24 +585,23 @@ export class BlogListComponent implements OnInit, OnDestroy {
     this.appliedTag = this.tagQuery.trim() ? this.tagQuery.trim() : null;
     this.appliedSeries = this.seriesQuery.trim() ? this.seriesQuery.trim() : null;
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-    this.seoIntro.set(this.seoCopyFallback.blogListIntro(lang, this.appliedTag, this.appliedSeries));
+    this.seoIntro.set(
+      this.seoCopyFallback.blogListIntro(lang, this.appliedTag, this.appliedSeries),
+    );
     this.crumbs =
       this.appliedSeries && this.routeSeries
         ? [
             { label: 'nav.home', url: '/' },
             { label: 'nav.blog', url: '/blog' },
-            { label: this.appliedSeries }
+            { label: this.appliedSeries },
           ]
         : this.appliedTag && this.routeTag
           ? [
               { label: 'nav.home', url: '/' },
               { label: 'nav.blog', url: '/blog' },
-              { label: `#${this.appliedTag}` }
+              { label: `#${this.appliedTag}` },
             ]
-        : [
-            { label: 'nav.home', url: '/' },
-            { label: 'nav.blog' }
-          ];
+          : [{ label: 'nav.home', url: '/' }, { label: 'nav.blog' }];
 
     const querySort = typeof queryParams['sort'] === 'string' ? queryParams['sort'] : null;
     const nextSort = this.normalizeSort(querySort) ?? this.loadSavedSort() ?? 'newest';
@@ -555,44 +626,51 @@ export class BlogListComponent implements OnInit, OnDestroy {
         q: this.searchQuery.trim() || undefined,
         tag: this.tagQuery.trim() || undefined,
         series: this.seriesQuery.trim() || undefined,
-        sort: this.sort
+        sort: this.sort,
       })
       .subscribe({
-      next: (resp) => {
-        if (loadSeq !== this.loadSeq) return;
-        this.posts = resp.items;
-        const hasFilters = Boolean(this.searchQuery.trim() || this.tagQuery.trim() || this.seriesQuery.trim());
-        const canShowHero = !hasFilters && resp.meta.page === 1 && this.sort === 'newest' && resp.items.length > 0;
-        if (canShowHero) {
-          this.heroPost = resp.items[0];
-          this.gridPosts = resp.items.slice(1);
-        } else {
+        next: (resp) => {
+          if (loadSeq !== this.loadSeq) return;
+          this.posts = resp.items;
+          const hasFilters = Boolean(
+            this.searchQuery.trim() || this.tagQuery.trim() || this.seriesQuery.trim(),
+          );
+          const canShowHero =
+            !hasFilters && resp.meta.page === 1 && this.sort === 'newest' && resp.items.length > 0;
+          if (canShowHero) {
+            this.heroPost = resp.items[0];
+            this.gridPosts = resp.items.slice(1);
+          } else {
+            this.heroPost = null;
+            this.gridPosts = resp.items;
+          }
+          this.pageMeta = resp.meta;
+          this.loading.set(false);
+          this.hasError.set(false);
+          this.setMetaTags(resp.meta.page);
+        },
+        error: () => {
+          if (loadSeq !== this.loadSeq) return;
+          this.posts = [];
           this.heroPost = null;
-          this.gridPosts = resp.items;
-        }
-        this.pageMeta = resp.meta;
-        this.loading.set(false);
-        this.hasError.set(false);
-        this.setMetaTags(resp.meta.page);
-      },
-      error: () => {
-        if (loadSeq !== this.loadSeq) return;
-        this.posts = [];
-        this.heroPost = null;
-        this.gridPosts = [];
-        this.pageMeta = null;
-        this.loading.set(false);
-        this.hasError.set(true);
-        this.setMetaTags(page);
-      }
-    });
+          this.gridPosts = [];
+          this.pageMeta = null;
+          this.loading.set(false);
+          this.hasError.set(true);
+          this.setMetaTags(page);
+        },
+      });
   }
 
   changePage(delta: number): void {
     if (!this.pageMeta) return;
     const next = Math.min(Math.max(1, this.pageMeta.page + delta), this.pageMeta.total_pages);
     const queryParams: Params = { page: next !== 1 ? next : undefined };
-    void this.router.navigate([], { relativeTo: this.route, queryParams, queryParamsHandling: 'merge' });
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams,
+      queryParamsHandling: 'merge',
+    });
   }
 
   applyFilters(): void {
@@ -604,7 +682,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
       this.tagQuery = '';
       void this.router.navigate(['/blog/series', series], {
         queryParams: { q, sort, page: undefined },
-        queryParamsHandling: 'merge'
+        queryParamsHandling: 'merge',
       });
       return;
     }
@@ -612,18 +690,30 @@ export class BlogListComponent implements OnInit, OnDestroy {
       this.seriesQuery = '';
       void this.router.navigate(['/blog/tag', tag], {
         queryParams: { q, sort, page: undefined },
-        queryParamsHandling: 'merge'
+        queryParamsHandling: 'merge',
       });
       return;
     }
-    void this.router.navigate(['/blog'], { queryParams: { q, sort, page: undefined }, queryParamsHandling: 'merge' });
+    void this.router.navigate(['/blog'], {
+      queryParams: { q, sort, page: undefined },
+      queryParamsHandling: 'merge',
+    });
   }
 
   clearFilters(): void {
     this.searchQuery = '';
     this.tagQuery = '';
     this.seriesQuery = '';
-    void this.router.navigate(['/blog'], { queryParams: { q: undefined, tag: undefined, series: undefined, sort: undefined, page: undefined }, queryParamsHandling: 'merge' });
+    void this.router.navigate(['/blog'], {
+      queryParams: {
+        q: undefined,
+        tag: undefined,
+        series: undefined,
+        sort: undefined,
+        page: undefined,
+      },
+      queryParamsHandling: 'merge',
+    });
   }
 
   clearSearchChip(): void {
@@ -651,7 +741,7 @@ export class BlogListComponent implements OnInit, OnDestroy {
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { sort: normalized !== 'newest' ? normalized : undefined, page: undefined },
-      queryParamsHandling: 'merge'
+      queryParamsHandling: 'merge',
     });
   }
 

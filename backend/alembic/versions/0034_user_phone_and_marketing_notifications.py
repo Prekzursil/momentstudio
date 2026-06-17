@@ -21,11 +21,15 @@ def upgrade() -> None:
     op.add_column("users", sa.Column("phone", sa.String(length=32), nullable=True))
     op.add_column(
         "users",
-        sa.Column("notify_marketing", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "notify_marketing",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
 
 
 def downgrade() -> None:
     op.drop_column("users", "notify_marketing")
     op.drop_column("users", "phone")
-

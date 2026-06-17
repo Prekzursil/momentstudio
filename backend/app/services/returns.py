@@ -17,10 +17,20 @@ from app.services import audit_chain as audit_chain_service
 
 
 ALLOWED_TRANSITIONS: dict[ReturnRequestStatus, set[ReturnRequestStatus]] = {
-    ReturnRequestStatus.requested: {ReturnRequestStatus.approved, ReturnRequestStatus.rejected, ReturnRequestStatus.closed},
-    ReturnRequestStatus.approved: {ReturnRequestStatus.received, ReturnRequestStatus.closed},
+    ReturnRequestStatus.requested: {
+        ReturnRequestStatus.approved,
+        ReturnRequestStatus.rejected,
+        ReturnRequestStatus.closed,
+    },
+    ReturnRequestStatus.approved: {
+        ReturnRequestStatus.received,
+        ReturnRequestStatus.closed,
+    },
     ReturnRequestStatus.rejected: {ReturnRequestStatus.closed},
-    ReturnRequestStatus.received: {ReturnRequestStatus.refunded, ReturnRequestStatus.closed},
+    ReturnRequestStatus.received: {
+        ReturnRequestStatus.refunded,
+        ReturnRequestStatus.closed,
+    },
     ReturnRequestStatus.refunded: {ReturnRequestStatus.closed},
     ReturnRequestStatus.closed: set(),
 }
@@ -56,7 +66,11 @@ async def list_return_requests(
     if filters:
         query = query.where(*filters)
 
-    count_stmt = select(func.count()).select_from(ReturnRequest).join(Order, ReturnRequest.order_id == Order.id)
+    count_stmt = (
+        select(func.count())
+        .select_from(ReturnRequest)
+        .join(Order, ReturnRequest.order_id == Order.id)
+    )
     if filters:
         count_stmt = count_stmt.where(*filters)
     total_items = int((await session.execute(count_stmt)).scalar_one() or 0)
@@ -67,7 +81,9 @@ async def list_return_requests(
     return list(rows), total_items
 
 
-async def get_return_request(session: AsyncSession, return_id: UUID) -> ReturnRequest | None:
+async def get_return_request(
+    session: AsyncSession, return_id: UUID
+) -> ReturnRequest | None:
     result = await session.execute(
         select(ReturnRequest)
         .options(
@@ -90,24 +106,32 @@ async def create_return_request(
 ) -> ReturnRequest:
     order = await order_service.get_order_by_id_admin(session, payload.order_id)
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
 
     order_items_by_id = {item.id: item for item in order.items}
     items: list[ReturnRequestItem] = []
     requested_quantities: dict[UUID, int] = {}
     for item_payload in payload.items:
         if item_payload.quantity <= 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
-        requested_quantities[item_payload.order_item_id] = requested_quantities.get(item_payload.order_item_id, 0) + int(
-            item_payload.quantity
-        )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity"
+            )
+        requested_quantities[item_payload.order_item_id] = requested_quantities.get(
+            item_payload.order_item_id, 0
+        ) + int(item_payload.quantity)
 
     for order_item_id, quantity in requested_quantities.items():
         order_item = order_items_by_id.get(order_item_id)
         if not order_item:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item"
+            )
         if quantity <= 0 or quantity > int(order_item.quantity):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity"
+            )
         items.append(ReturnRequestItem(order_item_id=order_item.id, quantity=quantity))
 
     now = datetime.now(timezone.utc)
@@ -116,7 +140,9 @@ async def create_return_request(
         user_id=order.user_id,
         status=ReturnRequestStatus.requested,
         reason=payload.reason.strip(),
-        customer_message=(payload.customer_message.strip() if payload.customer_message else None),
+        customer_message=(
+            payload.customer_message.strip() if payload.customer_message else None
+        ),
         created_by=actor.id,
         updated_by=actor.id,
         created_at=now,
@@ -144,9 +170,14 @@ async def create_return_request_for_user(
 ) -> ReturnRequest:
     order = await order_service.get_order(session, user.id, payload.order_id)
     if not order:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
+        )
     if OrderStatus(order.status) != OrderStatus.delivered:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Return request not eligible")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Return request not eligible",
+        )
 
     existing = int(
         (
@@ -163,24 +194,32 @@ async def create_return_request_for_user(
         or 0
     )
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Return request already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Return request already exists"
+        )
 
     order_items_by_id = {item.id: item for item in order.items}
     items: list[ReturnRequestItem] = []
     requested_quantities: dict[UUID, int] = {}
     for item_payload in payload.items:
         if item_payload.quantity <= 0:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
-        requested_quantities[item_payload.order_item_id] = requested_quantities.get(item_payload.order_item_id, 0) + int(
-            item_payload.quantity
-        )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity"
+            )
+        requested_quantities[item_payload.order_item_id] = requested_quantities.get(
+            item_payload.order_item_id, 0
+        ) + int(item_payload.quantity)
 
     for order_item_id, quantity in requested_quantities.items():
         order_item = order_items_by_id.get(order_item_id)
         if not order_item:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item"
+            )
         if quantity <= 0 or quantity > int(order_item.quantity):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid quantity"
+            )
         items.append(ReturnRequestItem(order_item_id=order_item.id, quantity=quantity))
 
     now = datetime.now(timezone.utc)
@@ -189,7 +228,9 @@ async def create_return_request_for_user(
         user_id=user.id,
         status=ReturnRequestStatus.requested,
         reason=payload.reason.strip(),
-        customer_message=(payload.customer_message.strip() if payload.customer_message else None),
+        customer_message=(
+            payload.customer_message.strip() if payload.customer_message else None
+        ),
         created_by=user.id,
         updated_by=user.id,
         created_at=now,
@@ -219,7 +260,10 @@ async def update_return_request(
         else:
             allowed = ALLOWED_TRANSITIONS.get(previous_status, set())
             if next_status not in allowed:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid status transition",
+                )
             record.status = next_status
             if next_status == ReturnRequestStatus.closed:
                 record.closed_at = datetime.now(timezone.utc)

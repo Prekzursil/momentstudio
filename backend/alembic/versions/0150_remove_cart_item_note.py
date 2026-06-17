@@ -23,4 +23,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.add_column("cart_items", sa.Column("note", sa.String(length=255), nullable=True))
-

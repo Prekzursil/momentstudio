@@ -19,7 +19,7 @@ export const authGuard: CanActivateFn = () => {
     catchError(() => {
       toast.error(translate.instant('errors.signInRequired'));
       return of(router.parseUrl('/login'));
-    })
+    }),
   );
 };
 
@@ -37,7 +37,7 @@ export const adminGuard: CanActivateFn = () => {
     catchError(() => {
       toast.error(translate.instant('errors.staffRequired'));
       return of(router.parseUrl('/'));
-    })
+    }),
   );
 };
 
@@ -65,9 +65,15 @@ export const adminSectionGuard =
         return auth.checkAdminAccess({ silent: true }).pipe(
           map(() => true),
           catchError((err) => {
-            const code = err?.error?.code || err?.headers?.get?.('X-Error-Code') || err?.headers?.get?.('x-error-code');
+            const code =
+              err?.error?.code ||
+              err?.headers?.get?.('X-Error-Code') ||
+              err?.headers?.get?.('x-error-code');
             const detail = err?.error?.detail;
-            if (code === 'admin_mfa_required' || detail === 'Two-factor authentication or passkey required for admin access') {
+            if (
+              code === 'admin_mfa_required' ||
+              detail === 'Two-factor authentication or passkey required for admin access'
+            ) {
               toast.error(translate.instant('adminUi.security.mfaRequired'));
               return of(router.parseUrl('/account/security'));
             }
@@ -91,13 +97,12 @@ export const adminSectionGuard =
             }
             toast.error(detail || translate.instant('errors.sectionDenied'));
             return of(router.parseUrl('/'));
-          })
+          }),
         );
-      })
-      ,
+      }),
       catchError(() => {
         toast.error(translate.instant('errors.sectionDenied'));
         return of(router.parseUrl('/'));
-      })
+      }),
     );
   };

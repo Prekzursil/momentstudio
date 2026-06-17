@@ -64,7 +64,9 @@ def make_test_client() -> tuple[TestClient, async_sessionmaker]:
     return TestClient(app), SessionLocal
 
 
-def create_user_token(session_factory: async_sessionmaker, *, email: str, username: str) -> tuple[str, UUID]:
+def create_user_token(
+    session_factory: async_sessionmaker, *, email: str, username: str
+) -> tuple[str, UUID]:
     async def _create() -> tuple[str, UUID]:
         async with session_factory() as session:
             user = await create_user(
@@ -86,14 +88,20 @@ def create_user_token(session_factory: async_sessionmaker, *, email: str, userna
     return asyncio.run(_create())
 
 
-def promote_user(session_factory: async_sessionmaker, *, user_id: UUID, role: UserRole) -> None:
+def promote_user(
+    session_factory: async_sessionmaker, *, user_id: UUID, role: UserRole
+) -> None:
     async def _promote() -> None:
         async with session_factory() as session:
             user = await session.get(User, user_id)
             assert user is not None
             user.role = role
             if role in (UserRole.admin, UserRole.owner):
-                existing = await session.scalar(select(UserPasskey.id).where(UserPasskey.user_id == user.id).limit(1))
+                existing = await session.scalar(
+                    select(UserPasskey.id)
+                    .where(UserPasskey.user_id == user.id)
+                    .limit(1)
+                )
                 if not existing:
                     session.add(
                         UserPasskey(
@@ -144,7 +152,15 @@ def seed_product(
 ) -> str:
     async def _seed() -> str:
         async with session_factory() as session:
-            category = (await session.execute(select(Category).where(Category.slug == category_slug))).scalars().first()
+            category = (
+                (
+                    await session.execute(
+                        select(Category).where(Category.slug == category_slug)
+                    )
+                )
+                .scalars()
+                .first()
+            )
             if not category:
                 category = Category(slug=category_slug, name=category_name)
             now = datetime.now(timezone.utc)
@@ -155,7 +171,9 @@ def seed_product(
                 name="Test product",
                 base_price=base_price,
                 sale_price=sale_price,
-                sale_start_at=(now - timedelta(days=1)) if sale_price is not None else None,
+                sale_start_at=(
+                    (now - timedelta(days=1)) if sale_price is not None else None
+                ),
                 currency="RON",
                 stock_quantity=50,
                 status=ProductStatus.published,
@@ -260,7 +278,9 @@ def create_promotion_and_coupon(
     return asyncio.run(_create())
 
 
-def get_product_category_id(session_factory: async_sessionmaker, product_id: str) -> str:
+def get_product_category_id(
+    session_factory: async_sessionmaker, product_id: str
+) -> str:
     async def _get() -> str:
         async with session_factory() as session:
             product = await session.get(Product, UUID(product_id))
@@ -273,7 +293,15 @@ def get_product_category_id(session_factory: async_sessionmaker, product_id: str
 def get_coupon_id(session_factory: async_sessionmaker, code: str) -> str:
     async def _get() -> str:
         async with session_factory() as session:
-            coupon = (await session.execute(select(Coupon).where(Coupon.code == code.strip().upper()))).scalars().first()
+            coupon = (
+                (
+                    await session.execute(
+                        select(Coupon).where(Coupon.code == code.strip().upper())
+                    )
+                )
+                .scalars()
+                .first()
+            )
             assert coupon is not None
             return str(coupon.id)
 
@@ -283,7 +311,9 @@ def get_coupon_id(session_factory: async_sessionmaker, code: str) -> str:
 def test_coupon_eligibility_and_validation() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token, _ = create_user_token(SessionLocal, email="coupon@example.com", username="coupon_user")
+        token, _ = create_user_token(
+            SessionLocal, email="coupon@example.com", username="coupon_user"
+        )
         product_id = seed_product(
             SessionLocal,
             slug="sale-item",
@@ -325,12 +355,16 @@ def test_coupon_eligibility_and_validation() -> None:
             allow_on_sale_items=False,
         )
 
-        eligibility = client.get("/api/v1/coupons/eligibility", headers=auth_headers(token))
+        eligibility = client.get(
+            "/api/v1/coupons/eligibility", headers=auth_headers(token)
+        )
         assert eligibility.status_code == 200, eligibility.text
         body = eligibility.json()
 
         eligible_codes = {offer["coupon"]["code"] for offer in body["eligible"]}
-        ineligible_by_code = {offer["coupon"]["code"]: offer for offer in body["ineligible"]}
+        ineligible_by_code = {
+            offer["coupon"]["code"]: offer for offer in body["ineligible"]
+        }
 
         assert save10 in eligible_codes
         assert big_spend in ineligible_by_code
@@ -338,7 +372,11 @@ def test_coupon_eligibility_and_validation() -> None:
         assert no_sale in ineligible_by_code
         assert "no_eligible_items" in set(ineligible_by_code[no_sale]["reasons"])
 
-        validate = client.post("/api/v1/coupons/validate", json={"code": "save10"}, headers=auth_headers(token))
+        validate = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": "save10"},
+            headers=auth_headers(token),
+        )
         assert validate.status_code == 200, validate.text
         payload = validate.json()
         assert payload["coupon"]["code"] == "SAVE10"
@@ -359,16 +397,33 @@ def test_coupon_eligibility_and_validation() -> None:
 def test_first_order_only_promotion_blocks_delivered_customers() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token1, _user1_id = create_user_token(SessionLocal, email="first-only-1@example.com", username="first_only_1")
-        token2, user2_id = create_user_token(SessionLocal, email="first-only-2@example.com", username="first_only_2")
+        token1, _user1_id = create_user_token(
+            SessionLocal, email="first-only-1@example.com", username="first_only_1"
+        )
+        token2, user2_id = create_user_token(
+            SessionLocal, email="first-only-2@example.com", username="first_only_2"
+        )
 
-        product_id = seed_product(SessionLocal, slug="first-only", sku="SKU-FIRST", base_price=Decimal("100.00"))
+        product_id = seed_product(
+            SessionLocal,
+            slug="first-only",
+            sku="SKU-FIRST",
+            base_price=Decimal("100.00"),
+        )
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token1)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_id, "quantity": 1},
+                headers=auth_headers(token1),
+            ).status_code
             == 201
         )
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token2)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_id, "quantity": 1},
+                headers=auth_headers(token2),
+            ).status_code
             == 201
         )
 
@@ -399,11 +454,19 @@ def test_first_order_only_promotion_blocks_delivered_customers() -> None:
 
         asyncio.run(_seed_delivered_order())
 
-        validate1 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token1))
+        validate1 = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": code},
+            headers=auth_headers(token1),
+        )
         assert validate1.status_code == 200, validate1.text
         assert validate1.json()["eligible"] is True
 
-        validate2 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token2))
+        validate2 = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": code},
+            headers=auth_headers(token2),
+        )
         assert validate2.status_code == 200, validate2.text
         assert validate2.json()["eligible"] is False
         assert "first_order_only" in set(validate2.json()["reasons"])
@@ -415,8 +478,12 @@ def test_first_order_only_promotion_blocks_delivered_customers() -> None:
 def test_assigned_coupon_requires_assignment() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token, user_id = create_user_token(SessionLocal, email="assigned@example.com", username="assigned_user")
-        product_id = seed_product(SessionLocal, slug="basic", sku="SKU-BASIC", base_price=Decimal("100.00"))
+        token, user_id = create_user_token(
+            SessionLocal, email="assigned@example.com", username="assigned_user"
+        )
+        product_id = seed_product(
+            SessionLocal, slug="basic", sku="SKU-BASIC", base_price=Decimal("100.00")
+        )
         res = client.post(
             "/api/v1/cart/items",
             json={"product_id": product_id, "quantity": 1},
@@ -433,7 +500,9 @@ def test_assigned_coupon_requires_assignment() -> None:
             visibility=CouponVisibility.assigned,
         )
 
-        validate = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token))
+        validate = client.post(
+            "/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token)
+        )
         assert validate.status_code == 200, validate.text
         assert validate.json()["eligible"] is False
         assert "not_assigned" in set(validate.json()["reasons"])
@@ -447,7 +516,9 @@ def test_assigned_coupon_requires_assignment() -> None:
 
         asyncio.run(assign_coupon())
 
-        validate2 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token))
+        validate2 = client.post(
+            "/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token)
+        )
         assert validate2.status_code == 200, validate2.text
         assert validate2.json()["eligible"] is True
     finally:
@@ -458,7 +529,9 @@ def test_assigned_coupon_requires_assignment() -> None:
 def test_scope_rules_include_product_only_discounts_matching_items() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token, _ = create_user_token(SessionLocal, email="scope1@example.com", username="scope1")
+        token, _ = create_user_token(
+            SessionLocal, email="scope1@example.com", username="scope1"
+        )
         product_a = seed_product(
             SessionLocal,
             slug="scope-a",
@@ -477,11 +550,19 @@ def test_scope_rules_include_product_only_discounts_matching_items() -> None:
         )
 
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_a, "quantity": 1}, headers=auth_headers(token)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_a, "quantity": 1},
+                headers=auth_headers(token),
+            ).status_code
             == 201
         )
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_b, "quantity": 1}, headers=auth_headers(token)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_b, "quantity": 1},
+                headers=auth_headers(token),
+            ).status_code
             == 201
         )
 
@@ -494,7 +575,9 @@ def test_scope_rules_include_product_only_discounts_matching_items() -> None:
             included_product_ids=[product_a],
         )
 
-        validate = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token))
+        validate = client.post(
+            "/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token)
+        )
         assert validate.status_code == 200, validate.text
         payload = validate.json()
         assert payload["eligible"] is True
@@ -507,7 +590,9 @@ def test_scope_rules_include_product_only_discounts_matching_items() -> None:
 def test_scope_rules_excluded_category_blocks_coupon() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token, _ = create_user_token(SessionLocal, email="scope2@example.com", username="scope2")
+        token, _ = create_user_token(
+            SessionLocal, email="scope2@example.com", username="scope2"
+        )
         product_id = seed_product(
             SessionLocal,
             slug="scope-excluded",
@@ -519,7 +604,11 @@ def test_scope_rules_excluded_category_blocks_coupon() -> None:
         category_id = get_product_category_id(SessionLocal, product_id)
 
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_id, "quantity": 1},
+                headers=auth_headers(token),
+            ).status_code
             == 201
         )
 
@@ -532,7 +621,9 @@ def test_scope_rules_excluded_category_blocks_coupon() -> None:
             excluded_category_ids=[category_id],
         )
 
-        validate = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token))
+        validate = client.post(
+            "/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token)
+        )
         assert validate.status_code == 200, validate.text
         payload = validate.json()
         assert payload["eligible"] is False
@@ -547,16 +638,30 @@ def test_scope_rules_excluded_category_blocks_coupon() -> None:
 def test_coupon_reservation_redeem_and_void_flow() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token1, user1_id = create_user_token(SessionLocal, email="cap1@example.com", username="cap1")
-        token2, _user2_id = create_user_token(SessionLocal, email="cap2@example.com", username="cap2")
-        product_id = seed_product(SessionLocal, slug="cap-item", sku="SKU-CAP", base_price=Decimal("100.00"))
+        token1, user1_id = create_user_token(
+            SessionLocal, email="cap1@example.com", username="cap1"
+        )
+        token2, _user2_id = create_user_token(
+            SessionLocal, email="cap2@example.com", username="cap2"
+        )
+        product_id = seed_product(
+            SessionLocal, slug="cap-item", sku="SKU-CAP", base_price=Decimal("100.00")
+        )
 
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token1)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_id, "quantity": 1},
+                headers=auth_headers(token1),
+            ).status_code
             == 201
         )
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token2)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_id, "quantity": 1},
+                headers=auth_headers(token2),
+            ).status_code
             == 201
         )
 
@@ -578,7 +683,9 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
                 assert coupon
 
                 cart1 = await cart_service.get_cart(session, user1_id, None)
-                checkout = await checkout_settings_service.get_checkout_settings(session)
+                checkout = await checkout_settings_service.get_checkout_settings(
+                    session
+                )
                 eligibility = await evaluate_coupon_for_cart(
                     session,
                     user_id=user1_id,
@@ -619,7 +726,11 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
         order_id = asyncio.run(reserve_for_user(code))
 
         # While reserved, other users should see it as sold out (cap=1).
-        validate = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token2))
+        validate = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": code},
+            headers=auth_headers(token2),
+        )
         assert validate.status_code == 200, validate.text
         assert validate.json()["eligible"] is False
         assert "sold_out" in set(validate.json()["reasons"])
@@ -628,7 +739,9 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
             async with SessionLocal() as session:
                 order = await session.get(Order, order_id)
                 assert order
-                await redeem_coupon_for_order(session, order=order, note="payment_captured")
+                await redeem_coupon_for_order(
+                    session, order=order, note="payment_captured"
+                )
 
                 res_count = int(
                     (
@@ -642,7 +755,13 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
                 assert res_count == 0
 
                 redemption = (
-                    (await session.execute(select(CouponRedemption).where(CouponRedemption.order_id == order_id)))
+                    (
+                        await session.execute(
+                            select(CouponRedemption).where(
+                                CouponRedemption.order_id == order_id
+                            )
+                        )
+                    )
                     .scalars()
                     .first()
                 )
@@ -653,7 +772,11 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
         asyncio.run(redeem(order_id))
 
         # Still sold out after redemption.
-        validate2 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token2))
+        validate2 = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": code},
+            headers=auth_headers(token2),
+        )
         assert validate2.status_code == 200, validate2.text
         assert validate2.json()["eligible"] is False
         assert "sold_out" in set(validate2.json()["reasons"])
@@ -664,7 +787,13 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
                 assert order
                 await release_coupon_for_order(session, order=order, reason="refunded")
                 redemption = (
-                    (await session.execute(select(CouponRedemption).where(CouponRedemption.order_id == order_id)))
+                    (
+                        await session.execute(
+                            select(CouponRedemption).where(
+                                CouponRedemption.order_id == order_id
+                            )
+                        )
+                    )
                     .scalars()
                     .first()
                 )
@@ -673,7 +802,11 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
 
         asyncio.run(void_redemption(order_id))
 
-        validate_final = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token2))
+        validate_final = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": code},
+            headers=auth_headers(token2),
+        )
         assert validate_final.status_code == 200, validate_final.text
         assert validate_final.json()["eligible"] is True
     finally:
@@ -684,16 +817,33 @@ def test_coupon_reservation_redeem_and_void_flow() -> None:
 def test_per_customer_cap_blocks_reuse() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token1, user1_id = create_user_token(SessionLocal, email="percap1@example.com", username="percap1")
-        token2, _user2_id = create_user_token(SessionLocal, email="percap2@example.com", username="percap2")
-        product_id = seed_product(SessionLocal, slug="percap-item", sku="SKU-PERCAP", base_price=Decimal("100.00"))
+        token1, user1_id = create_user_token(
+            SessionLocal, email="percap1@example.com", username="percap1"
+        )
+        token2, _user2_id = create_user_token(
+            SessionLocal, email="percap2@example.com", username="percap2"
+        )
+        product_id = seed_product(
+            SessionLocal,
+            slug="percap-item",
+            sku="SKU-PERCAP",
+            base_price=Decimal("100.00"),
+        )
 
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token1)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_id, "quantity": 1},
+                headers=auth_headers(token1),
+            ).status_code
             == 201
         )
         assert (
-            client.post("/api/v1/cart/items", json={"product_id": product_id, "quantity": 1}, headers=auth_headers(token2)).status_code
+            client.post(
+                "/api/v1/cart/items",
+                json={"product_id": product_id, "quantity": 1},
+                headers=auth_headers(token2),
+            ).status_code
             == 201
         )
 
@@ -714,7 +864,9 @@ def test_per_customer_cap_blocks_reuse() -> None:
                 assert coupon
 
                 cart1 = await cart_service.get_cart(session, user1_id, None)
-                checkout = await checkout_settings_service.get_checkout_settings(session)
+                checkout = await checkout_settings_service.get_checkout_settings(
+                    session
+                )
                 eligibility = await evaluate_coupon_for_cart(
                     session,
                     user_id=user1_id,
@@ -748,18 +900,28 @@ def test_per_customer_cap_blocks_reuse() -> None:
                     discount_ron=eligibility.estimated_discount_ron,
                     shipping_discount_ron=eligibility.estimated_shipping_discount_ron,
                 )
-                await redeem_coupon_for_order(session, order=order1, note="payment_captured")
+                await redeem_coupon_for_order(
+                    session, order=order1, note="payment_captured"
+                )
 
         asyncio.run(redeem_once())
 
         # Same user should be blocked after a redemption.
-        validate_user1 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token1))
+        validate_user1 = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": code},
+            headers=auth_headers(token1),
+        )
         assert validate_user1.status_code == 200, validate_user1.text
         assert validate_user1.json()["eligible"] is False
         assert "per_customer_limit_reached" in set(validate_user1.json()["reasons"])
 
         # Another user can still use it.
-        validate_user2 = client.post("/api/v1/coupons/validate", json={"code": code}, headers=auth_headers(token2))
+        validate_user2 = client.post(
+            "/api/v1/coupons/validate",
+            json={"code": code},
+            headers=auth_headers(token2),
+        )
         assert validate_user2.status_code == 200, validate_user2.text
         assert validate_user2.json()["eligible"] is True
     finally:
@@ -806,14 +968,18 @@ def test_first_order_reward_issued_on_first_delivered_order() -> None:
             await session.commit()
             await session.refresh(order1)
 
-            coupon = await issue_first_order_reward_if_eligible(session, user=user, order=order1, validity_days=30)
+            coupon = await issue_first_order_reward_if_eligible(
+                session, user=user, order=order1, validity_days=30
+            )
             assert coupon is not None
             assert coupon.code.startswith("FIRST20-")
             assert coupon.visibility == CouponVisibility.assigned
             assert coupon.per_customer_max_redemptions == 1
 
             # Idempotent on repeated calls for the same delivered order.
-            coupon2 = await issue_first_order_reward_if_eligible(session, user=user, order=order1, validity_days=30)
+            coupon2 = await issue_first_order_reward_if_eligible(
+                session, user=user, order=order1, validity_days=30
+            )
             assert coupon2 is None
 
             # Second delivered order should not issue another reward.
@@ -830,13 +996,17 @@ def test_first_order_reward_issued_on_first_delivered_order() -> None:
             await session.commit()
             await session.refresh(order2)
 
-            coupon3 = await issue_first_order_reward_if_eligible(session, user=user, order=order2, validity_days=30)
+            coupon3 = await issue_first_order_reward_if_eligible(
+                session, user=user, order=order2, validity_days=30
+            )
             assert coupon3 is None
 
             assigned_count = int(
                 (
                     await session.execute(
-                        select(func.count()).select_from(CouponAssignment).where(CouponAssignment.user_id == user.id)
+                        select(func.count())
+                        .select_from(CouponAssignment)
+                        .where(CouponAssignment.user_id == user.id)
                     )
                 ).scalar_one()
             )
@@ -848,11 +1018,26 @@ def test_first_order_reward_issued_on_first_delivered_order() -> None:
 def test_admin_products_by_ids_endpoint() -> None:
     client, SessionLocal = make_test_client()
     try:
-        token, user_id = create_user_token(SessionLocal, email="admin@example.com", username="admin_user")
+        token, user_id = create_user_token(
+            SessionLocal, email="admin@example.com", username="admin_user"
+        )
         promote_user(SessionLocal, user_id=user_id, role=UserRole.admin)
 
-        product1 = seed_product(SessionLocal, slug="p1", sku="SKU-P1", base_price=Decimal("10.00"), category_slug="decor")
-        product2 = seed_product(SessionLocal, slug="p2", sku="SKU-P2", base_price=Decimal("20.00"), category_slug="sale", category_name="Sale")
+        product1 = seed_product(
+            SessionLocal,
+            slug="p1",
+            sku="SKU-P1",
+            base_price=Decimal("10.00"),
+            category_slug="decor",
+        )
+        product2 = seed_product(
+            SessionLocal,
+            slug="p2",
+            sku="SKU-P2",
+            base_price=Decimal("20.00"),
+            category_slug="sale",
+            category_name="Sale",
+        )
 
         res = client.post(
             "/api/v1/admin/dashboard/products/by-ids",
@@ -871,10 +1056,14 @@ def test_admin_products_by_ids_endpoint() -> None:
 def test_admin_bulk_assign_and_revoke_coupon() -> None:
     client, SessionLocal = make_test_client()
     try:
-        admin_token, admin_id = create_user_token(SessionLocal, email="admin2@example.com", username="admin_user2")
+        admin_token, admin_id = create_user_token(
+            SessionLocal, email="admin2@example.com", username="admin_user2"
+        )
         promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
 
-        user_token, _ = create_user_token(SessionLocal, email="bulk-user@example.com", username="bulk_user")
+        user_token, _ = create_user_token(
+            SessionLocal, email="bulk-user@example.com", username="bulk_user"
+        )
         # Ensure the user exists in DB before bulk operations.
         assert user_token
 
@@ -889,7 +1078,14 @@ def test_admin_bulk_assign_and_revoke_coupon() -> None:
 
         res = client.post(
             f"/api/v1/coupons/admin/coupons/{coupon_id}/assign/bulk",
-            json={"emails": ["bulk-user@example.com", "missing@example.com", "not-an-email"], "send_email": False},
+            json={
+                "emails": [
+                    "bulk-user@example.com",
+                    "missing@example.com",
+                    "not-an-email",
+                ],
+                "send_email": False,
+            },
             headers=auth_headers(admin_token),
         )
         assert res.status_code == 200, res.text
@@ -900,7 +1096,11 @@ def test_admin_bulk_assign_and_revoke_coupon() -> None:
 
         res = client.post(
             f"/api/v1/coupons/admin/coupons/{coupon_id}/revoke/bulk",
-            json={"emails": ["bulk-user@example.com"], "reason": "test revoke", "send_email": False},
+            json={
+                "emails": ["bulk-user@example.com"],
+                "reason": "test revoke",
+                "send_email": False,
+            },
             headers=auth_headers(admin_token),
         )
         assert res.status_code == 200, res.text
@@ -910,7 +1110,11 @@ def test_admin_bulk_assign_and_revoke_coupon() -> None:
         # Revoking again is idempotent (counts as already revoked).
         res = client.post(
             f"/api/v1/coupons/admin/coupons/{coupon_id}/revoke/bulk",
-            json={"emails": ["bulk-user@example.com"], "reason": "test revoke", "send_email": False},
+            json={
+                "emails": ["bulk-user@example.com"],
+                "reason": "test revoke",
+                "send_email": False,
+            },
             headers=auth_headers(admin_token),
         )
         assert res.status_code == 200, res.text
@@ -923,10 +1127,14 @@ def test_admin_bulk_assign_and_revoke_coupon() -> None:
 def test_admin_issue_coupon_to_user() -> None:
     client, SessionLocal = make_test_client()
     try:
-        admin_token, admin_id = create_user_token(SessionLocal, email="admin-issue@example.com", username="admin_issue")
+        admin_token, admin_id = create_user_token(
+            SessionLocal, email="admin-issue@example.com", username="admin_issue"
+        )
         promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
 
-        _, user_id = create_user_token(SessionLocal, email="target-user@example.com", username="target_user")
+        _, user_id = create_user_token(
+            SessionLocal, email="target-user@example.com", username="target_user"
+        )
 
         base_code = create_promotion_and_coupon(
             SessionLocal,
@@ -938,7 +1146,17 @@ def test_admin_issue_coupon_to_user() -> None:
 
         async def _get_promotion_id() -> str:
             async with SessionLocal() as session:
-                coupon = (await session.execute(select(Coupon).where(Coupon.code == base_code.strip().upper()))).scalars().first()
+                coupon = (
+                    (
+                        await session.execute(
+                            select(Coupon).where(
+                                Coupon.code == base_code.strip().upper()
+                            )
+                        )
+                    )
+                    .scalars()
+                    .first()
+                )
                 assert coupon is not None
                 return str(coupon.promotion_id)
 
@@ -986,13 +1204,26 @@ def test_admin_issue_coupon_to_user() -> None:
 def test_admin_coupon_analytics() -> None:
     client, SessionLocal = make_test_client()
     try:
-        admin_token, admin_id = create_user_token(SessionLocal, email="admin-analytics@example.com", username="admin_analytics")
+        admin_token, admin_id = create_user_token(
+            SessionLocal,
+            email="admin-analytics@example.com",
+            username="admin_analytics",
+        )
         promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
 
-        _, user1_id = create_user_token(SessionLocal, email="analytics-u1@example.com", username="analytics_u1")
-        _, user2_id = create_user_token(SessionLocal, email="analytics-u2@example.com", username="analytics_u2")
+        _, user1_id = create_user_token(
+            SessionLocal, email="analytics-u1@example.com", username="analytics_u1"
+        )
+        _, user2_id = create_user_token(
+            SessionLocal, email="analytics-u2@example.com", username="analytics_u2"
+        )
 
-        product_id = seed_product(SessionLocal, slug="analytics-product", sku="SKU-ANALYTICS", base_price=Decimal("100.00"))
+        product_id = seed_product(
+            SessionLocal,
+            slug="analytics-product",
+            sku="SKU-ANALYTICS",
+            base_price=Decimal("100.00"),
+        )
 
         code = create_promotion_and_coupon(
             SessionLocal,
@@ -1111,16 +1342,30 @@ def test_admin_coupon_analytics() -> None:
 def test_admin_segment_bulk_job_assign_and_revoke() -> None:
     client, SessionLocal = make_test_client()
     try:
-        admin_token, admin_id = create_user_token(SessionLocal, email="admin-seg@example.com", username="admin_seg")
+        admin_token, admin_id = create_user_token(
+            SessionLocal, email="admin-seg@example.com", username="admin_seg"
+        )
         promote_user(SessionLocal, user_id=admin_id, role=UserRole.admin)
 
-        _, u1 = create_user_token(SessionLocal, email="seg1@example.com", username="seg1")
-        _, u2 = create_user_token(SessionLocal, email="seg2@example.com", username="seg2")
-        _, u3 = create_user_token(SessionLocal, email="seg3@example.com", username="seg3")
+        _, u1 = create_user_token(
+            SessionLocal, email="seg1@example.com", username="seg1"
+        )
+        _, u2 = create_user_token(
+            SessionLocal, email="seg2@example.com", username="seg2"
+        )
+        _, u3 = create_user_token(
+            SessionLocal, email="seg3@example.com", username="seg3"
+        )
 
-        set_user_flags(SessionLocal, user_id=u1, notify_marketing=True, email_verified=True)
-        set_user_flags(SessionLocal, user_id=u2, notify_marketing=True, email_verified=False)
-        set_user_flags(SessionLocal, user_id=u3, notify_marketing=False, email_verified=True)
+        set_user_flags(
+            SessionLocal, user_id=u1, notify_marketing=True, email_verified=True
+        )
+        set_user_flags(
+            SessionLocal, user_id=u2, notify_marketing=True, email_verified=False
+        )
+        set_user_flags(
+            SessionLocal, user_id=u3, notify_marketing=False, email_verified=True
+        )
 
         code = create_promotion_and_coupon(
             SessionLocal,
@@ -1205,15 +1450,12 @@ def test_admin_segment_bulk_job_assign_and_revoke() -> None:
                 assert assigned is not None
                 assert assigned.revoked_at is None
                 other = (
-                    (
-                        await session.execute(
-                            select(func.count())
-                            .select_from(CouponAssignment)
-                            .where(CouponAssignment.coupon_id == UUID(str(coupon_id)))
-                        )
+                    await session.execute(
+                        select(func.count())
+                        .select_from(CouponAssignment)
+                        .where(CouponAssignment.coupon_id == UUID(str(coupon_id)))
                     )
-                    .scalar_one()
-                )
+                ).scalar_one()
                 assert int(other) == 1
 
         asyncio.run(_assert_assigned())

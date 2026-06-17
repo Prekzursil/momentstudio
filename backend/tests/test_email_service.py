@@ -7,7 +7,9 @@ from app.services import email as email_service
 
 def test_email_rate_limit(monkeypatch):
     monkeypatch.setattr(email_service.settings, "email_rate_limit_per_minute", 1)
-    monkeypatch.setattr(email_service.settings, "email_rate_limit_per_recipient_per_minute", 1)
+    monkeypatch.setattr(
+        email_service.settings, "email_rate_limit_per_recipient_per_minute", 1
+    )
     email_service._rate_global.clear()
     email_service._rate_per_recipient.clear()
     now = time.time()
@@ -52,7 +54,9 @@ def test_send_email_smoke(monkeypatch):
     monkeypatch.setattr(email_service.settings, "smtp_use_tls", False)
     monkeypatch.setattr(email_service.settings, "smtp_username", None)
     monkeypatch.setattr(email_service.settings, "smtp_password", None)
-    monkeypatch.setattr(email_service.settings, "smtp_from_email", "no-reply@example.com")
+    monkeypatch.setattr(
+        email_service.settings, "smtp_from_email", "no-reply@example.com"
+    )
     monkeypatch.setattr(email_service, "_record_email_event", _noop)
     monkeypatch.setattr(email_service, "_record_email_failure", _noop)
     monkeypatch.setattr(email_service.smtplib, "SMTP", DummySMTP)
@@ -96,9 +100,13 @@ def test_email_rate_limit_does_not_log_recipient_email(monkeypatch, caplog):
     monkeypatch.setattr(email_service.settings, "smtp_use_tls", False)
     monkeypatch.setattr(email_service.settings, "smtp_username", None)
     monkeypatch.setattr(email_service.settings, "smtp_password", None)
-    monkeypatch.setattr(email_service.settings, "smtp_from_email", "no-reply@example.com")
+    monkeypatch.setattr(
+        email_service.settings, "smtp_from_email", "no-reply@example.com"
+    )
     monkeypatch.setattr(email_service.settings, "email_rate_limit_per_minute", 1)
-    monkeypatch.setattr(email_service.settings, "email_rate_limit_per_recipient_per_minute", 1)
+    monkeypatch.setattr(
+        email_service.settings, "email_rate_limit_per_recipient_per_minute", 1
+    )
     monkeypatch.setattr(email_service, "_record_email_event", _noop)
     monkeypatch.setattr(email_service, "_record_email_failure", _noop)
     monkeypatch.setattr(email_service.smtplib, "SMTP", DummySMTP)
@@ -107,9 +115,13 @@ def test_email_rate_limit_does_not_log_recipient_email(monkeypatch, caplog):
 
     caplog.set_level(logging.WARNING, logger="app.services.email")
 
-    ok = asyncio.run(email_service.send_email("a@example.com", "Subject", "Text", "<p>HTML</p>"))
+    ok = asyncio.run(
+        email_service.send_email("a@example.com", "Subject", "Text", "<p>HTML</p>")
+    )
     assert ok is True
 
-    blocked = asyncio.run(email_service.send_email("a@example.com", "Subject", "Text", "<p>HTML</p>"))
+    blocked = asyncio.run(
+        email_service.send_email("a@example.com", "Subject", "Text", "<p>HTML</p>")
+    )
     assert blocked is False
     assert "a@example.com" not in caplog.text

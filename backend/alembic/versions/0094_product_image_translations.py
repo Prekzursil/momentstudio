@@ -32,15 +32,27 @@ def upgrade() -> None:
         sa.Column("lang", sa.String(length=10), nullable=False),
         sa.Column("alt_text", sa.String(length=255), nullable=True),
         sa.Column("caption", sa.Text(), nullable=True),
-        sa.UniqueConstraint("image_id", "lang", name="uq_product_image_translations_image_lang"),
+        sa.UniqueConstraint(
+            "image_id", "lang", name="uq_product_image_translations_image_lang"
+        ),
     )
-    op.create_index("ix_product_image_translations_image_id", "product_image_translations", ["image_id"])
-    op.create_index("ix_product_image_translations_lang", "product_image_translations", ["lang"])
+    op.create_index(
+        "ix_product_image_translations_image_id",
+        "product_image_translations",
+        ["image_id"],
+    )
+    op.create_index(
+        "ix_product_image_translations_lang", "product_image_translations", ["lang"]
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_product_image_translations_lang", table_name="product_image_translations")
-    op.drop_index("ix_product_image_translations_image_id", table_name="product_image_translations")
+    op.drop_index(
+        "ix_product_image_translations_lang", table_name="product_image_translations"
+    )
+    op.drop_index(
+        "ix_product_image_translations_image_id",
+        table_name="product_image_translations",
+    )
     op.drop_table("product_image_translations")
     op.drop_column("product_images", "caption")
-

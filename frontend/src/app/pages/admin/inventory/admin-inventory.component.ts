@@ -16,7 +16,7 @@ import {
   RestockListItem,
   RestockListResponse,
   RestockNoteUpsert,
-  StockAdjustmentReason
+  StockAdjustmentReason,
 } from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { extractRequestId } from '../../../shared/http-error';
@@ -42,13 +42,16 @@ type RestockRow = RestockListItem & {
     ErrorStateComponent,
     ModalComponent,
     SkeletonComponent,
-    AdminPageHeaderComponent
+    AdminPageHeaderComponent,
   ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <app-admin-page-header [titleKey]="'adminUi.inventory.title'" [hintKey]="'adminUi.inventory.hint'">
+      <app-admin-page-header
+        [titleKey]="'adminUi.inventory.title'"
+        [hintKey]="'adminUi.inventory.hint'"
+      >
         <ng-template #primaryActions>
           <app-button
             size="sm"
@@ -66,7 +69,9 @@ type RestockRow = RestockListItem & {
         </ng-template>
       </app-admin-page-header>
 
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+      <section
+        class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <div class="grid gap-3 lg:grid-cols-[auto_auto_1fr] items-end">
           <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
             <span>{{ 'adminUi.inventory.filters.includeVariants' | translate }}</span>
@@ -123,9 +128,15 @@ type RestockRow = RestockListItem & {
                 [(ngModel)]="bulkAdjustReason"
                 [disabled]="bulkAdjustBusy()"
               >
-                <option [ngValue]="'restock'">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
-                <option [ngValue]="'damage'">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
-                <option [ngValue]="'manual_correction'">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
+                <option [ngValue]="'restock'">
+                  {{ 'adminUi.products.form.stockReason.restock' | translate }}
+                </option>
+                <option [ngValue]="'damage'">
+                  {{ 'adminUi.products.form.stockReason.damage' | translate }}
+                </option>
+                <option [ngValue]="'manual_correction'">
+                  {{ 'adminUi.products.form.stockReason.manual_correction' | translate }}
+                </option>
               </select>
             </label>
 
@@ -154,7 +165,11 @@ type RestockRow = RestockListItem & {
 
             <app-button
               size="sm"
-              [label]="bulkAdjustBusy() ? ('adminUi.inventory.bulkAdjust.applying' | translate) : ('adminUi.inventory.bulkAdjust.apply' | translate)"
+              [label]="
+                bulkAdjustBusy()
+                  ? ('adminUi.inventory.bulkAdjust.applying' | translate)
+                  : ('adminUi.inventory.bulkAdjust.apply' | translate)
+              "
               (action)="applyBulkStockAdjustment()"
               [disabled]="bulkAdjustBusy()"
             ></app-button>
@@ -204,21 +219,47 @@ type RestockRow = RestockListItem & {
                       [attr.aria-label]="'adminUi.inventory.bulkAdjust.selectAll' | translate"
                     />
                   </th>
-                  <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.table.item' | translate }}</th>
-                  <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.table.stock' | translate }}</th>
-                  <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.table.reservedCarts' | translate }}</th>
-                  <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.table.reservedOrders' | translate }}</th>
-                  <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.table.available' | translate }}</th>
-                  <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.table.threshold' | translate }}</th>
-                  <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.table.supplier' | translate }}</th>
-                  <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.table.desiredQty' | translate }}</th>
-                  <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.table.note' | translate }}</th>
-                  <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.table.updated' | translate }}</th>
-                  <th class="text-right py-2">{{ 'adminUi.inventory.table.actions' | translate }}</th>
+                  <th class="text-left py-2 pr-4">
+                    {{ 'adminUi.inventory.table.item' | translate }}
+                  </th>
+                  <th class="text-right py-2 pr-4">
+                    {{ 'adminUi.inventory.table.stock' | translate }}
+                  </th>
+                  <th class="text-right py-2 pr-4">
+                    {{ 'adminUi.inventory.table.reservedCarts' | translate }}
+                  </th>
+                  <th class="text-right py-2 pr-4">
+                    {{ 'adminUi.inventory.table.reservedOrders' | translate }}
+                  </th>
+                  <th class="text-right py-2 pr-4">
+                    {{ 'adminUi.inventory.table.available' | translate }}
+                  </th>
+                  <th class="text-right py-2 pr-4">
+                    {{ 'adminUi.inventory.table.threshold' | translate }}
+                  </th>
+                  <th class="text-left py-2 pr-4">
+                    {{ 'adminUi.inventory.table.supplier' | translate }}
+                  </th>
+                  <th class="text-right py-2 pr-4">
+                    {{ 'adminUi.inventory.table.desiredQty' | translate }}
+                  </th>
+                  <th class="text-left py-2 pr-4">
+                    {{ 'adminUi.inventory.table.note' | translate }}
+                  </th>
+                  <th class="text-left py-2 pr-4">
+                    {{ 'adminUi.inventory.table.updated' | translate }}
+                  </th>
+                  <th class="text-right py-2">
+                    {{ 'adminUi.inventory.table.actions' | translate }}
+                  </th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800/70">
-                <tr *ngFor="let row of rows(); trackBy: trackByKey" [class.bg-rose-50]="row.is_critical" class="align-top">
+                <tr
+                  *ngFor="let row of rows(); trackBy: trackByKey"
+                  [class.bg-rose-50]="row.is_critical"
+                  class="align-top"
+                >
                   <td class="py-3 pr-4">
                     <input
                       type="checkbox"
@@ -232,18 +273,27 @@ type RestockRow = RestockListItem & {
                   <td class="py-3 pr-4">
                     <div class="font-semibold text-slate-900 dark:text-slate-50">
                       {{ row.product_name }}
-                      <span *ngIf="row.variant_name" class="font-normal text-slate-600 dark:text-slate-300">— {{ row.variant_name }}</span>
+                      <span
+                        *ngIf="row.variant_name"
+                        class="font-normal text-slate-600 dark:text-slate-300"
+                        >— {{ row.variant_name }}</span
+                      >
                     </div>
                     <div class="text-xs text-slate-500 dark:text-slate-400">
                       <span class="font-mono">{{ row.sku }}</span>
                       <span class="px-2">·</span>
                       <span class="font-mono">{{ row.product_slug }}</span>
-                      <span *ngIf="row.kind === 'variant'" class="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                      <span
+                        *ngIf="row.kind === 'variant'"
+                        class="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      >
                         {{ row.kind }}
                       </span>
                     </div>
                   </td>
-                  <td class="py-3 pr-4 text-right font-semibold text-slate-900 dark:text-slate-50">{{ row.stock_quantity }}</td>
+                  <td class="py-3 pr-4 text-right font-semibold text-slate-900 dark:text-slate-50">
+                    {{ row.stock_quantity }}
+                  </td>
                   <td class="py-3 pr-4 text-right text-slate-700 dark:text-slate-200">
                     <button
                       *ngIf="row.reserved_in_carts > 0; else cartsPlain"
@@ -264,7 +314,9 @@ type RestockRow = RestockListItem & {
                       class="font-semibold underline decoration-dotted underline-offset-2 hover:text-slate-900 dark:hover:text-slate-50"
                       (click)="openReservations(row, 'orders')"
                       [disabled]="reservationsLoading()"
-                      [attr.aria-label]="'adminUi.inventory.reservations.openOrdersAria' | translate"
+                      [attr.aria-label]="
+                        'adminUi.inventory.reservations.openOrdersAria' | translate
+                      "
                     >
                       {{ row.reserved_in_orders }}
                     </button>
@@ -279,7 +331,9 @@ type RestockRow = RestockListItem & {
                   >
                     {{ row.available_quantity }}
                   </td>
-                  <td class="py-3 pr-4 text-right text-slate-700 dark:text-slate-200">{{ row.threshold }}</td>
+                  <td class="py-3 pr-4 text-right text-slate-700 dark:text-slate-200">
+                    {{ row.threshold }}
+                  </td>
                   <td class="py-3 pr-4">
                     <input
                       class="h-9 w-44 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -319,7 +373,11 @@ type RestockRow = RestockListItem & {
                       ></app-button>
                       <app-button
                         size="sm"
-                        [label]="row.isSaving ? ('adminUi.inventory.actions.saving' | translate) : ('adminUi.actions.save' | translate)"
+                        [label]="
+                          row.isSaving
+                            ? ('adminUi.inventory.actions.saving' | translate)
+                            : ('adminUi.actions.save' | translate)
+                        "
                         (action)="saveNote(row)"
                         [disabled]="row.isSaving || !row.isDirty"
                       ></app-button>
@@ -356,7 +414,7 @@ type RestockRow = RestockListItem & {
 
       <app-modal
         [open]="reservationsOpen()"
-        [title]="(reservationTitleKey() | translate)"
+        [title]="reservationTitleKey() | translate"
         [subtitle]="reservationSubtitle()"
         [showActions]="false"
         [closeLabel]="'adminUi.common.close' | translate"
@@ -380,10 +438,16 @@ type RestockRow = RestockListItem & {
         <ng-container *ngIf="!reservationsLoading() && !reservationsError()">
           <ng-container *ngIf="reservationsKind() === 'carts'">
             <p *ngIf="reservationsCutoff()" class="text-xs text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.inventory.reservations.cutoff' | translate: { cutoff: (reservationsCutoff() | date: 'short') } }}
+              {{
+                'adminUi.inventory.reservations.cutoff'
+                  | translate: { cutoff: (reservationsCutoff() | date: 'short') }
+              }}
             </p>
 
-            <div *ngIf="reservationsCarts().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+            <div
+              *ngIf="reservationsCarts().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.inventory.reservations.emptyCarts' | translate }}
             </div>
 
@@ -391,18 +455,34 @@ type RestockRow = RestockListItem & {
               <table class="min-w-[560px] w-full text-sm">
                 <thead class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.id' | translate }}</th>
-                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.updated' | translate }}</th>
-                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.customer' | translate }}</th>
-                    <th class="text-right py-2">{{ 'adminUi.inventory.reservations.table.qty' | translate }}</th>
+                    <th class="text-left py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.id' | translate }}
+                    </th>
+                    <th class="text-left py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.updated' | translate }}
+                    </th>
+                    <th class="text-left py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.customer' | translate }}
+                    </th>
+                    <th class="text-right py-2">
+                      {{ 'adminUi.inventory.reservations.table.qty' | translate }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800/70">
                   <tr *ngFor="let item of reservationsCarts()">
-                    <td class="py-2 pr-4 font-mono text-xs text-slate-700 dark:text-slate-200">{{ item.cart_id }}</td>
-                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.updated_at | date: 'short' }}</td>
-                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.customer_email || ('adminUi.orders.guest' | translate) }}</td>
-                    <td class="py-2 text-right font-semibold text-slate-900 dark:text-slate-50">{{ item.quantity }}</td>
+                    <td class="py-2 pr-4 font-mono text-xs text-slate-700 dark:text-slate-200">
+                      {{ item.cart_id }}
+                    </td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">
+                      {{ item.updated_at | date: 'short' }}
+                    </td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">
+                      {{ item.customer_email || ('adminUi.orders.guest' | translate) }}
+                    </td>
+                    <td class="py-2 text-right font-semibold text-slate-900 dark:text-slate-50">
+                      {{ item.quantity }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -410,7 +490,10 @@ type RestockRow = RestockListItem & {
           </ng-container>
 
           <ng-container *ngIf="reservationsKind() === 'orders'">
-            <div *ngIf="reservationsOrders().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+            <div
+              *ngIf="reservationsOrders().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.inventory.reservations.emptyOrders' | translate }}
             </div>
 
@@ -418,12 +501,24 @@ type RestockRow = RestockListItem & {
               <table class="min-w-[720px] w-full text-sm">
                 <thead class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   <tr>
-                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.id' | translate }}</th>
-                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.created' | translate }}</th>
-                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.customer' | translate }}</th>
-                    <th class="text-left py-2 pr-4">{{ 'adminUi.inventory.reservations.table.status' | translate }}</th>
-                    <th class="text-right py-2 pr-4">{{ 'adminUi.inventory.reservations.table.qty' | translate }}</th>
-                    <th class="text-right py-2">{{ 'adminUi.inventory.reservations.table.actions' | translate }}</th>
+                    <th class="text-left py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.id' | translate }}
+                    </th>
+                    <th class="text-left py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.created' | translate }}
+                    </th>
+                    <th class="text-left py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.customer' | translate }}
+                    </th>
+                    <th class="text-left py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.status' | translate }}
+                    </th>
+                    <th class="text-right py-2 pr-4">
+                      {{ 'adminUi.inventory.reservations.table.qty' | translate }}
+                    </th>
+                    <th class="text-right py-2">
+                      {{ 'adminUi.inventory.reservations.table.actions' | translate }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800/70">
@@ -431,12 +526,27 @@ type RestockRow = RestockListItem & {
                     <td class="py-2 pr-4 font-mono text-xs text-slate-700 dark:text-slate-200">
                       {{ item.reference_code || item.order_id }}
                     </td>
-                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.created_at | date: 'short' }}</td>
-                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ item.customer_email || ('adminUi.orders.guest' | translate) }}</td>
-                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">{{ ('adminUi.orders.' + item.status) | translate }}</td>
-                    <td class="py-2 pr-4 text-right font-semibold text-slate-900 dark:text-slate-50">{{ item.quantity }}</td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">
+                      {{ item.created_at | date: 'short' }}
+                    </td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">
+                      {{ item.customer_email || ('adminUi.orders.guest' | translate) }}
+                    </td>
+                    <td class="py-2 pr-4 text-slate-700 dark:text-slate-200">
+                      {{ 'adminUi.orders.' + item.status | translate }}
+                    </td>
+                    <td
+                      class="py-2 pr-4 text-right font-semibold text-slate-900 dark:text-slate-50"
+                    >
+                      {{ item.quantity }}
+                    </td>
                     <td class="py-2 text-right">
-                      <app-button size="sm" variant="ghost" [label]="'adminUi.actions.open' | translate" (action)="openOrder(item.order_id)"></app-button>
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.actions.open' | translate"
+                        (action)="openOrder(item.order_id)"
+                      ></app-button>
                     </td>
                   </tr>
                 </tbody>
@@ -446,13 +556,13 @@ type RestockRow = RestockListItem & {
         </ng-container>
       </app-modal>
     </div>
-  `
+  `,
 })
 export class AdminInventoryComponent implements OnInit {
   readonly crumbs: Crumb[] = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
-    { label: 'adminUi.inventory.title' }
+    { label: 'adminUi.inventory.title' },
   ];
 
   loading = signal(true);
@@ -495,7 +605,7 @@ export class AdminInventoryComponent implements OnInit {
     private readonly admin: AdminService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    private readonly router: Router
+    private readonly router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -548,13 +658,17 @@ export class AdminInventoryComponent implements OnInit {
     const deltaRaw = String(this.bulkAdjustDelta ?? '').trim();
     const deltaParsed = Number(deltaRaw);
     if (!Number.isInteger(deltaParsed) || deltaParsed === 0) {
-      this.bulkAdjustError.set(this.translate.instant('adminUi.inventory.bulkAdjust.errors.deltaInvalid'));
+      this.bulkAdjustError.set(
+        this.translate.instant('adminUi.inventory.bulkAdjust.errors.deltaInvalid'),
+      );
       return;
     }
 
     const note = (this.bulkAdjustNote || '').trim();
     if (!note) {
-      this.bulkAdjustError.set(this.translate.instant('adminUi.inventory.bulkAdjust.errors.noteRequired'));
+      this.bulkAdjustError.set(
+        this.translate.instant('adminUi.inventory.bulkAdjust.errors.noteRequired'),
+      );
       return;
     }
 
@@ -572,24 +686,30 @@ export class AdminInventoryComponent implements OnInit {
               variant_id: row.kind === 'variant' ? row.variant_id : null,
               delta: deltaParsed,
               reason: this.bulkAdjustReason,
-              note
+              note,
             })
             .pipe(
               map(() => ({ ok: true })),
-              catchError((err) => of({ ok: false, err }))
-            )
+              catchError((err) => of({ ok: false, err })),
+            ),
         ),
-        toArray()
+        toArray(),
       )
       .subscribe({
         next: (results) => {
           const okCount = results.filter((r) => r.ok).length;
           const failed = results.filter((r) => !r.ok);
           if (okCount) {
-            this.toast.success(this.translate.instant('adminUi.inventory.bulkAdjust.success.applied', { count: okCount }));
+            this.toast.success(
+              this.translate.instant('adminUi.inventory.bulkAdjust.success.applied', {
+                count: okCount,
+              }),
+            );
           }
           if (failed.length) {
-            this.bulkAdjustError.set(this.translate.instant('adminUi.inventory.bulkAdjust.errors.failed'));
+            this.bulkAdjustError.set(
+              this.translate.instant('adminUi.inventory.bulkAdjust.errors.failed'),
+            );
             this.toast.error(this.translate.instant('adminUi.inventory.bulkAdjust.errors.failed'));
           }
           this.bulkAdjustBusy.set(false);
@@ -600,8 +720,10 @@ export class AdminInventoryComponent implements OnInit {
         },
         error: () => {
           this.bulkAdjustBusy.set(false);
-          this.bulkAdjustError.set(this.translate.instant('adminUi.inventory.bulkAdjust.errors.failed'));
-        }
+          this.bulkAdjustError.set(
+            this.translate.instant('adminUi.inventory.bulkAdjust.errors.failed'),
+          );
+        },
       });
   }
 
@@ -616,7 +738,9 @@ export class AdminInventoryComponent implements OnInit {
   }
 
   openProduct(row: RestockRow): void {
-    void this.router.navigate(['/admin/products'], { state: { editProductSlug: row.product_slug } });
+    void this.router.navigate(['/admin/products'], {
+      state: { editProductSlug: row.product_slug },
+    });
   }
 
   togglePiiReveal(): void {
@@ -635,7 +759,9 @@ export class AdminInventoryComponent implements OnInit {
   reservationSubtitle(): string {
     const target = this.reservationsTarget();
     if (!target) return '';
-    const name = target.variant_name ? `${target.product_name} — ${target.variant_name}` : target.product_name;
+    const name = target.variant_name
+      ? `${target.product_name} — ${target.variant_name}`
+      : target.product_name;
     return `${name} · ${target.sku}`;
   }
 
@@ -648,7 +774,7 @@ export class AdminInventoryComponent implements OnInit {
       variant_id: row.kind === 'variant' ? (row.variant_id ?? undefined) : undefined,
       sku: row.sku,
       product_name: row.product_name,
-      variant_name: row.variant_name ?? null
+      variant_name: row.variant_name ?? null,
     });
     this.reloadReservations();
   }
@@ -673,7 +799,7 @@ export class AdminInventoryComponent implements OnInit {
     this.admin
       .exportRestockListCsv({
         include_variants: this.includeVariants,
-        default_threshold: this.defaultThreshold
+        default_threshold: this.defaultThreshold,
       })
       .subscribe({
         next: (blob) => {
@@ -689,7 +815,7 @@ export class AdminInventoryComponent implements OnInit {
         error: () => {
           this.toast.error(this.translate.instant('adminUi.inventory.errors.export'));
           this.exporting = false;
-        }
+        },
       });
   }
 
@@ -707,7 +833,7 @@ export class AdminInventoryComponent implements OnInit {
       variant_id: row.variant_id || null,
       supplier: supplier ? supplier : null,
       desired_quantity: Number.isFinite(desiredQuantity) ? Math.max(0, desiredQuantity) : null,
-      note: note ? note : null
+      note: note ? note : null,
     };
 
     this.admin.upsertRestockNote(payload).subscribe({
@@ -720,7 +846,7 @@ export class AdminInventoryComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.inventory.errors.noteSave'));
         row.isSaving = false;
-      }
+      },
     });
   }
 
@@ -734,17 +860,20 @@ export class AdminInventoryComponent implements OnInit {
         page: this.page,
         limit: this.limit,
         include_variants: this.includeVariants,
-        default_threshold: this.defaultThreshold
+        default_threshold: this.defaultThreshold,
       })
       .subscribe({
         next: (resp) => {
           const mapped = (resp.items || []).map((item) => ({
             ...item,
             draftSupplier: item.supplier || '',
-            draftDesiredQuantity: item.desired_quantity !== null && item.desired_quantity !== undefined ? String(item.desired_quantity) : '',
+            draftDesiredQuantity:
+              item.desired_quantity !== null && item.desired_quantity !== undefined
+                ? String(item.desired_quantity)
+                : '',
             draftNote: item.note || '',
             isDirty: false,
-            isSaving: false
+            isSaving: false,
           }));
           this.rows.set(mapped);
           this.pruneSelection(mapped);
@@ -758,7 +887,7 @@ export class AdminInventoryComponent implements OnInit {
           this.rows.set([]);
           this.meta.set(null);
           this.loading.set(false);
-        }
+        },
       });
   }
 
@@ -784,7 +913,7 @@ export class AdminInventoryComponent implements OnInit {
     const baseParams = {
       product_id: target.product_id,
       variant_id: target.variant_id,
-      include_pii: this.piiReveal() ? true : undefined
+      include_pii: this.piiReveal() ? true : undefined,
     };
 
     if (kind === 'carts') {
@@ -803,7 +932,7 @@ export class AdminInventoryComponent implements OnInit {
           }
           this.reservationsError.set(this.translate.instant('adminUi.errors.generic'));
           this.reservationsLoading.set(false);
-        }
+        },
       });
       return;
     }
@@ -822,7 +951,7 @@ export class AdminInventoryComponent implements OnInit {
         }
         this.reservationsError.set(this.translate.instant('adminUi.errors.generic'));
         this.reservationsLoading.set(false);
-      }
+      },
     });
   }
 
@@ -830,4 +959,3 @@ export class AdminInventoryComponent implements OnInit {
     this.load();
   }
 }
-

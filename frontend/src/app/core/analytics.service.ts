@@ -37,7 +37,9 @@ export class AnalyticsService {
     this.persistEnabled(this.enabledState());
     if (typeof window !== 'undefined') {
       try {
-        window.dispatchEvent(new CustomEvent('app:analytics-opt-in', { detail: { enabled: this.enabledState() } }));
+        window.dispatchEvent(
+          new CustomEvent('app:analytics-opt-in', { detail: { enabled: this.enabledState() } }),
+        );
       } catch {
         // ignore
       }
@@ -88,14 +90,16 @@ export class AnalyticsService {
         const headers: Record<string, string> = { 'X-Silent': '1' };
         if (token) headers['X-Analytics-Token'] = token;
         this.api
-          .post<{ received: boolean }>(
+          .post<{
+            received: boolean;
+          }>(
             '/analytics/events',
             { event, session_id: sessionId, path: this.getPath(), payload: payload ?? null },
-            headers
+            headers,
           )
           .subscribe({ error: () => void 0 });
       },
-      error: () => void 0
+      error: () => void 0,
     });
   }
 
@@ -240,21 +244,23 @@ export class AnalyticsService {
     if (existing) return of(existing);
     if (this.tokenRequest$) return this.tokenRequest$;
 
-    this.tokenRequest$ = this.api.post<AnalyticsTokenResponse>(
-      '/analytics/token',
-      { session_id: sessionId },
-      { 'X-Silent': '1' }
-    ).pipe(
-      tap((res) => {
-        if (res?.token) this.persistToken(res.token, res.expires_in);
-      }),
-      map((res) => (res?.token ? res.token : null)),
-      catchError(() => of(null)),
-      finalize(() => {
-        this.tokenRequest$ = undefined;
-      }),
-      shareReplay({ bufferSize: 1, refCount: false })
-    );
+    this.tokenRequest$ = this.api
+      .post<AnalyticsTokenResponse>(
+        '/analytics/token',
+        { session_id: sessionId },
+        { 'X-Silent': '1' },
+      )
+      .pipe(
+        tap((res) => {
+          if (res?.token) this.persistToken(res.token, res.expires_in);
+        }),
+        map((res) => (res?.token ? res.token : null)),
+        catchError(() => of(null)),
+        finalize(() => {
+          this.tokenRequest$ = undefined;
+        }),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
 
     return this.tokenRequest$;
   }
@@ -268,4 +274,3 @@ export class AnalyticsService {
     }
   }
 }
-

@@ -22,20 +22,27 @@ const RETURN_CONFIRM_TIMEOUT_MS = 30_000;
     ContainerComponent,
     CheckoutReturnErrorCardComponent,
     PageHeaderComponent,
-    LoadingStateComponent
+    LoadingStateComponent,
   ],
   template: `
     <app-container classes="py-10 grid gap-6">
-      <app-page-header [crumbs]="crumbs" [titleKey]="'checkout.netopiaReturnTitle'"></app-page-header>
+      <app-page-header
+        [crumbs]="crumbs"
+        [titleKey]="'checkout.netopiaReturnTitle'"
+      ></app-page-header>
 
       <div
         *ngIf="loading"
         class="rounded-2xl border border-slate-200 bg-white p-6 text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
       >
-        <p class="text-sm font-semibold tracking-[0.2em] uppercase text-slate-600 dark:text-slate-300">
+        <p
+          class="text-sm font-semibold tracking-[0.2em] uppercase text-slate-600 dark:text-slate-300"
+        >
           {{ 'checkout.netopiaReturnTitle' | translate }}
         </p>
-        <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">{{ 'checkout.netopiaConfirming' | translate }}</p>
+        <p class="mt-3 text-sm text-slate-700 dark:text-slate-200">
+          {{ 'checkout.netopiaConfirming' | translate }}
+        </p>
         <div class="mt-4">
           <app-loading-state [rows]="1"></app-loading-state>
         </div>
@@ -48,13 +55,13 @@ const RETURN_CONFIRM_TIMEOUT_MS = 30_000;
         (retry)="retry()"
       ></app-checkout-return-error-card>
     </app-container>
-  `
+  `,
 })
 export class NetopiaReturnComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'checkout.title', url: '/checkout' },
-    { label: 'checkout.netopiaReturnTitle' }
+    { label: 'checkout.netopiaReturnTitle' },
   ];
 
   loading = true;
@@ -69,7 +76,7 @@ export class NetopiaReturnComponent implements OnInit, OnDestroy {
     private readonly router: Router,
     private readonly translate: TranslateService,
     private readonly cart: CartStore,
-    private readonly analytics: AnalyticsService
+    private readonly analytics: AnalyticsService,
   ) {}
 
   ngOnInit(): void {
@@ -108,13 +115,16 @@ export class NetopiaReturnComponent implements OnInit, OnDestroy {
     const startedAt = Date.now();
     this.confirmSubscription?.unsubscribe();
     this.confirmSubscription = this.api
-      .post<{ order_id: string; reference_code?: string; status: string }>('/orders/netopia/confirm', payload)
+      .post<{ order_id: string; reference_code?: string; status: string }>(
+        '/orders/netopia/confirm',
+        payload,
+      )
       .pipe(
         timeout({ first: RETURN_CONFIRM_TIMEOUT_MS }),
         finalize(() => {
           this.loading = false;
           this.confirmSubscription = null;
-        })
+        }),
       )
       .subscribe({
         next: () => {
@@ -128,12 +138,12 @@ export class NetopiaReturnComponent implements OnInit, OnDestroy {
               provider: 'netopia',
               route: 'checkout/netopia/return',
               timeout_ms: RETURN_CONFIRM_TIMEOUT_MS,
-              elapsed_ms: Date.now() - startedAt
+              elapsed_ms: Date.now() - startedAt,
             });
             return;
           }
           this.errorMessage = this.resolveErrorMessage(err, 'checkout.netopiaConfirmFailed');
-        }
+        },
       });
   }
 
@@ -147,4 +157,3 @@ export class NetopiaReturnComponent implements OnInit, OnDestroy {
     return this.translate.instant(fallbackKey);
   }
 }
-

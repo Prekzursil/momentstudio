@@ -9,7 +9,7 @@ describe('AdminService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [AdminService]
+      providers: [AdminService],
     });
     service = TestBed.inject(AdminService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -62,7 +62,9 @@ describe('AdminService', () => {
     service.invalidateCouponStripeMappings('c1').subscribe((res) => {
       expect(res.deleted_mappings).toBe(2);
     });
-    const invalidateReq = httpMock.expectOne('/api/v1/admin/dashboard/coupons/c1/stripe/invalidate');
+    const invalidateReq = httpMock.expectOne(
+      '/api/v1/admin/dashboard/coupons/c1/stripe/invalidate',
+    );
     expect(invalidateReq.request.method).toBe('POST');
     expect(invalidateReq.request.body).toEqual({});
     invalidateReq.flush({ deleted_mappings: 2 });

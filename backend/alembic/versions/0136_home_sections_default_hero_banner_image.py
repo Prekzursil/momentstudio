@@ -49,9 +49,9 @@ def upgrade() -> None:
 
     row = (
         conn.execute(
-            sa.select(content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta).where(
-                content_blocks.c.key == "home.sections"
-            )
+            sa.select(
+                content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta
+            ).where(content_blocks.c.key == "home.sections")
         )
         .mappings()
         .first()
@@ -84,12 +84,21 @@ def upgrade() -> None:
         return
 
     meta["blocks"] = blocks
-    conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta))
+    conn.execute(
+        sa.update(content_blocks)
+        .where(content_blocks.c.id == row["id"])
+        .values(meta=meta)
+    )
 
     current_version = int(row.get("version") or 1)
     conn.execute(
         sa.update(versions)
-        .where(sa.and_(versions.c.content_block_id == row["id"], versions.c.version == current_version))
+        .where(
+            sa.and_(
+                versions.c.content_block_id == row["id"],
+                versions.c.version == current_version,
+            )
+        )
         .values(meta=meta)
     )
 
@@ -98,4 +107,3 @@ def downgrade() -> None:
     # Intentionally no-op: this migration only fills a default value when missing, and we
     # don't want to remove user edits during downgrade.
     return
-

@@ -40,7 +40,7 @@ describe('DamAssetLibraryComponent', () => {
     updated_at: '2026-02-16T00:00:00Z',
     tags: ['hero'],
     i18n: [],
-    variants: []
+    variants: [],
   };
 
   beforeEach(() => {
@@ -74,7 +74,7 @@ describe('DamAssetLibraryComponent', () => {
       'purgeMediaAsset',
       'createMediaCollection',
       'updateMediaCollection',
-      'replaceMediaCollectionItems'
+      'replaceMediaCollectionItems',
     ]);
     auth = jasmine.createSpyObj<AuthService>('AuthService', ['role']);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
@@ -83,15 +83,15 @@ describe('DamAssetLibraryComponent', () => {
     admin.listMediaAssets.and.returnValue(
       of({
         items: [baseAsset],
-        meta: { total_items: 1, total_pages: 1, page: 1, limit: 24 }
-      })
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 24 },
+      }),
     );
     admin.listMediaCollections.and.returnValue(of([]));
     admin.listMediaJobs.and.returnValue(
       of({
         items: [],
-        meta: { total_items: 0, total_pages: 1, page: 1, limit: 20 }
-      })
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 20 },
+      }),
     );
     admin.getMediaTelemetry.and.returnValue(
       of({
@@ -105,8 +105,8 @@ describe('DamAssetLibraryComponent', () => {
         oldest_queued_age_seconds: null,
         avg_processing_seconds: null,
         status_counts: {},
-        type_counts: {}
-      })
+        type_counts: {},
+      }),
     );
     admin.requestMediaUsageReconcile.and.returnValue(
       of({
@@ -129,8 +129,8 @@ describe('DamAssetLibraryComponent', () => {
         sla_due_at: null,
         incident_url: null,
         started_at: null,
-        completed_at: null
-      })
+        completed_at: null,
+      }),
     );
     admin.retryMediaJob.and.returnValue(
       of({
@@ -153,14 +153,14 @@ describe('DamAssetLibraryComponent', () => {
         sla_due_at: null,
         incident_url: null,
         started_at: null,
-        completed_at: null
-      })
+        completed_at: null,
+      }),
     );
     admin.retryMediaJobsBulk.and.returnValue(
       of({
         items: [],
-        meta: { total_items: 0, total_pages: 1, page: 1, limit: 1 }
-      })
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 1 },
+      }),
     );
     admin.updateMediaJobTriage.and.returnValue(
       of({
@@ -183,8 +183,8 @@ describe('DamAssetLibraryComponent', () => {
         sla_due_at: null,
         incident_url: null,
         started_at: null,
-        completed_at: '2026-02-16T00:00:00Z'
-      })
+        completed_at: '2026-02-16T00:00:00Z',
+      }),
     );
     admin.listMediaJobEvents.and.returnValue(of({ items: [] }));
     admin.listMediaRetryPolicies.and.returnValue(
@@ -198,10 +198,10 @@ describe('DamAssetLibraryComponent', () => {
             enabled: true,
             updated_by_user_id: null,
             created_at: '2026-02-16T00:00:00Z',
-            updated_at: '2026-02-16T00:00:00Z'
-          }
-        ]
-      })
+            updated_at: '2026-02-16T00:00:00Z',
+          },
+        ],
+      }),
     );
     admin.updateMediaRetryPolicy.and.returnValue(
       of({
@@ -212,8 +212,8 @@ describe('DamAssetLibraryComponent', () => {
         enabled: true,
         updated_by_user_id: 'owner-1',
         created_at: '2026-02-16T00:00:00Z',
-        updated_at: '2026-02-16T01:00:00Z'
-      })
+        updated_at: '2026-02-16T01:00:00Z',
+      }),
     );
     admin.resetMediaRetryPolicy.and.returnValue(
       of({
@@ -224,8 +224,8 @@ describe('DamAssetLibraryComponent', () => {
         enabled: true,
         updated_by_user_id: null,
         created_at: '2026-02-16T00:00:00Z',
-        updated_at: '2026-02-16T02:00:00Z'
-      })
+        updated_at: '2026-02-16T02:00:00Z',
+      }),
     );
     admin.resetAllMediaRetryPolicies.and.returnValue(
       of({
@@ -238,10 +238,10 @@ describe('DamAssetLibraryComponent', () => {
             enabled: true,
             updated_by_user_id: null,
             created_at: '2026-02-16T00:00:00Z',
-            updated_at: '2026-02-16T02:00:00Z'
-          }
-        ]
-      })
+            updated_at: '2026-02-16T02:00:00Z',
+          },
+        ],
+      }),
     );
     admin.listMediaRetryPolicyHistory.and.returnValue(
       of({
@@ -257,21 +257,21 @@ describe('DamAssetLibraryComponent', () => {
               backoff_schedule_seconds: [30, 120, 600, 1800],
               jitter_ratio: 0.15,
               enabled: true,
-              version_ts: 'seed'
+              version_ts: 'seed',
             },
             after_policy: {
               max_attempts: 6,
               backoff_schedule_seconds: [10, 30, 120],
               jitter_ratio: 0.2,
               enabled: true,
-              version_ts: 'seed'
+              version_ts: 'seed',
             },
             note: null,
-            created_at: '2026-02-16T03:00:00Z'
-          }
+            created_at: '2026-02-16T03:00:00Z',
+          },
         ],
-        meta: { total_items: 1, total_pages: 1, page: 1, limit: 10 }
-      })
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 10 },
+      }),
     );
     admin.getMediaRetryPolicyPresets.and.returnValue(
       of({
@@ -285,14 +285,14 @@ describe('DamAssetLibraryComponent', () => {
               backoff_schedule_seconds: [30, 120, 600, 1800],
               jitter_ratio: 0.15,
               enabled: true,
-              version_ts: 'seed'
+              version_ts: 'seed',
             },
             source_event_id: null,
             fallback_used: false,
-            updated_at: null
-          }
-        ]
-      })
+            updated_at: null,
+          },
+        ],
+      }),
     );
     admin.rollbackMediaRetryPolicy.and.returnValue(
       of({
@@ -303,8 +303,8 @@ describe('DamAssetLibraryComponent', () => {
         enabled: true,
         updated_by_user_id: 'owner-1',
         created_at: '2026-02-16T00:00:00Z',
-        updated_at: '2026-02-16T04:00:00Z'
-      })
+        updated_at: '2026-02-16T04:00:00Z',
+      }),
     );
     admin.markMediaRetryPolicyKnownGood.and.returnValue(
       of({
@@ -318,18 +318,18 @@ describe('DamAssetLibraryComponent', () => {
           backoff_schedule_seconds: [30, 120, 600, 1800],
           jitter_ratio: 0.15,
           enabled: true,
-          version_ts: 'seed'
+          version_ts: 'seed',
         },
         after_policy: {
           max_attempts: 5,
           backoff_schedule_seconds: [30, 120, 600, 1800],
           jitter_ratio: 0.15,
           enabled: true,
-          version_ts: 'seed'
+          version_ts: 'seed',
         },
         note: null,
-        created_at: '2026-02-16T05:00:00Z'
-      })
+        created_at: '2026-02-16T05:00:00Z',
+      }),
     );
 
     TestBed.configureTestingModule({
@@ -337,8 +337,8 @@ describe('DamAssetLibraryComponent', () => {
       providers: [
         { provide: AdminService, useValue: admin },
         { provide: AuthService, useValue: auth },
-        { provide: ToastService, useValue: toast }
-      ]
+        { provide: ToastService, useValue: toast },
+      ],
     });
   });
 
@@ -350,8 +350,8 @@ describe('DamAssetLibraryComponent', () => {
       jasmine.objectContaining({
         page: 1,
         limit: 24,
-        sort: 'newest'
-      })
+        sort: 'newest',
+      }),
     );
     expect(fixture.componentInstance.assets().length).toBe(1);
   });
@@ -366,7 +366,9 @@ describe('DamAssetLibraryComponent', () => {
 
     expect(component.tab()).toBe('review');
     expect(component.statusFilter).toBe('draft');
-    expect(admin.listMediaAssets).toHaveBeenCalledWith(jasmine.objectContaining({ status: 'draft' }));
+    expect(admin.listMediaAssets).toHaveBeenCalledWith(
+      jasmine.objectContaining({ status: 'draft' }),
+    );
   });
 
   it('uses preview_url for image rendering when available', () => {
@@ -375,7 +377,9 @@ describe('DamAssetLibraryComponent', () => {
 
     const image: HTMLImageElement | null = fixture.nativeElement.querySelector('img');
     expect(image).toBeTruthy();
-    expect(image?.getAttribute('src')).toContain('/api/v1/content/admin/media/assets/asset-1/preview');
+    expect(image?.getAttribute('src')).toContain(
+      '/api/v1/content/admin/media/assets/asset-1/preview',
+    );
   });
 
   it('loads persistent job list when switching to queue tab', () => {
@@ -390,8 +394,8 @@ describe('DamAssetLibraryComponent', () => {
       jasmine.objectContaining({
         page: 1,
         limit: 20,
-        dead_letter_only: false
-      })
+        dead_letter_only: false,
+      }),
     );
     expect(admin.listMediaRetryPolicies).toHaveBeenCalled();
   });
@@ -407,8 +411,8 @@ describe('DamAssetLibraryComponent', () => {
 
     expect(admin.listMediaJobs).toHaveBeenCalledWith(
       jasmine.objectContaining({
-        dead_letter_only: true
-      })
+        dead_letter_only: true,
+      }),
     );
   });
 
@@ -427,7 +431,7 @@ describe('DamAssetLibraryComponent', () => {
       enabled: true,
       max_attempts: 6,
       backoff_schedule_seconds: [10, 30, 120],
-      jitter_ratio: 0.2
+      jitter_ratio: 0.2,
     });
     expect(toast.success).toHaveBeenCalled();
   });
@@ -458,7 +462,7 @@ describe('DamAssetLibraryComponent', () => {
     expect(admin.listMediaRetryPolicyHistory).toHaveBeenCalledWith({
       job_type: 'ingest',
       page: 1,
-      limit: 10
+      limit: 10,
     });
     expect(admin.getMediaRetryPolicyPresets).toHaveBeenCalledWith('ingest');
     expect(component.isRetryPolicyHistoryOpen('ingest')).toBeTrue();
@@ -479,7 +483,9 @@ describe('DamAssetLibraryComponent', () => {
 
     await component.applyRetryPolicyRollbackPreview();
 
-    expect(admin.rollbackMediaRetryPolicy).toHaveBeenCalledWith('ingest', { preset_key: 'factory_default' });
+    expect(admin.rollbackMediaRetryPolicy).toHaveBeenCalledWith('ingest', {
+      preset_key: 'factory_default',
+    });
     expect(toast.success).toHaveBeenCalled();
   });
 

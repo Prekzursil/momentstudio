@@ -8,4 +8,3 @@ class AdminOrderAddressesUpdate(BaseModel):
     billing_address: AddressUpdate | None = None
     rerate_shipping: bool = Field(default=True)
     note: str | None = Field(default=None, max_length=255)
-

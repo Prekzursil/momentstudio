@@ -6,19 +6,29 @@ import {
   loginUi,
   OWNER_IDENTIFIER,
   seedCartWithFirstProduct,
-  uniqueSessionId
+  uniqueSessionId,
 } from './checkout-helpers';
 
-async function fetchOrderStatus(request: APIRequestContext, token: string, orderId: string): Promise<string> {
-  const res = await request.get(`/api/v1/orders/${orderId}`, { headers: { Authorization: `Bearer ${token}` } });
+async function fetchOrderStatus(
+  request: APIRequestContext,
+  token: string,
+  orderId: string,
+): Promise<string> {
+  const res = await request.get(`/api/v1/orders/${orderId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   expect(res.ok()).toBeTruthy();
   const payload = (await res.json()) as any;
   return String(payload?.status ?? '');
 }
 
-async function fetchRecentOrderIds(request: APIRequestContext, token: string, limit = 10): Promise<string[]> {
+async function fetchRecentOrderIds(
+  request: APIRequestContext,
+  token: string,
+  limit = 10,
+): Promise<string[]> {
   const res = await request.get(`/api/v1/orders/me?page=1&limit=${limit}`, {
-    headers: { Authorization: `Bearer ${token}` }
+    headers: { Authorization: `Bearer ${token}` },
   });
   expect(res.ok()).toBeTruthy();
   const payload = (await res.json()) as any;
@@ -30,7 +40,7 @@ async function waitForNewOrderId(
   request: APIRequestContext,
   token: string,
   knownOrderIds: Set<string>,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
 ): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -51,7 +61,10 @@ async function setSessionCart(page: Page, sessionId: string): Promise<void> {
 
 async function openCartAndCheckout(page: Page, productName: string): Promise<void> {
   const cartLoad = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/cart') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
   );
   await page.goto('/cart');
   await cartLoad;
@@ -63,7 +76,7 @@ async function openCartAndCheckout(page: Page, productName: string): Promise<voi
 async function startStripeCheckout(
   page: Page,
   request: APIRequestContext,
-  token: string
+  token: string,
 ): Promise<{ orderId: string } | null> {
   const sessionId = uniqueSessionId('e2e-stripe');
   await setSessionCart(page, sessionId);
@@ -72,7 +85,9 @@ async function startStripeCheckout(
 
   await openCartAndCheckout(page, product.name);
 
-  const shippingEmail = OWNER_IDENTIFIER.includes('@') ? OWNER_IDENTIFIER : `${OWNER_IDENTIFIER}@example.com`;
+  const shippingEmail = OWNER_IDENTIFIER.includes('@')
+    ? OWNER_IDENTIFIER
+    : `${OWNER_IDENTIFIER}@example.com`;
   await fillShippingAddress(page, shippingEmail);
 
   const stripeButton = page.getByRole('button', { name: /^Stripe$/ }).first();

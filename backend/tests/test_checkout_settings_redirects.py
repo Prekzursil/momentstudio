@@ -53,7 +53,9 @@ def seed_checkout_settings_redirect(session_factory) -> None:
                 },
             )
             session.add(block)
-            session.add(ContentRedirect(from_key="site.checkout", to_key="site.checkout.v2"))
+            session.add(
+                ContentRedirect(from_key="site.checkout", to_key="site.checkout.v2")
+            )
             await session.commit()
 
     asyncio.run(seed())

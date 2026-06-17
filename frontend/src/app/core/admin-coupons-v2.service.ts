@@ -1,7 +1,12 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
-import type { CouponRead, CouponVisibility, PromotionDiscountType, PromotionRead } from './coupons.service';
+import type {
+  CouponRead,
+  CouponVisibility,
+  PromotionDiscountType,
+  PromotionRead,
+} from './coupons.service';
 
 export interface PromotionCreatePayload {
   key?: string | null;
@@ -37,7 +42,9 @@ export interface CouponCreatePayload {
   per_customer_max_redemptions?: number | null;
 }
 
-export type CouponUpdatePayload = Partial<Omit<CouponCreatePayload, 'promotion_id' | 'code' | 'visibility'>>;
+export type CouponUpdatePayload = Partial<
+  Omit<CouponCreatePayload, 'promotion_id' | 'code' | 'visibility'>
+>;
 
 export interface CouponAssignmentRead {
   id: string;
@@ -191,7 +198,10 @@ export class AdminCouponsV2Service {
   }
 
   generateCouponCode(payload: CouponCodeGeneratePayload): Observable<CouponCodeGenerateResponse> {
-    return this.api.post<CouponCodeGenerateResponse>('/coupons/admin/coupons/generate-code', payload);
+    return this.api.post<CouponCodeGenerateResponse>(
+      '/coupons/admin/coupons/generate-code',
+      payload,
+    );
   }
 
   issueCouponToUser(payload: CouponIssueToUserPayload): Observable<CouponRead> {
@@ -214,15 +224,24 @@ export class AdminCouponsV2Service {
     return this.api.post<void>(`/coupons/admin/coupons/${couponId}/revoke`, payload);
   }
 
-  bulkAssignCoupon(couponId: string, payload: { emails: string[]; send_email?: boolean }): Observable<CouponBulkResult> {
-    return this.api.post<CouponBulkResult>(`/coupons/admin/coupons/${couponId}/assign/bulk`, payload);
+  bulkAssignCoupon(
+    couponId: string,
+    payload: { emails: string[]; send_email?: boolean },
+  ): Observable<CouponBulkResult> {
+    return this.api.post<CouponBulkResult>(
+      `/coupons/admin/coupons/${couponId}/assign/bulk`,
+      payload,
+    );
   }
 
   bulkRevokeCoupon(
     couponId: string,
-    payload: { emails: string[]; reason?: string | null; send_email?: boolean }
+    payload: { emails: string[]; reason?: string | null; send_email?: boolean },
   ): Observable<CouponBulkResult> {
-    return this.api.post<CouponBulkResult>(`/coupons/admin/coupons/${couponId}/revoke/bulk`, payload);
+    return this.api.post<CouponBulkResult>(
+      `/coupons/admin/coupons/${couponId}/revoke/bulk`,
+      payload,
+    );
   }
 
   previewSegmentAssign(
@@ -234,9 +253,12 @@ export class AdminCouponsV2Service {
       bucket_total?: number | null;
       bucket_index?: number | null;
       bucket_seed?: string | null;
-    }
+    },
   ): Observable<CouponBulkSegmentPreview> {
-    return this.api.post<CouponBulkSegmentPreview>(`/coupons/admin/coupons/${couponId}/assign/segment/preview`, payload);
+    return this.api.post<CouponBulkSegmentPreview>(
+      `/coupons/admin/coupons/${couponId}/assign/segment/preview`,
+      payload,
+    );
   }
 
   previewSegmentRevoke(
@@ -249,9 +271,12 @@ export class AdminCouponsV2Service {
       bucket_total?: number | null;
       bucket_index?: number | null;
       bucket_seed?: string | null;
-    }
+    },
   ): Observable<CouponBulkSegmentPreview> {
-    return this.api.post<CouponBulkSegmentPreview>(`/coupons/admin/coupons/${couponId}/revoke/segment/preview`, payload);
+    return this.api.post<CouponBulkSegmentPreview>(
+      `/coupons/admin/coupons/${couponId}/revoke/segment/preview`,
+      payload,
+    );
   }
 
   startSegmentAssignJob(
@@ -263,9 +288,12 @@ export class AdminCouponsV2Service {
       bucket_total?: number | null;
       bucket_index?: number | null;
       bucket_seed?: string | null;
-    }
+    },
   ): Observable<CouponBulkJobRead> {
-    return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/${couponId}/assign/segment`, payload);
+    return this.api.post<CouponBulkJobRead>(
+      `/coupons/admin/coupons/${couponId}/assign/segment`,
+      payload,
+    );
   }
 
   startSegmentRevokeJob(
@@ -278,21 +306,32 @@ export class AdminCouponsV2Service {
       bucket_total?: number | null;
       bucket_index?: number | null;
       bucket_seed?: string | null;
-    }
+    },
   ): Observable<CouponBulkJobRead> {
-    return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/${couponId}/revoke/segment`, payload);
+    return this.api.post<CouponBulkJobRead>(
+      `/coupons/admin/coupons/${couponId}/revoke/segment`,
+      payload,
+    );
   }
 
   getBulkJob(jobId: string): Observable<CouponBulkJobRead> {
     return this.api.get<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}`);
   }
 
-  getAnalytics(params: { promotion_id: string; coupon_id?: string | null; days?: number; top_limit?: number }): Observable<CouponAnalyticsResponse> {
+  getAnalytics(params: {
+    promotion_id: string;
+    coupon_id?: string | null;
+    days?: number;
+    top_limit?: number;
+  }): Observable<CouponAnalyticsResponse> {
     return this.api.get<CouponAnalyticsResponse>('/coupons/admin/analytics', params as any);
   }
 
   listBulkJobs(couponId: string, params?: { limit?: number }): Observable<CouponBulkJobRead[]> {
-    return this.api.get<CouponBulkJobRead[]>(`/coupons/admin/coupons/${couponId}/bulk-jobs`, params as any);
+    return this.api.get<CouponBulkJobRead[]>(
+      `/coupons/admin/coupons/${couponId}/bulk-jobs`,
+      params as any,
+    );
   }
 
   listAllBulkJobs(params?: { limit?: number }): Observable<CouponBulkJobRead[]> {
@@ -307,4 +346,3 @@ export class AdminCouponsV2Service {
     return this.api.post<CouponBulkJobRead>(`/coupons/admin/coupons/bulk-jobs/${jobId}/retry`, {});
   }
 }
-

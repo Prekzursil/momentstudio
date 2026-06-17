@@ -59,11 +59,31 @@ async def export_json(session: AsyncSession) -> Dict[str, Any]:
                 "meta_description": p.meta_description,
                 "tags": [t.slug for t in p.tags],
                 "images": [
-                    {"id": str(img.id), "url": img.url, "alt_text": img.alt_text, "sort_order": img.sort_order}
+                    {
+                        "id": str(img.id),
+                        "url": img.url,
+                        "alt_text": img.alt_text,
+                        "sort_order": img.sort_order,
+                    }
                     for img in p.images
                 ],
-                "options": [{"id": str(opt.id), "name": opt.option_name, "value": opt.option_value} for opt in p.options],
-                "variants": [{"id": str(v.id), "name": v.name, "price_delta": float(v.additional_price_delta), "stock_quantity": v.stock_quantity} for v in p.variants],
+                "options": [
+                    {
+                        "id": str(opt.id),
+                        "name": opt.option_name,
+                        "value": opt.option_value,
+                    }
+                    for opt in p.options
+                ],
+                "variants": [
+                    {
+                        "id": str(v.id),
+                        "name": v.name,
+                        "price_delta": float(v.additional_price_delta),
+                        "stock_quantity": v.stock_quantity,
+                    }
+                    for v in p.variants
+                ],
             }
         )
     addresses = (await session.execute(select(Address))).scalars().all()
@@ -91,8 +111,12 @@ async def export_json(session: AsyncSession) -> Dict[str, Any]:
                 "total_amount": float(o.total_amount),
                 "currency": o.currency,
                 "reference_code": o.reference_code,
-                "shipping_address_id": str(o.shipping_address_id) if o.shipping_address_id else None,
-                "billing_address_id": str(o.billing_address_id) if o.billing_address_id else None,
+                "shipping_address_id": (
+                    str(o.shipping_address_id) if o.shipping_address_id else None
+                ),
+                "billing_address_id": (
+                    str(o.billing_address_id) if o.billing_address_id else None
+                ),
                 "items": [
                     {
                         "id": str(oi.id),

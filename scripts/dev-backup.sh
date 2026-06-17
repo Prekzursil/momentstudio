@@ -61,4 +61,3 @@ tar -C "${repo_root}" -czf "${out}" \
 
 echo "Backup created: ${out}"
 echo "Tip: copy this file to the VPS and restore with: ./infra/prod/restore.sh ${out}"
-

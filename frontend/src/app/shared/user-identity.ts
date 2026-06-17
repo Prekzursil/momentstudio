@@ -24,7 +24,10 @@ export function formatIdentity(identity: IdentityLike | null | undefined, fallba
   return name || username || email || id || fallback;
 }
 
-export function initialsFromIdentity(identity: IdentityLike | null | undefined, fallback = '?'): string {
+export function initialsFromIdentity(
+  identity: IdentityLike | null | undefined,
+  fallback = '?',
+): string {
   if (!identity) return fallback;
   const name = (identity.name ?? '').trim();
   const username = (identity.username ?? '').trim();
@@ -37,7 +40,5 @@ export function initialsFromIdentity(identity: IdentityLike | null | undefined, 
     .filter(Boolean)
     .map((p) => p[0]?.toUpperCase())
     .filter(Boolean);
-  return (letters.slice(0, 2).join('') || src.slice(0, 1).toUpperCase());
+  return letters.slice(0, 2).join('') || src.slice(0, 1).toUpperCase();
 }
-
-

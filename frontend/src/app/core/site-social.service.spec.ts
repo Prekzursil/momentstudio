@@ -13,16 +13,20 @@ describe('SiteSocialService', () => {
           version: 1,
           contact: { phone: '+1', email: 'a@b.com' },
           instagram_pages: [
-            { label: 'A', url: 'https://example.com/a', thumbnail_url: 'https://example.com/a.png' },
-            { label: '', url: 'https://bad.example.com' }
+            {
+              label: 'A',
+              url: 'https://example.com/a',
+              thumbnail_url: 'https://example.com/a.png',
+            },
+            { label: '', url: 'https://bad.example.com' },
           ],
-          facebook_pages: []
-        }
-      })
+          facebook_pages: [],
+        },
+      }),
     );
 
     TestBed.configureTestingModule({
-      providers: [{ provide: ApiService, useValue: api }, SiteSocialService]
+      providers: [{ provide: ApiService, useValue: api }, SiteSocialService],
     });
 
     const service = TestBed.inject(SiteSocialService);
@@ -41,7 +45,7 @@ describe('SiteSocialService', () => {
     api.get.and.returnValue(throwError(() => new Error('fail')));
 
     TestBed.configureTestingModule({
-      providers: [{ provide: ApiService, useValue: api }, SiteSocialService]
+      providers: [{ provide: ApiService, useValue: api }, SiteSocialService],
     });
 
     const service = TestBed.inject(SiteSocialService);
@@ -53,4 +57,3 @@ describe('SiteSocialService', () => {
     });
   });
 });
-

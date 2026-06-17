@@ -29,7 +29,9 @@ def test_upsert_severe_uses_paginated_open_issues_for_dedupe(monkeypatch):
 
     page_1_rows = [{"number": i, "title": f"Issue {i}"} for i in range(1, 101)]
     # Keep PR filtering behavior intact by ensuring PR rows do not become dedupe candidates.
-    page_1_rows[0]["pull_request"] = {"url": "https://api.github.com/repos/octo/demo/pulls/1"}
+    page_1_rows[0]["pull_request"] = {
+        "url": "https://api.github.com/repos/octo/demo/pulls/1"
+    }
     page_2_rows = [
         {
             "number": 999,

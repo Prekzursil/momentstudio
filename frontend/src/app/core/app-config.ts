@@ -61,14 +61,20 @@ const defaults: AppConfig = {
   siteProfile: {
     contact: { phone: '+40723204204', email: 'momentstudio.ro@gmail.com' },
     instagramPages: [
-      { label: 'Moments in Clay - Studio', url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx' },
-      { label: 'adrianaartizanat', url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy' }
+      {
+        label: 'Moments in Clay - Studio',
+        url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx',
+      },
+      {
+        label: 'adrianaartizanat',
+        url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy',
+      },
     ],
     facebookPages: [
       { label: 'Moments in Clay - Studio', url: 'https://www.facebook.com/share/17YqBmfX5x/' },
-      { label: 'adrianaartizanat', url: 'https://www.facebook.com/share/1APqKJM6Zi/' }
-    ]
-  }
+      { label: 'adrianaartizanat', url: 'https://www.facebook.com/share/1APqKJM6Zi/' },
+    ],
+  },
 };
 
 export const appConfig: AppConfig = (() => {
@@ -76,7 +82,9 @@ export const appConfig: AppConfig = (() => {
   const runtimeSiteProfile = runtime?.siteProfile as Partial<AppConfig['siteProfile']> | undefined;
   if (globalThis.window === undefined) {
     const ssrApiBase =
-      (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.['SSR_API_BASE_URL']?.trim() || '';
+      (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[
+        'SSR_API_BASE_URL'
+      ]?.trim() || '';
     return {
       ...defaults,
       ...(ssrApiBase ? { apiBaseUrl: ssrApiBase.replace(/\/$/, '') } : {}),

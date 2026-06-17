@@ -6,17 +6,26 @@ from app.services import email as email_service
 
 
 def test_jinja2_is_available() -> None:
-    assert email_service.env is not None, "jinja2 must be installed so email templates render deterministically"
+    assert (
+        email_service.env is not None
+    ), "jinja2 must be installed so email templates render deterministically"
 
 
 @pytest.mark.parametrize(
     ("template", "context", "expected"),
     [
         ("back_in_stock.txt.j2", {"product_name": "Test Product"}, ["Test Product"]),
-        ("low_stock_alert.txt.j2", {"product_name": "Test Product", "stock": 2}, ["Test Product", "2"]),
+        (
+            "low_stock_alert.txt.j2",
+            {"product_name": "Test Product", "stock": 2},
+            ["Test Product", "2"],
+        ),
         (
             "cart_abandonment.txt.j2",
-            {"cart_url": "https://example.com/cart", "unsubscribe_url": "https://example.com/unsub"},
+            {
+                "cart_url": "https://example.com/cart",
+                "unsubscribe_url": "https://example.com/unsub",
+            },
             ["https://example.com/cart", "https://example.com/unsub"],
         ),
         (
@@ -115,7 +124,9 @@ def test_jinja2_is_available() -> None:
         ),
     ],
 )
-def test_email_template_renders(template: str, context: dict, expected: list[str]) -> None:
+def test_email_template_renders(
+    template: str, context: dict, expected: list[str]
+) -> None:
     text_body, html_body = email_service.render_bilingual_template(
         template, context, preferred_language="en"
     )
@@ -124,4 +135,3 @@ def test_email_template_renders(template: str, context: dict, expected: list[str
     assert "English" in text_body and "Română" in text_body
     for needle in expected:
         assert needle in text_body or needle in html_body
-

@@ -81,25 +81,68 @@ from app.services import storage
 
 logger = logging.getLogger(__name__)
 
-QUEUE_KEY = str(getattr(settings, "media_dam_queue_key", "media:jobs:queue") or "media:jobs:queue")
-TRASH_RETENTION_DAYS = int(getattr(settings, "media_dam_trash_retention_days", 30) or 30)
-HEARTBEAT_PREFIX = str(getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat") or "media:workers:heartbeat")
+QUEUE_KEY = str(
+    getattr(settings, "media_dam_queue_key", "media:jobs:queue") or "media:jobs:queue"
+)
+TRASH_RETENTION_DAYS = int(
+    getattr(settings, "media_dam_trash_retention_days", 30) or 30
+)
+HEARTBEAT_PREFIX = str(
+    getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat")
+    or "media:workers:heartbeat"
+)
 RETRY_BACKOFF_SECONDS = (30, 120, 600, 1800)
-DEFAULT_MAX_ATTEMPTS = max(1, int(getattr(settings, "media_dam_retry_max_attempts", 5) or 5))
+DEFAULT_MAX_ATTEMPTS = max(
+    1, int(getattr(settings, "media_dam_retry_max_attempts", 5) or 5)
+)
 TRIAGE_STATES = {"open", "retrying", "ignored", "resolved"}
 RETRY_POLICY_PAYLOAD_KEY = "__retry_policy"
 MAX_RETRY_POLICY_ATTEMPTS = 20
 
 DEFAULT_RETRY_POLICIES: dict[MediaJobType, dict[str, Any]] = {
-    MediaJobType.ingest: {"max_attempts": 5, "schedule": [30, 120, 600, 1800], "jitter_ratio": 0.15, "enabled": True},
-    MediaJobType.variant: {"max_attempts": 5, "schedule": [20, 90, 300, 900], "jitter_ratio": 0.20, "enabled": True},
-    MediaJobType.edit: {"max_attempts": 5, "schedule": [20, 90, 300, 900], "jitter_ratio": 0.20, "enabled": True},
-    MediaJobType.ai_tag: {"max_attempts": 4, "schedule": [60, 300, 900, 1800], "jitter_ratio": 0.20, "enabled": True},
-    MediaJobType.duplicate_scan: {"max_attempts": 4, "schedule": [120, 600, 1800], "jitter_ratio": 0.20, "enabled": True},
-    MediaJobType.usage_reconcile: {"max_attempts": 3, "schedule": [300, 900, 1800], "jitter_ratio": 0.10, "enabled": True},
+    MediaJobType.ingest: {
+        "max_attempts": 5,
+        "schedule": [30, 120, 600, 1800],
+        "jitter_ratio": 0.15,
+        "enabled": True,
+    },
+    MediaJobType.variant: {
+        "max_attempts": 5,
+        "schedule": [20, 90, 300, 900],
+        "jitter_ratio": 0.20,
+        "enabled": True,
+    },
+    MediaJobType.edit: {
+        "max_attempts": 5,
+        "schedule": [20, 90, 300, 900],
+        "jitter_ratio": 0.20,
+        "enabled": True,
+    },
+    MediaJobType.ai_tag: {
+        "max_attempts": 4,
+        "schedule": [60, 300, 900, 1800],
+        "jitter_ratio": 0.20,
+        "enabled": True,
+    },
+    MediaJobType.duplicate_scan: {
+        "max_attempts": 4,
+        "schedule": [120, 600, 1800],
+        "jitter_ratio": 0.20,
+        "enabled": True,
+    },
+    MediaJobType.usage_reconcile: {
+        "max_attempts": 3,
+        "schedule": [300, 900, 1800],
+        "jitter_ratio": 0.10,
+        "enabled": True,
+    },
 }
 
-RETRY_POLICY_PRESET_KEYS: tuple[str, ...] = ("factory_default", "last_change", "known_good")
+RETRY_POLICY_PRESET_KEYS: tuple[str, ...] = (
+    "factory_default",
+    "last_change",
+    "known_good",
+)
 RETRY_POLICY_PRESET_LABELS: dict[str, str] = {
     "factory_default": "Factory default",
     "last_change": "Last change",
@@ -181,10 +224,20 @@ def _coerce_triage_state(
 
 
 def _default_retry_policy(job_type: MediaJobType) -> RetryPolicyResolved:
-    raw = DEFAULT_RETRY_POLICIES.get(job_type, DEFAULT_RETRY_POLICIES[MediaJobType.ingest])
-    schedule = [max(1, int(v)) for v in list(raw.get("schedule") or list(RETRY_BACKOFF_SECONDS))]
+    raw = DEFAULT_RETRY_POLICIES.get(
+        job_type, DEFAULT_RETRY_POLICIES[MediaJobType.ingest]
+    )
+    schedule = [
+        max(1, int(v)) for v in list(raw.get("schedule") or list(RETRY_BACKOFF_SECONDS))
+    ]
     return RetryPolicyResolved(
-        max_attempts=max(1, min(MAX_RETRY_POLICY_ATTEMPTS, int(raw.get("max_attempts") or DEFAULT_MAX_ATTEMPTS))),
+        max_attempts=max(
+            1,
+            min(
+                MAX_RETRY_POLICY_ATTEMPTS,
+                int(raw.get("max_attempts") or DEFAULT_MAX_ATTEMPTS),
+            ),
+        ),
         schedule=schedule or list(RETRY_BACKOFF_SECONDS),
         jitter_ratio=max(0.0, min(1.0, float(raw.get("jitter_ratio") or 0.0))),
         enabled=bool(raw.get("enabled", True)),
@@ -220,7 +273,9 @@ def _normalize_retry_policy_fields(
     )
 
 
-def _retry_policy_from_payload(payload: dict[str, Any], *, job_type: MediaJobType) -> RetryPolicyResolved | None:
+def _retry_policy_from_payload(
+    payload: dict[str, Any], *, job_type: MediaJobType
+) -> RetryPolicyResolved | None:
     raw = payload.get(RETRY_POLICY_PAYLOAD_KEY)
     if not isinstance(raw, dict):
         return None
@@ -264,9 +319,13 @@ def _retry_delay_seconds(
 def _guess_asset_type(content_type: str | None, filename: str | None) -> MediaAssetType:
     ctype = str(content_type or "").lower().strip()
     name = str(filename or "").lower()
-    if ctype.startswith("image/") or name.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg")):
+    if ctype.startswith("image/") or name.endswith(
+        (".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg")
+    ):
         return MediaAssetType.image
-    if ctype.startswith("video/") or name.endswith((".mp4", ".webm", ".mov", ".m4v", ".mkv")):
+    if ctype.startswith("video/") or name.endswith(
+        (".mp4", ".webm", ".mov", ".m4v", ".mkv")
+    ):
         return MediaAssetType.video
     return MediaAssetType.document
 
@@ -321,16 +380,24 @@ def _find_existing_storage_path(storage_key: str) -> Path | None:
 
 def _asset_file_path(asset: MediaAsset) -> Path:
     if asset.storage_key:
-        preferred = _storage_path_for_key(asset.storage_key, public_root=_is_publicly_servable(asset))
+        preferred = _storage_path_for_key(
+            asset.storage_key, public_root=_is_publicly_servable(asset)
+        )
         if preferred.exists():
             return preferred
-        alternate = _storage_path_for_key(asset.storage_key, public_root=not _is_publicly_servable(asset))
+        alternate = _storage_path_for_key(
+            asset.storage_key, public_root=not _is_publicly_servable(asset)
+        )
         if alternate.exists():
             return alternate
-    existing_from_url = _find_existing_storage_path(str(asset.public_url or "").removeprefix("/media/"))
+    existing_from_url = _find_existing_storage_path(
+        str(asset.public_url or "").removeprefix("/media/")
+    )
     if existing_from_url is not None:
         return existing_from_url
-    expected = _storage_path_for_key(asset.storage_key, public_root=_is_publicly_servable(asset))
+    expected = _storage_path_for_key(
+        asset.storage_key, public_root=_is_publicly_servable(asset)
+    )
     return expected
 
 
@@ -378,14 +445,24 @@ def _ensure_asset_storage_placement(asset: MediaAsset) -> None:
         return
 
 
-def _sign_preview(asset_id: UUID, *, exp: int, variant_profile: str | None = None) -> str:
+def _sign_preview(
+    asset_id: UUID, *, exp: int, variant_profile: str | None = None
+) -> str:
     base = f"{asset_id}:{exp}:{(variant_profile or '').strip().lower()}"
     key = str(getattr(settings, "secret_key", "") or "").encode("utf-8")
     return hmac.new(key, base.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def build_preview_url(asset_id: UUID, *, variant_profile: str | None = None, ttl_seconds: int | None = None) -> str:
-    ttl = int(ttl_seconds or int(getattr(settings, "media_private_preview_ttl_seconds", 600) or 600))
+def build_preview_url(
+    asset_id: UUID,
+    *,
+    variant_profile: str | None = None,
+    ttl_seconds: int | None = None,
+) -> str:
+    ttl = int(
+        ttl_seconds
+        or int(getattr(settings, "media_private_preview_ttl_seconds", 600) or 600)
+    )
     ttl = max(30, ttl)
     exp = int(_now().timestamp()) + ttl
     sig = _sign_preview(asset_id, exp=exp, variant_profile=variant_profile)
@@ -395,7 +472,9 @@ def build_preview_url(asset_id: UUID, *, variant_profile: str | None = None, ttl
     return base
 
 
-def verify_preview_signature(asset_id: UUID, *, exp: int, sig: str, variant_profile: str | None = None) -> bool:
+def verify_preview_signature(
+    asset_id: UUID, *, exp: int, sig: str, variant_profile: str | None = None
+) -> bool:
     try:
         exp_ts = int(exp)
     except Exception:
@@ -404,6 +483,7 @@ def verify_preview_signature(asset_id: UUID, *, exp: int, sig: str, variant_prof
         return False
     expected = _sign_preview(asset_id, exp=exp_ts, variant_profile=variant_profile)
     return hmac.compare_digest(expected, str(sig or ""))
+
 
 async def create_asset_from_upload(
     session: AsyncSession,
@@ -456,7 +536,9 @@ async def create_asset_from_upload(
     await session.commit()
     await session.refresh(asset)
     await _maybe_queue_job(ingest_job.id)
-    return MediaAssetUploadResponse(asset=asset_to_read(asset), ingest_job_id=ingest_job.id)
+    return MediaAssetUploadResponse(
+        asset=asset_to_read(asset), ingest_job_id=ingest_job.id
+    )
 
 
 async def enqueue_job(
@@ -475,15 +557,21 @@ async def enqueue_job(
     else:
         resolved_policy = policy_snapshot
     if max_attempts is not None:
-        resolved_policy.max_attempts = max(1, min(MAX_RETRY_POLICY_ATTEMPTS, int(max_attempts)))
-    payload_data[RETRY_POLICY_PAYLOAD_KEY] = _resolved_policy_to_snapshot(resolved_policy)
+        resolved_policy.max_attempts = max(
+            1, min(MAX_RETRY_POLICY_ATTEMPTS, int(max_attempts))
+        )
+    payload_data[RETRY_POLICY_PAYLOAD_KEY] = _resolved_policy_to_snapshot(
+        resolved_policy
+    )
     attempts = max(1, int(resolved_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
     job = MediaJob(
         id=uuid4(),
         asset_id=asset_id,
         job_type=job_type,
         status=MediaJobStatus.queued,
-        payload_json=json.dumps(payload_data, separators=(",", ":"), ensure_ascii=False),
+        payload_json=json.dumps(
+            payload_data, separators=(",", ":"), ensure_ascii=False
+        ),
         progress_pct=0,
         attempt=0,
         max_attempts=attempts,
@@ -540,7 +628,11 @@ async def _record_job_event(
             actor_user_id=actor_user_id,
             action=(action or "").strip()[:80] or "event",
             note=(note or "").strip() or None,
-            meta_json=(json.dumps(meta, separators=(",", ":"), ensure_ascii=False) if meta else None),
+            meta_json=(
+                json.dumps(meta, separators=(",", ":"), ensure_ascii=False)
+                if meta
+                else None
+            ),
         )
     )
     await session.flush()
@@ -562,14 +654,18 @@ def _parse_schedule_json(value: str | None, *, fallback: list[int]) -> list[int]
     return out or list(fallback)
 
 
-def _policy_row_to_resolved(row: MediaJobRetryPolicy | None, *, job_type: MediaJobType) -> RetryPolicyResolved:
+def _policy_row_to_resolved(
+    row: MediaJobRetryPolicy | None, *, job_type: MediaJobType
+) -> RetryPolicyResolved:
     fallback = _default_retry_policy(job_type)
     if row is None:
         return fallback
     version_ts = (row.updated_at or row.created_at or _now()).isoformat()
     return _normalize_retry_policy_fields(
         max_attempts=row.max_attempts,
-        schedule=_parse_schedule_json(row.backoff_schedule_json, fallback=fallback.schedule),
+        schedule=_parse_schedule_json(
+            row.backoff_schedule_json, fallback=fallback.schedule
+        ),
         jitter_ratio=row.jitter_ratio,
         enabled=row.enabled,
         fallback=RetryPolicyResolved(
@@ -592,19 +688,31 @@ def _resolved_policy_to_snapshot(policy: RetryPolicyResolved) -> dict[str, Any]:
     }
 
 
-def _policy_snapshot_from_raw(raw: dict[str, Any], *, job_type: MediaJobType) -> RetryPolicyResolved:
+def _policy_snapshot_from_raw(
+    raw: dict[str, Any], *, job_type: MediaJobType
+) -> RetryPolicyResolved:
     base = _default_retry_policy(job_type)
     raw_attempts = raw.get("max_attempts", base.max_attempts)
     try:
-        attempts = int(raw_attempts if isinstance(raw_attempts, (int, float, str)) else base.max_attempts)
+        attempts = int(
+            raw_attempts
+            if isinstance(raw_attempts, (int, float, str))
+            else base.max_attempts
+        )
     except Exception:
         attempts = base.max_attempts
     attempts = max(1, min(MAX_RETRY_POLICY_ATTEMPTS, attempts))
     schedule_raw = raw.get("schedule")
-    schedule = _validate_schedule(schedule_raw if isinstance(schedule_raw, list) else list(base.schedule))
+    schedule = _validate_schedule(
+        schedule_raw if isinstance(schedule_raw, list) else list(base.schedule)
+    )
     raw_jitter = raw.get("jitter_ratio", base.jitter_ratio)
     try:
-        jitter = float(raw_jitter if isinstance(raw_jitter, (int, float, str)) else base.jitter_ratio)
+        jitter = float(
+            raw_jitter
+            if isinstance(raw_jitter, (int, float, str))
+            else base.jitter_ratio
+        )
     except Exception:
         jitter = base.jitter_ratio
     jitter = max(0.0, min(1.0, jitter))
@@ -630,10 +738,14 @@ def _snapshot_to_schema(policy: RetryPolicyResolved) -> MediaRetryPolicySnapshot
 
 
 def _serialize_policy_snapshot_json(policy: RetryPolicyResolved) -> str:
-    return json.dumps(_resolved_policy_to_snapshot(policy), separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(
+        _resolved_policy_to_snapshot(policy), separators=(",", ":"), ensure_ascii=False
+    )
 
 
-def _deserialize_policy_snapshot_json(value: str | None, *, job_type: MediaJobType) -> RetryPolicyResolved:
+def _deserialize_policy_snapshot_json(
+    value: str | None, *, job_type: MediaJobType
+) -> RetryPolicyResolved:
     try:
         raw = json.loads(value or "{}")
     except Exception:
@@ -643,9 +755,15 @@ def _deserialize_policy_snapshot_json(value: str | None, *, job_type: MediaJobTy
     return _policy_snapshot_from_raw(raw, job_type=job_type)
 
 
-def retry_policy_event_to_read(event: MediaJobRetryPolicyEvent) -> MediaRetryPolicyEventRead:
-    before = _deserialize_policy_snapshot_json(event.before_policy_json, job_type=event.job_type)
-    after = _deserialize_policy_snapshot_json(event.after_policy_json, job_type=event.job_type)
+def retry_policy_event_to_read(
+    event: MediaJobRetryPolicyEvent,
+) -> MediaRetryPolicyEventRead:
+    before = _deserialize_policy_snapshot_json(
+        event.before_policy_json, job_type=event.job_type
+    )
+    after = _deserialize_policy_snapshot_json(
+        event.after_policy_json, job_type=event.job_type
+    )
     preset_key = str(event.preset_key or "").strip() or None
     if preset_key not in RETRY_POLICY_PRESET_KEYS:
         preset_key = None
@@ -687,7 +805,9 @@ async def _record_retry_policy_event(
     return row
 
 
-def _retry_policy_to_read(job_type: MediaJobType, policy: RetryPolicyResolved, row: MediaJobRetryPolicy | None) -> MediaRetryPolicyRead:
+def _retry_policy_to_read(
+    job_type: MediaJobType, policy: RetryPolicyResolved, row: MediaJobRetryPolicy | None
+) -> MediaRetryPolicyRead:
     created_at = row.created_at if row is not None else _now()
     updated_at = row.updated_at if row is not None else created_at
     updated_by_user_id = row.updated_by_user_id if row is not None else None
@@ -730,7 +850,9 @@ def _validate_policy_payload(payload: MediaRetryPolicyUpdateRequest) -> None:
     if payload.max_attempts is not None:
         attempts = int(payload.max_attempts)
         if attempts < 1 or attempts > MAX_RETRY_POLICY_ATTEMPTS:
-            raise ValueError(f"max_attempts must be between 1 and {MAX_RETRY_POLICY_ATTEMPTS}")
+            raise ValueError(
+                f"max_attempts must be between 1 and {MAX_RETRY_POLICY_ATTEMPTS}"
+            )
     if payload.backoff_schedule_seconds is not None:
         _validate_schedule(payload.backoff_schedule_seconds)
     if payload.jitter_ratio is not None:
@@ -739,15 +861,25 @@ def _validate_policy_payload(payload: MediaRetryPolicyUpdateRequest) -> None:
             raise ValueError("jitter_ratio must be between 0 and 1")
 
 
-async def get_retry_policy_for_job_type(session: AsyncSession, job_type: MediaJobType) -> RetryPolicyResolved:
-    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == job_type))
+async def get_retry_policy_for_job_type(
+    session: AsyncSession, job_type: MediaJobType
+) -> RetryPolicyResolved:
+    row = await session.scalar(
+        select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == job_type)
+    )
     return _policy_row_to_resolved(row, job_type=job_type)
 
 
 async def list_retry_policies(session: AsyncSession) -> list[MediaRetryPolicyRead]:
     rows = (
-        await session.execute(select(MediaJobRetryPolicy).order_by(MediaJobRetryPolicy.job_type.asc()))
-    ).scalars().all()
+        (
+            await session.execute(
+                select(MediaJobRetryPolicy).order_by(MediaJobRetryPolicy.job_type.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
     by_type = {row.job_type: row for row in rows}
     out: list[MediaRetryPolicyRead] = []
     for job_type in MediaJobType:
@@ -766,7 +898,11 @@ async def upsert_retry_policy(
 ) -> MediaRetryPolicyRead:
     _validate_policy_payload(payload)
     parsed_job_type = _parse_job_type(job_type)
-    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    row = await session.scalar(
+        select(MediaJobRetryPolicy).where(
+            MediaJobRetryPolicy.job_type == parsed_job_type
+        )
+    )
     if row is None:
         base = _default_retry_policy(parsed_job_type)
         row = MediaJobRetryPolicy(
@@ -788,7 +924,9 @@ async def upsert_retry_policy(
         fallback=before_policy,
     )
     row.max_attempts = after_policy.max_attempts
-    row.backoff_schedule_json = json.dumps(_validate_schedule(after_policy.schedule), separators=(",", ":"))
+    row.backoff_schedule_json = json.dumps(
+        _validate_schedule(after_policy.schedule), separators=(",", ":")
+    )
     row.jitter_ratio = after_policy.jitter_ratio
     row.enabled = after_policy.enabled
     row.updated_by_user_id = updated_by_user_id
@@ -803,7 +941,9 @@ async def upsert_retry_policy(
     )
     await session.commit()
     await session.refresh(row)
-    return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
+    return _retry_policy_to_read(
+        parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row
+    )
 
 
 async def reset_retry_policy(
@@ -814,7 +954,11 @@ async def reset_retry_policy(
 ) -> MediaRetryPolicyRead:
     parsed_job_type = _parse_job_type(job_type)
     fallback = _default_retry_policy(parsed_job_type)
-    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    row = await session.scalar(
+        select(MediaJobRetryPolicy).where(
+            MediaJobRetryPolicy.job_type == parsed_job_type
+        )
+    )
     before_policy = _policy_row_to_resolved(row, job_type=parsed_job_type)
     if row is None:
         row = MediaJobRetryPolicy(job_type=parsed_job_type)
@@ -835,13 +979,23 @@ async def reset_retry_policy(
     )
     await session.commit()
     await session.refresh(row)
-    return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
+    return _retry_policy_to_read(
+        parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row
+    )
 
 
-async def reset_all_retry_policies(session: AsyncSession, *, updated_by_user_id: UUID | None) -> list[MediaRetryPolicyRead]:
+async def reset_all_retry_policies(
+    session: AsyncSession, *, updated_by_user_id: UUID | None
+) -> list[MediaRetryPolicyRead]:
     rows = (
-        await session.execute(select(MediaJobRetryPolicy).order_by(MediaJobRetryPolicy.job_type.asc()))
-    ).scalars().all()
+        (
+            await session.execute(
+                select(MediaJobRetryPolicy).order_by(MediaJobRetryPolicy.job_type.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
     by_type = {row.job_type: row for row in rows}
     for job_type in MediaJobType:
         row = by_type.get(job_type)
@@ -877,7 +1031,9 @@ def _apply_resolved_policy_to_row(
     updated_by_user_id: UUID | None,
 ) -> None:
     row.max_attempts = int(policy.max_attempts)
-    row.backoff_schedule_json = json.dumps(_validate_schedule(policy.schedule), separators=(",", ":"))
+    row.backoff_schedule_json = json.dumps(
+        _validate_schedule(policy.schedule), separators=(",", ":")
+    )
     row.jitter_ratio = float(policy.jitter_ratio)
     row.enabled = bool(policy.enabled)
     row.updated_by_user_id = updated_by_user_id
@@ -904,7 +1060,10 @@ async def list_retry_policy_history(
         stmt = stmt.where(and_(*clauses))
         count_stmt = count_stmt.where(and_(*clauses))
     stmt = (
-        stmt.order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+        stmt.order_by(
+            MediaJobRetryPolicyEvent.created_at.desc(),
+            MediaJobRetryPolicyEvent.id.desc(),
+        )
         .offset((page - 1) * limit)
         .limit(limit)
     )
@@ -929,7 +1088,9 @@ def _preset_to_read(
 ) -> MediaRetryPolicyPresetRead:
     return MediaRetryPolicyPresetRead(
         preset_key=cast(Any, preset_key),
-        label=RETRY_POLICY_PRESET_LABELS.get(preset_key, preset_key.replace("_", " ").title()),
+        label=RETRY_POLICY_PRESET_LABELS.get(
+            preset_key, preset_key.replace("_", " ").title()
+        ),
         policy=_snapshot_to_schema(policy),
         source_event_id=source_event_id,
         fallback_used=fallback_used,
@@ -952,7 +1113,10 @@ async def get_retry_policy_presets(
             MediaJobRetryPolicyEvent.job_type == parsed_job_type,
             MediaJobRetryPolicyEvent.action == "mark_known_good",
         )
-        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+        .order_by(
+            MediaJobRetryPolicyEvent.created_at.desc(),
+            MediaJobRetryPolicyEvent.id.desc(),
+        )
     )
     if known_good_event is not None:
         known_good_policy = _deserialize_policy_snapshot_json(
@@ -978,9 +1142,14 @@ async def get_retry_policy_presets(
         select(MediaJobRetryPolicyEvent)
         .where(
             MediaJobRetryPolicyEvent.job_type == parsed_job_type,
-            MediaJobRetryPolicyEvent.action.in_(("update", "reset", "reset_all", "rollback")),
+            MediaJobRetryPolicyEvent.action.in_(
+                ("update", "reset", "reset_all", "rollback")
+            ),
         )
-        .order_by(MediaJobRetryPolicyEvent.created_at.desc(), MediaJobRetryPolicyEvent.id.desc())
+        .order_by(
+            MediaJobRetryPolicyEvent.created_at.desc(),
+            MediaJobRetryPolicyEvent.id.desc(),
+        )
     )
     if last_change_event is not None:
         last_change_policy = _deserialize_policy_snapshot_json(
@@ -1019,7 +1188,11 @@ async def mark_retry_policy_known_good(
     note: str | None = None,
 ) -> MediaRetryPolicyEventRead:
     parsed_job_type = _parse_job_type(job_type)
-    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    row = await session.scalar(
+        select(MediaJobRetryPolicy).where(
+            MediaJobRetryPolicy.job_type == parsed_job_type
+        )
+    )
     current = _policy_row_to_resolved(row, job_type=parsed_job_type)
     event = await _record_retry_policy_event(
         session,
@@ -1044,7 +1217,11 @@ async def rollback_retry_policy(
     actor_user_id: UUID | None,
 ) -> MediaRetryPolicyRead:
     parsed_job_type = _parse_job_type(job_type)
-    row = await session.scalar(select(MediaJobRetryPolicy).where(MediaJobRetryPolicy.job_type == parsed_job_type))
+    row = await session.scalar(
+        select(MediaJobRetryPolicy).where(
+            MediaJobRetryPolicy.job_type == parsed_job_type
+        )
+    )
     before_policy = _policy_row_to_resolved(row, job_type=parsed_job_type)
 
     target_policy: RetryPolicyResolved
@@ -1058,11 +1235,16 @@ async def rollback_retry_policy(
         )
         if event is None:
             raise ValueError("Retry policy history event not found")
-        target_policy = _deserialize_policy_snapshot_json(event.after_policy_json, job_type=parsed_job_type)
+        target_policy = _deserialize_policy_snapshot_json(
+            event.after_policy_json, job_type=parsed_job_type
+        )
         target_preset_key = None
     else:
         presets = await get_retry_policy_presets(session, job_type=parsed_job_type)
-        preset = next((item for item in presets.items if item.preset_key == payload.preset_key), None)
+        preset = next(
+            (item for item in presets.items if item.preset_key == payload.preset_key),
+            None,
+        )
         if preset is None:
             raise ValueError("Unknown retry policy preset")
         target_policy = _policy_snapshot_from_raw(
@@ -1080,7 +1262,9 @@ async def rollback_retry_policy(
         row = MediaJobRetryPolicy(job_type=parsed_job_type)
         session.add(row)
         await session.flush()
-    _apply_resolved_policy_to_row(row, policy=target_policy, updated_by_user_id=actor_user_id)
+    _apply_resolved_policy_to_row(
+        row, policy=target_policy, updated_by_user_id=actor_user_id
+    )
     session.add(row)
     await _record_retry_policy_event(
         session,
@@ -1094,7 +1278,9 @@ async def rollback_retry_policy(
     )
     await session.commit()
     await session.refresh(row)
-    return _retry_policy_to_read(parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row)
+    return _retry_policy_to_read(
+        parsed_job_type, _policy_row_to_resolved(row, job_type=parsed_job_type), row
+    )
 
 
 async def _apply_job_tag_changes(
@@ -1105,7 +1291,9 @@ async def _apply_job_tag_changes(
     remove_tags: list[str] | None = None,
 ) -> None:
     existing_by_value = {
-        rel.tag.value: rel for rel in (job.tags or []) if getattr(rel, "tag", None) and getattr(rel.tag, "value", None)
+        rel.tag.value: rel
+        for rel in (job.tags or [])
+        if getattr(rel, "tag", None) and getattr(rel.tag, "value", None)
     }
 
     remove_values = {_normalize_job_tag(raw) for raw in (remove_tags or [])}
@@ -1120,7 +1308,9 @@ async def _apply_job_tag_changes(
     for value in add_values:
         if value in existing_by_value:
             continue
-        tag = await session.scalar(select(MediaJobTag).where(MediaJobTag.value == value))
+        tag = await session.scalar(
+            select(MediaJobTag).where(MediaJobTag.value == value)
+        )
         if tag is None:
             tag = MediaJobTag(value=value)
             session.add(tag)
@@ -1129,7 +1319,9 @@ async def _apply_job_tag_changes(
     await session.flush()
 
 
-async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple[list[MediaAsset], dict[str, int]]:
+async def list_assets(
+    session: AsyncSession, filters: MediaListFilters
+) -> tuple[list[MediaAsset], dict[str, int]]:
     clauses = []
     if not filters.include_trashed:
         clauses.append(MediaAsset.status != MediaAssetStatus.trashed)
@@ -1187,18 +1379,37 @@ async def list_assets(session: AsyncSession, filters: MediaListFilters) -> tuple
     order_map: dict[str, list[ColumnElement[Any]]] = {
         "newest": [MediaAsset.created_at.desc(), MediaAsset.id.desc()],
         "oldest": [MediaAsset.created_at.asc(), MediaAsset.id.asc()],
-        "name_asc": [MediaAsset.original_filename.asc().nulls_last(), MediaAsset.created_at.desc()],
-        "name_desc": [MediaAsset.original_filename.desc().nulls_last(), MediaAsset.created_at.desc()],
+        "name_asc": [
+            MediaAsset.original_filename.asc().nulls_last(),
+            MediaAsset.created_at.desc(),
+        ],
+        "name_desc": [
+            MediaAsset.original_filename.desc().nulls_last(),
+            MediaAsset.created_at.desc(),
+        ],
     }
     order = order_map.get(filters.sort, order_map["newest"])
-    stmt = stmt.order_by(*order).offset((filters.page - 1) * filters.limit).limit(filters.limit)
+    stmt = (
+        stmt.order_by(*order)
+        .offset((filters.page - 1) * filters.limit)
+        .limit(filters.limit)
+    )
     total_items = int((await session.scalar(count_stmt)) or 0)
-    total_pages = max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
+    total_pages = (
+        max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
+    )
     rows = (await session.execute(stmt)).scalars().all()
-    return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
+    return list(rows), {
+        "total_items": total_items,
+        "total_pages": total_pages,
+        "page": filters.page,
+        "limit": filters.limit,
+    }
 
 
-async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tuple[list[MediaJob], dict[str, int]]:
+async def list_jobs(
+    session: AsyncSession, filters: MediaJobListFilters
+) -> tuple[list[MediaJob], dict[str, int]]:
     clauses: list[ColumnElement[bool]] = []
     if filters.status:
         clauses.append(MediaJob.status == MediaJobStatus(filters.status))
@@ -1211,7 +1422,10 @@ async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tupl
     if filters.created_to:
         clauses.append(MediaJob.created_at <= filters.created_to)
     if filters.triage_state:
-        clauses.append(MediaJob.triage_state == _coerce_triage_state(filters.triage_state, fallback="open"))
+        clauses.append(
+            MediaJob.triage_state
+            == _coerce_triage_state(filters.triage_state, fallback="open")
+        )
     if filters.assigned_to_user_id:
         clauses.append(MediaJob.assigned_to_user_id == filters.assigned_to_user_id)
     if filters.dead_letter_only:
@@ -1231,17 +1445,30 @@ async def list_jobs(session: AsyncSession, filters: MediaJobListFilters) -> tupl
                 )
             )
 
-    stmt = select(MediaJob).options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
+    stmt = select(MediaJob).options(
+        selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag)
+    )
     count_stmt = select(func.count()).select_from(MediaJob)
     if clauses:
         stmt = stmt.where(and_(*clauses))
         count_stmt = count_stmt.where(and_(*clauses))
 
-    stmt = stmt.order_by(MediaJob.created_at.desc(), MediaJob.id.desc()).offset((filters.page - 1) * filters.limit).limit(filters.limit)
+    stmt = (
+        stmt.order_by(MediaJob.created_at.desc(), MediaJob.id.desc())
+        .offset((filters.page - 1) * filters.limit)
+        .limit(filters.limit)
+    )
     total_items = int((await session.scalar(count_stmt)) or 0)
-    total_pages = max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
+    total_pages = (
+        max(1, (total_items + filters.limit - 1) // filters.limit) if total_items else 1
+    )
     rows = (await session.execute(stmt)).scalars().all()
-    return list(rows), {"total_items": total_items, "total_pages": total_pages, "page": filters.page, "limit": filters.limit}
+    return list(rows), {
+        "total_items": total_items,
+        "total_pages": total_pages,
+        "page": filters.page,
+        "limit": filters.limit,
+    }
 
 
 async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
@@ -1249,7 +1476,10 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
     queue_depth = 0
     workers: list[MediaTelemetryWorkerRead] = []
     now = _now()
-    prefix = str(getattr(settings, "media_dam_worker_heartbeat_prefix", HEARTBEAT_PREFIX) or HEARTBEAT_PREFIX)
+    prefix = str(
+        getattr(settings, "media_dam_worker_heartbeat_prefix", HEARTBEAT_PREFIX)
+        or HEARTBEAT_PREFIX
+    )
 
     if redis is not None:
         try:
@@ -1258,7 +1488,13 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
             queue_depth = 0
 
         try:
-            scan_limit = max(1, int(getattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 500) or 500))
+            scan_limit = max(
+                1,
+                int(
+                    getattr(settings, "media_dam_telemetry_heartbeat_scan_limit", 500)
+                    or 500
+                ),
+            )
 
             async def _consume_heartbeat(key: object) -> bool:
                 raw = await _await_if_needed(redis.get(str(key)))
@@ -1275,9 +1511,15 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
                 lag = max(0, int((now - last_seen).total_seconds()))
                 workers.append(
                     MediaTelemetryWorkerRead(
-                        worker_id=str(payload.get("worker_id") or str(key).split(":")[-1]),
+                        worker_id=str(
+                            payload.get("worker_id") or str(key).split(":")[-1]
+                        ),
                         hostname=str(payload.get("hostname") or "") or None,
-                        pid=int(payload["pid"]) if str(payload.get("pid") or "").isdigit() else None,
+                        pid=(
+                            int(payload["pid"])
+                            if str(payload.get("pid") or "").isdigit()
+                            else None
+                        ),
                         app_version=str(payload.get("app_version") or "") or None,
                         last_seen_at=last_seen,
                         lag_seconds=lag,
@@ -1302,20 +1544,39 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         except Exception:
             workers = []
 
-    stale_seconds = max(60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600))
+    stale_seconds = max(
+        60, int(getattr(settings, "media_dam_processing_stale_seconds", 600) or 600)
+    )
     stale_cutoff = now - timedelta(seconds=stale_seconds)
     stale_processing_count = int(
-        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.processing, MediaJob.started_at < stale_cutoff)))
+        (
+            await session.scalar(
+                select(func.count())
+                .select_from(MediaJob)
+                .where(
+                    MediaJob.status == MediaJobStatus.processing,
+                    MediaJob.started_at < stale_cutoff,
+                )
+            )
+        )
         or 0
     )
     dead_letter_count = int(
-        (await session.scalar(select(func.count()).select_from(MediaJob).where(MediaJob.status == MediaJobStatus.dead_letter)))
+        (
+            await session.scalar(
+                select(func.count())
+                .select_from(MediaJob)
+                .where(MediaJob.status == MediaJobStatus.dead_letter)
+            )
+        )
         or 0
     )
     retry_scheduled_count = int(
         (
             await session.scalar(
-                select(func.count()).select_from(MediaJob).where(
+                select(func.count())
+                .select_from(MediaJob)
+                .where(
                     MediaJob.status == MediaJobStatus.failed,
                     MediaJob.next_retry_at.is_not(None),
                 )
@@ -1326,7 +1587,9 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
     sla_breached_count = int(
         (
             await session.scalar(
-                select(func.count()).select_from(MediaJob).where(
+                select(func.count())
+                .select_from(MediaJob)
+                .where(
                     MediaJob.sla_due_at.is_not(None),
                     MediaJob.sla_due_at < now,
                     MediaJob.triage_state != "resolved",
@@ -1337,21 +1600,35 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
     )
 
     oldest_queued_at = await session.scalar(
-        select(func.min(MediaJob.created_at)).where(MediaJob.status == MediaJobStatus.queued)
+        select(func.min(MediaJob.created_at)).where(
+            MediaJob.status == MediaJobStatus.queued
+        )
     )
     oldest_queued_age_seconds: int | None = None
     if oldest_queued_at:
-        oldest_queued_age_seconds = max(0, int((now - oldest_queued_at).total_seconds()))
+        oldest_queued_age_seconds = max(
+            0, int((now - oldest_queued_at).total_seconds())
+        )
 
     status_counts_rows = (
-        await session.execute(select(MediaJob.status, func.count()).group_by(MediaJob.status))
+        await session.execute(
+            select(MediaJob.status, func.count()).group_by(MediaJob.status)
+        )
     ).all()
-    status_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in status_counts_rows}
+    status_counts = {
+        row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0)
+        for row in status_counts_rows
+    }
 
     type_counts_rows = (
-        await session.execute(select(MediaJob.job_type, func.count()).group_by(MediaJob.job_type))
+        await session.execute(
+            select(MediaJob.job_type, func.count()).group_by(MediaJob.job_type)
+        )
     ).all()
-    type_counts = {row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0) for row in type_counts_rows}
+    type_counts = {
+        row[0].value if hasattr(row[0], "value") else str(row[0]): int(row[1] or 0)
+        for row in type_counts_rows
+    }
 
     completed_rows = (
         await session.execute(
@@ -1370,8 +1647,14 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
     for started_at, completed_at in completed_rows:
         if not started_at or not completed_at:
             continue
-        processing_seconds.append(max(0, int((completed_at - started_at).total_seconds())))
-    avg_processing_seconds = int(sum(processing_seconds) / len(processing_seconds)) if processing_seconds else None
+        processing_seconds.append(
+            max(0, int((completed_at - started_at).total_seconds()))
+        )
+    avg_processing_seconds = (
+        int(sum(processing_seconds) / len(processing_seconds))
+        if processing_seconds
+        else None
+    )
 
     workers.sort(key=lambda row: row.last_seen_at, reverse=True)
     return MediaTelemetryResponse(
@@ -1388,12 +1671,22 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
         type_counts=type_counts,
     )
 
+
 def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
     _ensure_asset_storage_placement(asset)
-    tags = sorted({tag_rel.tag.value for tag_rel in (asset.tags or []) if getattr(tag_rel, "tag", None)})
+    tags = sorted(
+        {
+            tag_rel.tag.value
+            for tag_rel in (asset.tags or [])
+            if getattr(tag_rel, "tag", None)
+        }
+    )
     i18n: list[MediaAssetI18nRead] = []
     for i18n_row in sorted(asset.i18n or [], key=lambda x: x.lang):
-        lang = cast(Literal["en", "ro"], i18n_row.lang if i18n_row.lang in {"en", "ro"} else "en")
+        lang = cast(
+            Literal["en", "ro"],
+            i18n_row.lang if i18n_row.lang in {"en", "ro"} else "en",
+        )
         i18n.append(
             MediaAssetI18nRead(
                 lang=lang,
@@ -1417,7 +1710,11 @@ def asset_to_read(asset: MediaAsset) -> MediaAssetRead:
                 created_at=variant_row.created_at,
             )
         )
-    preview_url = asset.public_url if _is_publicly_servable(asset) else build_preview_url(asset.id)
+    preview_url = (
+        asset.public_url
+        if _is_publicly_servable(asset)
+        else build_preview_url(asset.id)
+    )
     return MediaAssetRead(
         id=asset.id,
         asset_type=asset.asset_type.value,
@@ -1466,7 +1763,9 @@ async def get_asset_or_404(session: AsyncSession, asset_id: UUID) -> MediaAsset:
     return asset
 
 
-async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: MediaAssetUpdateRequest) -> None:
+async def apply_asset_update(
+    session: AsyncSession, asset: MediaAsset, payload: MediaAssetUpdateRequest
+) -> None:
     before_public = _is_publicly_servable(asset)
     if payload.status:
         asset.status = MediaAssetStatus(payload.status)
@@ -1491,7 +1790,9 @@ async def apply_asset_update(session: AsyncSession, asset: MediaAsset, payload: 
         _move_variant_file_roots(asset, to_public=after_public)
 
 
-async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries: list[MediaAssetUpdateI18nItem]) -> None:
+async def _replace_asset_i18n(
+    session: AsyncSession, asset: MediaAsset, entries: list[MediaAssetUpdateI18nItem]
+) -> None:
     by_lang = {row.lang: row for row in (asset.i18n or [])}
     seen_langs: set[str] = set()
     for row in entries:
@@ -1509,7 +1810,9 @@ async def _replace_asset_i18n(session: AsyncSession, asset: MediaAsset, entries:
         current.description = (row.description or "").strip() or None
 
 
-async def _replace_asset_tags(session: AsyncSession, asset: MediaAsset, tags: list[str]) -> None:
+async def _replace_asset_tags(
+    session: AsyncSession, asset: MediaAsset, tags: list[str]
+) -> None:
     normalized = []
     seen = set()
     for raw in tags or []:
@@ -1521,7 +1824,9 @@ async def _replace_asset_tags(session: AsyncSession, asset: MediaAsset, tags: li
         if len(normalized) >= 30:
             break
 
-    existing = {rel.tag.value: rel for rel in (asset.tags or []) if getattr(rel, "tag", None)}
+    existing = {
+        rel.tag.value: rel for rel in (asset.tags or []) if getattr(rel, "tag", None)
+    }
     keep = set(normalized)
     for value, relation in existing.items():
         if value not in keep:
@@ -1575,7 +1880,9 @@ async def change_status(
     return asset
 
 
-async def soft_delete_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID | None) -> MediaAsset:
+async def soft_delete_asset(
+    session: AsyncSession, asset: MediaAsset, actor_id: UUID | None
+) -> MediaAsset:
     prev_status = asset.status
     asset.status = MediaAssetStatus.trashed
     asset.trashed_at = _now()
@@ -1610,7 +1917,9 @@ async def soft_delete_asset(session: AsyncSession, asset: MediaAsset, actor_id: 
     return asset
 
 
-async def restore_asset(session: AsyncSession, asset: MediaAsset, actor_id: UUID | None) -> MediaAsset:
+async def restore_asset(
+    session: AsyncSession, asset: MediaAsset, actor_id: UUID | None
+) -> MediaAsset:
     if asset.status != MediaAssetStatus.trashed:
         return asset
     prev_status = asset.status
@@ -1683,10 +1992,17 @@ async def purge_asset(session: AsyncSession, asset: MediaAsset) -> None:
 async def purge_expired_trash(session: AsyncSession) -> int:
     cutoff = _now() - timedelta(days=TRASH_RETENTION_DAYS)
     rows = (
-        await session.execute(
-            select(MediaAsset).where(MediaAsset.status == MediaAssetStatus.trashed, MediaAsset.trashed_at < cutoff)
+        (
+            await session.execute(
+                select(MediaAsset).where(
+                    MediaAsset.status == MediaAssetStatus.trashed,
+                    MediaAsset.trashed_at < cutoff,
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     count = 0
     for asset in rows:
         await purge_asset(session, asset)
@@ -1700,7 +2016,9 @@ async def rebuild_usage_edges(
     *,
     commit: bool = True,
 ) -> MediaUsageResponse:
-    await session.execute(delete(MediaUsageEdge).where(MediaUsageEdge.asset_id == asset.id))
+    await session.execute(
+        delete(MediaUsageEdge).where(MediaUsageEdge.asset_id == asset.id)
+    )
     now = _now()
     refs = await _collect_usage_refs(session, asset)
     seen: set[tuple[str, str, str | None, str, str | None]] = set()
@@ -1725,8 +2043,16 @@ async def rebuild_usage_edges(
     else:
         await session.flush()
     rows = (
-        await session.execute(select(MediaUsageEdge).where(MediaUsageEdge.asset_id == asset.id).order_by(MediaUsageEdge.source_key.asc()))
-    ).scalars().all()
+        (
+            await session.execute(
+                select(MediaUsageEdge)
+                .where(MediaUsageEdge.asset_id == asset.id)
+                .order_by(MediaUsageEdge.source_key.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
     return MediaUsageResponse(
         asset_id=asset.id,
         public_url=asset.public_url,
@@ -1762,7 +2088,9 @@ async def _collect_usage_refs(
             )
         ).all()
         for image_id, block_key in content_rows:
-            refs.append(("content_image", block_key, str(image_id), "content_images.url", None))
+            refs.append(
+                ("content_image", block_key, str(image_id), "content_images.url", None)
+            )
 
         product_rows = (
             await session.execute(
@@ -1772,23 +2100,35 @@ async def _collect_usage_refs(
             )
         ).all()
         for image_id, slug in product_rows:
-            refs.append(("product_image", slug, str(image_id), "product_images.url", None))
+            refs.append(
+                ("product_image", slug, str(image_id), "product_images.url", None)
+            )
 
         like = f"%{url}%"
         tr_rows = (
             await session.execute(
                 select(ContentBlock.key, ContentBlockTranslation.lang)
-                .join(ContentBlock, ContentBlock.id == ContentBlockTranslation.content_block_id)
+                .join(
+                    ContentBlock,
+                    ContentBlock.id == ContentBlockTranslation.content_block_id,
+                )
                 .where(ContentBlockTranslation.body_markdown.ilike(like))
             )
         ).all()
         for block_key, lang in tr_rows:
-            refs.append(("content_translation", block_key, None, "translations.body_markdown", str(lang or "")))
+            refs.append(
+                (
+                    "content_translation",
+                    block_key,
+                    None,
+                    "translations.body_markdown",
+                    str(lang or ""),
+                )
+            )
 
         social_rows = (
             await session.execute(
-                select(ContentBlock.key)
-                .where(
+                select(ContentBlock.key).where(
                     ContentBlock.key == "site.social",
                     or_(
                         ContentBlock.body_markdown.ilike(like),
@@ -1830,18 +2170,29 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
         retry_policy = await get_retry_policy_for_job_type(session, job.job_type)
     if RETRY_POLICY_PAYLOAD_KEY not in payload:
         payload[RETRY_POLICY_PAYLOAD_KEY] = _resolved_policy_to_snapshot(retry_policy)
-        job.payload_json = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
+        job.payload_json = json.dumps(
+            payload, separators=(",", ":"), ensure_ascii=False
+        )
     if not int(job.max_attempts or 0):
         job.max_attempts = int(retry_policy.max_attempts)
 
     job.status = MediaJobStatus.processing
-    job.triage_state = "retrying" if job.attempt > 0 else _coerce_triage_state(job.triage_state, fallback="open")
+    job.triage_state = (
+        "retrying"
+        if job.attempt > 0
+        else _coerce_triage_state(job.triage_state, fallback="open")
+    )
     job.started_at = _now()
     job.attempt = int(job.attempt or 0) + 1
     job.next_retry_at = None
     session.add(job)
     await session.flush()
-    await _record_job_event(session, job=job, action="processing_started", meta={"attempt": int(job.attempt or 0)})
+    await _record_job_event(
+        session,
+        job=job,
+        action="processing_started",
+        meta={"attempt": int(job.attempt or 0)},
+    )
     try:
         if job.job_type == MediaJobType.ingest:
             await _process_ingest_job(session, job)
@@ -1872,7 +2223,10 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
         )
     except Exception as exc:
         now = _now()
-        effective_max_attempts = max(1, int(job.max_attempts or retry_policy.max_attempts or DEFAULT_MAX_ATTEMPTS))
+        effective_max_attempts = max(
+            1,
+            int(job.max_attempts or retry_policy.max_attempts or DEFAULT_MAX_ATTEMPTS),
+        )
         delay = (
             None
             if not retry_policy.enabled
@@ -1938,7 +2292,9 @@ def _job_payload(job: MediaJob) -> dict[str, Any]:
 async def _process_ingest_job(session: AsyncSession, job: MediaJob) -> None:
     if not job.asset_id:
         return
-    asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == job.asset_id))
+    asset = await session.scalar(
+        select(MediaAsset).where(MediaAsset.id == job.asset_id)
+    )
     if asset is None:
         return
     path = _asset_file_path(asset)
@@ -1963,7 +2319,9 @@ async def _process_variant_job(session: AsyncSession, job: MediaJob) -> None:
     profile = str(payload.get("profile") or "web-1280")
     if not job.asset_id:
         return
-    asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == job.asset_id))
+    asset = await session.scalar(
+        select(MediaAsset).where(MediaAsset.id == job.asset_id)
+    )
     if asset is None or asset.asset_type != MediaAssetType.image:
         return
     src_path = _asset_file_path(asset)
@@ -1971,7 +2329,9 @@ async def _process_variant_job(session: AsyncSession, job: MediaJob) -> None:
         raise FileNotFoundError(f"Missing media file for {asset.public_url}")
     dimensions = PROFILE_DIMENSIONS.get(profile, PROFILE_DIMENSIONS["web-1280"])
     variant_key = f"variants/{asset.id}/{profile}.jpg"
-    variant_path = _storage_path_for_key(variant_key, public_root=_is_publicly_servable(asset))
+    variant_path = _storage_path_for_key(
+        variant_key, public_root=_is_publicly_servable(asset)
+    )
     variant_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _render_variant() -> tuple[int, int]:
@@ -1983,7 +2343,9 @@ async def _process_variant_job(session: AsyncSession, job: MediaJob) -> None:
 
     width, height = await anyio.to_thread.run_sync(_render_variant)
     row = await session.scalar(
-        select(MediaVariant).where(MediaVariant.asset_id == asset.id, MediaVariant.profile == profile)
+        select(MediaVariant).where(
+            MediaVariant.asset_id == asset.id, MediaVariant.profile == profile
+        )
     )
     if row is None:
         row = MediaVariant(
@@ -2003,7 +2365,9 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     payload = _job_payload(job)
     if not job.asset_id:
         return
-    asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == job.asset_id))
+    asset = await session.scalar(
+        select(MediaAsset).where(MediaAsset.id == job.asset_id)
+    )
     if asset is None or asset.asset_type != MediaAssetType.image:
         return
     src_path = _asset_file_path(asset)
@@ -2016,7 +2380,9 @@ async def _process_edit_job(session: AsyncSession, job: MediaJob) -> None:
     max_w = payload.get("resize_max_width")
     max_h = payload.get("resize_max_height")
     edited_key = f"variants/{asset.id}/edit-{job.id}.jpg"
-    edited_path = _storage_path_for_key(edited_key, public_root=_is_publicly_servable(asset))
+    edited_path = _storage_path_for_key(
+        edited_key, public_root=_is_publicly_servable(asset)
+    )
     edited_path.parent.mkdir(parents=True, exist_ok=True)
 
     def _render_edit() -> tuple[int, int]:
@@ -2059,7 +2425,9 @@ async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
     if not job.asset_id:
         return
     asset = await session.scalar(
-        select(MediaAsset).options(selectinload(MediaAsset.tags).selectinload(MediaAssetTag.tag)).where(MediaAsset.id == job.asset_id)
+        select(MediaAsset)
+        .options(selectinload(MediaAsset.tags).selectinload(MediaAssetTag.tag))
+        .where(MediaAsset.id == job.asset_id)
     )
     if asset is None:
         return
@@ -2070,23 +2438,33 @@ async def _process_ai_tag_job(session: AsyncSession, job: MediaJob) -> None:
             auto_tags.add(token[:32])
     if asset.width and asset.height:
         auto_tags.add("landscape" if asset.width >= asset.height else "portrait")
-    await _replace_asset_tags(session, asset, sorted({*(tag.tag.value for tag in (asset.tags or []) if tag.tag), *auto_tags}))
+    await _replace_asset_tags(
+        session,
+        asset,
+        sorted({*(tag.tag.value for tag in (asset.tags or []) if tag.tag), *auto_tags}),
+    )
 
 
 async def _process_duplicate_scan_job(session: AsyncSession, job: MediaJob) -> None:
     if not job.asset_id:
         return
-    asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == job.asset_id))
+    asset = await session.scalar(
+        select(MediaAsset).where(MediaAsset.id == job.asset_id)
+    )
     if not asset or not asset.checksum_sha256:
         return
     rows = (
-        await session.execute(
-            select(MediaAsset).where(
-                MediaAsset.id != asset.id,
-                MediaAsset.checksum_sha256 == asset.checksum_sha256,
+        (
+            await session.execute(
+                select(MediaAsset).where(
+                    MediaAsset.id != asset.id,
+                    MediaAsset.checksum_sha256 == asset.checksum_sha256,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     group = asset.checksum_sha256[:16]
     asset.dedupe_group = group
     session.add(asset)
@@ -2097,7 +2475,10 @@ async def _process_duplicate_scan_job(session: AsyncSession, job: MediaJob) -> N
 
 async def _process_usage_reconcile_job(session: AsyncSession, job: MediaJob) -> None:
     payload = _job_payload(job)
-    limit = int(payload.get("limit") or int(getattr(settings, "media_usage_reconcile_batch_size", 200) or 200))
+    limit = int(
+        payload.get("limit")
+        or int(getattr(settings, "media_usage_reconcile_batch_size", 200) or 200)
+    )
     limit = max(1, min(limit, 5000))
 
     stmt = (
@@ -2148,7 +2529,10 @@ async def enqueue_due_retries(session: AsyncSession, *, limit: int = 50) -> list
             session,
             job=job,
             action="retry_enqueued",
-            meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+            meta={
+                "attempt": int(job.attempt or 0),
+                "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS),
+            },
         )
         queued_ids.append(job.id)
     await session.commit()
@@ -2179,7 +2563,10 @@ async def manual_retry_job(
         job=job,
         actor_user_id=actor_user_id,
         action="manual_retry",
-        meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+        meta={
+            "attempt": int(job.attempt or 0),
+            "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS),
+        },
     )
     await session.commit()
     await _maybe_queue_job(job.id)
@@ -2196,15 +2583,24 @@ async def bulk_retry_jobs(
     if not job_ids:
         return []
     rows = (
-        await session.execute(
-            select(MediaJob).where(MediaJob.id.in_(job_ids)).options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
+        (
+            await session.execute(
+                select(MediaJob)
+                .where(MediaJob.id.in_(job_ids))
+                .options(selectinload(MediaJob.tags).selectinload(MediaJobTagLink.tag))
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     retried: list[MediaJob] = []
     for job in rows:
         if job.status == MediaJobStatus.processing:
             continue
-        if int(job.attempt or 0) >= int(job.max_attempts or DEFAULT_MAX_ATTEMPTS) and job.status != MediaJobStatus.dead_letter:
+        if (
+            int(job.attempt or 0) >= int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)
+            and job.status != MediaJobStatus.dead_letter
+        ):
             continue
         job.status = MediaJobStatus.queued
         job.progress_pct = 0
@@ -2222,7 +2618,10 @@ async def bulk_retry_jobs(
             job=job,
             actor_user_id=actor_user_id,
             action="bulk_retry",
-            meta={"attempt": int(job.attempt or 0), "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS)},
+            meta={
+                "attempt": int(job.attempt or 0),
+                "max_attempts": int(job.max_attempts or DEFAULT_MAX_ATTEMPTS),
+            },
         )
         retried.append(job)
     await session.commit()
@@ -2274,7 +2673,9 @@ async def update_job_triage(
         job.incident_url = cleaned or None
         meta["incident_url"] = job.incident_url
 
-    await _apply_job_tag_changes(session, job=job, add_tags=add_tags or [], remove_tags=remove_tags or [])
+    await _apply_job_tag_changes(
+        session, job=job, add_tags=add_tags or [], remove_tags=remove_tags or []
+    )
     session.add(job)
     await _record_job_event(
         session,
@@ -2289,7 +2690,9 @@ async def update_job_triage(
     return job
 
 
-async def list_job_events(session: AsyncSession, *, job_id: UUID, limit: int = 200) -> list[MediaJobEvent]:
+async def list_job_events(
+    session: AsyncSession, *, job_id: UUID, limit: int = 200
+) -> list[MediaJobEvent]:
     stmt = (
         select(MediaJobEvent)
         .where(MediaJobEvent.job_id == job_id)
@@ -2310,9 +2713,14 @@ async def get_job_or_404(session: AsyncSession, job_id: UUID) -> MediaJob:
     return row
 
 
-def resolve_asset_preview_path(asset: MediaAsset, *, variant_profile: str | None = None) -> Path:
+def resolve_asset_preview_path(
+    asset: MediaAsset, *, variant_profile: str | None = None
+) -> Path:
     if variant_profile:
-        variant = next((row for row in (asset.variants or []) if row.profile == variant_profile), None)
+        variant = next(
+            (row for row in (asset.variants or []) if row.profile == variant_profile),
+            None,
+        )
         if variant is None:
             raise ValueError("Variant not found")
         path = _find_existing_storage_path(variant.storage_key)
@@ -2332,7 +2740,13 @@ def job_to_read(job: MediaJob) -> MediaJobRead:
         raw_tags = []
     except Exception:
         raw_tags = []
-    tags = sorted({rel.tag.value for rel in raw_tags if getattr(rel, "tag", None) and rel.tag.value})
+    tags = sorted(
+        {
+            rel.tag.value
+            for rel in raw_tags
+            if getattr(rel, "tag", None) and rel.tag.value
+        }
+    )
     return MediaJobRead(
         id=job.id,
         asset_id=job.asset_id,
@@ -2373,7 +2787,10 @@ async def list_collections(session: AsyncSession) -> list[MediaCollectionRead]:
     rows = (
         await session.execute(
             select(MediaCollection, func.count(MediaCollectionItem.id))
-            .outerjoin(MediaCollectionItem, MediaCollectionItem.collection_id == MediaCollection.id)
+            .outerjoin(
+                MediaCollectionItem,
+                MediaCollectionItem.collection_id == MediaCollection.id,
+            )
             .group_by(MediaCollection.id)
             .order_by(MediaCollection.name.asc())
         )
@@ -2403,7 +2820,9 @@ async def upsert_collection(
 ) -> MediaCollectionRead:
     row = None
     if collection_id:
-        row = await session.scalar(select(MediaCollection).where(MediaCollection.id == collection_id))
+        row = await session.scalar(
+            select(MediaCollection).where(MediaCollection.id == collection_id)
+        )
     if row is None:
         row = MediaCollection(id=uuid4(), created_by_user_id=actor_id)
     row.name = payload.name.strip()
@@ -2415,7 +2834,9 @@ async def upsert_collection(
     count = int(
         (
             await session.scalar(
-                select(func.count()).select_from(MediaCollectionItem).where(MediaCollectionItem.collection_id == row.id)
+                select(func.count())
+                .select_from(MediaCollectionItem)
+                .where(MediaCollectionItem.collection_id == row.id)
             )
         )
         or 0
@@ -2431,10 +2852,20 @@ async def upsert_collection(
     )
 
 
-async def replace_collection_items(session: AsyncSession, *, collection_id: UUID, asset_ids: list[UUID]) -> None:
-    await session.execute(delete(MediaCollectionItem).where(MediaCollectionItem.collection_id == collection_id))
+async def replace_collection_items(
+    session: AsyncSession, *, collection_id: UUID, asset_ids: list[UUID]
+) -> None:
+    await session.execute(
+        delete(MediaCollectionItem).where(
+            MediaCollectionItem.collection_id == collection_id
+        )
+    )
     for idx, asset_id in enumerate(asset_ids, start=1):
-        session.add(MediaCollectionItem(collection_id=collection_id, asset_id=asset_id, sort_order=idx))
+        session.add(
+            MediaCollectionItem(
+                collection_id=collection_id, asset_id=asset_id, sort_order=idx
+            )
+        )
     await session.commit()
 
 
@@ -2443,19 +2874,27 @@ def can_approve_or_purge(role: UserRole | str) -> bool:
     return role_value in {UserRole.owner.value, UserRole.admin.value}
 
 
-def coerce_visibility(raw: str | None, fallback: MediaVisibility = MediaVisibility.private) -> MediaVisibility:
+def coerce_visibility(
+    raw: str | None, fallback: MediaVisibility = MediaVisibility.private
+) -> MediaVisibility:
     value = (raw or "").strip().lower()
     if value in {"public", "private"}:
         return MediaVisibility(value)  # type: ignore[arg-type]
     return fallback
 
 
-async def ensure_public_asset(session: AsyncSession, asset_id: UUID) -> MediaAsset | None:
+async def ensure_public_asset(
+    session: AsyncSession, asset_id: UUID
+) -> MediaAsset | None:
     asset = await session.scalar(select(MediaAsset).where(MediaAsset.id == asset_id))
     if asset is None:
         return None
     if asset.visibility != MediaVisibility.public:
         return None
-    if asset.status not in {MediaAssetStatus.approved, MediaAssetStatus.archived, MediaAssetStatus.draft}:
+    if asset.status not in {
+        MediaAssetStatus.approved,
+        MediaAssetStatus.archived,
+        MediaAssetStatus.draft,
+    }:
         return None
     return asset

@@ -13,12 +13,23 @@ type NotificationsTab = 'inbox' | 'hidden';
 @Component({
   selector: 'app-account-notifications-inbox',
   standalone: true,
-  imports: [CommonModule, DatePipe, RouterLink, TranslateModule, ButtonComponent, SkeletonComponent],
+  imports: [
+    CommonModule,
+    DatePipe,
+    RouterLink,
+    TranslateModule,
+    ButtonComponent,
+    SkeletonComponent,
+  ],
   template: `
-    <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
       <div class="flex items-start justify-between gap-3">
         <div class="grid gap-1 min-w-0">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50 truncate">{{ 'notifications.title' | translate }}</h2>
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50 truncate">
+            {{ 'notifications.title' | translate }}
+          </h2>
           <p class="text-xs text-slate-500 dark:text-slate-400">
             {{
               tab === 'hidden'
@@ -28,8 +39,18 @@ type NotificationsTab = 'inbox' | 'hidden';
           </p>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2">
-          <app-button size="sm" variant="ghost" [label]="'notifications.refresh' | translate" (action)="load()"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'notifications.settings' | translate" [routerLink]="['/account/notifications/settings']"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'notifications.refresh' | translate"
+            (action)="load()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'notifications.settings' | translate"
+            [routerLink]="['/account/notifications/settings']"
+          ></app-button>
         </div>
       </div>
 
@@ -46,7 +67,9 @@ type NotificationsTab = 'inbox' | 'hidden';
           [attr.aria-pressed]="tab === 'inbox'"
         >
           {{ 'notifications.inbox' | translate }}
-          <span class="ml-2 text-xs" *ngIf="activeNotifications().length">{{ activeNotifications().length }}</span>
+          <span class="ml-2 text-xs" *ngIf="activeNotifications().length">{{
+            activeNotifications().length
+          }}</span>
         </button>
         <button
           type="button"
@@ -60,7 +83,9 @@ type NotificationsTab = 'inbox' | 'hidden';
           [attr.aria-pressed]="tab === 'hidden'"
         >
           {{ 'notifications.hidden' | translate }}
-          <span class="ml-2 text-xs" *ngIf="hiddenNotifications().length">{{ hiddenNotifications().length }}</span>
+          <span class="ml-2 text-xs" *ngIf="hiddenNotifications().length">{{
+            hiddenNotifications().length
+          }}</span>
         </button>
       </div>
 
@@ -73,27 +98,45 @@ type NotificationsTab = 'inbox' | 'hidden';
       </ng-container>
 
       <ng-template #body>
-        <p *ngIf="errorKey" class="text-sm text-rose-700 dark:text-rose-300">{{ errorKey | translate }}</p>
+        <p *ngIf="errorKey" class="text-sm text-rose-700 dark:text-rose-300">
+          {{ errorKey | translate }}
+        </p>
 
         <ng-container *ngIf="!errorKey">
-          <div *ngIf="currentList().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-            {{ (tab === 'hidden' ? 'notifications.emptyHidden' : 'notifications.empty') | translate }}
+          <div
+            *ngIf="currentList().length === 0"
+            class="text-sm text-slate-600 dark:text-slate-300"
+          >
+            {{
+              (tab === 'hidden' ? 'notifications.emptyHidden' : 'notifications.empty') | translate
+            }}
           </div>
           <ul *ngIf="currentList().length" class="grid gap-3">
             <li *ngFor="let n of currentList()">
               <div
                 class="rounded-xl p-4 border border-slate-200 dark:border-slate-800"
                 [ngClass]="
-                  !n.read_at && !n.dismissed_at ? 'bg-amber-50/70 dark:bg-amber-950/25' : 'bg-white dark:bg-slate-900'
+                  !n.read_at && !n.dismissed_at
+                    ? 'bg-amber-50/70 dark:bg-amber-950/25'
+                    : 'bg-white dark:bg-slate-900'
                 "
               >
                 <button type="button" class="w-full text-left" (click)="openNotification(n)">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ n.title }}</p>
-                      <p *ngIf="n.body" class="mt-1 text-sm text-slate-700 dark:text-slate-200 break-words">{{ n.body }}</p>
+                      <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">
+                        {{ n.title }}
+                      </p>
+                      <p
+                        *ngIf="n.body"
+                        class="mt-1 text-sm text-slate-700 dark:text-slate-200 break-words"
+                      >
+                        {{ n.body }}
+                      </p>
                     </div>
-                    <p class="shrink-0 text-xs text-slate-500 dark:text-slate-400">{{ n.created_at | date: 'short' }}</p>
+                    <p class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                      {{ n.created_at | date: 'short' }}
+                    </p>
                   </div>
                 </button>
                 <div class="mt-3 flex flex-wrap items-center justify-end gap-2">
@@ -128,7 +171,7 @@ type NotificationsTab = 'inbox' | 'hidden';
         </ng-container>
       </ng-template>
     </section>
-  `
+  `,
 })
 export class AccountNotificationsInboxComponent implements OnInit {
   private readonly api = inject(ApiService);
@@ -160,7 +203,9 @@ export class AccountNotificationsInboxComponent implements OnInit {
     this.loading = true;
     this.errorKey = '';
     this.api
-      .get<{ items: UserNotification[] }>('/notifications', { limit: 75, include_dismissed: true, include_old_read: true })
+      .get<{
+        items: UserNotification[];
+      }>('/notifications', { limit: 75, include_dismissed: true, include_old_read: true })
       .subscribe({
         next: (resp) => {
           this.items = Array.isArray(resp.items) ? resp.items : [];
@@ -170,7 +215,7 @@ export class AccountNotificationsInboxComponent implements OnInit {
         error: () => {
           this.errorKey = 'notifications.loadError';
           this.loading = false;
-        }
+        },
       });
   }
 
@@ -184,29 +229,35 @@ export class AccountNotificationsInboxComponent implements OnInit {
   }
 
   markRead(n: UserNotification): void {
-    this.api.post<UserNotification>(`/notifications/${encodeURIComponent(n.id)}/read`, {}).subscribe({
-      next: (updated) => {
-        this.items = this.items.map((item) => (item.id === updated.id ? updated : item));
-        this.notifications.refreshUnreadCount();
-      }
-    });
+    this.api
+      .post<UserNotification>(`/notifications/${encodeURIComponent(n.id)}/read`, {})
+      .subscribe({
+        next: (updated) => {
+          this.items = this.items.map((item) => (item.id === updated.id ? updated : item));
+          this.notifications.refreshUnreadCount();
+        },
+      });
   }
 
   dismiss(n: UserNotification): void {
-    this.api.post<UserNotification>(`/notifications/${encodeURIComponent(n.id)}/dismiss`, {}).subscribe({
-      next: (updated) => {
-        this.items = this.items.map((item) => (item.id === updated.id ? updated : item));
-        this.notifications.refreshUnreadCount();
-      }
-    });
+    this.api
+      .post<UserNotification>(`/notifications/${encodeURIComponent(n.id)}/dismiss`, {})
+      .subscribe({
+        next: (updated) => {
+          this.items = this.items.map((item) => (item.id === updated.id ? updated : item));
+          this.notifications.refreshUnreadCount();
+        },
+      });
   }
 
   restore(n: UserNotification): void {
-    this.api.post<UserNotification>(`/notifications/${encodeURIComponent(n.id)}/restore`, {}).subscribe({
-      next: (updated) => {
-        this.items = this.items.map((item) => (item.id === updated.id ? updated : item));
-        this.notifications.refreshUnreadCount();
-      }
-    });
+    this.api
+      .post<UserNotification>(`/notifications/${encodeURIComponent(n.id)}/restore`, {})
+      .subscribe({
+        next: (updated) => {
+          this.items = this.items.map((item) => (item.id === updated.id ? updated : item));
+          this.notifications.refreshUnreadCount();
+        },
+      });
   }
 }

@@ -16,4 +16,3 @@ export class HttpErrorBusService {
     this.subject.next(event);
   }
 }
-

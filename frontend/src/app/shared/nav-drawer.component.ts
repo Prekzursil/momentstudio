@@ -25,7 +25,15 @@ export interface NavDrawerUser {
 @Component({
   selector: 'app-nav-drawer',
   standalone: true,
-  imports: [NgForOf, NgClass, NgIf, RouterLink, TranslateModule, FormsModule, ThemeSegmentedControlComponent],
+  imports: [
+    NgForOf,
+    NgClass,
+    NgIf,
+    RouterLink,
+    TranslateModule,
+    FormsModule,
+    ThemeSegmentedControlComponent,
+  ],
   template: `
     <div
       class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm transition-opacity dark:bg-black/60"
@@ -41,8 +49,12 @@ export interface NavDrawerUser {
       [attr.aria-hidden]="open ? null : 'true'"
       [attr.inert]="open ? null : ''"
     >
-      <div class="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-        <span id="mobile-menu-title" class="font-semibold text-slate-900 dark:text-slate-50">{{ 'nav.menu' | translate }}</span>
+      <div
+        class="p-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-700"
+      >
+        <span id="mobile-menu-title" class="font-semibold text-slate-900 dark:text-slate-50">{{
+          'nav.menu' | translate
+        }}</span>
         <button
           class="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
           (click)="onClose()"
@@ -95,12 +107,16 @@ export interface NavDrawerUser {
         </ng-container>
       </nav>
       <div class="p-4 border-t border-slate-200 dark:border-slate-700">
-        <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+        <div
+          class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+        >
           {{ 'nav.preferences' | translate }}
         </div>
         <div class="mt-3 grid gap-3">
           <div class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'nav.theme' | translate }}</span>
+            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+              'nav.theme' | translate
+            }}</span>
             <app-theme-segmented-control
               class="w-full"
               [preference]="themePreference"
@@ -113,15 +129,27 @@ export interface NavDrawerUser {
             ></app-theme-segmented-control>
           </div>
           <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'nav.language' | translate }}</span>
+            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+              'nav.language' | translate
+            }}</span>
             <select
               class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 [color-scheme:light] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark]"
               [ngModel]="language"
               (ngModelChange)="onLanguageChange($event)"
               [attr.aria-label]="'nav.language' | translate"
             >
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="en">EN</option>
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="ro">RO</option>
+              <option
+                class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                value="en"
+              >
+                EN
+              </option>
+              <option
+                class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                value="ro"
+              >
+                RO
+              </option>
             </select>
           </label>
         </div>
@@ -136,7 +164,7 @@ export interface NavDrawerUser {
         </button>
       </div>
     </aside>
-  `
+  `,
 })
 export class NavDrawerComponent {
   @Input() open = false;

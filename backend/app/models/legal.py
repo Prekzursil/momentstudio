@@ -2,7 +2,15 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,9 +24,16 @@ class LegalConsentContext(str, enum.Enum):
 
 class LegalConsent(Base):
     __tablename__ = "legal_consents"
-    __table_args__ = (CheckConstraint("user_id IS NOT NULL OR order_id IS NOT NULL", name="ck_legal_consents_subject"),)
+    __table_args__ = (
+        CheckConstraint(
+            "user_id IS NOT NULL OR order_id IS NOT NULL",
+            name="ck_legal_consents_subject",
+        ),
+    )
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     doc_key: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     doc_version: Mapped[int] = mapped_column(Integer, nullable=False)
     context: Mapped[LegalConsentContext] = mapped_column(
@@ -36,8 +51,9 @@ class LegalConsent(Base):
         nullable=True,
         index=True,
     )
-    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    accepted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     user = relationship("User", foreign_keys=[user_id])
     order = relationship("Order", foreign_keys=[order_id])
-

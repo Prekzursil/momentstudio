@@ -54,15 +54,15 @@ export class AdminUiPrefsService {
       const raw = localStorage.getItem(this.storageKey());
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      const mode = (parsed)?.mode;
+      const mode = parsed?.mode;
       if (mode === 'simple' || mode === 'advanced') {
         this.mode.set(mode);
       }
-      const preset = (parsed)?.preset;
+      const preset = parsed?.preset;
       if (preset === 'custom' || preset === 'owner_basic') {
         this.preset.set(preset);
       }
-      const sidebarCompact = (parsed)?.sidebarCompact;
+      const sidebarCompact = parsed?.sidebarCompact;
       if (typeof sidebarCompact === 'boolean') {
         this.sidebarCompact.set(sidebarCompact);
       }
@@ -79,11 +79,14 @@ export class AdminUiPrefsService {
     try {
       localStorage.setItem(
         this.storageKey(),
-        JSON.stringify({ mode: this.mode(), preset: this.preset(), sidebarCompact: this.sidebarCompact() })
+        JSON.stringify({
+          mode: this.mode(),
+          preset: this.preset(),
+          sidebarCompact: this.sidebarCompact(),
+        }),
       );
     } catch {
       // ignore
     }
   }
 }
-

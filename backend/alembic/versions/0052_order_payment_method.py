@@ -19,9 +19,16 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "orders",
-        sa.Column("payment_method", sa.String(length=20), nullable=False, server_default="stripe"),
+        sa.Column(
+            "payment_method",
+            sa.String(length=20),
+            nullable=False,
+            server_default="stripe",
+        ),
     )
-    op.execute("UPDATE orders SET payment_method='stripe' WHERE payment_method IS NULL OR payment_method=''")
+    op.execute(
+        "UPDATE orders SET payment_method='stripe' WHERE payment_method IS NULL OR payment_method=''"
+    )
     op.alter_column("orders", "payment_method", server_default=None)
 
 

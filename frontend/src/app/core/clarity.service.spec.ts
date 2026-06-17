@@ -96,7 +96,9 @@ describe('ClarityService', () => {
 
     const script = getClarityScript();
     expect(script).toBeTruthy();
-    expect(script?.getAttribute('data-clarity-src')).toContain('https://www.clarity.ms/tag/vicuv3ldav');
+    expect(script?.getAttribute('data-clarity-src')).toContain(
+      'https://www.clarity.ms/tag/vicuv3ldav',
+    );
   }));
 
   it('does not initialize on private routes', fakeAsync(() => {

@@ -2,7 +2,14 @@ import { isProfileComplete, missingRequiredProfileFields } from './profile-requi
 
 describe('profile requirements', () => {
   it('lists all required fields when user is null', () => {
-    expect(missingRequiredProfileFields(null)).toEqual(['name', 'username', 'first_name', 'last_name', 'date_of_birth', 'phone']);
+    expect(missingRequiredProfileFields(null)).toEqual([
+      'name',
+      'username',
+      'first_name',
+      'last_name',
+      'date_of_birth',
+      'phone',
+    ]);
     expect(isProfileComplete(null)).toBeFalse();
   });
 
@@ -13,7 +20,7 @@ describe('profile requirements', () => {
       first_name: 'Ana',
       last_name: 'Pop',
       date_of_birth: '2000-01-01',
-      phone: '+40723204204'
+      phone: '+40723204204',
     };
     expect(missingRequiredProfileFields(user)).toEqual([]);
     expect(isProfileComplete(user)).toBeTrue();
@@ -26,9 +33,13 @@ describe('profile requirements', () => {
       first_name: null,
       last_name: 'Pop',
       date_of_birth: '',
-      phone: undefined
+      phone: undefined,
     };
-    expect(missingRequiredProfileFields(user)).toEqual(['name', 'first_name', 'date_of_birth', 'phone']);
+    expect(missingRequiredProfileFields(user)).toEqual([
+      'name',
+      'first_name',
+      'date_of_birth',
+      'phone',
+    ]);
   });
 });
-

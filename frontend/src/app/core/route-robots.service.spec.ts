@@ -43,4 +43,3 @@ describe('RouteRobotsService', () => {
     expect(meta.getTag("name='robots'")?.content).toBe('index,follow,max-image-preview:large');
   }));
 });
-
