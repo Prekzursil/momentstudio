@@ -25,6 +25,16 @@ repos:
       - id: prettier
         files: ^frontend/
 
+  # --- Gate 5 (lean charter): secrets (gitleaks 8.30.1, pinned) ---
+  # Additive: the lean reusable-quality.yml runs the secrets gate via this
+  # pre-commit hook (gate-lint-format-secrets). Allowlist + reasons in .gitleaks.toml.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secrets)
+        args: ["--config", ".gitleaks.toml"]
+
   - repo: local
     hooks:
       - id: frontend-eslint

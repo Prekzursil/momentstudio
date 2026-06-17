@@ -1,0 +1,30 @@
+# gitleaks configuration for the lean secrets gate (pinned tool: gitleaks 8.30.1).
+# The gate runs via pre-commit over the working tree and must report 0 findings.
+# Extends the upstream default ruleset; we only add path/match allowlists for
+# vendored dependencies, build output, and genuine greppable test/example
+# fixtures (no real secrets).
+title = "momentstudio lean secrets gate"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vendored deps, generated/build output, and reasoned non-secret fixtures."
+
+# Never scan third-party / generated / local-tooling trees. These are not our
+# source and produce only upstream-example false positives.
+paths = [
+  '''(^|/)\.venv/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)vendor/''',
+  '''(^|/)dist/''',
+  '''(^|/)build/''',
+  '''(^|/)out/''',
+  '''(^|/)\.git/''',
+  '''(^|/)\.angular/''',
+  '''.*\.egg-info/''',
+  # Local/example env templates carry placeholder values, not real secrets.
+  '''(^|/)\.env\.example$''',
+  '''(^|/)\.env\.sample$''',
+  '''(^|/)\.env\.template$''',
+]
