@@ -1439,8 +1439,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   bulkHasPendingEdits(): boolean {
     return Boolean(
       (this.bulkStatus || '').trim() ||
-      (this.bulkCategoryId || '').trim() ||
-      String(this.bulkFeatured || '').trim(),
+        (this.bulkCategoryId || '').trim() ||
+        String(this.bulkFeatured || '').trim(),
     );
   }
 

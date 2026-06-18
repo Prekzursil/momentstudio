@@ -4,7 +4,7 @@ module.exports = function (config) {
       // Prefer Playwright's bundled Chromium in environments without system Chrome.
       const { chromium } = require('playwright');
       process.env.CHROME_BIN = chromium.executablePath();
-    } catch (_) {
+    } catch {
       // Fall back to system Chrome resolution via karma-chrome-launcher.
     }
   }

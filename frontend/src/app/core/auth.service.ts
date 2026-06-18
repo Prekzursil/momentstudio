@@ -813,7 +813,7 @@ export class AuthService {
   private isAuthResponse(res: AuthResponse | TwoFactorChallengeResponse): res is AuthResponse {
     return Boolean(
       (res as AuthResponse | null)?.tokens?.access_token &&
-      (res as AuthResponse | null)?.tokens?.refresh_token,
+        (res as AuthResponse | null)?.tokens?.refresh_token,
     );
   }
 

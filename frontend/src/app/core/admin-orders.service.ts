@@ -169,7 +169,7 @@ export class AdminOrdersService {
     const finalParams = { ...params, include_pii: params.include_pii ?? true };
     return this.api.get<AdminOrderListResponse>('/orders/admin/search', finalParams as any).pipe(
       map((res: any) => ({
-        ...(res ?? {}),
+        ...res,
         items: (res?.items ?? []).map((o: any) => ({
           ...o,
           total_amount: parseMoney(o?.total_amount),

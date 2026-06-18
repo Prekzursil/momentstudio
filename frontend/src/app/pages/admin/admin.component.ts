@@ -12354,7 +12354,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (!post) return;
       const nextOrder = idx + 1;
       if ((this.blogPinnedSlot(post) ?? 1) === nextOrder) return;
-      const meta = { ...(post.meta || {}) };
+      const meta = { ...post.meta };
       meta['pinned'] = true;
       meta['pin_order'] = nextOrder;
       updates.push({ key, meta });
@@ -13987,7 +13987,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       case 'tags_remove': {
         const tagsInput = this.parseTags(this.blogBulkTags);
         if (!tagsInput.length) return null;
-        const meta = { ...(block.meta || {}) } as Record<string, unknown>;
+        const meta = { ...block.meta } as Record<string, unknown>;
         const existingRaw = meta['tags'];
         const existing = Array.isArray(existingRaw)
           ? existingRaw.map((t) => String(t))
@@ -14108,7 +14108,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
-    const meta: Record<string, any> = { ...(this.blogMeta || {}) };
+    const meta: Record<string, any> = { ...this.blogMeta };
 
     const tags = this.parseTags(this.blogForm.tags);
     if (tags.length) meta['tags'] = tags;
@@ -14447,7 +14447,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.reportsSettingsMessage = null;
     this.reportsSettingsError = null;
 
-    const meta: Record<string, any> = { ...(this.reportsSettingsMeta || {}) };
+    const meta: Record<string, any> = { ...this.reportsSettingsMeta };
     meta['reports_weekly_enabled'] = Boolean(this.reportsSettingsForm.weekly_enabled);
     meta['reports_weekly_weekday'] = Math.min(
       6,
@@ -15504,7 +15504,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       onSuccess();
       return;
     }
-    const meta: Record<string, unknown> = { ...(this.legalPageMeta || {}) };
+    const meta: Record<string, unknown> = { ...this.legalPageMeta };
     if (next) meta['last_updated'] = next;
     else delete meta['last_updated'];
 
@@ -15908,7 +15908,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   private persistReusableBlocks(next: CmsReusableBlock[], opts?: { successKey?: string }): void {
-    const meta = { ...(this.reusableBlocksMeta || {}), snippets: next } as Record<string, unknown>;
+    const meta = { ...this.reusableBlocksMeta, snippets: next } as Record<string, unknown>;
     const payload = this.withExpectedVersion(this.reusableBlocksKey, { meta });
 
     const onSaved = (
@@ -17925,10 +17925,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       return base;
     });
 
-    const meta = { ...(this.pageBlocksMeta[pageKey] || {}), version: 2, blocks } as Record<
-      string,
-      unknown
-    >;
+    const meta = { ...this.pageBlocksMeta[pageKey], version: 2, blocks } as Record<string, unknown>;
     if (this.pageKeySupportsRequiresAuth(pageKey) && this.pageBlocksRequiresAuth[pageKey]) {
       meta['requires_auth'] = true;
     } else {
@@ -18127,9 +18124,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (!checklist) return false;
     return Boolean(
       checklist.missingTranslations.length ||
-      checklist.missingAlt.length ||
-      checklist.emptySections.length ||
-      checklist.linkIssues.length,
+        checklist.missingAlt.length ||
+        checklist.emptySections.length ||
+        checklist.linkIssues.length,
     );
   }
 

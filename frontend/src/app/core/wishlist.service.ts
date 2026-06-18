@@ -117,7 +117,7 @@ export class WishlistService {
 
   private normalizeProduct(raw: any): Product {
     return {
-      ...(raw ?? {}),
+      ...raw,
       base_price: parseMoney(raw?.base_price),
       sale_price: raw?.sale_price == null ? null : parseMoney(raw.sale_price),
       sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value),

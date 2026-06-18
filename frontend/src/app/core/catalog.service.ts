@@ -133,7 +133,7 @@ export class CatalogService {
 
   private normalizeProduct(raw: any): Product {
     return {
-      ...(raw ?? {}),
+      ...raw,
       base_price: parseMoney(raw?.base_price),
       sale_price: raw?.sale_price == null ? null : parseMoney(raw.sale_price),
       sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value),
@@ -165,7 +165,7 @@ export class CatalogService {
       })
       .pipe(
         map((res: any) => ({
-          ...(res ?? {}),
+          ...res,
           items: (res?.items ?? []).map((p: any) => this.normalizeProduct(p)),
         })),
       );
@@ -220,7 +220,7 @@ export class CatalogService {
     return this.api.get<FeaturedCollection[]>('/catalog/collections/featured', { lang }).pipe(
       map((rows: any) =>
         (rows ?? []).map((c: any) => ({
-          ...(c ?? {}),
+          ...c,
           products: (c?.products ?? []).map((p: any) => this.normalizeProduct(p)),
         })),
       ),

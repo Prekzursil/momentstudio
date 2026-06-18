@@ -86,7 +86,7 @@ export class AdminClientErrorLoggerService {
       context: {
         app_env: appConfig.appEnv,
         ...(appConfig.appVersion ? { app_version: appConfig.appVersion } : {}),
-        ...(context || {}),
+        ...context,
       },
     };
   }

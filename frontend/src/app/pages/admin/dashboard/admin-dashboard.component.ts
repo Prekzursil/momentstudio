@@ -4234,8 +4234,8 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   hasAnomalyAlerts(): boolean {
     return Boolean(
       this.failedPaymentsAlert() ||
-      this.refundRequestsAlert() ||
-      this.stockoutsAlertCount() !== null,
+        this.refundRequestsAlert() ||
+        this.stockoutsAlertCount() !== null,
     );
   }
 

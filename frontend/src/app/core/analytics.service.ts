@@ -66,7 +66,7 @@ export class AnalyticsService {
     }
 
     const sessionId = this.getSessionId();
-    const record = { event, session_id: sessionId, ...(payload ?? {}) };
+    const record = { event, session_id: sessionId, ...payload };
 
     try {
       if (Array.isArray(window.dataLayer)) {

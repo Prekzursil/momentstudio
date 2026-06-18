@@ -621,9 +621,9 @@ export class AccountState implements OnInit, OnDestroy {
   ordersFiltersActive(): boolean {
     return Boolean(
       (this.orderFilter || '').trim() ||
-      this.ordersQuery.trim() ||
-      (this.ordersFrom || '').trim() ||
-      (this.ordersTo || '').trim(),
+        this.ordersQuery.trim() ||
+        (this.ordersFrom || '').trim() ||
+        (this.ordersTo || '').trim(),
     );
   }
 

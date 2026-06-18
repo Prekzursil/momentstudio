@@ -1,38 +1,38 @@
 #!/usr/bin/env node
 
-import fs from "node:fs/promises";
-import path from "node:path";
-import { createRequire } from "node:module";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const require = createRequire(new URL("../../frontend/package.json", import.meta.url));
+const require = createRequire(new URL('../../frontend/package.json', import.meta.url));
 const scriptPath = fileURLToPath(import.meta.url);
 const scriptDir = path.dirname(scriptPath);
-const repoRoot = path.resolve(scriptDir, "..", "..");
+const repoRoot = path.resolve(scriptDir, '..', '..');
 
 function parseArgs(argv) {
   const out = {};
   const allowedKeys = new Set([
-    "base-url",
-    "routes-json",
-    "output-dir",
-    "max-routes",
-    "route-samples",
-    "api-base-url",
-    "auth-mode",
-    "owner-identifier",
-    "owner-password",
+    'base-url',
+    'routes-json',
+    'output-dir',
+    'max-routes',
+    'route-samples',
+    'api-base-url',
+    'auth-mode',
+    'owner-identifier',
+    'owner-password',
   ]);
   for (let i = 2; i < argv.length; i += 1) {
     const token = argv[i];
-    if (!token.startsWith("--")) {
+    if (!token.startsWith('--')) {
       continue;
     }
     const key = token.slice(2);
     if (!allowedKeys.has(key)) {
       continue;
     }
-    const value = argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "1";
+    const value = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : '1';
     out[key] = value;
   }
   return out;
@@ -42,7 +42,7 @@ function isPathWithinRoot(rootPath, candidatePath) {
   const root = path.resolve(rootPath);
   const candidate = path.resolve(candidatePath);
   const relative = path.relative(root, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
 function resolvePathWithinRoot(rootPath, ...segments) {
@@ -55,34 +55,38 @@ function resolvePathWithinRoot(rootPath, ...segments) {
 }
 
 function resolvePathInAllowedRoots(rawPath, allowedRoots, label) {
-  const token = rawPath instanceof URL ? fileURLToPath(rawPath) : String(rawPath || "");
+  const token = rawPath instanceof URL ? fileURLToPath(rawPath) : String(rawPath || '');
   const candidate = path.resolve(token);
   const normalizedRoots = allowedRoots.map((root) => path.resolve(root));
   if (!normalizedRoots.some((root) => isPathWithinRoot(root, candidate))) {
-    throw new Error(`${label} must be within allowed roots (${normalizedRoots.join(", ")}): ${candidate}`);
+    throw new Error(
+      `${label} must be within allowed roots (${normalizedRoots.join(', ')}): ${candidate}`,
+    );
   }
   return candidate;
 }
 
 function normalizeUrl(raw) {
-  let value = String(raw || "").trim();
-  if (!value) return "";
-  while (value.endsWith("/")) {
+  let value = String(raw || '').trim();
+  if (!value) return '';
+  while (value.endsWith('/')) {
     value = value.slice(0, -1);
   }
   return value;
 }
 
 function normalizeAuthMode(raw) {
-  const value = String(raw || "").trim().toLowerCase();
-  if (!value) return "none";
-  if (value === "none" || value === "owner") return value;
-  return "none";
+  const value = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (!value) return 'none';
+  if (value === 'none' || value === 'owner') return value;
+  return 'none';
 }
 
 function resolveMaxRoutes(value, logger = console) {
   const token = value === undefined ? undefined : String(value);
-  const parsed = Number.parseInt(token ?? "", 10);
+  const parsed = Number.parseInt(token ?? '', 10);
   const maxRoutes = Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
 
   if (token !== undefined && maxRoutes === 30 && parsed !== 30) {
@@ -93,94 +97,98 @@ function resolveMaxRoutes(value, logger = console) {
 }
 
 function routeSlug(routePath) {
-  const clean = (routePath || "/").replace(/^\//, "").replace(/\/+/g, "-");
-  return clean ? clean.replace(/[^a-zA-Z0-9._-]/g, "_") : "root";
+  const clean = (routePath || '/').replace(/^\//, '').replace(/\/+/g, '-');
+  return clean ? clean.replace(/[^a-zA-Z0-9._-]/g, '_') : 'root';
 }
 
 function toSeverity(level) {
-  const raw = String(level || "").toLowerCase();
-  if (raw === "error") return "s2";
-  if (raw === "warning" || raw === "warn") return "s3";
-  return "s4";
+  const raw = String(level || '').toLowerCase();
+  if (raw === 'error') return 's2';
+  if (raw === 'warning' || raw === 'warn') return 's3';
+  return 's4';
 }
 
 function classifyConsoleMessage(message, level) {
-  const text = String(message || "").toLowerCase();
-  const normalizedLevel = String(level || "").toLowerCase();
-  if (text.includes("was preloaded using link preload but not used within a few seconds from the window's load event")) {
-    return { skip: true, severity: "s4", level: normalizedLevel };
+  const text = String(message || '').toLowerCase();
+  const normalizedLevel = String(level || '').toLowerCase();
+  if (
+    text.includes(
+      "was preloaded using link preload but not used within a few seconds from the window's load event",
+    )
+  ) {
+    return { skip: true, severity: 's4', level: normalizedLevel };
   }
   const noisyPatterns = [
-    "/api/",
-    "net::err_connection_refused",
-    "failed to load resource",
-    "status of 404",
-    "httperrorresponse",
-    "failed to fetch",
-    "networkerror when attempting to fetch resource",
-    "xmlhttprequest",
-    "response with status",
+    '/api/',
+    'net::err_connection_refused',
+    'failed to load resource',
+    'status of 404',
+    'httperrorresponse',
+    'failed to fetch',
+    'networkerror when attempting to fetch resource',
+    'xmlhttprequest',
+    'response with status',
     "unexpected token '<'",
-    "unexpected token <",
-    "is not valid json",
-    "challenges.cloudflare.com",
-    "private access token challenge",
-    "cloudflare",
-    "turnstile",
-    "executing inline script violates the following content security policy directive",
-    "the action has been blocked"
+    'unexpected token <',
+    'is not valid json',
+    'challenges.cloudflare.com',
+    'private access token challenge',
+    'cloudflare',
+    'turnstile',
+    'executing inline script violates the following content security policy directive',
+    'the action has been blocked',
   ];
   if (noisyPatterns.some((pattern) => text.includes(pattern))) {
-    return { skip: false, severity: "s4", level: normalizedLevel };
+    return { skip: false, severity: 's4', level: normalizedLevel };
   }
   return { skip: false, severity: toSeverity(normalizedLevel), level: normalizedLevel };
 }
 
 function normalizeResourceFailureUrl(rawUrl) {
-  const value = String(rawUrl || "").trim();
-  if (!value) return "";
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
   try {
     const parsed = new URL(value);
-    parsed.hash = "";
+    parsed.hash = '';
     return parsed.toString();
   } catch {
-    return value.split("#", 1)[0];
+    return value.split('#', 1)[0];
   }
 }
 
 function buildResourceFailureKey({ source, statusCode, url, resourceType, method, failureText }) {
   return [
-    String(source || ""),
-    String(statusCode ?? ""),
+    String(source || ''),
+    String(statusCode ?? ''),
     normalizeResourceFailureUrl(url),
-    String(resourceType || ""),
-    String(method || ""),
-    String(failureText || ""),
-  ].join("|");
+    String(resourceType || ''),
+    String(method || ''),
+    String(failureText || ''),
+  ].join('|');
 }
 
 function placeholderKeys(pathTemplate) {
-  const matches = String(pathTemplate || "").matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g);
-  return Array.from(matches, (match) => String(match[1] || "")).filter(Boolean);
+  const matches = String(pathTemplate || '').matchAll(/:([A-Za-z][A-Za-z0-9_]*)/g);
+  return Array.from(matches, (match) => String(match[1] || '')).filter(Boolean);
 }
 
 function materializeRoute(routeTemplate, routeSamples) {
-  const template = String(routeTemplate || "/");
+  const template = String(routeTemplate || '/');
   const keys = placeholderKeys(template);
   if (!keys.length) {
     return {
       resolvedRoute: template,
       unresolvedPlaceholder: false,
-      unresolvedKeys: []
+      unresolvedKeys: [],
     };
   }
 
   const sample = routeSamples[template];
-  if (!sample || typeof sample !== "object") {
+  if (!sample || typeof sample !== 'object') {
     return {
       resolvedRoute: template,
       unresolvedPlaceholder: true,
-      unresolvedKeys: keys
+      unresolvedKeys: keys,
     };
   }
 
@@ -188,7 +196,7 @@ function materializeRoute(routeTemplate, routeSamples) {
   const unresolvedKeys = [];
   for (const key of keys) {
     const raw = sample[key];
-    const value = String(raw ?? "").trim();
+    const value = String(raw ?? '').trim();
     if (!value) {
       unresolvedKeys.push(key);
       continue;
@@ -198,18 +206,18 @@ function materializeRoute(routeTemplate, routeSamples) {
   return {
     resolvedRoute,
     unresolvedPlaceholder: unresolvedKeys.length > 0 || placeholderKeys(resolvedRoute).length > 0,
-    unresolvedKeys
+    unresolvedKeys,
   };
 }
 
 async function loadRouteSamples(routeSamplesPath, allowedRoots) {
-  const fallbackPath = new URL("./fixtures/route-samples.json", import.meta.url);
+  const fallbackPath = new URL('./fixtures/route-samples.json', import.meta.url);
   const target = routeSamplesPath
-    ? resolvePathInAllowedRoots(routeSamplesPath, allowedRoots, "--route-samples")
-    : resolvePathInAllowedRoots(fallbackPath, allowedRoots, "route samples");
+    ? resolvePathInAllowedRoots(routeSamplesPath, allowedRoots, '--route-samples')
+    : resolvePathInAllowedRoots(fallbackPath, allowedRoots, 'route samples');
   try {
-    const payload = JSON.parse(await fs.readFile(target, "utf-8"));
-    if (!payload || typeof payload !== "object") {
+    const payload = JSON.parse(await fs.readFile(target, 'utf-8'));
+    if (!payload || typeof payload !== 'object') {
       return {};
     }
     return payload;
@@ -220,40 +228,44 @@ async function loadRouteSamples(routeSamplesPath, allowedRoots) {
 
 function readSlugFromCollection(payload) {
   if (Array.isArray(payload)) {
-    const first = payload.find((item) => item && typeof item === "object" && String(item.slug || "").trim());
-    return first ? String(first.slug).trim() : "";
+    const first = payload.find(
+      (item) => item && typeof item === 'object' && String(item.slug || '').trim(),
+    );
+    return first ? String(first.slug).trim() : '';
   }
   const items = Array.isArray(payload?.items) ? payload.items : [];
-  const first = items.find((item) => item && typeof item === "object" && String(item.slug || "").trim());
-  return first ? String(first.slug).trim() : "";
+  const first = items.find(
+    (item) => item && typeof item === 'object' && String(item.slug || '').trim(),
+  );
+  return first ? String(first.slug).trim() : '';
 }
 
 function readSeriesSlug(payload) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
   for (const item of items) {
-    if (!item || typeof item !== "object") continue;
-    const direct = String(item.series_slug || "").trim();
+    if (!item || typeof item !== 'object') continue;
+    const direct = String(item.series_slug || '').trim();
     if (direct) return direct;
-    const nested = String(item.series?.slug || "").trim();
+    const nested = String(item.series?.slug || '').trim();
     if (nested) return nested;
-    const rawSeries = String(item.series || "").trim();
+    const rawSeries = String(item.series || '').trim();
     if (rawSeries) return rawSeries;
   }
-  return "";
+  return '';
 }
 
 function readOrderSample(payload) {
   const items = Array.isArray(payload?.items) ? payload.items : [];
-  const first = items.find((item) => item && typeof item === "object");
-  if (!first) return { orderId: "", receiptToken: "" };
-  const orderId = String(first.id || first.order_id || "").trim();
+  const first = items.find((item) => item && typeof item === 'object');
+  if (!first) return { orderId: '', receiptToken: '' };
+  const orderId = String(first.id || first.order_id || '').trim();
   const receiptToken = String(
-    first.receipt_share_token || first.receipt_token || first.token || first.share_token || ""
+    first.receipt_share_token || first.receipt_token || first.token || first.share_token || '',
   ).trim();
   return { orderId, receiptToken };
 }
 
-async function fetchJson(context, url, accessToken = "") {
+async function fetchJson(context, url, accessToken = '') {
   try {
     const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
     const response = await context.request.get(url, headers ? { headers } : undefined);
@@ -271,9 +283,9 @@ async function hydrateRouteSamplesFromApi(context, { apiBaseUrl, routeSamples, a
   const apiRoot = normalizeUrl(apiBaseUrl);
   if (!apiRoot) return routeSamples;
 
-  const hydrated = routeSamples && typeof routeSamples === "object" ? { ...routeSamples } : {};
+  const hydrated = routeSamples && typeof routeSamples === 'object' ? { ...routeSamples } : {};
   const setSample = (routeTemplate, key, value) => {
-    const token = String(value || "").trim();
+    const token = String(value || '').trim();
     if (!token) {
       delete hydrated[routeTemplate];
       return;
@@ -283,26 +295,30 @@ async function hydrateRouteSamplesFromApi(context, { apiBaseUrl, routeSamples, a
 
   const categories = await fetchJson(context, `${apiRoot}/catalog/categories`);
   if (categories.ok) {
-    setSample("/shop/:category", "category", readSlugFromCollection(categories.data));
+    setSample('/shop/:category', 'category', readSlugFromCollection(categories.data));
   }
 
   const products = await fetchJson(context, `${apiRoot}/catalog/products?limit=1`);
   if (products.ok) {
-    setSample("/products/:slug", "slug", readSlugFromCollection(products.data));
+    setSample('/products/:slug', 'slug', readSlugFromCollection(products.data));
   }
 
   const blogPosts = await fetchJson(context, `${apiRoot}/blog/posts?limit=20`);
   if (blogPosts.ok) {
-    setSample("/blog/:slug", "slug", readSlugFromCollection(blogPosts.data));
-    setSample("/blog/series/:series", "series", readSeriesSlug(blogPosts.data));
+    setSample('/blog/:slug', 'slug', readSlugFromCollection(blogPosts.data));
+    setSample('/blog/series/:series', 'series', readSeriesSlug(blogPosts.data));
   }
 
   if (accessToken) {
-    const adminOrders = await fetchJson(context, `${apiRoot}/orders/admin/search?limit=1`, accessToken);
+    const adminOrders = await fetchJson(
+      context,
+      `${apiRoot}/orders/admin/search?limit=1`,
+      accessToken,
+    );
     if (adminOrders.ok) {
       const sample = readOrderSample(adminOrders.data);
-      setSample("/admin/orders/:orderId", "orderId", sample.orderId);
-      setSample("/receipt/:token", "token", sample.receiptToken);
+      setSample('/admin/orders/:orderId', 'orderId', sample.orderId);
+      setSample('/receipt/:token', 'token', sample.receiptToken);
     }
   }
 
@@ -313,10 +329,10 @@ async function installApiRewrite(context, { baseUrl, apiBaseUrl }) {
   if (!baseUrl || !apiBaseUrl) return;
   const baseOrigin = new URL(baseUrl).origin;
   const apiOrigin = new URL(apiBaseUrl).origin;
-  const apiPrefix = "/api/v1/";
+  const apiPrefix = '/api/v1/';
   if (baseOrigin === apiOrigin) return;
 
-  await context.route("**/*", async (route) => {
+  await context.route('**/*', async (route) => {
     const request = route.request();
     const rawUrl = request.url();
     let parsed;
@@ -338,7 +354,9 @@ async function installApiRewrite(context, { baseUrl, apiBaseUrl }) {
 
 async function primeOwnerSession(context, { apiBaseUrl, ownerIdentifier, ownerPassword }) {
   if (!apiBaseUrl || !ownerIdentifier || !ownerPassword) {
-    throw new Error("Owner auth mode requires --api-base-url, --owner-identifier, and --owner-password.");
+    throw new Error(
+      'Owner auth mode requires --api-base-url, --owner-identifier, and --owner-password.',
+    );
   }
 
   const loginUrl = `${normalizeUrl(apiBaseUrl)}/auth/login`;
@@ -359,57 +377,65 @@ async function primeOwnerSession(context, { apiBaseUrl, ownerIdentifier, ownerPa
   }
 
   if (!response.ok()) {
-    const details = payload && typeof payload === "object" ? JSON.stringify(payload).slice(0, 500) : "";
-    const suffix = details ? `: ${details}` : "";
+    const details =
+      payload && typeof payload === 'object' ? JSON.stringify(payload).slice(0, 500) : '';
+    const suffix = details ? `: ${details}` : '';
     throw new Error(`Owner login failed (${response.status()})${suffix}`);
   }
 
   const tokens = payload?.tokens;
   if (!tokens?.access_token || !tokens?.refresh_token) {
     if (payload?.two_factor_token) {
-      throw new Error("Owner login requires 2FA; configure the owner test profile without forced 2FA for audit crawls.");
+      throw new Error(
+        'Owner login requires 2FA; configure the owner test profile without forced 2FA for audit crawls.',
+      );
     }
-    throw new Error("Owner login did not return auth tokens.");
+    throw new Error('Owner login did not return auth tokens.');
   }
 
   await context.addInitScript((authTokens) => {
     try {
-      globalThis.sessionStorage.setItem("auth_tokens", JSON.stringify(authTokens));
+      globalThis.sessionStorage.setItem('auth_tokens', JSON.stringify(authTokens));
     } catch {
       // noop
     }
   }, tokens);
 
   return {
-    accessToken: String(tokens.access_token || ""),
-    refreshToken: String(tokens.refresh_token || ""),
+    accessToken: String(tokens.access_token || ''),
+    refreshToken: String(tokens.refresh_token || ''),
   };
 }
 
 async function collectVisibilityProbe(page) {
   return page.evaluate(() => {
-    const normalizeText = (value) => String(value || "").replaceAll(/\s+/g, " ").trim();
+    const normalizeText = (value) =>
+      String(value || '')
+        .replaceAll(/\s+/g, ' ')
+        .trim();
     const isVisiblyRendered = (el) => {
       if (!el) return false;
       const style = globalThis.getComputedStyle(el);
-      if (style.display === "none" || style.visibility === "hidden") return false;
-      if (Number.parseFloat(style.opacity || "1") === 0) return false;
+      if (style.display === 'none' || style.visibility === 'hidden') return false;
+      if (Number.parseFloat(style.opacity || '1') === 0) return false;
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0;
     };
 
-    const main = document.querySelector("main");
+    const main = document.querySelector('main');
     const root = main || document.body;
-    const text = normalizeText(root?.textContent || "");
-    const words = text ? text.split(" ").filter(Boolean).length : 0;
-    const headings = root ? root.querySelectorAll("h1, h2").length : 0;
+    const text = normalizeText(root?.textContent || '');
+    const words = text ? text.split(' ').filter(Boolean).length : 0;
+    const headings = root ? root.querySelectorAll('h1, h2').length : 0;
 
-    const controls = root ? Array.from(root.querySelectorAll("input, textarea, select, button")) : [];
+    const controls = root
+      ? Array.from(root.querySelectorAll('input, textarea, select, button'))
+      : [];
     const visibleControls = controls.filter((el) => isVisiblyRendered(el));
 
     const loadingNodes = root
       ? root.querySelectorAll(
-          "[aria-busy='true'], [data-loading-state='true'], [data-loading='true'], .animate-pulse, .spinner, .loading"
+          "[aria-busy='true'], [data-loading-state='true'], [data-loading='true'], .animate-pulse, .spinner, .loading",
         ).length
       : 0;
 
@@ -427,36 +453,42 @@ async function collectVisibilityProbe(page) {
 
 async function main() {
   const args = parseArgs(process.argv);
-  const baseUrl = normalizeUrl(args["base-url"]);
-  const apiBaseUrl = normalizeUrl(args["api-base-url"] || "");
-  const routesJsonPath = String(args["routes-json"] || "").trim();
-  const outputDir = String(args["output-dir"] || "").trim();
-  const routeSamplesPath = String(args["route-samples"] || "").trim();
-  const authMode = normalizeAuthMode(args["auth-mode"]);
-  const ownerIdentifier = String(args["owner-identifier"] || "").trim();
-  const ownerPassword = String(args["owner-password"] || "").trim();
-  const maxRoutes = resolveMaxRoutes(args["max-routes"]);
+  const baseUrl = normalizeUrl(args['base-url']);
+  const apiBaseUrl = normalizeUrl(args['api-base-url'] || '');
+  const routesJsonPath = String(args['routes-json'] || '').trim();
+  const outputDir = String(args['output-dir'] || '').trim();
+  const routeSamplesPath = String(args['route-samples'] || '').trim();
+  const authMode = normalizeAuthMode(args['auth-mode']);
+  const ownerIdentifier = String(args['owner-identifier'] || '').trim();
+  const ownerPassword = String(args['owner-password'] || '').trim();
+  const maxRoutes = resolveMaxRoutes(args['max-routes']);
 
   if (!baseUrl || !routesJsonPath || !outputDir) {
-    throw new Error("Required args: --base-url --routes-json --output-dir");
+    throw new Error('Required args: --base-url --routes-json --output-dir');
   }
 
   const allowedRoots = Array.from(new Set([repoRoot, path.resolve(process.cwd())]));
-  const routesJsonAbsPath = resolvePathInAllowedRoots(routesJsonPath, allowedRoots, "--routes-json");
-  const outputDirAbsPath = resolvePathInAllowedRoots(outputDir, allowedRoots, "--output-dir");
+  const routesJsonAbsPath = resolvePathInAllowedRoots(
+    routesJsonPath,
+    allowedRoots,
+    '--routes-json',
+  );
+  const outputDirAbsPath = resolvePathInAllowedRoots(outputDir, allowedRoots, '--output-dir');
   const routeSamplesAbsPath = routeSamplesPath
-    ? resolvePathInAllowedRoots(routeSamplesPath, allowedRoots, "--route-samples")
-    : "";
+    ? resolvePathInAllowedRoots(routeSamplesPath, allowedRoots, '--route-samples')
+    : '';
 
-  const routesPayload = JSON.parse(await fs.readFile(routesJsonAbsPath, "utf-8"));
-  const routes = Array.isArray(routesPayload?.routes) ? routesPayload.routes.slice(0, maxRoutes) : [];
+  const routesPayload = JSON.parse(await fs.readFile(routesJsonAbsPath, 'utf-8'));
+  const routes = Array.isArray(routesPayload?.routes)
+    ? routesPayload.routes.slice(0, maxRoutes)
+    : [];
   let routeSamples = await loadRouteSamples(routeSamplesAbsPath, allowedRoots);
 
   await fs.mkdir(outputDirAbsPath, { recursive: true });
-  const screenshotDir = resolvePathWithinRoot(outputDirAbsPath, "screenshots");
+  const screenshotDir = resolvePathWithinRoot(outputDirAbsPath, 'screenshots');
   await fs.mkdir(screenshotDir, { recursive: true });
 
-  const { chromium } = require("@playwright/test");
+  const { chromium } = require('@playwright/test');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   await installApiRewrite(context, {
@@ -464,7 +496,7 @@ async function main() {
     apiBaseUrl: apiBaseUrl || baseUrl,
   });
   let ownerAuth = null;
-  if (authMode === "owner") {
+  if (authMode === 'owner') {
     ownerAuth = await primeOwnerSession(context, {
       apiBaseUrl: apiBaseUrl || baseUrl,
       ownerIdentifier,
@@ -474,7 +506,7 @@ async function main() {
   routeSamples = await hydrateRouteSamplesFromApi(context, {
     apiBaseUrl: apiBaseUrl || baseUrl,
     routeSamples,
-    accessToken: ownerAuth?.accessToken || "",
+    accessToken: ownerAuth?.accessToken || '',
   });
   const page = await context.newPage();
 
@@ -484,13 +516,15 @@ async function main() {
   const visibilitySignals = [];
 
   for (const route of routes) {
-    const routeTemplate = String(route?.full_path || "/");
-    const surface = String(route?.surface || "storefront");
+    const routeTemplate = String(route?.full_path || '/');
+    const surface = String(route?.surface || 'storefront');
     const materialized = materializeRoute(routeTemplate, routeSamples);
-    const resolvedPath = materialized.resolvedRoute.startsWith("/") ? materialized.resolvedRoute : `/${materialized.resolvedRoute}`;
+    const resolvedPath = materialized.resolvedRoute.startsWith('/')
+      ? materialized.resolvedRoute
+      : `/${materialized.resolvedRoute}`;
     const url = `${baseUrl}${resolvedPath}`;
     const slug = routeSlug(resolvedPath || routeTemplate);
-    const screenshotPath = path.join("screenshots", `${slug}.png`);
+    const screenshotPath = path.join('screenshots', `${slug}.png`);
     const screenshotAbsPath = resolvePathWithinRoot(outputDirAbsPath, screenshotPath);
     const routeConsole = [];
     const routePageErrors = [];
@@ -519,7 +553,7 @@ async function main() {
         word_count_initial_html: 0,
         meaningful_text_block_count: 0,
         internal_link_count: 0,
-        skipped_reason: "unresolved_placeholder"
+        skipped_reason: 'unresolved_placeholder',
       });
       layoutSignals.push({
         route: routeTemplate,
@@ -531,7 +565,7 @@ async function main() {
         sticky_count: 0,
         scrollable_count: 0,
         nested_scrollables_count: 0,
-        skipped_reason: "unresolved_placeholder"
+        skipped_reason: 'unresolved_placeholder',
       });
       visibilitySignals.push({
         route: routeTemplate,
@@ -540,23 +574,27 @@ async function main() {
         unresolved_placeholder: true,
         surface,
         auth_mode: authMode,
-        skipped_reason: "unresolved_placeholder",
+        skipped_reason: 'unresolved_placeholder',
       });
       continue;
     }
 
     const onConsole = (msg) => {
-      const location = typeof msg.location === "function" ? msg.location() : null;
+      const location = typeof msg.location === 'function' ? msg.location() : null;
       const line =
-        location && Number.isFinite(Number(location.lineNumber)) ? Number(location.lineNumber) : null;
+        location && Number.isFinite(Number(location.lineNumber))
+          ? Number(location.lineNumber)
+          : null;
       const column =
-        location && Number.isFinite(Number(location.columnNumber)) ? Number(location.columnNumber) : null;
+        location && Number.isFinite(Number(location.columnNumber))
+          ? Number(location.columnNumber)
+          : null;
       routeConsole.push({
         route: routeTemplate,
         route_template: routeTemplate,
         resolved_route: resolvedPath,
-        level: String(msg.type() || "info"),
-        text: String(msg.text() || ""),
+        level: String(msg.type() || 'info'),
+        text: String(msg.text() || ''),
         source_url: location && location.url ? String(location.url) : null,
         line,
         column,
@@ -567,19 +605,19 @@ async function main() {
         route: routeTemplate,
         route_template: routeTemplate,
         resolved_route: resolvedPath,
-        level: "error",
-        text: String(err?.message || err || ""),
+        level: 'error',
+        text: String(err?.message || err || ''),
       });
     };
     const onResponse = (response) => {
       const statusCode = Number(response.status() || 0);
       if (!Number.isFinite(statusCode) || statusCode < 400) return;
       const request = response.request();
-      const resourceType = String(request.resourceType() || "");
+      const resourceType = String(request.resourceType() || '');
       const url = normalizeResourceFailureUrl(response.url());
-      const method = String(request.method() || "");
+      const method = String(request.method() || '');
       const item = {
-        source: "response",
+        source: 'response',
         route: routeTemplate,
         route_template: routeTemplate,
         resolved_route: resolvedPath,
@@ -587,7 +625,7 @@ async function main() {
         request_url: url,
         resource_type: resourceType,
         method,
-        failure_text: "",
+        failure_text: '',
       };
       const dedupeKey = buildResourceFailureKey(item);
       if (routeResourceFailureKeys.has(dedupeKey)) return;
@@ -597,63 +635,72 @@ async function main() {
     const onRequestFailed = (request) => {
       const failure = request.failure();
       const item = {
-        source: "requestfailed",
+        source: 'requestfailed',
         route: routeTemplate,
         route_template: routeTemplate,
         resolved_route: resolvedPath,
         status_code: null,
         request_url: normalizeResourceFailureUrl(request.url()),
-        resource_type: String(request.resourceType() || ""),
-        method: String(request.method() || ""),
-        failure_text: String(failure?.errorText || ""),
+        resource_type: String(request.resourceType() || ''),
+        method: String(request.method() || ''),
+        failure_text: String(failure?.errorText || ''),
       };
       const dedupeKey = buildResourceFailureKey(item);
       if (routeResourceFailureKeys.has(dedupeKey)) return;
       routeResourceFailureKeys.add(dedupeKey);
       routeResourceFailures.push(item);
     };
-    page.on("console", onConsole);
-    page.on("pageerror", onPageError);
-    page.on("response", onResponse);
-    page.on("requestfailed", onRequestFailed);
+    page.on('console', onConsole);
+    page.on('pageerror', onPageError);
+    page.on('response', onResponse);
+    page.on('requestfailed', onRequestFailed);
 
     try {
-      await page.goto(url, { waitUntil: "networkidle", timeout: 45000 });
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 45000 });
       const visibilityInitial = await collectVisibilityProbe(page);
       await page.waitForTimeout(2000);
       const visibilitySettled = await collectVisibilityProbe(page);
       await page.evaluate(() => {
-        globalThis.dispatchEvent(new Event("scroll"));
-        globalThis.dispatchEvent(new Event("resize"));
+        globalThis.dispatchEvent(new Event('scroll'));
+        globalThis.dispatchEvent(new Event('resize'));
       });
       await page.waitForTimeout(250);
       const visibilityAfterPassive = await collectVisibilityProbe(page);
       await page.screenshot({ path: screenshotAbsPath, fullPage: true });
 
       const seo = await page.evaluate(() => {
-        const canonical = document.querySelector("link[rel='canonical']")?.getAttribute("href") || null;
-        const robots = document.querySelector("meta[name='robots']")?.getAttribute("content") || null;
-        const description = document.querySelector("meta[name='description']")?.getAttribute("content") || null;
-        const ogDescription = document.querySelector("meta[property='og:description']")?.getAttribute("content") || null;
+        const canonical =
+          document.querySelector("link[rel='canonical']")?.getAttribute('href') || null;
+        const robots =
+          document.querySelector("meta[name='robots']")?.getAttribute('content') || null;
+        const description =
+          document.querySelector("meta[name='description']")?.getAttribute('content') || null;
+        const ogDescription =
+          document.querySelector("meta[property='og:description']")?.getAttribute('content') ||
+          null;
         const title = document.title || null;
-        const h1Nodes = Array.from(document.querySelectorAll("h1"));
-        const h1Texts = h1Nodes.map((node) => (node.textContent || "").trim()).filter(Boolean);
+        const h1Nodes = Array.from(document.querySelectorAll('h1'));
+        const h1Texts = h1Nodes.map((node) => (node.textContent || '').trim()).filter(Boolean);
         const routeHeadingCount = document.querySelectorAll("[data-route-heading='true']").length;
 
-        const bodyText = (document.body?.innerText || "").replaceAll(/\s+/g, " ").trim();
-        const wordCount = bodyText ? bodyText.split(" ").filter(Boolean).length : 0;
-        const candidateBlocks = Array.from(document.querySelectorAll("main p, article p, section p, li, h2, h3"))
-          .map((node) => (node.textContent || "").replaceAll(/\s+/g, " ").trim())
+        const bodyText = (document.body?.innerText || '').replaceAll(/\s+/g, ' ').trim();
+        const wordCount = bodyText ? bodyText.split(' ').filter(Boolean).length : 0;
+        const candidateBlocks = Array.from(
+          document.querySelectorAll('main p, article p, section p, li, h2, h3'),
+        )
+          .map((node) => (node.textContent || '').replaceAll(/\s+/g, ' ').trim())
           .filter((text) => text.length >= 40);
-        const meaningfulTextBlocks = candidateBlocks.filter((text) => text.split(" ").filter(Boolean).length >= 8);
+        const meaningfulTextBlocks = candidateBlocks.filter(
+          (text) => text.split(' ').filter(Boolean).length >= 8,
+        );
 
-        const internalLinks = Array.from(document.querySelectorAll("a[href]")).filter((anchor) => {
-          const href = String(anchor.getAttribute("href") || "").trim();
+        const internalLinks = Array.from(document.querySelectorAll('a[href]')).filter((anchor) => {
+          const href = String(anchor.getAttribute('href') || '').trim();
           if (!href) return false;
-          if (href.startsWith("#")) return false;
+          if (href.startsWith('#')) return false;
           try {
             const url = new URL(href, globalThis.location.origin);
-            if (url.protocol !== "http:" && url.protocol !== "https:") {
+            if (url.protocol !== 'http:' && url.protocol !== 'https:') {
               return false;
             }
             return url.origin === globalThis.location.origin;
@@ -661,7 +708,9 @@ async function main() {
             return false;
           }
         });
-        const noindex = String(robots || "").toLowerCase().includes("noindex");
+        const noindex = String(robots || '')
+          .toLowerCase()
+          .includes('noindex');
         return {
           title,
           description,
@@ -679,12 +728,16 @@ async function main() {
       });
 
       const layout = await page.evaluate(() => {
-        const allElements = Array.from(document.querySelectorAll("*"));
-        const stickyElements = allElements.filter((el) => getComputedStyle(el).position === "sticky");
+        const allElements = Array.from(document.querySelectorAll('*'));
+        const stickyElements = allElements.filter(
+          (el) => getComputedStyle(el).position === 'sticky',
+        );
         const scrollables = allElements.filter((el) => {
           const style = getComputedStyle(el);
           const overflowY = style.overflowY;
-          const scrollable = (overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight + 8;
+          const scrollable =
+            (overflowY === 'auto' || overflowY === 'scroll') &&
+            el.scrollHeight > el.clientHeight + 8;
           return scrollable;
         });
         const nestedScrollables = scrollables.filter((el) => {
@@ -692,7 +745,10 @@ async function main() {
           if (!parent) return false;
           const style = getComputedStyle(parent);
           const overflowY = style.overflowY;
-          return (overflowY === "auto" || overflowY === "scroll") && parent.scrollHeight > parent.clientHeight + 8;
+          return (
+            (overflowY === 'auto' || overflowY === 'scroll') &&
+            parent.scrollHeight > parent.clientHeight + 8
+          );
         });
         return {
           sticky_count: stickyElements.length,
@@ -722,16 +778,19 @@ async function main() {
         ...layout,
       });
 
-      const controlsUnlockedAfterPassive = visibilitySettled.visible_form_control_count === 0
-        && visibilityAfterPassive.visible_form_control_count > 0;
-      const textUnlockedAfterPassive = visibilitySettled.text_words < 20
-        && visibilityAfterPassive.text_words >= 40;
-      const controlsAppearedAfterSettleWithoutLoading = visibilityInitial.visible_form_control_count === 0
-        && visibilitySettled.visible_form_control_count > 0
-        && visibilitySettled.loading_indicator_count === 0;
-      const textAppearedAfterSettleWithoutLoading = visibilityInitial.text_words < 20
-        && visibilitySettled.text_words >= 40
-        && visibilitySettled.loading_indicator_count === 0;
+      const controlsUnlockedAfterPassive =
+        visibilitySettled.visible_form_control_count === 0 &&
+        visibilityAfterPassive.visible_form_control_count > 0;
+      const textUnlockedAfterPassive =
+        visibilitySettled.text_words < 20 && visibilityAfterPassive.text_words >= 40;
+      const controlsAppearedAfterSettleWithoutLoading =
+        visibilityInitial.visible_form_control_count === 0 &&
+        visibilitySettled.visible_form_control_count > 0 &&
+        visibilitySettled.loading_indicator_count === 0;
+      const textAppearedAfterSettleWithoutLoading =
+        visibilityInitial.text_words < 20 &&
+        visibilitySettled.text_words >= 40 &&
+        visibilitySettled.loading_indicator_count === 0;
 
       visibilitySignals.push({
         route: routeTemplate,
@@ -749,16 +808,18 @@ async function main() {
         // "After settle" deltas are tracked as telemetry, but are often benign async hydration.
         visibility_issue: controlsUnlockedAfterPassive || textUnlockedAfterPassive,
         issue_reasons: [
-          controlsUnlockedAfterPassive ? "form_controls_appear_after_passive_events" : null,
-          textUnlockedAfterPassive ? "text_appears_after_passive_events" : null,
+          controlsUnlockedAfterPassive ? 'form_controls_appear_after_passive_events' : null,
+          textUnlockedAfterPassive ? 'text_appears_after_passive_events' : null,
         ].filter(Boolean),
         settle_only_reasons: [
-          controlsAppearedAfterSettleWithoutLoading ? "form_controls_appear_after_settle" : null,
-          textAppearedAfterSettleWithoutLoading ? "text_appears_after_settle_without_loading_state" : null,
+          controlsAppearedAfterSettleWithoutLoading ? 'form_controls_appear_after_settle' : null,
+          textAppearedAfterSettleWithoutLoading
+            ? 'text_appears_after_settle_without_loading_state'
+            : null,
         ].filter(Boolean),
       });
     } catch (err) {
-      const message = String(err?.message || err || "unknown browser error");
+      const message = String(err?.message || err || 'unknown browser error');
       seoSnapshot.push({
         route: routeTemplate,
         route_template: routeTemplate,
@@ -807,28 +868,35 @@ async function main() {
         route: routeTemplate,
         route_template: routeTemplate,
         resolved_route: resolvedPath,
-        level: "error",
+        level: 'error',
         text: message,
       });
     } finally {
-      page.off("console", onConsole);
-      page.off("pageerror", onPageError);
-      page.off("response", onResponse);
-      page.off("requestfailed", onRequestFailed);
+      page.off('console', onConsole);
+      page.off('pageerror', onPageError);
+      page.off('response', onResponse);
+      page.off('requestfailed', onRequestFailed);
     }
 
     for (const item of routeResourceFailures) {
-      const statusLabel = item.status_code ? `status ${item.status_code}` : (item.failure_text || "requestfailed");
-      const descriptor = [statusLabel, item.resource_type || "resource", item.method || "GET", item.request_url || "(unknown-url)"]
+      const statusLabel = item.status_code
+        ? `status ${item.status_code}`
+        : item.failure_text || 'requestfailed';
+      const descriptor = [
+        statusLabel,
+        item.resource_type || 'resource',
+        item.method || 'GET',
+        item.request_url || '(unknown-url)',
+      ]
         .filter(Boolean)
-        .join(" | ");
+        .join(' | ');
       consoleErrors.push({
         route: item.route,
         route_template: item.route_template,
         resolved_route: item.resolved_route,
         surface,
-        level: "error",
-        severity: "s4",
+        level: 'error',
+        severity: 's4',
         text: `Failed resource request: ${descriptor}`,
         source: item.source,
         request_url: item.request_url || null,
@@ -843,8 +911,8 @@ async function main() {
     }
 
     for (const item of routeConsole) {
-      const lowerText = String(item.text || "").toLowerCase();
-      if (lowerText.includes("failed to load resource")) {
+      const lowerText = String(item.text || '').toLowerCase();
+      if (lowerText.includes('failed to load resource')) {
         // Prefer structured resource-failure events above; generic console messages
         // are noisy and omit URL/status.
         continue;
@@ -867,8 +935,8 @@ async function main() {
       });
     }
     for (const item of routePageErrors) {
-      const lowerText = String(item.text || "").toLowerCase();
-      if (lowerText.includes("failed to load resource")) {
+      const lowerText = String(item.text || '').toLowerCase();
+      if (lowerText.includes('failed to load resource')) {
         // Prefer structured resource-failure events above; generic page errors
         // are noisy and omit URL/status.
         continue;
@@ -883,7 +951,7 @@ async function main() {
         resolved_route: item.resolved_route,
         surface,
         level: classification.level,
-        severity: classification.severity === "s4" ? "s4" : "s2",
+        severity: classification.severity === 's4' ? 's4' : 's2',
         text: item.text,
         source_url: item.source_url ?? null,
         line: item.line ?? null,
@@ -894,12 +962,28 @@ async function main() {
 
   await browser.close();
 
-  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "seo-snapshot.json"), `${JSON.stringify(seoSnapshot, null, 2)}\n`, "utf-8");
-  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "console-errors.json"), `${JSON.stringify(consoleErrors, null, 2)}\n`, "utf-8");
-  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "layout-signals.json"), `${JSON.stringify(layoutSignals, null, 2)}\n`, "utf-8");
-  await fs.writeFile(resolvePathWithinRoot(outputDirAbsPath, "visibility-signals.json"), `${JSON.stringify(visibilitySignals, null, 2)}\n`, "utf-8");
   await fs.writeFile(
-    resolvePathWithinRoot(outputDirAbsPath, "browser-evidence-meta.json"),
+    resolvePathWithinRoot(outputDirAbsPath, 'seo-snapshot.json'),
+    `${JSON.stringify(seoSnapshot, null, 2)}\n`,
+    'utf-8',
+  );
+  await fs.writeFile(
+    resolvePathWithinRoot(outputDirAbsPath, 'console-errors.json'),
+    `${JSON.stringify(consoleErrors, null, 2)}\n`,
+    'utf-8',
+  );
+  await fs.writeFile(
+    resolvePathWithinRoot(outputDirAbsPath, 'layout-signals.json'),
+    `${JSON.stringify(layoutSignals, null, 2)}\n`,
+    'utf-8',
+  );
+  await fs.writeFile(
+    resolvePathWithinRoot(outputDirAbsPath, 'visibility-signals.json'),
+    `${JSON.stringify(visibilitySignals, null, 2)}\n`,
+    'utf-8',
+  );
+  await fs.writeFile(
+    resolvePathWithinRoot(outputDirAbsPath, 'browser-evidence-meta.json'),
     `${JSON.stringify(
       {
         auth_mode: authMode,
@@ -907,15 +991,15 @@ async function main() {
         api_base_url: apiBaseUrl || baseUrl,
       },
       null,
-      2
+      2,
     )}\n`,
-    "utf-8"
+    'utf-8',
   );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((err) => {
-    const message = String(err?.message || err || "unknown error");
+    const message = String(err?.message || err || 'unknown error');
     process.stderr.write(`${message}\n`);
     process.exit(1);
   });

@@ -2,23 +2,21 @@ import { Routes } from '@angular/router';
 
 export const routes: Routes = [
   {
-    path: "",
+    path: '',
     title: 'routes.home.title',
     data: {
-      robots: "index,follow",
+      robots: 'index,follow',
     },
   },
   {
     path: 'account',
-    title:
-      "routes.account.title",
+    title: 'routes.account.title',
     children: [
       {
-        path: "orders",
+        path: 'orders',
         title: 'routes.account.orders',
         data: {
-          robots:
-            'noindex,nofollow',
+          robots: 'noindex,nofollow',
         },
       },
       {
@@ -28,15 +26,14 @@ export const routes: Routes = [
     ],
   },
   {
-    path: "admin",
+    path: 'admin',
     children: [
       {
         path: 'content',
         children: [
           {
-            path: "pages",
-            title:
-              "routes.admin.content.pages",
+            path: 'pages',
+            title: 'routes.admin.content.pages',
             robots: ROBOTS_NOINDEX,
           },
         ],
