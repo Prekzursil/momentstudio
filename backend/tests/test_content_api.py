@@ -933,7 +933,7 @@ def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
 
 
 def test_legal_pages_require_bilingual_before_publish(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

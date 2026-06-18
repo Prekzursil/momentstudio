@@ -162,7 +162,7 @@ def test_notifications_mark_read_and_dismiss(test_app: Dict[str, object]) -> Non
 
 
 def test_notifications_list_include_dismissed_and_old_read(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

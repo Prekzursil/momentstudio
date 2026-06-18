@@ -2214,15 +2214,18 @@ async def admin_find_replace_preview(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("content")),
 ) -> ContentFindReplacePreviewResponse:
-    items, total_items, total_matches, truncated = (
-        await content_service.preview_find_replace(
-            session,
-            find=payload.find,
-            replace=payload.replace,
-            key_prefix=payload.key_prefix,
-            case_sensitive=payload.case_sensitive,
-            limit=payload.limit,
-        )
+    (
+        items,
+        total_items,
+        total_matches,
+        truncated,
+    ) = await content_service.preview_find_replace(
+        session,
+        find=payload.find,
+        replace=payload.replace,
+        key_prefix=payload.key_prefix,
+        case_sensitive=payload.case_sensitive,
+        limit=payload.limit,
     )
     return ContentFindReplacePreviewResponse(
         items=items,
@@ -2240,15 +2243,18 @@ async def admin_find_replace_apply(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("content")),
 ) -> ContentFindReplaceApplyResponse:
-    updated_blocks, updated_translations, total_replacements, errors = (
-        await content_service.apply_find_replace(
-            session,
-            find=payload.find,
-            replace=payload.replace,
-            key_prefix=payload.key_prefix,
-            case_sensitive=payload.case_sensitive,
-            actor_id=admin.id,
-        )
+    (
+        updated_blocks,
+        updated_translations,
+        total_replacements,
+        errors,
+    ) = await content_service.apply_find_replace(
+        session,
+        find=payload.find,
+        replace=payload.replace,
+        key_prefix=payload.key_prefix,
+        case_sensitive=payload.case_sensitive,
+        actor_id=admin.id,
     )
     return ContentFindReplaceApplyResponse(
         updated_blocks=updated_blocks,

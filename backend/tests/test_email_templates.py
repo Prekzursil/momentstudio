@@ -6,9 +6,9 @@ from app.services import email as email_service
 
 
 def test_jinja2_is_available() -> None:
-    assert (
-        email_service.env is not None
-    ), "jinja2 must be installed so email templates render deterministically"
+    assert email_service.env is not None, (
+        "jinja2 must be installed so email templates render deterministically"
+    )
 
 
 @pytest.mark.parametrize(

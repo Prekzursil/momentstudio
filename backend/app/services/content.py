@@ -1768,9 +1768,9 @@ async def check_content_links(
         resolved_keys[k] = (resolved, err)
         resolved_targets.add(resolved)
 
-    blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = (
-        {}
-    )
+    blocks_by_key: dict[
+        str, tuple[ContentStatus, datetime | None, datetime | None]
+    ] = {}
     if resolved_targets:
         block_rows = (
             await session.execute(
@@ -2045,9 +2045,9 @@ async def check_content_links_preview(
         resolved_keys[k] = (resolved, err)
         resolved_targets.add(resolved)
 
-    blocks_by_key: dict[str, tuple[ContentStatus, datetime | None, datetime | None]] = (
-        {}
-    )
+    blocks_by_key: dict[
+        str, tuple[ContentStatus, datetime | None, datetime | None]
+    ] = {}
     if resolved_targets:
         block_rows = (
             await session.execute(

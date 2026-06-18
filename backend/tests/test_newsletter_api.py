@@ -52,7 +52,7 @@ def test_newsletter_subscribe_idempotent(test_app: Dict[str, object]) -> None:
 
 
 def test_newsletter_unsubscribe_accepts_one_click_post(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     token = newsletter_tokens.create_newsletter_token(

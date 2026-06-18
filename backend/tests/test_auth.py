@@ -211,7 +211,7 @@ def test_register_records_legal_consents(test_app: Dict[str, object]) -> None:
 
 
 def test_cooldowns_endpoint_returns_next_allowed_times(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
@@ -281,7 +281,7 @@ def test_sessions_list_and_revoke_others(test_app: Dict[str, object]) -> None:
 
 
 def test_security_events_include_logins_email_and_password_changes(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
@@ -692,7 +692,7 @@ def test_invalid_login_and_refresh(test_app: Dict[str, object]) -> None:
 
 
 def test_silent_refresh_probe_returns_204_for_missing_or_invalid_token(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
@@ -891,7 +891,7 @@ def test_update_profile_me(test_app: Dict[str, object]) -> None:
 
 
 def test_change_password_persists_and_updates_login(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
@@ -1043,7 +1043,7 @@ def test_alias_history_and_display_name_tags(test_app: Dict[str, object]) -> Non
 
 
 def test_display_name_history_reuses_name_tag_on_revert(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal: Callable = test_app["session_factory"]  # type: ignore[assignment]

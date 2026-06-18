@@ -177,7 +177,7 @@ def _is_benign_storefront_unexpected_token(row: dict[str, Any]) -> bool:
 
 
 def _build_console_noise_telemetry(
-    console_errors: list[dict[str, Any]]
+    console_errors: list[dict[str, Any]],
 ) -> dict[str, Any]:
     clusters: dict[str, dict[str, Any]] = {}
     for row in console_errors:
@@ -989,7 +989,7 @@ def _build_deterministic_findings(
         noise_finding = _finding(
             title=f"Browser console noise cluster on `{surface}` ({len(routes)} routes)",
             description=(
-                f"Representative console message: {cluster.get('message','')}\n\n"
+                f"Representative console message: {cluster.get('message', '')}\n\n"
                 f"{status_note}\n"
                 f"{endpoint_note}\n\n"
                 f"Affected routes (sample): {', '.join(f'`{route}`' for route in sample_routes)}"

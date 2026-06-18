@@ -712,7 +712,9 @@ async def list_user_comments(
         status_value = (
             "deleted"
             if comment.is_deleted
-            else "hidden" if comment.is_hidden else "posted"
+            else "hidden"
+            if comment.is_hidden
+            else "posted"
         )
         body_value = "" if comment.is_deleted or comment.is_hidden else comment.body
 

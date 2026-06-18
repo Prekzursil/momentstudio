@@ -102,7 +102,7 @@ async def seed_page(session_factory, *, key: str, title: str) -> None:
 
 
 def test_admin_can_rename_page_and_old_slug_redirects(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
@@ -288,7 +288,7 @@ def test_admin_can_list_and_delete_redirects(test_app: Dict[str, object]) -> Non
 
 
 def test_admin_upsert_redirect_accepts_display_values(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]

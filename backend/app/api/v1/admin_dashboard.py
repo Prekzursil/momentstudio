@@ -1158,8 +1158,9 @@ async def admin_payments_health(
             }
         )
     recent_errors.sort(
-        key=lambda item: item.get("last_attempt_at")
-        or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda item: (
+            item.get("last_attempt_at") or datetime.min.replace(tzinfo=timezone.utc)
+        ),
         reverse=True,
     )
     recent_errors = recent_errors[:12]

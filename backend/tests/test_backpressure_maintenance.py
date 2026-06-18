@@ -26,9 +26,9 @@ def test_maintenance_mode_allows_payment_webhooks(monkeypatch):
         "/api/v1/payments/netopia/webhook",
     ):
         res = client.post(path, json={})
-        assert (
-            res.status_code != 503
-        ), f"{path} should not be blocked by maintenance mode"
+        assert res.status_code != 503, (
+            f"{path} should not be blocked by maintenance mode"
+        )
     monkeypatch.setattr(settings, "maintenance_mode", False)
 
 

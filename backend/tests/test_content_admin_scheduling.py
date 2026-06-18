@@ -83,7 +83,7 @@ def admin_headers(client: TestClient, session_factory) -> dict[str, str]:
 
 
 def test_admin_scheduling_endpoint_paginates_and_orders(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]

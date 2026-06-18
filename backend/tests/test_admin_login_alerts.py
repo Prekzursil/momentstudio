@@ -41,7 +41,7 @@ def _create_user(
     email: str,
     username: str,
     role: UserRole,
-    password: str = "supersecret"
+    password: str = "supersecret",
 ) -> User:
     async def _inner() -> User:
         async with session_factory() as session:

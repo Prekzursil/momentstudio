@@ -171,7 +171,7 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
 
 
 def test_my_comments_endpoint_includes_status_and_context(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

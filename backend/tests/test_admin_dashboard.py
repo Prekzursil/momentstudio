@@ -328,7 +328,7 @@ def test_admin_summary(test_app: Dict[str, object]) -> None:
 
 
 def test_admin_dashboard_alert_thresholds_endpoints(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]

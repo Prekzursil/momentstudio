@@ -270,10 +270,10 @@ def _digest_body(low_findings: list[dict[str, Any]], run_url: str | None) -> str
         for finding in low_findings:
             lines.extend(
                 [
-                    f"- [{finding.get('severity','s3')}] {finding.get('title','Audit finding')}",
-                    f"  - Route: `{finding.get('route','/')}`",
-                    f"  - Surface: `{finding.get('surface','storefront')}`",
-                    f"  - Fingerprint: `{finding.get('fingerprint','')}`",
+                    f"- [{finding.get('severity', 's3')}] {finding.get('title', 'Audit finding')}",
+                    f"  - Route: `{finding.get('route', '/')}`",
+                    f"  - Surface: `{finding.get('surface', 'storefront')}`",
+                    f"  - Fingerprint: `{finding.get('fingerprint', '')}`",
                 ]
             )
     return "\n".join(lines).strip() + "\n"
@@ -346,8 +346,8 @@ def _upsert_issues(
             continue
         seen_fingerprints.add(fp)
         issue_title = (
-            f"[Audit][{finding.get('severity','s3').upper()}]"
-            f"[{finding.get('surface','storefront')}] {finding.get('title','Audit finding')}"
+            f"[Audit][{finding.get('severity', 's3').upper()}]"
+            f"[{finding.get('surface', 'storefront')}] {finding.get('title', 'Audit finding')}"
         )
         body = _issue_body_for_finding(finding, run_url)
         labels = sorted(set(["ai:ready", *list(finding.get("labels") or [])]))

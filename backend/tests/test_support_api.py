@@ -77,7 +77,7 @@ def create_user_token(
 
 
 def test_support_contact_submission_creates_notification(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -280,7 +280,7 @@ def test_support_guest_reply_sends_email(
 
 
 def test_support_ticket_thread_user_and_admin_reply(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -370,7 +370,7 @@ def test_support_ticket_thread_user_and_admin_reply(
 
 
 def test_support_assignment_and_mentions_notify_staff(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

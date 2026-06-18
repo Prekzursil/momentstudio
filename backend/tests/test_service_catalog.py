@@ -35,6 +35,11 @@ def test_catalog_service_create_and_slug():
                 user_id=None,
             )
             assert prod.slug == "svc-prod"
-            await catalog_service.update_product(session, prod, ProductCreate.model_construct(name="Updated"), commit=True)  # type: ignore[arg-type]
+            await catalog_service.update_product(
+                session,
+                prod,
+                ProductCreate.model_construct(name="Updated"),
+                commit=True,
+            )  # type: ignore[arg-type]
 
     asyncio.run(run_flow())

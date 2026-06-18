@@ -74,7 +74,7 @@ def checkout_app() -> Dict[str, object]:
 
 
 def test_guest_checkout_requires_email_verification(
-    checkout_app: Dict[str, object]
+    checkout_app: Dict[str, object],
 ) -> None:
     client: TestClient = checkout_app["client"]  # type: ignore[assignment]
     SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
@@ -683,7 +683,7 @@ def test_authenticated_checkout_promo_and_shipping(
 
 
 def test_checkout_respects_product_delivery_exceptions(
-    checkout_app: Dict[str, object]
+    checkout_app: Dict[str, object],
 ) -> None:
     client: TestClient = checkout_app["client"]  # type: ignore[assignment]
     SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]

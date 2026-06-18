@@ -112,7 +112,7 @@ def auth_headers(client: TestClient, session_factory) -> dict[str, str]:
 
 
 def test_admin_export_only_includes_confirmed_opted_in_subscribers(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]

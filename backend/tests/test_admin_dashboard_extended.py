@@ -216,7 +216,7 @@ def test_admin_filters_and_low_stock(test_app: Dict[str, object]) -> None:
 
 
 def test_admin_summary_sales_excludes_cancelled_and_pending(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
@@ -332,7 +332,7 @@ def test_admin_summary_sales_excludes_cancelled_and_pending(
 
 
 def test_admin_summary_net_sales_subtracts_partial_refunds(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
@@ -388,7 +388,7 @@ def test_admin_summary_net_sales_subtracts_partial_refunds(
 
 
 def test_admin_summary_excludes_test_orders_from_kpis(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
@@ -449,7 +449,7 @@ def test_admin_summary_excludes_test_orders_from_kpis(
 
 
 def test_admin_channel_breakdown_groups_and_excludes_test_orders(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]
@@ -1608,7 +1608,7 @@ def test_admin_user_email_verification_controls(test_app: Dict[str, object]) -> 
 
 
 def test_admin_user_password_reset_resend_creates_token_and_audit(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     engine = test_app["engine"]

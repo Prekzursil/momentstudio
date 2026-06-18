@@ -166,7 +166,9 @@ async def validate_structured_data(session: AsyncSession) -> dict[str, object]:
         url_path = (
             "/about"
             if slug == "about"
-            else "/contact" if slug == "contact" else f"/pages/{slug}"
+            else "/contact"
+            if slug == "contact"
+            else f"/pages/{slug}"
         )
         url = f"{base}{url_path}"
         if not _is_absolute_url(url):

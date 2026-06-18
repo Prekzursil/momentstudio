@@ -121,7 +121,9 @@ async def simulate_shipping_rates(
             Decimal(checkout_settings.shipping_fee_ron), rounding=rounding
         )
     else:
-        base_shipping = pricing.quantize_money(order_service._calculate_shipping(subtotal, method), rounding=rounding)  # type: ignore[attr-defined]
+        base_shipping = pricing.quantize_money(
+            order_service._calculate_shipping(subtotal, method), rounding=rounding
+        )  # type: ignore[attr-defined]
 
     threshold = checkout_settings.free_shipping_threshold_ron
     if threshold is not None and threshold >= 0 and taxable >= Decimal(str(threshold)):

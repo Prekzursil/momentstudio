@@ -708,7 +708,9 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     email_service.send_order_confirmation = fake_send_order_confirmation  # type: ignore[assignment]
     email_service.send_shipping_update = fake_send_shipping_update  # type: ignore[assignment]
     email_service.send_delivery_confirmation = fake_send_delivery_confirmation  # type: ignore[assignment]
-    email_service.send_refund_requested_notification = fake_send_refund_requested_notification  # type: ignore[assignment]
+    email_service.send_refund_requested_notification = (
+        fake_send_refund_requested_notification  # type: ignore[assignment]
+    )
 
     res = client.post(
         "/api/v1/orders",
@@ -1687,9 +1689,9 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
         headers=auth_headers(admin_token),
         json={"status": "cancelled"},
     )
-    assert (
-        cancel_paid_missing_reason.status_code == 400
-    ), cancel_paid_missing_reason.text
+    assert cancel_paid_missing_reason.status_code == 400, (
+        cancel_paid_missing_reason.text
+    )
     assert "Cancel reason is required" in cancel_paid_missing_reason.text
 
     cancel_paid = client.patch(

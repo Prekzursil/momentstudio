@@ -745,7 +745,7 @@ def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
 
 
 def test_blog_view_count_deduped_per_session_and_skips_bots(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

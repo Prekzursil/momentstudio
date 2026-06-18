@@ -33,7 +33,7 @@ def test_app() -> Dict[str, object]:
 
 
 def test_payment_capabilities_exposes_netopia_disabled(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 

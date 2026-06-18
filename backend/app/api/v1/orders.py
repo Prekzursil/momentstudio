@@ -673,27 +673,26 @@ async def checkout(
                         f"{base}/checkout/netopia/return?order_id={existing_order.id}"
                     )
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
-                    netopia_ntp_id, netopia_payment_url = (
-                        await netopia_service.start_payment(
-                            order_id=str(existing_order.id),
-                            amount_ron=pricing.quantize_money(
-                                existing_order.total_amount
-                            ),
-                            description=(
-                                f"Order {existing_order.reference_code}"
-                                if existing_order.reference_code
-                                else f"Order {existing_order.id}"
-                            ),
-                            billing=billing_payload,
-                            shipping=shipping_payload,
-                            products=_build_netopia_products(
-                                existing_order, lang=current_user.preferred_language
-                            ),
-                            language=(current_user.preferred_language or "ro"),
-                            cancel_url=cancel_url,
-                            notify_url=notify_url,
-                            redirect_url=redirect_url,
-                        )
+                    (
+                        netopia_ntp_id,
+                        netopia_payment_url,
+                    ) = await netopia_service.start_payment(
+                        order_id=str(existing_order.id),
+                        amount_ron=pricing.quantize_money(existing_order.total_amount),
+                        description=(
+                            f"Order {existing_order.reference_code}"
+                            if existing_order.reference_code
+                            else f"Order {existing_order.id}"
+                        ),
+                        billing=billing_payload,
+                        shipping=shipping_payload,
+                        products=_build_netopia_products(
+                            existing_order, lang=current_user.preferred_language
+                        ),
+                        language=(current_user.preferred_language or "ro"),
+                        cancel_url=cancel_url,
+                        notify_url=notify_url,
+                        redirect_url=redirect_url,
                     )
                     existing_order.netopia_ntp_id = netopia_ntp_id
                     existing_order.netopia_payment_url = netopia_payment_url
@@ -1894,10 +1893,9 @@ async def admin_export_orders(
         "tracking_url": lambda o: getattr(o, "tracking_url", "") or "",
         "invoice_company": lambda o: getattr(o, "invoice_company", "") or "",
         "invoice_vat_id": lambda o: getattr(o, "invoice_vat_id", "") or "",
-        "shipping_method": lambda o: getattr(
-            getattr(o, "shipping_method", None), "name", ""
-        )
-        or "",
+        "shipping_method": lambda o: (
+            getattr(getattr(o, "shipping_method", None), "name", "") or ""
+        ),
         "locker_name": lambda o: getattr(o, "locker_name", "") or "",
         "locker_address": lambda o: getattr(o, "locker_address", "") or "",
         "created_at": lambda o: (
@@ -1908,27 +1906,17 @@ async def admin_export_orders(
         ),
     }
     if not include_pii:
-        allowed["customer_email"] = (
-            lambda o: pii_service.mask_email(getattr(o, "customer_email", "") or "")
-            or ""
+        allowed["customer_email"] = lambda o: (
+            pii_service.mask_email(getattr(o, "customer_email", "") or "") or ""
         )
-        allowed["customer_name"] = (
-            lambda o: pii_service.mask_text(
-                getattr(o, "customer_name", "") or "", keep=1
-            )
-            or ""
+        allowed["customer_name"] = lambda o: (
+            pii_service.mask_text(getattr(o, "customer_name", "") or "", keep=1) or ""
         )
-        allowed["invoice_company"] = (
-            lambda o: pii_service.mask_text(
-                getattr(o, "invoice_company", "") or "", keep=1
-            )
-            or ""
+        allowed["invoice_company"] = lambda o: (
+            pii_service.mask_text(getattr(o, "invoice_company", "") or "", keep=1) or ""
         )
-        allowed["invoice_vat_id"] = (
-            lambda o: pii_service.mask_text(
-                getattr(o, "invoice_vat_id", "") or "", keep=2
-            )
-            or ""
+        allowed["invoice_vat_id"] = lambda o: (
+            pii_service.mask_text(getattr(o, "invoice_vat_id", "") or "", keep=2) or ""
         )
         allowed["locker_address"] = lambda o: (
             "***" if (getattr(o, "locker_address", "") or "").strip() else ""
@@ -2401,27 +2389,26 @@ async def guest_checkout(
                         f"{base}/checkout/netopia/return?order_id={existing_order.id}"
                     )
                     notify_url = f"{base}/api/v1/payments/netopia/webhook"
-                    netopia_ntp_id, netopia_payment_url = (
-                        await netopia_service.start_payment(
-                            order_id=str(existing_order.id),
-                            amount_ron=pricing.quantize_money(
-                                existing_order.total_amount
-                            ),
-                            description=(
-                                f"Order {existing_order.reference_code}"
-                                if existing_order.reference_code
-                                else f"Order {existing_order.id}"
-                            ),
-                            billing=billing_payload,
-                            shipping=shipping_payload,
-                            products=_build_netopia_products(
-                                existing_order, lang=payload.preferred_language
-                            ),
-                            language=(payload.preferred_language or "ro"),
-                            cancel_url=cancel_url,
-                            notify_url=notify_url,
-                            redirect_url=redirect_url,
-                        )
+                    (
+                        netopia_ntp_id,
+                        netopia_payment_url,
+                    ) = await netopia_service.start_payment(
+                        order_id=str(existing_order.id),
+                        amount_ron=pricing.quantize_money(existing_order.total_amount),
+                        description=(
+                            f"Order {existing_order.reference_code}"
+                            if existing_order.reference_code
+                            else f"Order {existing_order.id}"
+                        ),
+                        billing=billing_payload,
+                        shipping=shipping_payload,
+                        products=_build_netopia_products(
+                            existing_order, lang=payload.preferred_language
+                        ),
+                        language=(payload.preferred_language or "ro"),
+                        cancel_url=cancel_url,
+                        notify_url=notify_url,
+                        redirect_url=redirect_url,
                     )
                     existing_order.netopia_ntp_id = netopia_ntp_id
                     existing_order.netopia_payment_url = netopia_payment_url

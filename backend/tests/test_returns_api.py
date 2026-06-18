@@ -224,7 +224,7 @@ async def _seed_order_for_user(
 
 
 def test_admin_can_create_list_and_update_return_request(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
@@ -266,7 +266,7 @@ def test_admin_can_create_list_and_update_return_request(
 
 
 def test_create_return_request_rejects_duplicate_order_items(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
@@ -291,7 +291,7 @@ def test_create_return_request_rejects_duplicate_order_items(
 
 
 def test_customer_can_request_return_for_delivered_order(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]
@@ -342,7 +342,7 @@ def test_customer_can_request_return_for_delivered_order(
 
 
 def test_customer_return_request_rejects_non_delivered(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]  # type: ignore[assignment]

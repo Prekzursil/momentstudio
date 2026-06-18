@@ -328,7 +328,7 @@ def test_catalog_admin_and_public_flows(test_app: Dict[str, object]) -> None:
 
 
 def test_catalog_category_filters_include_descendants(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -386,7 +386,7 @@ def test_catalog_category_filters_include_descendants(
 
 
 def test_catalog_slug_autogen_and_slug_reuse_after_delete(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -880,7 +880,7 @@ def test_bulk_update_and_publish(test_app: Dict[str, object]) -> None:
 
 
 def test_bulk_category_assignment_and_publish_scheduling(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -1018,7 +1018,7 @@ def test_product_reviews_and_related(test_app: Dict[str, object]) -> None:
 
 
 def test_product_relationships_curate_related_and_upsells(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
@@ -1610,7 +1610,7 @@ def test_back_in_stock_fulfilled_on_restock(test_app: Dict[str, object]) -> None
 
 
 def test_catalog_variant_matrix_update_and_delete_guards(
-    test_app: Dict[str, object]
+    test_app: Dict[str, object],
 ) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]

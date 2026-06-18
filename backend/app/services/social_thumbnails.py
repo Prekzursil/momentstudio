@@ -393,7 +393,7 @@ async def fetch_social_thumbnail_url(
 
 
 async def hydrate_site_social_meta(
-    meta: dict[str, Any] | None
+    meta: dict[str, Any] | None,
 ) -> dict[str, Any] | None:
     if not isinstance(meta, dict):
         return meta
