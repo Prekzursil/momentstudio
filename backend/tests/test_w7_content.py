@@ -2057,3 +2057,705 @@ async def test_admin_media_asset_edit_not_found(monkeypatch) -> None:
             admin=_user(),
         )
     assert ei.value.status_code == 404
+
+
+# =========================================================================== #
+# Part 6: media jobs / retry-policies / collections / tools / pages / versions
+# =========================================================================== #
+from app.models.content import ContentAuditLog, ContentBlockVersion  # noqa: E402
+
+
+# --------------------------- admin_list_media_jobs ------------------------- #
+async def _list_jobs(session=None, **kw):
+    base = dict(
+        page=1,
+        limit=24,
+        status_filter="",
+        job_type="",
+        asset_id=None,
+        triage_state="",
+        assigned_to_user_id=None,
+        tag="",
+        sla_breached=False,
+        dead_letter_only=False,
+        created_from=None,
+        created_to=None,
+        session=session or object(),
+        _=_user(),
+    )
+    base.update(kw)
+    return await c.admin_list_media_jobs(**base)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_jobs_ok(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        list_jobs=_afn(([], {"total_items": 0, "total_pages": 1})),
+    )
+    out = await _list_jobs(
+        created_from="2030-01-01T00:00:00", created_to="2030-02-01T00:00:00"
+    )
+    assert out.items == []
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_jobs_bad_date(monkeypatch) -> None:
+    _patch_media(monkeypatch)
+    with pytest.raises(HTTPException) as ei:
+        await _list_jobs(created_from="bad")
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_jobs_bad_range(monkeypatch) -> None:
+    _patch_media(monkeypatch)
+    with pytest.raises(HTTPException) as ei:
+        await _list_jobs(
+            created_from="2030-02-01T00:00:00", created_to="2030-01-01T00:00:00"
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_jobs_value_error(monkeypatch) -> None:
+    _patch_media(monkeypatch, list_jobs=_araise(ValueError("bad")))
+    with pytest.raises(HTTPException) as ei:
+        await _list_jobs()
+    assert ei.value.status_code == 400
+
+
+# --------------------------- telemetry / retry-policies -------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_telemetry(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_telemetry=_afn("telemetry"))
+    assert await c.admin_media_telemetry(session=object(), _=_user()) == "telemetry"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_retry_policies(monkeypatch) -> None:
+    _patch_media(monkeypatch, list_retry_policies=_afn([]))
+    out = await c.admin_media_retry_policies(session=object(), _=_user())
+    assert out.items == []
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_retry_policy_history_ok(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        list_retry_policy_history=_afn(([], {"total_items": 0, "total_pages": 1})),
+    )
+    out = await c.admin_media_retry_policy_history(
+        job_type=None, page=1, limit=20, session=object(), _=_user()
+    )
+    assert out.items == []
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_retry_policy_history_value_error(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch, list_retry_policy_history=_araise(ValueError("bad"))
+    )
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_retry_policy_history(
+            job_type="x", page=1, limit=20, session=object(), _=_user()
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_retry_policy_presets_ok(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_retry_policy_presets=_afn("presets"))
+    out = await c.admin_media_retry_policy_presets(
+        job_type="ingest", session=object(), _=_user()
+    )
+    assert out == "presets"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_retry_policy_presets_value_error(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_retry_policy_presets=_araise(ValueError("bad")))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_retry_policy_presets(
+            job_type="x", session=object(), _=_user()
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_retry_policy_ok(monkeypatch) -> None:
+    from app.schemas.media import MediaRetryPolicyUpdateRequest
+
+    _patch_media(monkeypatch, upsert_retry_policy=_afn("policy"))
+    out = await c.admin_update_media_retry_policy(
+        job_type="ingest",
+        payload=MediaRetryPolicyUpdateRequest(),
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "policy"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_retry_policy_value_error(monkeypatch) -> None:
+    from app.schemas.media import MediaRetryPolicyUpdateRequest
+
+    _patch_media(monkeypatch, upsert_retry_policy=_araise(ValueError("bad")))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_update_media_retry_policy(
+            job_type="x",
+            payload=MediaRetryPolicyUpdateRequest(),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_rollback_media_retry_policy_ok(monkeypatch) -> None:
+    from app.schemas.media import MediaRetryPolicyRollbackRequest
+
+    _patch_media(monkeypatch, rollback_retry_policy=_afn("rolled"))
+    out = await c.admin_rollback_media_retry_policy(
+        job_type="ingest",
+        payload=MediaRetryPolicyRollbackRequest(event_id=uuid4()),
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "rolled"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_rollback_media_retry_policy_value_error(monkeypatch) -> None:
+    from app.schemas.media import MediaRetryPolicyRollbackRequest
+
+    _patch_media(monkeypatch, rollback_retry_policy=_araise(ValueError("bad")))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_rollback_media_retry_policy(
+            job_type="x",
+            payload=MediaRetryPolicyRollbackRequest(event_id=uuid4()),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_mark_media_retry_policy_known_good_ok(monkeypatch) -> None:
+    _patch_media(monkeypatch, mark_retry_policy_known_good=_afn("event"))
+    out = await c.admin_mark_media_retry_policy_known_good(
+        job_type="ingest", note="ok", session=object(), admin=_user()
+    )
+    assert out == "event"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_mark_media_retry_policy_known_good_value_error(
+    monkeypatch,
+) -> None:
+    _patch_media(
+        monkeypatch, mark_retry_policy_known_good=_araise(ValueError("bad"))
+    )
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_mark_media_retry_policy_known_good(
+            job_type="x", note=None, session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_reset_media_retry_policy_ok(monkeypatch) -> None:
+    _patch_media(monkeypatch, reset_retry_policy=_afn("reset"))
+    out = await c.admin_reset_media_retry_policy(
+        job_type="ingest", session=object(), admin=_user()
+    )
+    assert out == "reset"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_reset_media_retry_policy_value_error(monkeypatch) -> None:
+    _patch_media(monkeypatch, reset_retry_policy=_araise(ValueError("bad")))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_reset_media_retry_policy(
+            job_type="x", session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_reset_all_media_retry_policies(monkeypatch) -> None:
+    _patch_media(monkeypatch, reset_all_retry_policies=_afn([]))
+    out = await c.admin_reset_all_media_retry_policies(
+        session=object(), admin=_user()
+    )
+    assert out.items == []
+
+
+# --------------------------- usage reconcile ------------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_usage_reconcile_background(monkeypatch) -> None:
+    job = SimpleNamespace(id=uuid4())
+    monkeypatch.setattr(
+        c.settings, "media_usage_reconcile_batch_size", 0, raising=False
+    )
+    queued = []
+    _patch_media(
+        monkeypatch,
+        enqueue_job=_afn(job),
+        queue_job=_afn(None),
+        get_redis=lambda: None,
+        job_to_read=lambda j: j,
+    )
+    bt = SimpleNamespace(add_task=lambda *a, **k: queued.append(a))
+    out = await c.admin_media_usage_reconcile(
+        background_tasks=bt,
+        session=SimpleNamespace(commit=_afn(None)),
+        admin=_user(),
+    )
+    assert out is job
+    assert queued
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_usage_reconcile_redis(monkeypatch) -> None:
+    job = SimpleNamespace(id=uuid4())
+    monkeypatch.setattr(
+        c.settings, "media_usage_reconcile_batch_size", 100, raising=False
+    )
+    _patch_media(
+        monkeypatch,
+        enqueue_job=_afn(job),
+        queue_job=_afn(None),
+        get_redis=lambda: object(),
+        job_to_read=lambda j: j,
+    )
+    bt = SimpleNamespace(
+        add_task=lambda *a, **k: (_ for _ in ()).throw(AssertionError)
+    )
+    out = await c.admin_media_usage_reconcile(
+        background_tasks=bt,
+        session=SimpleNamespace(commit=_afn(None)),
+        admin=_user(),
+    )
+    assert out is job
+
+
+# --------------------------- jobs: get / retry / bulk / triage / events ---- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_media_job_ok(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch, get_job_or_404=_afn("job"), job_to_read=lambda j: j
+    )
+    out = await c.admin_get_media_job(job_id=uuid4(), session=object(), _=_user())
+    assert out == "job"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_media_job_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_job_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_get_media_job(job_id=uuid4(), session=object(), _=_user())
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_retry_media_job_ok(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        get_job_or_404=_afn("job"),
+        manual_retry_job=_afn("retried"),
+        job_to_read=lambda j: j,
+    )
+    out = await c.admin_retry_media_job(
+        job_id=uuid4(), session=object(), admin=_user()
+    )
+    assert out == "retried"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_retry_media_job_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_job_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_retry_media_job(
+            job_id=uuid4(), session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_retry_media_jobs_bulk(monkeypatch) -> None:
+    from app.schemas.media import MediaJobRetryBulkRequest
+
+    # empty rows keep MediaJobListResponse.items validation trivial while still
+    # exercising the comprehension + meta construction.
+    _patch_media(
+        monkeypatch,
+        bulk_retry_jobs=_afn([]),
+        job_to_read=lambda j: j,
+    )
+    out = await c.admin_retry_media_jobs_bulk(
+        payload=MediaJobRetryBulkRequest(job_ids=[uuid4(), uuid4()]),
+        session=object(),
+        admin=_user(),
+    )
+    assert out.items == []
+    assert out.meta["total_items"] == 0
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_job_triage_ok(monkeypatch) -> None:
+    from app.schemas.media import MediaJobTriageUpdateRequest
+
+    _patch_media(
+        monkeypatch,
+        get_job_or_404=_afn("job"),
+        update_job_triage=_afn("updated"),
+        job_to_read=lambda j: j,
+    )
+    out = await c.admin_update_media_job_triage(
+        job_id=uuid4(),
+        payload=MediaJobTriageUpdateRequest(),
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "updated"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_job_triage_not_found(monkeypatch) -> None:
+    from app.schemas.media import MediaJobTriageUpdateRequest
+
+    _patch_media(monkeypatch, get_job_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_update_media_job_triage(
+            job_id=uuid4(),
+            payload=MediaJobTriageUpdateRequest(),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_job_events_ok(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        get_job_or_404=_afn("job"),
+        list_job_events=_afn([]),
+        job_event_to_read=lambda r: r,
+    )
+    out = await c.admin_list_media_job_events(
+        job_id=uuid4(), limit=200, session=object(), _=_user()
+    )
+    assert out.items == []
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_job_events_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_job_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_list_media_job_events(
+            job_id=uuid4(), limit=200, session=object(), _=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+# --------------------------- collections ----------------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_collections(monkeypatch) -> None:
+    _patch_media(monkeypatch, list_collections=_afn(["col"]))
+    out = await c.admin_list_media_collections(session=object(), _=_user())
+    assert out == ["col"]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_create_media_collection(monkeypatch) -> None:
+    from app.schemas.media import MediaCollectionUpsertRequest
+
+    _patch_media(monkeypatch, upsert_collection=_afn("created"))
+    out = await c.admin_create_media_collection(
+        payload=MediaCollectionUpsertRequest(name="n", slug="s"),
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "created"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_collection(monkeypatch) -> None:
+    from app.schemas.media import MediaCollectionUpsertRequest
+
+    _patch_media(monkeypatch, upsert_collection=_afn("updated"))
+    out = await c.admin_update_media_collection(
+        collection_id=uuid4(),
+        payload=MediaCollectionUpsertRequest(name="n", slug="s"),
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "updated"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_collection_items(monkeypatch) -> None:
+    from app.schemas.media import MediaCollectionItemsRequest
+
+    _patch_media(monkeypatch, replace_collection_items=_afn(None))
+    resp = await c.admin_update_media_collection_items(
+        collection_id=uuid4(),
+        payload=MediaCollectionItemsRequest(asset_ids=[uuid4()]),
+        session=object(),
+        _=_user(),
+    )
+    assert resp.status_code == 204
+
+
+# --------------------------- tools: link-check / find-replace -------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_link_check(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "check_content_links", _afn([]))
+    out = await c.admin_link_check(key="page.x", session=object(), _=_user())
+    assert out.issues == []
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_link_check_preview(monkeypatch) -> None:
+    from app.schemas.content import ContentLinkCheckPreviewRequest
+
+    monkeypatch.setattr(
+        c.content_service, "check_content_links_preview", _afn([])
+    )
+    out = await c.admin_link_check_preview(
+        payload=ContentLinkCheckPreviewRequest(key="page.x"),
+        session=object(),
+        _=_user(),
+    )
+    assert out.issues == []
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_find_replace_preview(monkeypatch) -> None:
+    from app.schemas.content import ContentFindReplacePreviewRequest
+
+    monkeypatch.setattr(
+        c.content_service, "preview_find_replace", _afn(([], 0, 0, False))
+    )
+    out = await c.admin_find_replace_preview(
+        payload=ContentFindReplacePreviewRequest(find="x", replace="y"),
+        session=object(),
+        _=_user(),
+    )
+    assert out.total_items == 0
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_find_replace_apply(monkeypatch) -> None:
+    from app.schemas.content import ContentFindReplaceApplyRequest
+
+    monkeypatch.setattr(
+        c.content_service, "apply_find_replace", _afn((1, 2, 3, []))
+    )
+    out = await c.admin_find_replace_apply(
+        payload=ContentFindReplaceApplyRequest(find="x", replace="y"),
+        session=object(),
+        admin=_user(),
+    )
+    assert out.updated_blocks == 1
+    assert out.total_replacements == 3
+
+
+# --------------------------- pages: list / rename / translation-status ----- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_pages(session_factory) -> None:
+    async with session_factory() as session:
+        await _seed_block(session, key="page.alpha", meta={"hidden": True})
+        await _seed_block(session, key="page.beta", meta=None)
+        out = await c.admin_list_pages(session=session, _=_user())
+    keys = {p.key for p in out}
+    assert keys == {"page.alpha", "page.beta"}
+    hidden = {p.key: p.hidden for p in out}
+    assert hidden["page.alpha"] is True
+    assert hidden["page.beta"] is False
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_translation_status(monkeypatch) -> None:
+    from app.schemas.content import ContentTranslationStatusUpdate
+
+    monkeypatch.setattr(
+        c.content_service, "set_translation_status", _afn(_block())
+    )
+    out = await c.admin_update_translation_status(
+        key="page.x",
+        payload=ContentTranslationStatusUpdate(needs_translation_en=True),
+        session=object(),
+        admin=_user(),
+    )
+    assert out.key == "page.about"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_rename_page(monkeypatch) -> None:
+    from app.schemas.content import ContentPageRenameRequest
+
+    monkeypatch.setattr(
+        c.content_service,
+        "rename_page_slug",
+        _afn(("old", "new", "page.old", "page.new")),
+    )
+    out = await c.admin_rename_page(
+        slug="old",
+        payload=ContentPageRenameRequest(new_slug="new"),
+        session=object(),
+        admin=_user(),
+    )
+    assert out.new_key == "page.new"
+
+
+# --------------------------- admin_preview_content ------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_preview_content_bad_token(monkeypatch) -> None:
+    monkeypatch.setattr(c.settings, "content_preview_token", "secret", False)
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_preview_content(
+            key="page.x", token="wrong", session=object(), lang=None
+        )
+    assert ei.value.status_code == 403
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_preview_content_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(c.settings, "content_preview_token", "secret", False)
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_preview_content(
+            key="page.x", token="secret", session=object(), lang=None
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_preview_content_ok(monkeypatch) -> None:
+    monkeypatch.setattr(c.settings, "content_preview_token", "secret", False)
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(_block()))
+    out = await c.admin_preview_content(
+        key="page.about", token="secret", session=object(), lang="en"
+    )
+    assert out.key == "page.about"
+
+
+# --------------------------- audit / versions ------------------------------ #
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_audit_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_list_content_audit(
+            key="page.x", session=object(), _=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_audit_ok(monkeypatch) -> None:
+    # The handler serialises block.audits directly; supply a block whose audit
+    # collection is already materialised (ContentAuditRead is from_attributes).
+    audit = SimpleNamespace(
+        id=uuid4(),
+        action="update",
+        version=1,
+        user_id=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    blk = _block(key="page.audited")
+    blk.audits = [audit]
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(blk))
+    out = await c.admin_list_content_audit(
+        key="page.audited", session=object(), _=_user()
+    )
+    assert len(out) == 1
+    assert out[0].action == "update"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_versions_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_list_content_versions(
+            key="page.x", session=object(), _=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+async def _seed_version(session, block, version=1):
+    v = ContentBlockVersion(
+        content_block_id=block.id,
+        version=version,
+        title="t",
+        body_markdown="b",
+        status=ContentStatus.published,
+    )
+    session.add(v)
+    await session.commit()
+    await session.refresh(v)
+    return v
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_versions_ok(session_factory, monkeypatch) -> None:
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.versioned")
+        await _seed_version(session, blk, version=1)
+        await _seed_version(session, blk, version=2)
+        monkeypatch.setattr(
+            c.content_service, "get_block_by_key", _afn(blk)
+        )
+        out = await c.admin_list_content_versions(
+            key="page.versioned", session=session, _=_user()
+        )
+    assert [v.version for v in out] == [2, 1]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_content_version_block_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_get_content_version(
+            key="page.x", version=1, session=object(), _=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_content_version_version_not_found(
+    session_factory, monkeypatch
+) -> None:
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.v2")
+        monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(blk))
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_get_content_version(
+                key="page.v2", version=99, session=session, _=_user()
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_content_version_ok(session_factory, monkeypatch) -> None:
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.v3")
+        await _seed_version(session, blk, version=5)
+        monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(blk))
+        out = await c.admin_get_content_version(
+            key="page.v3", version=5, session=session, _=_user()
+        )
+    assert out.version == 5
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_rollback_content_version(monkeypatch) -> None:
+    monkeypatch.setattr(
+        c.content_service, "rollback_to_version", _afn(_block())
+    )
+    out = await c.admin_rollback_content_version(
+        key="page.x", version=1, session=object(), admin=_user()
+    )
+    assert out.key == "page.about"
