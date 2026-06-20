@@ -1174,3 +1174,83 @@ async def test_process_edit_job_with_crop_and_rotate(media_roots, monkeypatch) -
         "originals/e2/p.png", (500, 2000),
         {"rotate_cw": 0, "crop_aspect_w": 4, "crop_aspect_h": 1},
     )
+
+
+def test_resolve_asset_preview_path(media_roots) -> None:
+    public, private = media_roots
+
+    class _Variant:
+        def __init__(self, profile, key):
+            self.profile = profile
+            self.storage_key = key
+
+    class _AssetStub:
+        # plain stub: resolve_asset_preview_path / _asset_file_path read these.
+        def __init__(self, storage_key, public_url, variants):
+            self.storage_key = storage_key
+            self.public_url = public_url
+            self.variants = variants
+            self.visibility = MediaVisibility.public
+            self.status = MediaAssetStatus.approved
+
+    # variant present + file exists
+    vfile = public / "r" / "v.png"
+    vfile.parent.mkdir(parents=True)
+    vfile.write_bytes(b"v")
+    asset = _AssetStub("r/a.png", "/media/r/a.png", [_Variant("thumb", "r/v.png")])
+    assert md.resolve_asset_preview_path(asset, variant_profile="thumb") == (
+        vfile.resolve()
+    )
+    # variant requested but not found -> ValueError
+    with pytest.raises(ValueError, match="Variant not found"):
+        md.resolve_asset_preview_path(asset, variant_profile="missing")
+    # variant present but file missing -> FileNotFoundError
+    asset_gone = _AssetStub("r/a.png", "/media/r/a.png",
+                            [_Variant("gone", "r/gone.png")])
+    with pytest.raises(FileNotFoundError, match="Variant file missing"):
+        md.resolve_asset_preview_path(asset_gone, variant_profile="gone")
+    # no variant_profile, asset file missing -> FileNotFoundError
+    asset_missing = _AssetStub("r/none.png", "/media/r/none.png", [])
+    with pytest.raises(FileNotFoundError, match="Asset file missing"):
+        md.resolve_asset_preview_path(asset_missing)
+    # no variant_profile, asset file present
+    afile = public / "r" / "a.png"
+    afile.write_bytes(b"a")
+    assert md.resolve_asset_preview_path(asset) == afile.resolve()
+
+
+@pytest.mark.anyio
+async def test_soft_delete_restore_move_failure(media_roots, monkeypatch) -> None:
+    """When the file move raises, soft_delete/restore swallow it and continue."""
+    public, private = media_roots
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            storage_key="originals/sd/p.png",
+            public_url="/media/originals/sd/p.png",
+        )
+        session.add(asset)
+        await session.commit()
+        asset_id = asset.id
+    # create the file so old_path.exists() is True and the move is attempted
+    f = public / "originals" / "sd" / "p.png"
+    f.parent.mkdir(parents=True)
+    f.write_bytes(b"x")
+
+    def _boom(src, dst):
+        raise OSError("move blocked")
+
+    monkeypatch.setattr(md, "_move_file", _boom)
+
+    async with local() as session:
+        asset = await md.get_asset_or_404(session, asset_id)
+        out = await md.soft_delete_asset(session, asset, uuid.uuid4())
+        assert out.status == MediaAssetStatus.trashed
+
+    async with local() as session:
+        asset = await md.get_asset_or_404(session, asset_id)
+        out = await md.restore_asset(session, asset, uuid.uuid4())
+        assert out.status == MediaAssetStatus.draft
