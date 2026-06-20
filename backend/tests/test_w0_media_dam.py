@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
+from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db.base import Base
@@ -26,6 +27,7 @@ from app.models.media import (
     MediaJobType,
     MediaVisibility,
 )
+from app.models.user import UserRole
 from app.schemas.media import (
     MediaAssetUpdateI18nItem,
     MediaAssetUpdateRequest,
@@ -703,3 +705,143 @@ async def test_create_asset_from_upload(media_roots, monkeypatch) -> None:
         )
         assert resp.asset.original_filename == "picture.png"
         assert resp.ingest_job_id is not None
+
+
+def test_pure_helpers_sha_dims_roles(tmp_path) -> None:
+    # _sha256_for_path
+    f = tmp_path / "h.bin"
+    f.write_bytes(b"abc")
+    import hashlib as _h
+
+    assert md._sha256_for_path(f) == _h.sha256(b"abc").hexdigest()
+
+    # _detect_image_dimensions: real image + failure path
+    img_path = tmp_path / "i.png"
+    Image.new("RGB", (8, 4)).save(img_path)
+    assert md._detect_image_dimensions(img_path) == (8, 4)
+    assert md._detect_image_dimensions(tmp_path / "missing.png") == (None, None)
+
+    # can_approve_or_purge
+    assert md.can_approve_or_purge(UserRole.admin) is True
+    assert md.can_approve_or_purge("owner") is True
+    assert md.can_approve_or_purge(UserRole.customer) is False
+
+    # coerce_visibility
+    assert md.coerce_visibility("public") == MediaVisibility.public
+    assert md.coerce_visibility("nonsense") == MediaVisibility.private
+
+
+def _seed_job(session, *, status, attempt=0, max_attempts=5, triage="open",
+              next_retry_at=None):
+    job = MediaJob(
+        id=uuid.uuid4(), asset_id=None, job_type=MediaJobType.ingest,
+        status=status, attempt=attempt, max_attempts=max_attempts,
+        triage_state=triage, next_retry_at=next_retry_at,
+    )
+    session.add(job)
+    return job
+
+
+@pytest.mark.anyio
+async def test_job_management(monkeypatch) -> None:
+    monkeypatch.setattr(md, "get_redis", lambda: None)  # skip queueing
+    engine, local = _make_local()
+    await _init(engine)
+    actor = uuid.uuid4()
+
+    async with local() as session:
+        # due retry: failed + next_retry_at in past + attempt < max
+        due = _seed_job(
+            session, status=MediaJobStatus.failed, attempt=1,
+            next_retry_at=datetime(2000, 1, 1, tzinfo=UTC),
+        )
+        await session.commit()
+        due_id = due.id
+
+    async with local() as session:
+        queued = await md.enqueue_due_retries(session, limit=10)
+        assert due_id in queued
+
+    async with local() as session:
+        # get_job_or_404
+        with pytest.raises(ValueError, match="Job not found"):
+            await md.get_job_or_404(session, uuid.uuid4())
+        job = await md.get_job_or_404(session, due_id)
+        # manual retry
+        retried = await md.manual_retry_job(session, job=job, actor_user_id=actor)
+        assert retried.status == MediaJobStatus.queued
+
+    async with local() as session:
+        # bulk retry: empty list short-circuit
+        assert await md.bulk_retry_jobs(session, job_ids=[]) == []
+
+    async with local() as session:
+        processing = _seed_job(session, status=MediaJobStatus.processing)
+        exhausted = _seed_job(
+            session, status=MediaJobStatus.failed, attempt=5, max_attempts=5
+        )
+        dead = _seed_job(session, status=MediaJobStatus.dead_letter, attempt=5,
+                         max_attempts=5)
+        await session.commit()
+        ids = [processing.id, exhausted.id, dead.id]
+
+    async with local() as session:
+        retried = await md.bulk_retry_jobs(session, job_ids=ids, actor_user_id=actor)
+        # processing skipped, exhausted-non-dead skipped, dead retried
+        retried_ids = {j.id for j in retried}
+        assert dead.id in retried_ids
+        assert processing.id not in retried_ids
+
+    async with local() as session:
+        job = await md.get_job_or_404(session, due_id)
+        # triage update: all branches (set state, assign, sla, incident, tags)
+        await md.update_job_triage(
+            session, job=job, actor_user_id=actor,
+            triage_state="resolved", assigned_to_user_id=actor,
+            sla_due_at=datetime(2030, 1, 1, tzinfo=UTC),
+            incident_url="https://example.com/i",
+            add_tags=["urgent"], remove_tags=["stale"], note="done",
+        )
+
+    async with local() as session:
+        job = await md.get_job_or_404(session, due_id)
+        # triage update: clear branches
+        await md.update_job_triage(
+            session, job=job, actor_user_id=actor,
+            clear_assignee=True, clear_sla_due_at=True, clear_incident_url=True,
+        )
+
+    async with local() as session:
+        events = await md.list_job_events(session, job_id=due_id, limit=50)
+        assert len(events) >= 1
+
+
+@pytest.mark.anyio
+async def test_ensure_public_asset() -> None:
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        public_ok = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            storage_key="p/ok.png", public_url="/media/p/ok.png",
+        )
+        private_asset = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved, visibility=MediaVisibility.private,
+            storage_key="p/pr.png", public_url="/media/p/pr.png",
+        )
+        rejected = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.rejected, visibility=MediaVisibility.public,
+            storage_key="p/rj.png", public_url="/media/p/rj.png",
+        )
+        session.add_all([public_ok, private_asset, rejected])
+        await session.commit()
+        ids = (public_ok.id, private_asset.id, rejected.id)
+
+    async with local() as session:
+        assert await md.ensure_public_asset(session, ids[0]) is not None
+        assert await md.ensure_public_asset(session, ids[1]) is None
+        assert await md.ensure_public_asset(session, ids[2]) is None
+        assert await md.ensure_public_asset(session, uuid.uuid4()) is None
