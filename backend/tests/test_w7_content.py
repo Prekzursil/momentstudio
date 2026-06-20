@@ -27,6 +27,13 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
+@pytest.fixture
+def session_factory():
+    from tests.conftest import make_memory_session_factory
+
+    return make_memory_session_factory()
+
+
 def _user(role: UserRole = UserRole.admin) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), role=role, email="a@b.ro")
 
@@ -588,3 +595,344 @@ async def test_admin_fetch_social_thumbnail_empty(monkeypatch) -> None:
             payload=SimpleNamespace(url="x"), _=_user()
         )
     assert ei.value.status_code == 502
+
+
+# =========================================================================== #
+# DB-backed query handlers (in-memory SQLite session)
+# =========================================================================== #
+from app.models.content import (  # noqa: E402
+    ContentBlock,
+    ContentRedirect,
+    ContentStatus,
+)
+
+
+async def _seed_block(session, **kw):
+    base = dict(
+        key="page.about",
+        title="About",
+        body_markdown="hi",
+        status=ContentStatus.published,
+        lang="en",
+    )
+    base.update(kw)
+    blk = ContentBlock(**base)
+    session.add(blk)
+    await session.commit()
+    await session.refresh(blk)
+    return blk
+
+
+# --------------------------- admin_list_scheduling ------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_scheduling_empty(session_factory) -> None:
+    async with session_factory() as session:
+        out = await c.admin_list_scheduling(
+            session=session,
+            window_days=90,
+            window_start=None,
+            page=1,
+            limit=50,
+            _=_user(),
+        )
+    assert out.meta.total_items == 0
+    assert out.meta.total_pages == 1
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_scheduling_naive_window_start(session_factory) -> None:
+    async with session_factory() as session:
+        await c.admin_list_scheduling(
+            session=session,
+            window_days=30,
+            window_start=datetime(2000, 1, 1),  # naive -> tz added branch
+            page=1,
+            limit=2,
+            _=_user(),
+        )
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_scheduling_default_window_pagination(
+    session_factory,
+) -> None:
+    now = datetime.now(timezone.utc)
+    async with session_factory() as session:
+        # one publish event, one unpublish event, one with both set
+        await _seed_block(
+            session, key="page.future", published_at=now + timedelta(days=1)
+        )
+        await _seed_block(
+            session,
+            key="page.expiring",
+            published_until=now + timedelta(days=2),
+        )
+        await _seed_block(
+            session,
+            key="page.both",
+            published_at=now + timedelta(days=1),
+            published_until=now + timedelta(days=3),
+        )
+        out = await c.admin_list_scheduling(
+            session=session,
+            window_days=90,
+            window_start=None,  # default to today midnight branch
+            page=2,
+            limit=2,
+            _=_user(),
+        )
+    assert out.meta.total_items == 3
+    assert out.meta.total_pages == 2
+    assert len(out.items) == 1
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_scheduling_aware_window_start(session_factory) -> None:
+    now = datetime.now(timezone.utc)
+    async with session_factory() as session:
+        await _seed_block(
+            session, key="page.x", published_at=now + timedelta(days=1)
+        )
+        out = await c.admin_list_scheduling(
+            session=session,
+            window_days=90,
+            window_start=now - timedelta(days=1),  # aware -> astimezone path
+            page=1,
+            limit=50,
+            _=_user(),
+        )
+    assert out.meta.total_items == 1
+
+
+# --------------------------- admin_list_redirects -------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_redirects_empty(session_factory) -> None:
+    async with session_factory() as session:
+        out = await c.admin_list_redirects(
+            session=session, q=None, page=1, limit=25, _=_user()
+        )
+    assert out.meta.total_items == 0
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_redirects_with_data_and_search(session_factory) -> None:
+    async with session_factory() as session:
+        await _seed_block(session, key="page.target")
+        session.add(ContentRedirect(from_key="page.old", to_key="page.target"))
+        session.add(ContentRedirect(from_key="page.loopa", to_key="page.loopb"))
+        session.add(ContentRedirect(from_key="page.loopb", to_key="page.loopa"))
+        await session.commit()
+        out = await c.admin_list_redirects(
+            session=session, q="old", page=1, limit=25, _=_user()
+        )
+        assert out.meta.total_items == 1
+        assert out.items[0].target_exists is True
+        out2 = await c.admin_list_redirects(
+            session=session, q=None, page=1, limit=25, _=_user()
+        )
+        assert out2.meta.total_items == 3
+        errors = {i.from_key: i.chain_error for i in out2.items}
+        assert errors["page.loopa"] == "loop"
+
+
+# --------------------------- admin_upsert_redirect ------------------------- #
+def _upsert_req(from_key, to_key):
+    from app.schemas.content import ContentRedirectUpsertRequest
+
+    return ContentRedirectUpsertRequest(from_key=from_key, to_key=to_key)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upsert_redirect_invalid(session_factory) -> None:
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_upsert_redirect(
+                payload=_upsert_req("same", "same"),
+                session=session,
+                _=_user(),
+            )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upsert_redirect_target_missing(session_factory) -> None:
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_upsert_redirect(
+                payload=_upsert_req("page.a", "page.nope"),
+                session=session,
+                _=_user(),
+            )
+    assert ei.value.status_code == 400
+    assert "target" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upsert_redirect_loop(session_factory) -> None:
+    async with session_factory() as session:
+        await _seed_block(session, key="page.b")
+        session.add(ContentRedirect(from_key="page.b", to_key="page.a"))
+        await _seed_block(session, key="page.a")
+        await session.commit()
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_upsert_redirect(
+                payload=_upsert_req("page.a", "page.b"),
+                session=session,
+                _=_user(),
+            )
+    assert "loop" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upsert_redirect_too_deep(session_factory) -> None:
+    async with session_factory() as session:
+        await _seed_block(session, key="page.b")
+        prev = "page.b"
+        for i in range(60):
+            nxt = f"page.deep{i}"
+            session.add(ContentRedirect(from_key=prev, to_key=nxt))
+            prev = nxt
+        await _seed_block(session, key="page.a")
+        await session.commit()
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_upsert_redirect(
+                payload=_upsert_req("page.a", "page.b"),
+                session=session,
+                _=_user(),
+            )
+    assert "too deep" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upsert_redirect_create_then_update(session_factory) -> None:
+    async with session_factory() as session:
+        await _seed_block(session, key="page.t1")
+        await _seed_block(session, key="page.t2")
+        out = await c.admin_upsert_redirect(
+            payload=_upsert_req("page.from", "page.t1"),
+            session=session,
+            _=_user(),
+        )
+        assert out.to_key == "page.t1"
+        out2 = await c.admin_upsert_redirect(
+            payload=_upsert_req("page.from", "page.t2"),
+            session=session,
+            _=_user(),
+        )
+        assert out2.to_key == "page.t2"
+
+
+# --------------------------- admin_export_redirects ------------------------ #
+@pytest.mark.anyio("asyncio")
+async def test_admin_export_redirects(session_factory) -> None:
+    async with session_factory() as session:
+        session.add(ContentRedirect(from_key="page.old", to_key="page.new"))
+        session.add(ContentRedirect(from_key="plain", to_key="other"))
+        await session.commit()
+        resp = await c.admin_export_redirects(
+            request=SimpleNamespace(),
+            session=session,
+            q="old",
+            admin=_user(),
+        )
+        assert resp.media_type == "text/csv"
+        assert "/pages/old" in resp.body.decode()
+        resp2 = await c.admin_export_redirects(
+            request=SimpleNamespace(), session=session, q=None, admin=_user()
+        )
+        assert "plain" in resp2.body.decode()
+
+
+# --------------------------- admin_import_redirects ------------------------ #
+class _UploadFile:
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    async def read(self) -> bytes:
+        return self._data
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_import_redirects_empty_only_errors(session_factory) -> None:
+    # header skipped, blank skipped, comment skipped, "onlyone" -> missing
+    # columns, "page.x," -> has 2 cells but to is empty -> missing from/to.
+    csv_text = "from,to\n\n# comment\nonlyone\npage.x,\n"
+    async with session_factory() as session:
+        out = await c.admin_import_redirects(
+            file=_UploadFile(csv_text.encode("utf-8-sig")),
+            session=session,
+            _=_user(),
+        )
+    assert out.created == 0 and out.updated == 0 and out.skipped == 0
+    assert len(out.errors) == 2
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_import_redirects_invalid_too_long_same(
+    session_factory,
+) -> None:
+    long_key = "page." + ("x" * 130)
+    csv_text = (
+        "/pages/ ,page.real\n"
+        + f"{long_key},page.real2\n"
+        + "page.same,page.same\n"
+    )
+    async with session_factory() as session:
+        out = await c.admin_import_redirects(
+            file=_UploadFile(csv_text.encode("utf-8")),
+            session=session,
+            _=_user(),
+        )
+    codes = [e.error for e in out.errors]
+    assert any("Invalid" in x for x in codes)
+    assert any("too long" in x.lower() for x in codes)
+    assert any("differ" in x for x in codes)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_import_redirects_loop_detection(session_factory) -> None:
+    csv_text = "page.a,page.b\npage.b,page.a\n"
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_import_redirects(
+                file=_UploadFile(csv_text.encode("utf-8")),
+                session=session,
+                _=_user(),
+            )
+    assert "loop" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_import_redirects_too_deep_detection(session_factory) -> None:
+    lines = [f"page.k{i},page.k{i + 1}" for i in range(60)]
+    csv_text = "\n".join(lines) + "\n"
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_import_redirects(
+                file=_UploadFile(csv_text.encode("utf-8")),
+                session=session,
+                _=_user(),
+            )
+    assert "too deep" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_import_redirects_create_update_skip(session_factory) -> None:
+    async with session_factory() as session:
+        session.add(ContentRedirect(from_key="page.skip", to_key="page.x"))
+        session.add(ContentRedirect(from_key="page.upd", to_key="page.old"))
+        await session.commit()
+        csv_text = (
+            "page.skip,page.x\n"
+            + "page.upd,page.new\n"
+            + "page.new1,page.dest\n"
+            + "page.new1,page.dest\n"
+        )
+        out = await c.admin_import_redirects(
+            file=_UploadFile(csv_text.encode("utf-8")),
+            session=session,
+            _=_user(),
+        )
+    assert out.created == 1
+    assert out.updated == 1
+    assert out.skipped == 1
