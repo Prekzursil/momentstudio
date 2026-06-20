@@ -1106,3 +1106,71 @@ async def test_process_ai_tag_duplicate_usage_jobs(media_roots, monkeypatch) -> 
             job = await session.get(MediaJob, jid)
             done = await md.process_job_inline(session, job)
             assert done.status == MediaJobStatus.completed
+
+
+@pytest.mark.anyio
+async def test_process_variant_job(media_roots, monkeypatch) -> None:
+    public, private = media_roots
+    monkeypatch.setattr(md, "get_redis", lambda: None)
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset = _seed_asset_with_file(
+            session, public=public, private=private, key="originals/v/p.png",
+            dims=(2000, 1000),
+        )
+        await session.flush()
+        job = await md.enqueue_job(
+            session, asset_id=asset.id, job_type=MediaJobType.variant,
+            payload={"profile": "web-1280"}, created_by_user_id=None,
+        )
+        await session.commit()
+        job_id, asset_id = job.id, asset.id
+
+    async with local() as session:
+        job = await session.get(MediaJob, job_id)
+        done = await md.process_job_inline(session, job)
+        assert done.status == MediaJobStatus.completed
+        variant = await session.scalar(
+            __import__("sqlalchemy").select(md.MediaVariant).where(
+                md.MediaVariant.asset_id == asset_id
+            )
+        )
+        assert variant is not None
+
+
+@pytest.mark.anyio
+async def test_process_edit_job_with_crop_and_rotate(media_roots, monkeypatch) -> None:
+    public, private = media_roots
+    monkeypatch.setattr(md, "get_redis", lambda: None)
+    engine, local = _make_local()
+    await _init(engine)
+
+    async def _run_edit(key, dims, payload):
+        async with local() as session:
+            asset = _seed_asset_with_file(
+                session, public=public, private=private, key=key, dims=dims
+            )
+            await session.flush()
+            job = await md.enqueue_job(
+                session, asset_id=asset.id, job_type=MediaJobType.edit,
+                payload=payload, created_by_user_id=None,
+            )
+            await session.commit()
+            jid = job.id
+        async with local() as session:
+            job = await session.get(MediaJob, jid)
+            done = await md.process_job_inline(session, job)
+            assert done.status == MediaJobStatus.completed
+
+    # wide image cropped to a taller target ratio -> current_ratio > target
+    await _run_edit(
+        "originals/e1/p.png", (2000, 500),
+        {"rotate_cw": 90, "crop_aspect_w": 1, "crop_aspect_h": 1,
+         "resize_max_width": 500, "resize_max_height": 500},
+    )
+    # tall image cropped to a wider target ratio -> current_ratio < target
+    await _run_edit(
+        "originals/e2/p.png", (500, 2000),
+        {"rotate_cw": 0, "crop_aspect_w": 4, "crop_aspect_h": 1},
+    )
