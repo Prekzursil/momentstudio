@@ -58,6 +58,7 @@ from app.schemas.catalog import (
     FeaturedCollectionCreate,
     FeaturedCollectionUpdate,
     ProductFeedItem,
+    ProductRelationshipsRead,
     ProductRelationshipsUpdate,
 )
 from app.services.storage import get_media_image_stats, regenerate_media_thumbnails
@@ -2491,7 +2492,7 @@ async def get_curated_relationship_products(
 
 async def get_product_relationships(
     session: AsyncSession, product_id: uuid.UUID
-) -> ProductRelationshipsUpdate:
+) -> ProductRelationshipsRead:
     related = list(
         await session.scalars(
             select(ProductRelationship.related_product_id)
@@ -2519,7 +2520,7 @@ async def get_product_relationships(
             )
         )
     )
-    return ProductRelationshipsUpdate(
+    return ProductRelationshipsRead(
         related_product_ids=related,
         upsell_product_ids=upsells,
     )
@@ -2531,7 +2532,7 @@ async def update_product_relationships(
     product: Product,
     payload: ProductRelationshipsUpdate,
     user_id: uuid.UUID | None = None,
-) -> ProductRelationshipsUpdate:
+) -> ProductRelationshipsRead:
     related_ids = _dedupe_uuid_list(list(payload.related_product_ids or []))
     upsell_ids = _dedupe_uuid_list(list(payload.upsell_product_ids or []))
 
@@ -2598,7 +2599,7 @@ async def update_product_relationships(
             "upsell_product_ids": [str(pid) for pid in upsell_ids],
         },
     )
-    return ProductRelationshipsUpdate(
+    return ProductRelationshipsRead(
         related_product_ids=related_ids, upsell_product_ids=upsell_ids
     )
 

@@ -91,7 +91,6 @@ class CategoryRead(CategoryBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    sort_order: int
     tax_group_id: UUID | None = None
 
 
