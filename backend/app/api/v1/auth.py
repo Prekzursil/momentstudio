@@ -3,6 +3,7 @@ import re
 from datetime import datetime, timedelta, timezone, date
 from functools import partial
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -24,7 +25,7 @@ from fastapi import (
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy import func, select, or_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from webauthn.helpers import base64url_to_bytes
 
 from app.core import security
@@ -200,18 +201,28 @@ def _validate_google_state(
         )
 
 
+def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+    value = settings.cookie_samesite.lower()
+    if value == "strict":
+        return "strict"
+    if value == "none":
+        return "none"
+    return "lax"
+
+
 def set_refresh_cookie(
     response: Response, token: str, *, persistent: bool = True
 ) -> None:
-    payload = {
-        "httponly": True,
-        "secure": settings.secure_cookies,
-        "samesite": settings.cookie_samesite.lower(),
-        "path": "/",
-    }
-    if persistent:
-        payload["max_age"] = settings.refresh_token_exp_days * 24 * 60 * 60
-    response.set_cookie("refresh_token", token, **payload)
+    max_age = settings.refresh_token_exp_days * 24 * 60 * 60 if persistent else None
+    response.set_cookie(
+        "refresh_token",
+        token,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite=_cookie_samesite(),
+        path="/",
+        max_age=max_age,
+    )
 
 
 def clear_refresh_cookie(response: Response) -> None:
@@ -219,7 +230,7 @@ def clear_refresh_cookie(response: Response) -> None:
         "refresh_token",
         path="/",
         secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
+        samesite=_cookie_samesite(),
     )
 
 
@@ -230,7 +241,7 @@ def set_admin_ip_bypass_cookie(response: Response, token: str) -> None:
         token,
         httponly=True,
         secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
+        samesite=_cookie_samesite(),
         path="/",
         max_age=max_age,
     )
@@ -241,7 +252,7 @@ def clear_admin_ip_bypass_cookie(response: Response) -> None:
         "admin_ip_bypass",
         path="/",
         secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
+        samesite=_cookie_samesite(),
     )
 
 
@@ -572,7 +583,7 @@ async def register(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
     await captcha_service.verify(
         payload.captcha_token, remote_ip=request.client.host if request.client else None
@@ -662,7 +673,7 @@ async def login(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse | TwoFactorChallengeResponse:
     await captcha_service.verify(
         payload.captcha_token, remote_ip=request.client.host if request.client else None
@@ -749,7 +760,7 @@ async def login_two_factor(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(two_factor_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
     token_payload = security.decode_token(payload.two_factor_token)
     if not token_payload or token_payload.get("type") != "two_factor":
@@ -863,9 +874,10 @@ async def passkey_login_options(
         else:
             user = await auth_service.get_user_by_username(session, identifier)
 
-    options, _ = await passkeys_service.generate_authentication_options_for_user(
-        session, user
-    )
+    (
+        options,
+        _challenge,
+    ) = await passkeys_service.generate_authentication_options_for_user(session, user)
     challenge = str(options.get("challenge") or "").strip()
     if not challenge:
         raise HTTPException(
@@ -895,7 +907,7 @@ async def passkey_login_verify(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
     token_payload = security.decode_token(payload.authentication_token)
     if (
@@ -1132,7 +1144,7 @@ async def refresh_tokens(
     request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(refresh_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> TokenPair | Response:
     silent_header = str(request.headers.get("X-Silent") or "").strip().lower()
     silent_refresh_probe = silent_header in {"1", "true", "yes", "on"}
@@ -1310,7 +1322,7 @@ async def logout(
     payload: RefreshRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
-    response: Response = None,
+    response: Response = Response(),
 ) -> None:
     refresh_token = (payload.refresh_token or "").strip()
     if not refresh_token:
@@ -1340,7 +1352,7 @@ async def admin_ip_bypass(
     request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
-    response: Response = None,
+    response: Response = Response(),
 ) -> None:
     secret = (settings.admin_ip_bypass_token or "").strip()
     if not secret:
@@ -1370,7 +1382,7 @@ async def admin_ip_bypass(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Clear admin IP bypass for this device",
 )
-async def clear_admin_ip_bypass(response: Response = None) -> None:
+async def clear_admin_ip_bypass(response: Response = Response()) -> None:
     if response:
         clear_admin_ip_bypass_cookie(response)
     return None
@@ -1983,7 +1995,7 @@ async def start_export_job(
     ):
         if latest.status == UserDataExportStatus.pending:
             engine = session.bind
-            if engine is None:
+            if not isinstance(engine, AsyncEngine):
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="Database engine unavailable",
@@ -2010,7 +2022,7 @@ async def start_export_job(
     await session.refresh(job)
 
     engine = session.bind
-    if engine is None:
+    if not isinstance(engine, AsyncEngine):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database engine unavailable",
@@ -2582,7 +2594,7 @@ async def google_callback(
     request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    response: Response = None,
+    response: Response = Response(),
     _: None = Depends(google_rate_limit),
 ) -> GoogleCallbackResponse:
     _validate_google_state(payload.state, "google_state")
@@ -2785,7 +2797,7 @@ async def google_complete_registration(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_google_completion_user),
     session: AsyncSession = Depends(get_session),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
     if not payload.accept_terms or not payload.accept_privacy:
         raise HTTPException(

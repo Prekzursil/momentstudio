@@ -17,6 +17,7 @@ from fastapi import (
     status,
 )
 from sqlalchemy import delete, func, or_, select
+from sqlalchemy.sql.elements import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
@@ -572,22 +573,22 @@ async def admin_update_promotion(
             current_ex_categories,
         ) = _scopes_from_promotion(promo)
         include_products = (
-            set(data.get("included_product_ids"))
+            set(data["included_product_ids"])
             if "included_product_ids" in data
             else current_in_products
         )
         exclude_products = (
-            set(data.get("excluded_product_ids"))
+            set(data["excluded_product_ids"])
             if "excluded_product_ids" in data
             else current_ex_products
         )
         include_categories = (
-            set(data.get("included_category_ids"))
+            set(data["included_category_ids"])
             if "included_category_ids" in data
             else current_in_categories
         )
         exclude_categories = (
-            set(data.get("excluded_category_ids"))
+            set(data["excluded_category_ids"])
             if "excluded_category_ids" in data
             else current_ex_categories
         )
@@ -1176,8 +1177,8 @@ def _normalize_bulk_emails(raw: list[str]) -> tuple[list[str], list[str]]:
     return emails, invalid
 
 
-def _segment_user_filters(payload: object) -> list[object]:
-    filters: list[object] = [User.deleted_at.is_(None)]
+def _segment_user_filters(payload: object) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = [User.deleted_at.is_(None)]
     require_marketing = bool(
         getattr(payload, "require_marketing_opt_in", False)
     ) or bool(getattr(payload, "send_email", False))
@@ -1197,7 +1198,7 @@ class _BucketConfig:
 
 
 def _parse_bucket_config(
-    *, bucket_total: object, bucket_index: object, bucket_seed: object
+    *, bucket_total: int | None, bucket_index: int | None, bucket_seed: str | None
 ) -> _BucketConfig | None:
     seed = (str(bucket_seed) if bucket_seed is not None else "").strip()
     if bucket_total is None and bucket_index is None and not seed:
@@ -1223,7 +1224,7 @@ def _bucket_index_for_user(*, user_id: UUID, seed: str, total: int) -> int:
 
 
 async def _segment_sample_emails(
-    session: AsyncSession, *, filters: list[object], limit: int = 10
+    session: AsyncSession, *, filters: list[ColumnElement[bool]], limit: int = 10
 ) -> list[str]:
     rows = (
         (
@@ -1244,7 +1245,7 @@ async def _preview_segment_assign(
     session: AsyncSession,
     *,
     coupon_id: UUID,
-    filters: list[object],
+    filters: list[ColumnElement[bool]],
     bucket: _BucketConfig | None = None,
 ) -> CouponBulkSegmentPreview:
     if bucket is not None:
@@ -1361,7 +1362,7 @@ async def _preview_segment_revoke(
     session: AsyncSession,
     *,
     coupon_id: UUID,
-    filters: list[object],
+    filters: list[ColumnElement[bool]],
     bucket: _BucketConfig | None = None,
 ) -> CouponBulkSegmentPreview:
     if bucket is not None:
@@ -2164,7 +2165,7 @@ async def admin_start_segment_assign_job(
     await session.refresh(job)
 
     engine = session.bind
-    if engine is None:
+    if not isinstance(engine, AsyncEngine):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database engine unavailable",
@@ -2225,7 +2226,7 @@ async def admin_start_segment_revoke_job(
     await session.refresh(job)
 
     engine = session.bind
-    if engine is None:
+    if not isinstance(engine, AsyncEngine):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database engine unavailable",
@@ -2379,7 +2380,7 @@ async def admin_retry_bulk_job(
     await session.refresh(new_job)
 
     engine = session.bind
-    if engine is None:
+    if not isinstance(engine, AsyncEngine):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database engine unavailable",
