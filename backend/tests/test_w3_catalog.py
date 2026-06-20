@@ -17,15 +17,39 @@ noted in the worker REMAINING summary.
 
 from __future__ import annotations
 
+import asyncio
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.models.catalog import ProductBadge
+from app.models.catalog import Category, ProductBadge
+from app.schemas.catalog import CategoryCreate, CategoryReorderItem, CategoryUpdate
 from app.services import catalog
+
+
+def _make_session_factory() -> async_sessionmaker:
+    import app.models  # noqa: F401
+    from app.db.base import Base
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _init() -> None:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(_init())
+    return factory
+
+
+@pytest.fixture()
+def session_factory():
+    return _make_session_factory()
 
 
 # --------------------------------------------------------------------------- #
@@ -485,3 +509,221 @@ def test_reprocess_thumbnails_value_error(monkeypatch) -> None:
     with pytest.raises(HTTPException) as exc:
         catalog.reprocess_product_image_thumbnails(SimpleNamespace(url="x"))
     assert exc.value.status_code == 400
+
+
+# --------------------------------------------------------------------------- #
+# create_category (DB-backed, SQLite-safe: payload UUIDs, no string-get)        #
+# --------------------------------------------------------------------------- #
+def _add_category(session_factory, *, slug, name="Cat", parent_id=None):
+    holder = {}
+
+    async def add():
+        async with session_factory() as session:
+            cat = Category(slug=slug, name=name, parent_id=parent_id)
+            session.add(cat)
+            await session.commit()
+            await session.refresh(cat)
+            holder["id"] = cat.id
+
+    asyncio.run(add())
+    return holder["id"]
+
+
+def test_create_category_success_and_slug_collision(session_factory) -> None:
+    async def run() -> None:
+        async with session_factory() as session:
+            first = await catalog.create_category(
+                session, CategoryCreate(name="Mugs & Cups")
+            )
+            assert first.slug == "mugs-cups"
+            # Same name -> slug collision -> suffixed candidate.
+            second = await catalog.create_category(
+                session, CategoryCreate(name="Mugs & Cups")
+            )
+            assert second.slug == "mugs-cups-2"
+
+    asyncio.run(run())
+
+
+def test_create_category_blank_name_slug_fallback(session_factory) -> None:
+    # A name of only punctuation slugifies to "" -> falls back to "category".
+    async def run() -> None:
+        async with session_factory() as session:
+            cat = await catalog.create_category(session, CategoryCreate(name="@@@"))
+            assert cat.slug == "category"
+
+    asyncio.run(run())
+
+
+def test_create_category_parent_not_found(session_factory) -> None:
+    async def run() -> None:
+        async with session_factory() as session:
+            with pytest.raises(HTTPException) as exc:
+                await catalog.create_category(
+                    session, CategoryCreate(name="Child", parent_id=uuid.uuid4())
+                )
+            assert "Parent category not found" in exc.value.detail
+
+    asyncio.run(run())
+
+
+def test_create_category_tax_group_not_found(session_factory) -> None:
+    async def run() -> None:
+        async with session_factory() as session:
+            with pytest.raises(HTTPException) as exc:
+                await catalog.create_category(
+                    session, CategoryCreate(name="Taxed", tax_group_id=uuid.uuid4())
+                )
+            assert "Tax group not found" in exc.value.detail
+
+    asyncio.run(run())
+
+
+def test_create_category_with_valid_parent(session_factory) -> None:
+    parent_id = _add_category(session_factory, slug="parent", name="Parent")
+
+    async def run() -> None:
+        async with session_factory() as session:
+            child = await catalog.create_category(
+                session, CategoryCreate(name="Child", parent_id=parent_id)
+            )
+            assert child.parent_id == parent_id
+
+    asyncio.run(run())
+
+
+# --------------------------------------------------------------------------- #
+# update_category                                                              #
+# --------------------------------------------------------------------------- #
+def test_update_category_slug_change_rejected(session_factory) -> None:
+    cat_id = _add_category(session_factory, slug="orig", name="Orig")
+
+    async def run() -> None:
+        async with session_factory() as session:
+            cat = await session.get(Category, cat_id)
+            with pytest.raises(HTTPException) as exc:
+                await catalog.update_category(
+                    session, cat, CategoryUpdate(slug="different")
+                )
+            assert "slug cannot be changed" in exc.value.detail
+
+    asyncio.run(run())
+
+
+def test_update_category_same_slug_and_fields(session_factory) -> None:
+    cat_id = _add_category(session_factory, slug="keep", name="Old")
+
+    async def run() -> None:
+        async with session_factory() as session:
+            cat = await session.get(Category, cat_id)
+            updated = await catalog.update_category(
+                session,
+                cat,
+                CategoryUpdate(slug="keep", name="New Name", description="d"),
+            )
+            assert updated.name == "New Name"
+            assert updated.description == "d"
+
+    asyncio.run(run())
+
+
+def test_update_category_tax_group_not_found(session_factory) -> None:
+    cat_id = _add_category(session_factory, slug="tx", name="Tx")
+
+    async def run() -> None:
+        async with session_factory() as session:
+            cat = await session.get(Category, cat_id)
+            with pytest.raises(HTTPException) as exc:
+                await catalog.update_category(
+                    session, cat, CategoryUpdate(tax_group_id=uuid.uuid4())
+                )
+            assert "Tax group not found" in exc.value.detail
+
+    asyncio.run(run())
+
+
+def test_update_category_parent_self_rejected(session_factory) -> None:
+    cat_id = _add_category(session_factory, slug="self", name="Self")
+
+    async def run() -> None:
+        async with session_factory() as session:
+            cat = await session.get(Category, cat_id)
+            with pytest.raises(HTTPException) as exc:
+                await catalog.update_category(
+                    session, cat, CategoryUpdate(parent_id=cat_id)
+                )
+            assert "its own parent" in exc.value.detail
+
+    asyncio.run(run())
+
+
+def test_update_category_parent_not_found(session_factory) -> None:
+    cat_id = _add_category(session_factory, slug="np", name="NP")
+
+    async def run() -> None:
+        async with session_factory() as session:
+            cat = await session.get(Category, cat_id)
+            with pytest.raises(HTTPException) as exc:
+                await catalog.update_category(
+                    session, cat, CategoryUpdate(parent_id=uuid.uuid4())
+                )
+            assert "Parent category not found" in exc.value.detail
+
+    asyncio.run(run())
+
+
+def test_update_category_parent_cycle_rejected(session_factory) -> None:
+    # a -> b chain; making a's parent = b while b's parent = a forms a cycle.
+    a_id = _add_category(session_factory, slug="a", name="A")
+    b_id = _add_category(session_factory, slug="b", name="B", parent_id=a_id)
+
+    async def run() -> None:
+        async with session_factory() as session:
+            cat_a = await session.get(Category, a_id)
+            with pytest.raises(HTTPException) as exc:
+                await catalog.update_category(
+                    session, cat_a, CategoryUpdate(parent_id=b_id)
+                )
+            assert "cycle" in exc.value.detail
+
+    asyncio.run(run())
+
+
+# --------------------------------------------------------------------------- #
+# reorder_categories                                                          #
+# --------------------------------------------------------------------------- #
+def test_reorder_categories_empty(session_factory) -> None:
+    async def run() -> None:
+        async with session_factory() as session:
+            assert await catalog.reorder_categories(session, []) == []
+
+    asyncio.run(run())
+
+
+def test_reorder_categories_no_matching_slug(session_factory) -> None:
+    async def run() -> None:
+        async with session_factory() as session:
+            out = await catalog.reorder_categories(
+                session, [CategoryReorderItem(slug="ghost", sort_order=5)]
+            )
+            assert out == []
+
+    asyncio.run(run())
+
+
+def test_reorder_categories_updates(session_factory) -> None:
+    _add_category(session_factory, slug="r1", name="R1")
+    _add_category(session_factory, slug="r2", name="R2")
+
+    async def run() -> None:
+        async with session_factory() as session:
+            out = await catalog.reorder_categories(
+                session,
+                [
+                    CategoryReorderItem(slug="r1", sort_order=3),
+                    CategoryReorderItem(slug="r2", sort_order=7),
+                ],
+            )
+            assert {c.slug: c.sort_order for c in out} == {"r1": 3, "r2": 7}
+
+    asyncio.run(run())
