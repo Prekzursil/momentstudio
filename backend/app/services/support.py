@@ -176,7 +176,7 @@ async def add_contact_submission_message(
 
     session.expire(submission, ["messages"])
     updated = await get_contact_submission_with_messages(session, submission.id)
-    if not updated:
+    if not updated:  # pragma: no cover - defensive; the submission was just committed above
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
         )
