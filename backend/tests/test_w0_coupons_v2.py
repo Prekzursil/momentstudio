@@ -1908,3 +1908,64 @@ async def test_bucket_preview_and_runner_with_assignments() -> None:
     async with local() as session:
         job = await session.get(CouponBulkJob, job_id)
         assert job.status == CouponBulkJobStatus.succeeded
+
+
+@pytest.mark.anyio
+async def test_bulk_assign_restores_revoked() -> None:
+    """Bulk assign over a user with a revoked assignment hits the restored branch."""
+    engine, local = _make_engine_and_local()
+    await _init(engine)
+    admin = _Admin()
+    bg = BackgroundTasks()
+    async with local() as session:
+        user = await _seed_user(session, email="rev@a.com", notify_marketing=True)
+        promo, coupon = await _seed_promo_coupon(session)
+        session.add(
+            CouponAssignment(
+                coupon_id=coupon.id, user_id=user.id, revoked_at=datetime.now(UTC)
+            )
+        )
+        await session.commit()
+        coupon_id = coupon.id
+
+    async with local() as session:
+        res = await api.admin_bulk_assign_coupon(
+            coupon_id,
+            CouponBulkAssignRequest(emails=["rev@a.com"], send_email=True),
+            bg, session=session, _=admin,
+        )
+        assert res.restored == 1
+
+
+@pytest.mark.anyio
+async def test_runner_no_email_bucket() -> None:
+    """Bucketed runner with send_email False hits the false notify branch."""
+    engine, local = _make_engine_and_local()
+    await _init(engine)
+    seed = "noemail"
+    total = 100
+
+    async with local() as session:
+        promo, coupon = await _seed_promo_coupon(session)
+        for i in range(6):
+            await _seed_user(session, email=f"ne{i}@a.com", notify_marketing=True)
+        await session.flush()
+        users = (
+            await session.execute(__import__("sqlalchemy").select(User.id))
+        ).scalars().all()
+        idx = api._bucket_index_for_user(user_id=users[0], seed=seed, total=total)
+        job = CouponBulkJob(
+            coupon_id=coupon.id, created_by_user_id=uuid.uuid4(),
+            action=CouponBulkJobAction.assign,
+            status=CouponBulkJobStatus.pending, send_email=False,
+            bucket_total=total, bucket_index=idx, bucket_seed=seed,
+            total_candidates=1,
+        )
+        session.add(job)
+        await session.commit()
+        job_id = job.id
+
+    await api._run_bulk_segment_job(engine, job_id=job_id)
+    async with local() as session:
+        job = await session.get(CouponBulkJob, job_id)
+        assert job.status == CouponBulkJobStatus.succeeded
