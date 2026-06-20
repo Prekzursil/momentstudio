@@ -82,8 +82,7 @@ def test_parse_missing_cube_raises() -> None:
 
 def test_parse_missing_cube_date_raises() -> None:
     xml = _xml(
-        '<Rate currency="EUR">4.9700</Rate>'
-        '<Rate currency="USD">4.5500</Rate>',
+        '<Rate currency="EUR">4.9700</Rate><Rate currency="USD">4.5500</Rate>',
         cube_date=None,
     )
     with pytest.raises(ValueError, match="Missing Cube date"):
@@ -97,10 +96,7 @@ def test_parse_missing_eur_or_usd_raises() -> None:
 
 
 def test_parse_nonpositive_rate_raises() -> None:
-    xml = _xml(
-        '<Rate currency="EUR">0.0000</Rate>'
-        '<Rate currency="USD">4.5500</Rate>'
-    )
+    xml = _xml('<Rate currency="EUR">0.0000</Rate><Rate currency="USD">4.5500</Rate>')
     with pytest.raises(ValueError, match="Non-positive EUR/USD rates"):
         fx_rates._parse_bnr_rates(xml)
 
@@ -129,7 +125,9 @@ def test_fetch_bnr_xml_uses_settings_url(monkeypatch: pytest.MonkeyPatch) -> Non
             return _Resp()
 
     monkeypatch.setattr(httpx, "AsyncClient", _Client)
-    monkeypatch.setattr(fx_rates.settings, "fx_rates_url", "https://example.test/fx.xml")
+    monkeypatch.setattr(
+        fx_rates.settings, "fx_rates_url", "https://example.test/fx.xml"
+    )
 
     text = asyncio.run(fx_rates._fetch_bnr_xml())
     assert text == _VALID
