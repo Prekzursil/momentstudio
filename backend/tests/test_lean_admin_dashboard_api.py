@@ -19,6 +19,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.v1 import admin_dashboard as ad
+from app.core.config import settings
 from app.db.base import Base
 from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds
 from app.models.user import User, UserRole
@@ -1488,5 +1489,567 @@ def test_admin_content_and_coupons(session_factory: async_sessionmaker) -> None:
         assert any(c["author"] is None for c in content)
         coupons = await ad.admin_coupons(session=session, _=None)
         assert len(coupons) == 2
+
+    run(session_factory, scenario)
+
+
+# ---------------------------------------------------------------------------
+# scheduled-tasks / coupon CRUD / audit / sessions
+# ---------------------------------------------------------------------------
+
+
+def test_scheduled_tasks_overview(session_factory: async_sessionmaker) -> None:
+    from app.models.catalog import Category, Product, ProductStatus
+    from app.models.coupons_v2 import Promotion, PromotionDiscountType
+
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        now = datetime.now(timezone.utc)
+        cat = Category(name="C", slug="c", low_stock_threshold=5)
+        session.add(cat)
+        await session.flush()
+        session.add(
+            Product(
+                name="Sched",
+                slug="sched",
+                base_price=Decimal("20"),
+                category_id=cat.id,
+                is_active=True,
+                status=ProductStatus.draft,
+                sale_auto_publish=True,
+                sale_start_at=now + timedelta(days=2),
+                sale_end_at=now + timedelta(days=5),
+            )
+        )
+        session.add(
+            Promotion(
+                name="Promo",
+                discount_type=PromotionDiscountType.percent,
+                percentage_off=Decimal("10"),
+                is_active=True,
+                starts_at=now + timedelta(days=1),
+                ends_at=now + timedelta(days=10),
+            )
+        )
+        await session.commit()
+        result = await ad.scheduled_tasks_overview(session=session, _=None, limit=10)
+        assert len(result.publish_schedules) >= 1
+        assert len(result.promo_schedules) >= 1
+
+    run(session_factory, scenario)
+
+
+def test_admin_invalidate_coupon_stripe(
+    session_factory: async_sessionmaker,
+) -> None:
+    import uuid as _uuid
+
+    from app.models.promo import PromoCode, StripeCouponMapping
+
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_invalidate_coupon_stripe(
+                coupon_id=_uuid.uuid4(), session=session, _=None
+            )
+        assert exc.value.status_code == 404
+
+        promo = PromoCode(code="C1", active=True)
+        session.add(promo)
+        await session.flush()
+        session.add(
+            StripeCouponMapping(
+                promo_code_id=promo.id,
+                stripe_coupon_id="co_1",
+                discount_cents=1000,
+            )
+        )
+        await session.commit()
+        result = await ad.admin_invalidate_coupon_stripe(
+            coupon_id=promo.id, session=session, _=None
+        )
+        assert result["deleted_mappings"] == 1
+
+    run(session_factory, scenario)
+
+
+def test_admin_create_coupon(session_factory: async_sessionmaker) -> None:
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_create_coupon(payload={}, session=session, _=None)
+        assert exc.value.status_code == 400
+        with pytest.raises(HTTPException) as exc2:
+            await ad.admin_create_coupon(
+                payload={"code": "X", "currency": "usd"}, session=session, _=None
+            )
+        assert exc2.value.status_code == 400
+        result = await ad.admin_create_coupon(
+            payload={
+                "code": "NEW10",
+                "percentage_off": 10,
+                "currency": "ron",
+                "active": True,
+            },
+            session=session,
+            _=None,
+        )
+        assert result["code"] == "NEW10"
+        assert result["currency"] == "RON"
+
+    run(session_factory, scenario)
+
+
+def test_admin_update_coupon(session_factory: async_sessionmaker) -> None:
+    import uuid as _uuid
+
+    from app.models.promo import PromoCode
+
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_update_coupon(
+                coupon_id=_uuid.uuid4(), payload={}, session=session, _=None
+            )
+        assert exc.value.status_code == 404
+
+        promo = PromoCode(code="UPD", active=True)
+        session.add(promo)
+        await session.commit()
+        # bad currency
+        with pytest.raises(HTTPException) as exc2:
+            await ad.admin_update_coupon(
+                coupon_id=promo.id,
+                payload={"currency": "usd"},
+                session=session,
+                _=None,
+            )
+        assert exc2.value.status_code == 400
+        # valid update incl. currency=RON and fields, invalidate_stripe True
+        result = await ad.admin_update_coupon(
+            coupon_id=promo.id,
+            payload={"percentage_off": 15, "active": False, "currency": "RON"},
+            session=session,
+            _=None,
+        )
+        assert result["currency"] == "RON"
+        # currency cleared (falsy) branch
+        result2 = await ad.admin_update_coupon(
+            coupon_id=promo.id,
+            payload={"currency": ""},
+            session=session,
+            _=None,
+        )
+        assert result2["currency"] is None
+
+    run(session_factory, scenario)
+
+
+def _seed_audit_rows(session: Any) -> Callable[[], Any]:
+    async def _seed() -> Any:
+        from app.models.catalog import Category, Product, ProductAuditLog
+        from app.models.content import ContentAuditLog, ContentBlock, ContentStatus
+        from app.models.user import AdminAuditLog
+
+        actor = await create_user(
+            session,
+            UserCreate(email="actor@x.com", password="password123", name="Actor"),
+        )
+        cat = Category(name="C", slug="c", low_stock_threshold=5)
+        session.add(cat)
+        await session.flush()
+        product = Product(
+            name="P", slug="p", base_price=Decimal("10"), category_id=cat.id
+        )
+        block = ContentBlock(
+            key="blog.b", title="B", body_markdown="x", status=ContentStatus.published
+        )
+        session.add_all([product, block])
+        await session.flush()
+        session.add(
+            ProductAuditLog(
+                product_id=product.id,
+                action="update",
+                user_id=actor.id,
+                payload='{"ip": "192.168.1.1"}',
+            )
+        )
+        session.add(
+            ContentAuditLog(
+                content_block_id=block.id,
+                action="publish",
+                version=1,
+                user_id=actor.id,
+            )
+        )
+        session.add(
+            AdminAuditLog(
+                action="user.update",
+                actor_user_id=actor.id,
+                subject_user_id=actor.id,
+                data={"email": "actor@x.com", "ip": "10.0.0.1"},
+            )
+        )
+        await session.commit()
+        return actor
+
+    return _seed
+
+
+def test_admin_audit(session_factory: async_sessionmaker) -> None:
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        await _seed_audit_rows(session)()
+        result = await ad.admin_audit(session=session, _=None)
+        assert len(result["products"]) >= 1
+        assert len(result["content"]) >= 1
+        assert len(result["security"]) >= 1
+
+    run(session_factory, scenario)
+
+
+def test_admin_audit_entries_filters(session_factory: async_sessionmaker) -> None:
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        await _seed_audit_rows(session)()
+        # entity=all, no filters
+        result = await ad.admin_audit_entries(
+            session=session,
+            _=None,
+            entity="all",
+            action=None,
+            user=None,
+            page=1,
+            limit=20,
+        )
+        assert result["meta"]["total_items"] >= 3
+        # entity filter + single action token + user filter
+        result2 = await ad.admin_audit_entries(
+            session=session,
+            _=None,
+            entity="product",
+            action="update",
+            user="actor",
+            page=1,
+            limit=20,
+        )
+        assert result2["meta"]["total_items"] >= 1
+        # multi-token action filter (the or_ branch)
+        result3 = await ad.admin_audit_entries(
+            session=session,
+            _=None,
+            entity="all",
+            action="update|publish",
+            user=None,
+            page=1,
+            limit=20,
+        )
+        assert result3["meta"]["total_items"] >= 2
+
+    run(session_factory, scenario)
+
+
+def test_audit_helpers() -> None:
+    # _audit_mask_email
+    assert ad._audit_mask_email("") == ""
+    assert ad._audit_mask_email("noemail") == "noemail"
+    assert ad._audit_mask_email("@domain.com") == "@domain.com"
+    assert ad._audit_mask_email("a@x.com") == "*@x.com"
+    masked = ad._audit_mask_email("alexander@example.com")
+    assert masked.startswith("a") and masked.endswith("@example.com")
+    # _audit_redact_text
+    redacted = ad._audit_redact_text("mail a@b.com ip 1.2.3.4 v6 fe80::1")
+    assert "a@b.com" not in redacted
+    assert "***.***.***.***" in redacted
+    # _audit_csv_cell formula injection
+    assert ad._audit_csv_cell("=cmd()") == "'=cmd()"
+    assert ad._audit_csv_cell("normal") == "normal"
+    # _iso_to_dt
+    assert ad._iso_to_dt(None) is None
+    assert ad._iso_to_dt("not-a-date") is None
+    assert ad._iso_to_dt("2024-01-01T00:00:00+00:00") is not None
+
+
+def test_admin_audit_export_csv(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def scenario(session: Any) -> None:
+        owner = await _admin(session, role=UserRole.owner)
+        await _seed_audit_rows(session)()
+        monkeypatch.setattr(
+            ad.step_up_service, "require_step_up", lambda *a, **k: None
+        )
+        # redacted export
+        resp = await ad.admin_audit_export_csv(
+            request=_FakeRequest(),
+            entity="all",
+            action=None,
+            user=None,
+            redact=True,
+            session=session,
+            current_user=owner,
+        )
+        assert resp.media_type == "text/csv"
+        assert "192.168" not in resp.body.decode()
+        # unredacted as owner
+        resp2 = await ad.admin_audit_export_csv(
+            request=_FakeRequest(),
+            entity="all",
+            action=None,
+            user=None,
+            redact=False,
+            session=session,
+            current_user=owner,
+        )
+        assert resp2.media_type == "text/csv"
+
+    run(session_factory, scenario)
+
+
+def test_admin_audit_export_csv_forbidden(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        monkeypatch.setattr(
+            ad.step_up_service, "require_step_up", lambda *a, **k: None
+        )
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_audit_export_csv(
+                request=_FakeRequest(),
+                entity="all",
+                action=None,
+                user=None,
+                redact=False,
+                session=session,
+                current_user=admin,
+            )
+        assert exc.value.status_code == 403
+
+    run(session_factory, scenario)
+
+
+def test_admin_audit_retention(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        await _seed_audit_rows(session)()
+        # Enable a retention policy so the cutoff branch runs.
+        monkeypatch.setattr(
+            settings, "audit_retention_days_product", 30, raising=False
+        )
+        monkeypatch.setattr(
+            settings, "audit_retention_days_content", 0, raising=False
+        )
+        monkeypatch.setattr(
+            settings, "audit_retention_days_security", 0, raising=False
+        )
+        result = await ad.admin_audit_retention(session=session, _=None)
+        assert result["policies"]["product"]["enabled"] is True
+        assert result["policies"]["content"]["enabled"] is False
+
+    run(session_factory, scenario)
+
+
+def test_admin_audit_retention_purge(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def scenario(session: Any) -> None:
+        owner = await _admin(session, role=UserRole.owner)
+        admin = await _admin(session)
+        # not owner -> 403
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_audit_retention_purge(
+                payload={"confirm": "PURGE"}, session=session, current_user=admin
+            )
+        assert exc.value.status_code == 403
+        # missing confirm -> 400
+        with pytest.raises(HTTPException) as exc2:
+            await ad.admin_audit_retention_purge(
+                payload={}, session=session, current_user=owner
+            )
+        assert exc2.value.status_code == 400
+        # dry run -> no delete
+        dry = await ad.admin_audit_retention_purge(
+            payload={"confirm": "purge", "dry_run": True},
+            session=session,
+            current_user=owner,
+        )
+        assert dry["dry_run"] is True
+
+    run(session_factory, scenario)
+
+
+def test_admin_audit_retention_purge_executes(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.models.user import AdminAuditLog
+
+    async def scenario(session: Any) -> None:
+        owner = await _admin(session, role=UserRole.owner)
+        old = datetime.now(timezone.utc) - timedelta(days=400)
+        session.add(
+            AdminAuditLog(action="old.event", actor_user_id=owner.id, created_at=old)
+        )
+        await session.commit()
+        monkeypatch.setattr(
+            settings, "audit_retention_days_security", 30, raising=False
+        )
+        monkeypatch.setattr(
+            settings, "audit_retention_days_product", 0, raising=False
+        )
+        monkeypatch.setattr(
+            settings, "audit_retention_days_content", 0, raising=False
+        )
+        result = await ad.admin_audit_retention_purge(
+            payload={"confirm": "PURGE", "dry_run": False},
+            session=session,
+            current_user=owner,
+        )
+        assert result["deleted"]["security"] >= 1
+
+    run(session_factory, scenario)
+
+
+def test_revoke_sessions(session_factory: async_sessionmaker) -> None:
+    import uuid as _uuid
+
+    from app.models.user import RefreshSession
+
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        target = await create_user(
+            session,
+            UserCreate(email="rev@x.com", password="password123", name="Rev"),
+        )
+        await session.flush()
+        session.add(
+            RefreshSession(
+                user_id=target.id,
+                jti="jti-1",
+                expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+                revoked=False,
+            )
+        )
+        await session.commit()
+        # not found
+        with pytest.raises(HTTPException) as exc:
+            await ad.revoke_sessions(
+                user_id=_uuid.uuid4(),
+                request=_FakeRequest(),
+                session=session,
+                current_user=admin,
+            )
+        assert exc.value.status_code == 404
+        # revoke existing
+        assert (
+            await ad.revoke_sessions(
+                user_id=target.id,
+                request=_FakeRequest(),
+                session=session,
+                current_user=admin,
+            )
+            is None
+        )
+
+    run(session_factory, scenario)
+
+
+def test_admin_list_user_sessions(session_factory: async_sessionmaker) -> None:
+    import uuid as _uuid
+
+    from app.models.user import RefreshSession
+
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        target = await create_user(
+            session,
+            UserCreate(email="ls@x.com", password="password123", name="LS"),
+        )
+        await session.flush()
+        # active + expired sessions
+        session.add(
+            RefreshSession(
+                user_id=target.id,
+                jti="jti-active",
+                expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+                revoked=False,
+            )
+        )
+        session.add(
+            RefreshSession(
+                user_id=target.id,
+                jti="jti-expired",
+                expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+                revoked=False,
+            )
+        )
+        await session.commit()
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_list_user_sessions(
+                user_id=_uuid.uuid4(), session=session, _=None
+            )
+        assert exc.value.status_code == 404
+        result = await ad.admin_list_user_sessions(
+            user_id=target.id, session=session, _=None
+        )
+        # Only the active one is returned (expired filtered out).
+        assert len(result) == 1
+
+    run(session_factory, scenario)
+
+
+def test_admin_revoke_user_session(session_factory: async_sessionmaker) -> None:
+    import uuid as _uuid
+
+    from app.models.user import RefreshSession
+
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        target = await create_user(
+            session,
+            UserCreate(email="rs@x.com", password="password123", name="RS"),
+        )
+        await session.flush()
+        refresh = RefreshSession(
+            user_id=target.id,
+            jti="jti-tok",
+            expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            revoked=False,
+        )
+        session.add(refresh)
+        await session.commit()
+        # user not found
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_revoke_user_session(
+                user_id=_uuid.uuid4(),
+                session_id=refresh.id,
+                request=_FakeRequest(),
+                session=session,
+                current_user=admin,
+            )
+        assert exc.value.status_code == 404
+        # session not found
+        with pytest.raises(HTTPException) as exc2:
+            await ad.admin_revoke_user_session(
+                user_id=target.id,
+                session_id=_uuid.uuid4(),
+                request=_FakeRequest(),
+                session=session,
+                current_user=admin,
+            )
+        assert exc2.value.status_code == 404
+        # revoke ok
+        assert (
+            await ad.admin_revoke_user_session(
+                user_id=target.id,
+                session_id=refresh.id,
+                request=_FakeRequest(),
+                session=session,
+                current_user=admin,
+            )
+            is None
+        )
 
     run(session_factory, scenario)
