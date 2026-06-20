@@ -11,8 +11,6 @@ from __future__ import annotations
 import asyncio
 from decimal import Decimal
 
-import pytest
-
 from app.core.config import settings
 from app.models.catalog import (
     Category,
