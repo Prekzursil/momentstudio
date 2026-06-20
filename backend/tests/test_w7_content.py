@@ -1277,3 +1277,171 @@ async def test_admin_update_content_image_blank_alt(session_factory) -> None:
             _=_user(),
         )
     assert out.alt_text is None
+
+
+# =========================================================================== #
+# Part 4: image tags / focal / edit / usage / delete
+# =========================================================================== #
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content_image_tags_not_found(session_factory) -> None:
+    from app.schemas.content import ContentImageTagsUpdate
+
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_update_content_image_tags(
+                image_id=uuid4(),
+                payload=ContentImageTagsUpdate(tags=["a"]),
+                session=session,
+                _=_user(),
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content_image_tags_add_and_remove(
+    session_factory,
+) -> None:
+    from app.schemas.content import ContentImageTagsUpdate
+
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.tagblk")
+        img = await _seed_image(session, blk)
+        session.add(ContentImageTag(content_image_id=img.id, tag="old"))
+        await session.commit()
+        # "old" removed, "new" added
+        out = await c.admin_update_content_image_tags(
+            image_id=img.id,
+            payload=ContentImageTagsUpdate(tags=["new"]),
+            session=session,
+            _=_user(),
+        )
+    assert out.tags == ["new"]
+    assert out.content_key == "page.tagblk"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content_image_focal(session_factory) -> None:
+    from app.schemas.content import ContentImageFocalPointUpdate
+
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.focalblk")
+        img = await _seed_image(session, blk)
+        session.add(ContentImageTag(content_image_id=img.id, tag="z"))
+        await session.commit()
+        out = await c.admin_update_content_image_focal_point(
+            image_id=img.id,
+            payload=ContentImageFocalPointUpdate(focal_x=30, focal_y=70),
+            session=session,
+            _=_user(),
+        )
+    assert out.focal_x == 30 and out.focal_y == 70
+    assert out.tags == ["z"]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content_image_focal_not_found(session_factory) -> None:
+    from app.schemas.content import ContentImageFocalPointUpdate
+
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_update_content_image_focal_point(
+                image_id=uuid4(),
+                payload=ContentImageFocalPointUpdate(),
+                session=session,
+                _=_user(),
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_edit_content_image_not_found(session_factory) -> None:
+    from app.schemas.content import ContentImageEditRequest
+
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_edit_content_image(
+                image_id=uuid4(),
+                payload=ContentImageEditRequest(rotate_cw=90),
+                session=session,
+                admin=_user(),
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_edit_content_image_ok(session_factory, monkeypatch) -> None:
+    from app.schemas.content import ContentImageEditRequest
+
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.editblk")
+        img = await _seed_image(session, blk)
+        session.add(ContentImageTag(content_image_id=img.id, tag="e"))
+        await session.commit()
+
+        async def fake_edit(sess, *, image, payload, actor_id):
+            return image  # return same image as the edited result
+
+        monkeypatch.setattr(c.content_service, "edit_image_asset", fake_edit)
+        out = await c.admin_edit_content_image(
+            image_id=img.id,
+            payload=ContentImageEditRequest(rotate_cw=90),
+            session=session,
+            admin=_user(),
+        )
+    assert out.content_key == "page.editblk"
+    assert out.tags == ["e"]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_content_image_usage_not_found(session_factory) -> None:
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_get_content_image_usage(
+                image_id=uuid4(), session=session, _=_user()
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_content_image_usage_ok(session_factory, monkeypatch) -> None:
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.usageblk")
+        img = await _seed_image(session, blk, url="https://cdn/u.png")
+        monkeypatch.setattr(
+            c.content_service, "get_asset_usage_keys", _afn(["page.usageblk"])
+        )
+        out = await c.admin_get_content_image_usage(
+            image_id=img.id, session=session, _=_user()
+        )
+    assert out.stored_in_key == "page.usageblk"
+    assert out.keys == ["page.usageblk"]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_delete_content_image_not_found(session_factory) -> None:
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_delete_content_image(
+                image_id=uuid4(),
+                delete_versions=False,
+                session=session,
+                admin=_user(),
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_delete_content_image_ok(session_factory, monkeypatch) -> None:
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.delblk")
+        img = await _seed_image(session, blk)
+        monkeypatch.setattr(
+            c.content_service, "delete_image_asset", _afn(None)
+        )
+        resp = await c.admin_delete_content_image(
+            image_id=img.id,
+            delete_versions=True,
+            session=session,
+            admin=_user(),
+        )
+    assert resp.status_code == 204
