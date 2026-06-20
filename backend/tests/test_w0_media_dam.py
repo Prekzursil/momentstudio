@@ -944,3 +944,165 @@ async def test_rebuild_usage_edges() -> None:
         asset = await session.get(MediaAsset, asset_id)
         resp = await md.rebuild_usage_edges(session, asset, commit=True)
         assert resp is not None
+
+
+def _seed_asset_with_file(session, *, public, private, key, dims=(8, 4),
+                          original_filename="my-photo.png"):
+    asset = MediaAsset(
+        id=uuid.uuid4(), asset_type=MediaAssetType.image,
+        status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+        storage_key=key, public_url=md._public_url_from_storage_key(key),
+        original_filename=original_filename,
+    )
+    session.add(asset)
+    f = private / key
+    f.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", dims).save(f)
+    return asset
+
+
+@pytest.mark.anyio
+async def test_process_ingest_job_success(media_roots, monkeypatch) -> None:
+    public, private = media_roots
+    monkeypatch.setattr(md, "get_redis", lambda: None)
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset = _seed_asset_with_file(
+            session, public=public, private=private, key="originals/i/p.png"
+        )
+        await session.flush()
+        job = await md.enqueue_job(
+            session, asset_id=asset.id, job_type=MediaJobType.ingest,
+            payload={"reason": "upload"}, created_by_user_id=None,
+        )
+        await session.commit()
+        job_id, asset_id = job.id, asset.id
+
+    async with local() as session:
+        job = await session.get(MediaJob, job_id)
+        done = await md.process_job_inline(session, job)
+        assert done.status == MediaJobStatus.completed
+        refreshed = await session.get(MediaAsset, asset_id)
+        assert refreshed.checksum_sha256 is not None
+        assert refreshed.width == 8
+
+
+@pytest.mark.anyio
+async def test_process_ingest_job_missing_file_dead_letters(media_roots,
+                                                            monkeypatch) -> None:
+    public, private = media_roots
+    monkeypatch.setattr(md, "get_redis", lambda: None)
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            storage_key="originals/missing/x.png",
+            public_url="/media/originals/missing/x.png",
+        )
+        session.add(asset)
+        await session.flush()
+        # disabled retry policy in payload -> exception goes straight to dead_letter
+        job = await md.enqueue_job(
+            session, asset_id=asset.id, job_type=MediaJobType.ingest,
+            payload={
+                md.RETRY_POLICY_PAYLOAD_KEY: {
+                    "max_attempts": 1, "schedule": [60],
+                    "jitter_ratio": 0.0, "enabled": False, "version_ts": "s",
+                }
+            },
+            created_by_user_id=None,
+        )
+        await session.commit()
+        job_id = job.id
+
+    async with local() as session:
+        job = await session.get(MediaJob, job_id)
+        done = await md.process_job_inline(session, job)
+        assert done.status == MediaJobStatus.dead_letter
+        assert done.error_code == "processing_failed"
+
+
+@pytest.mark.anyio
+async def test_process_ingest_job_failure_schedules_retry(media_roots,
+                                                          monkeypatch) -> None:
+    public, private = media_roots
+    monkeypatch.setattr(md, "get_redis", lambda: None)
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            storage_key="originals/m2/y.png",
+            public_url="/media/originals/m2/y.png",
+        )
+        session.add(asset)
+        await session.flush()
+        # enabled retry policy with attempts remaining -> failed + next_retry_at
+        job = await md.enqueue_job(
+            session, asset_id=asset.id, job_type=MediaJobType.ingest,
+            payload={
+                md.RETRY_POLICY_PAYLOAD_KEY: {
+                    "max_attempts": 3, "schedule": [60, 120],
+                    "jitter_ratio": 0.0, "enabled": True, "version_ts": "s",
+                }
+            },
+            created_by_user_id=None,
+        )
+        await session.commit()
+        job_id = job.id
+
+    async with local() as session:
+        job = await session.get(MediaJob, job_id)
+        done = await md.process_job_inline(session, job)
+        assert done.status == MediaJobStatus.failed
+        assert done.next_retry_at is not None
+
+
+@pytest.mark.anyio
+async def test_process_ai_tag_duplicate_usage_jobs(media_roots, monkeypatch) -> None:
+    public, private = media_roots
+    monkeypatch.setattr(md, "get_redis", lambda: None)
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset = _seed_asset_with_file(
+            session, public=public, private=private, key="originals/t/p.png",
+            original_filename="sunny-beach.png",
+        )
+        asset.width = 8
+        asset.height = 4
+        asset.checksum_sha256 = "abc123checksum00"
+        await session.flush()
+        # a duplicate with the same checksum
+        dup = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            storage_key="originals/t/dup.png",
+            public_url="/media/originals/t/dup.png",
+            checksum_sha256="abc123checksum00",
+        )
+        session.add(dup)
+        ai_job = await md.enqueue_job(
+            session, asset_id=asset.id, job_type=MediaJobType.ai_tag,
+            payload={}, created_by_user_id=None,
+        )
+        dup_job = await md.enqueue_job(
+            session, asset_id=asset.id, job_type=MediaJobType.duplicate_scan,
+            payload={}, created_by_user_id=None,
+        )
+        usage_job = await md.enqueue_job(
+            session, asset_id=None, job_type=MediaJobType.usage_reconcile,
+            payload={"limit": 10}, created_by_user_id=None,
+        )
+        await session.commit()
+        ai_id, dup_id, usage_id = ai_job.id, dup_job.id, usage_job.id
+
+    async with local() as session:
+        for jid in (ai_id, dup_id, usage_id):
+            job = await session.get(MediaJob, jid)
+            done = await md.process_job_inline(session, job)
+            assert done.status == MediaJobStatus.completed
