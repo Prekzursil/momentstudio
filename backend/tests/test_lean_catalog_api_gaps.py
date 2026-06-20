@@ -713,3 +713,344 @@ def test_unpublished_product_hidden_from_public(test_app: Dict[str, object]) -> 
     assert client.get(
         "/api/v1/catalog/products/draft-prod", headers=admin
     ).status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Related / upsell listings with real data (sale-inactive + lang branches)
+# ---------------------------------------------------------------------------
+
+
+def test_related_and_upsell_with_data(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "RelCat")
+    base = _create_product(client, admin, cat["id"], "rel-base", status="published")
+    sibling = _create_product(
+        client, admin, cat["id"], "rel-sibling", status="published"
+    )
+    upsell = _create_product(
+        client, admin, cat["id"], "rel-upsell", status="published"
+    )
+
+    # Configure distinct related + upsell relationships (overlapping ids are
+    # de-duplicated server-side in favour of "related", so use separate products).
+    res = client.put(
+        "/api/v1/catalog/products/rel-base/relationships",
+        json={
+            "related_product_ids": [sibling["id"]],
+            "upsell_product_ids": [upsell["id"]],
+        },
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+
+    # related: curated relationship products + lang + sale-inactive branch.
+    res = client.get("/api/v1/catalog/products/rel-base/related?lang=ro")
+    assert res.status_code == 200, res.text
+    assert any(p["slug"] == "rel-sibling" for p in res.json())
+
+    # upsell: curated upsell products + lang + sale-inactive branch.
+    res = client.get("/api/v1/catalog/products/rel-base/upsells?lang=ro")
+    assert res.status_code == 200, res.text
+    assert any(p["slug"] == "rel-upsell" for p in res.json())
+
+    # related fallback (no curated relationships) -> category-based siblings.
+    res = client.get("/api/v1/catalog/products/rel-sibling/related")
+    assert res.status_code == 200, res.text
+
+
+# ---------------------------------------------------------------------------
+# Featured collections with a product + collection-not-found
+# ---------------------------------------------------------------------------
+
+
+def test_featured_collection_with_product_and_404(
+    test_app: Dict[str, object]
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "CollCat")
+    product = _create_product(
+        client, admin, cat["id"], "coll-prod", status="published"
+    )
+
+    res = client.post(
+        "/api/v1/catalog/collections/featured",
+        json={"name": "Highlights", "product_ids": [product["id"]]},
+        headers=admin,
+    )
+    assert res.status_code == 201, res.text
+    slug = res.json()["slug"]
+
+    # list with lang -> exercises the per-product translation + sale branch.
+    res = client.get("/api/v1/catalog/collections/featured?lang=ro")
+    assert res.status_code == 200, res.text
+    assert any(c["slug"] == slug for c in res.json())
+
+    # update existing collection (success) + update missing (404).
+    res = client.patch(
+        f"/api/v1/catalog/collections/featured/{slug}",
+        json={"name": "Highlights 2"},
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+    res = client.patch(
+        "/api/v1/catalog/collections/featured/nope",
+        json={"name": "X"},
+        headers=admin,
+    )
+    assert res.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Recently-viewed with a recorded view (sale-inactive branch on a real item)
+# ---------------------------------------------------------------------------
+
+
+def test_recently_viewed_with_recorded_view(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "RvCat")
+    _create_product(client, admin, cat["id"], "rv-prod", status="published")
+
+    sid = "guest-session-xyz"
+    # Viewing a published product records it for the session.
+    assert (
+        client.get(f"/api/v1/catalog/products/rv-prod?session_id={sid}").status_code
+        == 200
+    )
+    # Recently-viewed now returns it -> exercises the loop + sale-inactive branch.
+    res = client.get(
+        f"/api/v1/catalog/products/recently-viewed?session_id={sid}&lang=ro"
+    )
+    assert res.status_code == 200, res.text
+    assert any(p["slug"] == "rv-prod" for p in res.json())
+
+
+# ---------------------------------------------------------------------------
+# Product image lifecycle success bodies (delete / sort / restore / translations)
+# ---------------------------------------------------------------------------
+
+
+def test_product_image_lifecycle_success(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "ImgLifeCat")
+    _create_product(client, admin, cat["id"], "imglife", status="published")
+
+    # Upload a real image so we have an image_id to operate on.
+    res = client.post(
+        "/api/v1/catalog/products/imglife/images",
+        files={"file": ("p.png", _png_bytes(), "image/png")},
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+    images = res.json()["images"]
+    assert images, res.text
+    image_id = images[0]["id"]
+
+    # sort (success body + audit source branch)
+    res = client.patch(
+        f"/api/v1/catalog/products/imglife/images/{image_id}/sort?sort_order=2&source=storefront",
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+
+    # image translation upsert (success) + list + stats + reprocess
+    res = client.put(
+        f"/api/v1/catalog/products/imglife/images/{image_id}/translations/ro?source=storefront",
+        json={"alt_text": "Imagine", "caption": "Subtitlu"},
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/imglife/images/{image_id}/translations",
+            headers=admin,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/imglife/images/{image_id}/stats", headers=admin
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/imglife/images/{image_id}/reprocess",
+            headers=admin,
+        ).status_code
+        == 200
+    )
+    # delete image translation (success)
+    res = client.delete(
+        f"/api/v1/catalog/products/imglife/images/{image_id}/translations/ro?source=storefront",
+        headers=admin,
+    )
+    assert res.status_code == 204, res.text
+
+    # delete the image (success body) then restore it (success body)
+    res = client.delete(
+        f"/api/v1/catalog/products/imglife/images/{image_id}", headers=admin
+    )
+    assert res.status_code == 200, res.text
+    res = client.get(
+        "/api/v1/catalog/products/imglife/images/deleted", headers=admin
+    )
+    assert res.status_code == 200, res.text
+    res = client.post(
+        f"/api/v1/catalog/products/imglife/images/{image_id}/restore", headers=admin
+    )
+    assert res.status_code == 200, res.text
+
+
+# ---------------------------------------------------------------------------
+# Review approval success body
+# ---------------------------------------------------------------------------
+
+
+def test_review_create_and_approve(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "RevCat")
+    _create_product(client, admin, cat["id"], "rev-prod", status="published")
+
+    res = client.post(
+        "/api/v1/catalog/products/rev-prod/reviews",
+        json={"author_name": "Reviewer", "rating": 4, "title": "Nice", "body": "Good"},
+    )
+    assert res.status_code == 201, res.text
+    review_id = res.json()["id"]
+
+    # approve the existing review (success) + a missing review id (404)
+    res = client.post(
+        f"/api/v1/catalog/products/rev-prod/reviews/{review_id}/approve", headers=admin
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["is_approved"] is True
+    res = client.post(
+        "/api/v1/catalog/products/rev-prod/reviews/00000000-0000-0000-0000-0000000000ff/approve",
+        headers=admin,
+    )
+    assert res.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Audit-source-omitted branches (category endpoints called WITHOUT ?source=)
+# ---------------------------------------------------------------------------
+
+
+def test_category_endpoints_without_audit_source(
+    test_app: Dict[str, object]
+) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+
+    res = client.post(
+        "/api/v1/catalog/categories", json={"name": "Plain"}, headers=admin
+    )
+    assert res.status_code == 201, res.text
+    slug = res.json()["slug"]
+
+    # update / translation upsert / translation delete / reorder / delete, no source
+    assert (
+        client.patch(
+            f"/api/v1/catalog/categories/{slug}",
+            json={"name": "Plain2"},
+            headers=admin,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            f"/api/v1/catalog/categories/{slug}/translations/ro",
+            json={"name": "Simplu"},
+            headers=admin,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.delete(
+            f"/api/v1/catalog/categories/{slug}/translations/ro", headers=admin
+        ).status_code
+        == 204
+    )
+    assert (
+        client.post(
+            "/api/v1/catalog/categories/reorder",
+            json=[{"slug": slug, "sort_order": 1}],
+            headers=admin,
+        ).status_code
+        == 200
+    )
+    assert (
+        client.delete(f"/api/v1/catalog/categories/{slug}", headers=admin).status_code
+        == 200
+    )
+
+
+# ---------------------------------------------------------------------------
+# Product CSV import: csv-required + decode-error branches
+# ---------------------------------------------------------------------------
+
+
+def test_product_csv_import_errors(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+
+    res = client.post(
+        "/api/v1/catalog/products/import",
+        files={"file": ("data.txt", b"x", "text/plain")},
+        headers=admin,
+    )
+    assert res.status_code == 400
+    res = client.post(
+        "/api/v1/catalog/products/import",
+        files={"file": ("data.csv", b"\xff\xfe\x00bad", "text/csv")},
+        headers=admin,
+    )
+    assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Categories list: anonymous (hidden filter) branch + a hidden category w/ lang
+# ---------------------------------------------------------------------------
+
+
+def test_categories_list_visibility_and_lang(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+
+    visible = _create_category(client, admin, "VisibleCat")
+    # A hidden category (is_visible=False) created via admin update.
+    hidden = _create_category(client, admin, "HiddenCat")
+    res = client.patch(
+        f"/api/v1/catalog/categories/{hidden['slug']}",
+        json={"is_visible": False},
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+
+    # Anonymous list with lang -> only visible categories, translation applied.
+    res = client.get("/api/v1/catalog/categories?lang=ro")
+    assert res.status_code == 200, res.text
+    slugs = {c["slug"] for c in res.json()}
+    assert visible["slug"] in slugs
+    assert hidden["slug"] not in slugs
+
+    # Staff list including hidden + lang -> hidden category appears, translated.
+    res = client.get(
+        "/api/v1/catalog/categories?lang=ro&include_hidden=true", headers=admin
+    )
+    assert res.status_code == 200, res.text
+    staff_slugs = {c["slug"] for c in res.json()}
+    assert hidden["slug"] in staff_slugs
