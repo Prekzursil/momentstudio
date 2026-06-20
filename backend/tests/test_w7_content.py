@@ -1393,6 +1393,45 @@ async def test_admin_edit_content_image_ok(session_factory, monkeypatch) -> None
 
 
 @pytest.mark.anyio("asyncio")
+async def test_admin_edit_content_image_no_content_block(
+    session_factory, monkeypatch
+) -> None:
+    # The edited result reports no content_block_id, so the content_key guard
+    # falls through to "" (the False branch of the content_block_id check).
+    from app.schemas.content import ContentImageEditRequest
+
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.editblk2")
+        img = await _seed_image(session, blk)
+        await session.commit()
+
+        edited = SimpleNamespace(
+            id=img.id,  # so the tag lookup query still resolves
+            root_image_id=None,
+            source_image_id=None,
+            url=img.url,
+            alt_text=img.alt_text,
+            sort_order=img.sort_order,
+            focal_x=50,
+            focal_y=50,
+            created_at=img.created_at,
+            content_block_id=None,
+        )
+
+        async def fake_edit(sess, *, image, payload, actor_id):
+            return edited
+
+        monkeypatch.setattr(c.content_service, "edit_image_asset", fake_edit)
+        out = await c.admin_edit_content_image(
+            image_id=img.id,
+            payload=ContentImageEditRequest(rotate_cw=90),
+            session=session,
+            admin=_user(),
+        )
+    assert out.content_key == ""
+
+
+@pytest.mark.anyio("asyncio")
 async def test_admin_get_content_image_usage_not_found(session_factory) -> None:
     async with session_factory() as session:
         with pytest.raises(HTTPException) as ei:
@@ -2759,3 +2798,107 @@ async def test_admin_rollback_content_version(monkeypatch) -> None:
         key="page.x", version=1, session=object(), admin=_user()
     )
     assert out.key == "page.about"
+
+
+# =========================================================================== #
+# Part 7: content_block_id=None defensive-guard arc for image asset handlers.
+# A persisted ContentImage can never have a NULL content_block_id (NOT NULL
+# constraint), but the handlers defend with getattr(..., None). A fake session
+# returns a fake image with content_block_id=None so the empty content_key arc
+# is exercised without an unreachable real-DB row.
+# =========================================================================== #
+class _FakeScalarResult:
+    def scalars(self):
+        return self
+
+    def all(self):
+        return []
+
+
+class _FakeImageSession:
+    def __init__(self, image):
+        self._image = image
+
+    async def scalar(self, *a, **k):
+        return self._image
+
+    async def execute(self, *a, **k):
+        return _FakeScalarResult()
+
+    def add(self, *a, **k):
+        return None
+
+    async def delete(self, *a, **k):
+        return None
+
+    async def commit(self, *a, **k):
+        return None
+
+
+def _fake_image_no_block():
+    return SimpleNamespace(
+        id=uuid4(),
+        content_block_id=None,
+        root_image_id=None,
+        source_image_id=None,
+        url="https://x/y.png",
+        alt_text="a",
+        sort_order=1,
+        focal_x=50,
+        focal_y=50,
+        created_at=datetime.now(timezone.utc),
+    )
+
+
+@pytest.mark.anyio("asyncio")
+async def test_update_content_image_no_content_block() -> None:
+    from app.schemas.content import ContentImageAssetUpdate
+
+    img = _fake_image_no_block()
+    out = await c.admin_update_content_image(
+        image_id=img.id,
+        payload=ContentImageAssetUpdate(alt_text="x"),
+        session=_FakeImageSession(img),
+        _=_user(),
+    )
+    assert out.content_key == ""
+
+
+@pytest.mark.anyio("asyncio")
+async def test_update_content_image_tags_no_content_block() -> None:
+    from app.schemas.content import ContentImageTagsUpdate
+
+    img = _fake_image_no_block()
+    out = await c.admin_update_content_image_tags(
+        image_id=img.id,
+        payload=ContentImageTagsUpdate(tags=[]),
+        session=_FakeImageSession(img),
+        _=_user(),
+    )
+    assert out.content_key == ""
+
+
+@pytest.mark.anyio("asyncio")
+async def test_update_content_image_focal_no_content_block() -> None:
+    from app.schemas.content import ContentImageFocalPointUpdate
+
+    img = _fake_image_no_block()
+    out = await c.admin_update_content_image_focal_point(
+        image_id=img.id,
+        payload=ContentImageFocalPointUpdate(focal_x=10, focal_y=20),
+        session=_FakeImageSession(img),
+        _=_user(),
+    )
+    assert out.content_key == ""
+
+
+@pytest.mark.anyio("asyncio")
+async def test_get_content_image_usage_no_content_block(monkeypatch) -> None:
+    img = _fake_image_no_block()
+    monkeypatch.setattr(c.content_service, "get_asset_usage_keys", _afn([]))
+    out = await c.admin_get_content_image_usage(
+        image_id=img.id,
+        session=_FakeImageSession(img),
+        _=_user(),
+    )
+    assert out.stored_in_key is None
