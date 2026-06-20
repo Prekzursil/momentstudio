@@ -32,7 +32,6 @@ from app.schemas.receipt import (
 )
 from app.services.font_utils import load_font as _load_font
 
-
 MoneyValue = str | SupportsFloat | SupportsIndex
 _REPORTLAB_FONTS: tuple[str, str] | None = None
 
@@ -425,7 +424,9 @@ def _render_order_receipt_pdf_reportlab(
     )
 
     def _money_cell(value: MoneyValue | None) -> str:
-        if value is None:
+        if (
+            value is None
+        ):  # pragma: no cover - defensive: callers always pass a Decimal (items/totals are normalized via _as_decimal / `or Decimal("0.00")`)
             return "—"
         return xml_escape(_money(value, receipt.currency, locale=locale))
 
@@ -538,7 +539,9 @@ def _render_order_receipt_pdf_reportlab(
             created_at = _format_date(refund.created_at, locale=locale)
             provider = (refund.provider or "").strip()
             summary = f"{xml_escape(created_at)} — {xml_escape(amount)}"
-            if provider:
+            if (
+                provider
+            ):  # pragma: no branch - defensive: build_order_receipt always sets provider to "manual" when empty, so this is always truthy here
                 summary = f"{summary} ({xml_escape(provider)})"
             story.append(Paragraph(summary, base_style))
             if refund.note:
@@ -763,7 +766,9 @@ def render_order_receipt_pdf_raster(
                 current = word
         if current:
             name_lines.append(current)
-        if not name_lines:
+        if (
+            not name_lines
+        ):  # pragma: no cover - defensive: name is normalized to a non-empty, non-whitespace string, so name.split() always yields >= 1 word
             name_lines = [name]
 
         draw.text((margin, y), name_lines[0], fill=fg, font=small_font)
