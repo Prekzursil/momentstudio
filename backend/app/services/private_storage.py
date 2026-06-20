@@ -138,7 +138,7 @@ def save_private_bytes(
     destination = (dest_dir / safe_name).resolve()
     try:
         destination.relative_to(dest_dir)
-    except ValueError:
+    except ValueError:  # pragma: no cover - defensive; Path(...).name strips traversal
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
         )
