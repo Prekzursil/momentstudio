@@ -611,3 +611,95 @@ async def test_purge_expired_trash(media_roots) -> None:
     async with local() as session:
         purged = await md.purge_expired_trash(session)
         assert purged == 1
+
+
+@pytest.mark.anyio
+async def test_enqueue_job_with_snapshot_and_max_attempts() -> None:
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        # payload carries a retry-policy snapshot (policy_snapshot not None branch)
+        # and max_attempts override is applied.
+        job = await md.enqueue_job(
+            session,
+            asset_id=None,
+            job_type=MediaJobType.ingest,
+            payload={
+                md.RETRY_POLICY_PAYLOAD_KEY: {
+                    "max_attempts": 7,
+                    "schedule": [1, 2],
+                    "jitter_ratio": 0.3,
+                    "enabled": True,
+                    "version_ts": "snap",
+                }
+            },
+            created_by_user_id=None,
+            max_attempts=3,
+        )
+        await session.commit()
+        assert job.max_attempts == 3
+
+
+@pytest.mark.anyio
+async def test_queue_job_and_await_if_needed(monkeypatch) -> None:
+    # _await_if_needed: sync value passthrough + awaitable resolution
+    assert await md._await_if_needed(5) == 5
+
+    async def _coro():
+        return 9
+
+    assert await md._await_if_needed(_coro()) == 9
+
+    # queue_job with a fake redis present -> rpush path
+    pushed = {}
+
+    class _FakeRedis:
+        def rpush(self, key, value):
+            pushed["key"] = key
+            pushed["value"] = value
+            return 1
+
+    monkeypatch.setattr(md, "get_redis", lambda: _FakeRedis())
+    job_id = uuid.uuid4()
+    await md.queue_job(job_id)
+    assert pushed["value"] == str(job_id)
+
+    # _maybe_queue_job with no redis -> early return
+    monkeypatch.setattr(md, "get_redis", lambda: None)
+    await md._maybe_queue_job(uuid.uuid4())
+
+
+@pytest.mark.anyio
+async def test_create_asset_from_upload(media_roots, monkeypatch) -> None:
+    public, private = media_roots
+    engine, local = _make_local()
+    await _init(engine)
+
+    # Stage a temp file that save_upload "produced".
+    temp_path = public / "tmp_upload.png"
+    temp_path.write_bytes(b"PNGDATA")
+
+    def _fake_save_upload(file, **kwargs):
+        return "/media/tmp_upload.png", {}
+
+    monkeypatch.setattr(md.storage, "save_upload", _fake_save_upload)
+    monkeypatch.setattr(md.storage, "media_url_to_path", lambda url: temp_path)
+
+    async def _noop_queue(job_id):
+        return None
+
+    monkeypatch.setattr(md, "_maybe_queue_job", _noop_queue)
+
+    class _Upload:
+        filename = "picture.png"
+        content_type = "image/png"
+
+    async with local() as session:
+        resp = await md.create_asset_from_upload(
+            session,
+            file=_Upload(),
+            created_by_user_id=uuid.uuid4(),
+            visibility=MediaVisibility.private,
+        )
+        assert resp.asset.original_filename == "picture.png"
+        assert resp.ingest_job_id is not None
