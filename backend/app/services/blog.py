@@ -324,7 +324,7 @@ async def list_published_posts(
     for block in blocks:
         _apply_translation(block, lang)
 
-    if query_text or tag_text or series_text:
+    if query_text or tag_text or series_text:  # pragma: no branch -- guarded above: line 283 returns early when all three are empty, so this is always True here
         filtered: list[ContentBlock] = []
         for block in blocks:
             meta = getattr(block, "meta", None) or {}
@@ -628,7 +628,7 @@ async def list_comment_threads(
             .order_by(BlogComment.created_at.asc(), BlogComment.id.asc())
         )
         for reply in replies_result.scalars().unique():
-            if reply.parent_id:
+            if reply.parent_id:  # pragma: no branch -- defensive: query filters parent_id IN (root_ids), so parent_id is always non-null here
                 replies_by_parent.setdefault(reply.parent_id, []).append(reply)
 
     threads: list[tuple[BlogComment, list[BlogComment]]] = []
@@ -692,7 +692,7 @@ async def list_user_comments(
             .group_by(BlogComment.parent_id)
         )
         for parent_id, cnt in counts_rows.all():
-            if parent_id:
+            if parent_id:  # pragma: no branch -- defensive: grouped over rows where parent_id IN (comment_ids), so parent_id is always non-null here
                 reply_counts[parent_id] = int(cnt or 0)
 
         reply_rows = await session.execute(

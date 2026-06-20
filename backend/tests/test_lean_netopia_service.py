@@ -23,7 +23,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
-from fastapi import HTTPException, status
+from fastapi import HTTPException
 
 from app.core.config import settings
 from app.services import netopia as ns
