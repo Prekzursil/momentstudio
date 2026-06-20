@@ -114,6 +114,27 @@ async def test_secondary_email_full_flow(session_factory) -> None:
             await svc.confirm_secondary_email_verification(session, new_token.token)
 
 
+async def test_request_secondary_verification_no_existing_tokens(
+    session_factory,
+) -> None:
+    """A secondary with no outstanding tokens exercises the empty-revoke exit."""
+    from app.models.user import UserSecondaryEmail
+
+    async with session_factory() as session:
+        user = await _new_user(session)
+        secondary = UserSecondaryEmail(
+            user_id=user.id, email="notoken@x.io", verified=False
+        )
+        session.add(secondary)
+        await session.commit()
+        await session.refresh(secondary)
+
+        token = await svc.request_secondary_email_verification(
+            session, user, secondary.id
+        )
+        assert token.secondary_email_id == secondary.id
+
+
 async def test_request_secondary_verification_guards(session_factory) -> None:
     async with session_factory() as session:
         user = await _new_user(session)
@@ -301,6 +322,21 @@ async def test_email_lookup_helpers(session_factory) -> None:
         assert (
             await svc.get_user_by_login_email(session, user.email)
         ).id == user.id
+
+
+async def test_get_user_by_google_sub(session_factory) -> None:
+    async with session_factory() as session:
+        gu = await svc.create_google_user(
+            session,
+            email=f"sub-{uuid.uuid4().hex[:6]}@x.io",
+            name="G",
+            picture=None,
+            sub="lookup-sub-1",
+            email_verified=True,
+        )
+        found = await svc.get_user_by_google_sub(session, "lookup-sub-1")
+        assert found.id == gu.id
+        assert await svc.get_user_by_google_sub(session, "no-sub") is None
 
 
 async def test_owner_helpers(session_factory) -> None:
@@ -546,6 +582,9 @@ async def test_authenticate_user_locked_and_reset_required(session_factory) -> N
         locked.locked_until = datetime.now(timezone.utc) + timedelta(hours=1)
         session.add(locked)
         await session.commit()
+        # Re-load so locked_until comes back tz-naive (SQLite) and exercises the
+        # tzinfo coercion branch in authenticate_user.
+        session.expunge_all()
         with pytest.raises(HTTPException) as lk:
             await svc.authenticate_user(session, locked.email, "password1")
         assert lk.value.status_code == 403
@@ -771,6 +810,31 @@ async def test_complete_google_registration(session_factory) -> None:
         )
         assert svc.is_profile_complete(completed) is True
         assert completed.preferred_language == "ro"
+
+        # A separate Google user completing with the SAME username and display
+        # name it already has skips the rename blocks (371->386, 392->412) and
+        # omits preferred_language (417->420).
+        gu2 = await svc.create_google_user(
+            session,
+            email=f"goog2-{uuid.uuid4().hex[:6]}@x.io",
+            name="Keep Name",
+            picture=None,
+            sub=f"sub-{uuid.uuid4().hex[:6]}",
+            email_verified=True,
+        )
+        completed2 = await svc.complete_google_registration(
+            session,
+            gu2,
+            username=gu2.username,
+            display_name=gu2.name,
+            first_name="Keep",
+            last_name="Name",
+            middle_name=None,
+            date_of_birth=date(1998, 2, 2),
+            phone="+40723204209",
+            password="password1",
+        )
+        assert svc.is_profile_complete(completed2) is True
 
         # Already complete -> rejected.
         with pytest.raises(HTTPException) as done:
@@ -1026,6 +1090,8 @@ async def test_issue_tokens_locked_and_reset_required(session_factory) -> None:
         locked.locked_until = datetime.now(timezone.utc) + timedelta(hours=1)
         session.add(locked)
         await session.commit()
+        session.expunge_all()
+        locked = await session.get(type(locked), locked.id)
         with pytest.raises(HTTPException) as lk:
             await svc.issue_tokens_for_user(session, locked)
         assert lk.value.status_code == 403
