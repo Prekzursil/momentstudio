@@ -69,12 +69,15 @@ from app.schemas.content import (
     ContentTranslationStatusUpdate,
     ContentFindReplacePreviewRequest,
     ContentFindReplaceApplyRequest,
+    ContentFindReplaceApplyError,
+    ContentFindReplacePreviewItem,
     ContentFindReplacePreviewResponse,
     ContentFindReplaceApplyResponse,
     HomePreviewResponse,
     SitemapPreviewResponse,
     StructuredDataValidationResponse,
 )
+from app.schemas.catalog import PaginationMeta
 from app.schemas.media import (
     MediaApproveRequest,
     MediaAssetListResponse,
@@ -217,7 +220,7 @@ async def get_static_page(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.get("/pages/{slug}/preview", response_model=ContentBlockRead)
@@ -246,7 +249,7 @@ async def preview_static_page(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
         )
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.post("/pages/{slug}/preview-token", response_model=ContentPreviewTokenResponse)
@@ -314,7 +317,7 @@ async def get_content(
         out = ContentBlockRead.model_validate(block)
         out.meta = hydrated_meta
         return out
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.get("/home/preview", response_model=HomePreviewResponse)
@@ -340,7 +343,10 @@ async def preview_home(
         )
 
     story = await content_service.get_block_by_key(session, "home.story", lang=lang)
-    return HomePreviewResponse(sections=sections, story=story)
+    return HomePreviewResponse(
+        sections=ContentBlockRead.model_validate(sections),
+        story=ContentBlockRead.model_validate(story) if story is not None else None,
+    )
 
 
 @router.post("/home/preview-token", response_model=ContentPreviewTokenResponse)
@@ -481,12 +487,12 @@ async def admin_list_scheduling(
 
     return ContentSchedulingListResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=PaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -563,12 +569,12 @@ async def admin_list_redirects(
 
     return ContentRedirectListResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=PaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -780,7 +786,7 @@ async def admin_import_redirects(
     redirect_map = {
         from_key: to_key for from_key, to_key in existing_rows if from_key and to_key
     }
-    for _, from_key, to_key in rows:
+    for _line_no, from_key, to_key in rows:
         redirect_map[from_key] = to_key
 
     loop_keys: set[str] = set()
@@ -824,7 +830,7 @@ async def admin_import_redirects(
     )
     existing_by_key = {r.from_key: r for r in existing}
 
-    for from_key, (_, to_key) in unique_rows.items():
+    for from_key, (_line_no, to_key) in unique_rows.items():
         row = existing_by_key.get(from_key)
         if row:
             if row.to_key == to_key:
@@ -861,7 +867,7 @@ async def admin_validate_structured_data(
     _: User = Depends(require_admin_section("content")),
 ) -> StructuredDataValidationResponse:
     payload = await structured_data_service.validate_structured_data(session)
-    return StructuredDataValidationResponse(**payload)
+    return StructuredDataValidationResponse.model_validate(payload)
 
 
 @router.delete("/admin/redirects/{redirect_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -894,7 +900,7 @@ async def admin_get_content(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
         )
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.patch("/admin/{key}", response_model=ContentBlockRead)
@@ -905,7 +911,7 @@ async def admin_update_content(
     admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
     block = await content_service.upsert_block(session, key, payload, actor_id=admin.id)
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.delete("/admin/{key}", status_code=status.HTTP_204_NO_CONTENT)
@@ -945,7 +951,7 @@ async def admin_create_content(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Content key exists"
         )
     block = await content_service.upsert_block(session, key, payload, actor_id=admin.id)
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.post("/admin/{key}/images", response_model=ContentBlockRead)
@@ -962,7 +968,7 @@ async def admin_upload_content_image(
         create_payload = ContentBlockCreate(
             title=key,
             body_markdown="Asset bucket",
-            status="draft",
+            status=ContentStatus.draft,
             lang=lang,
             meta={},
         )
@@ -970,7 +976,7 @@ async def admin_upload_content_image(
             session, key, create_payload, actor_id=admin.id
         )
     block = await content_service.add_image(session, block, file, actor_id=admin.id)
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.get("/admin/assets/images", response_model=ContentImageAssetListResponse)
@@ -1088,12 +1094,12 @@ async def admin_list_content_images(
         )
     return ContentImageAssetListResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=PaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -2228,7 +2234,7 @@ async def admin_find_replace_preview(
         limit=payload.limit,
     )
     return ContentFindReplacePreviewResponse(
-        items=items,
+        items=[ContentFindReplacePreviewItem.model_validate(item) for item in items],
         total_items=total_items,
         total_matches=total_matches,
         truncated=truncated,
@@ -2260,7 +2266,7 @@ async def admin_find_replace_apply(
         updated_blocks=updated_blocks,
         updated_translations=updated_translations,
         total_replacements=total_replacements,
-        errors=errors,
+        errors=[ContentFindReplaceApplyError.model_validate(err) for err in errors],
     )
 
 
@@ -2306,7 +2312,7 @@ async def admin_update_translation_status(
     block = await content_service.set_translation_status(
         session, key=key, payload=payload, actor_id=admin.id
     )
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.post("/admin/pages/{slug}/rename", response_model=ContentPageRenameResponse)
@@ -2343,7 +2349,7 @@ async def admin_preview_content(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
         )
-    return block
+    return ContentBlockRead.model_validate(block)
 
 
 @router.get("/admin/{key}/audit", response_model=list[ContentAuditRead])
@@ -2357,7 +2363,7 @@ async def admin_list_content_audit(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Content not found"
         )
-    return block.audits
+    return [ContentAuditRead.model_validate(audit) for audit in block.audits]
 
 
 @router.get("/admin/{key}/versions", response_model=list[ContentBlockVersionListItem])
@@ -2376,7 +2382,10 @@ async def admin_list_content_versions(
         .where(ContentBlockVersion.content_block_id == block.id)
         .order_by(ContentBlockVersion.version.desc())
     )
-    return list(result.scalars().all())
+    return [
+        ContentBlockVersionListItem.model_validate(row)
+        for row in result.scalars().all()
+    ]
 
 
 @router.get("/admin/{key}/versions/{version}", response_model=ContentBlockVersionRead)
@@ -2402,7 +2411,7 @@ async def admin_get_content_version(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Version not found"
         )
-    return row
+    return ContentBlockVersionRead.model_validate(row)
 
 
 @router.post(
@@ -2414,6 +2423,7 @@ async def admin_rollback_content_version(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("content")),
 ) -> ContentBlockRead:
-    return await content_service.rollback_to_version(
+    block = await content_service.rollback_to_version(
         session, key=key, version=version, actor_id=admin.id
     )
+    return ContentBlockRead.model_validate(block)
