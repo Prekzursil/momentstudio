@@ -383,7 +383,7 @@ async def compute_cart_vat_amount(
 
     vat_total = Decimal("0.00")
     for rate, base in base_by_rate.items():
-        if base <= 0 or rate <= 0:
+        if base <= 0 or rate <= 0:  # pragma: no cover - defensive; only positive (base, rate) pairs are inserted above
             continue
         vat_total += pricing.quantize_money(
             base * Decimal(rate) / Decimal("100"), rounding=rounding
