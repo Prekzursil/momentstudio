@@ -343,7 +343,7 @@ async def create_order_itemized(
                 "currency_code": currency,
                 "value": _format_amount(discount_converted),
             }
-        if breakdown:
+        if breakdown:  # pragma: no branch -- breakdown is always populated here: reaching this block requires a non-None amount field, and any positive amount that survives the total>0 guard above also adds a breakdown entry
             amount["breakdown"] = breakdown
 
     payload: dict[str, Any] = {
