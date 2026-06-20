@@ -220,7 +220,7 @@ async def create_my_ticket(
     hydrated = await support_service.get_contact_submission_with_messages(
         session, record.id
     )
-    if not hydrated:
+    if not hydrated:  # pragma: no cover - defensive; record was just committed above
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
         )
@@ -361,7 +361,7 @@ async def admin_submit_feedback(
     hydrated = await support_service.get_contact_submission_with_messages(
         session, record.id
     )
-    if not hydrated:
+    if not hydrated:  # pragma: no cover - defensive; record was just committed above
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
         )
@@ -497,7 +497,7 @@ async def admin_update_contact_submission(
     hydrated = await support_service.get_contact_submission_with_messages(
         session, updated.id
     )
-    if not hydrated:
+    if not hydrated:  # pragma: no cover - defensive; submission was just updated above
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
         )
