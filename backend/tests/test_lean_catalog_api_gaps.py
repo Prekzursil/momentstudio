@@ -725,7 +725,7 @@ def test_related_and_upsell_with_data(test_app: Dict[str, object]) -> None:
     SessionLocal = test_app["session_factory"]
     admin = auth_headers(create_admin_token(SessionLocal))
     cat = _create_category(client, admin, "RelCat")
-    base = _create_product(client, admin, cat["id"], "rel-base", status="published")
+    _create_product(client, admin, cat["id"], "rel-base", status="published")
     sibling = _create_product(
         client, admin, cat["id"], "rel-sibling", status="published"
     )
@@ -1054,3 +1054,140 @@ def test_categories_list_visibility_and_lang(test_app: Dict[str, object]) -> Non
     assert res.status_code == 200, res.text
     staff_slugs = {c["slug"] for c in res.json()}
     assert hidden["slug"] in staff_slugs
+
+    # No-lang list -> exercises the lang-falsy branch (skips translation loop).
+    assert client.get("/api/v1/catalog/categories").status_code == 200
+
+
+def test_categories_list_lang_with_no_results(test_app: Dict[str, object]) -> None:
+    # lang set but zero categories -> the `if lang:` loop is entered with an
+    # empty iterable, covering the lang-truthy/empty-loop branch.
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    res = client.get("/api/v1/catalog/categories?lang=ro")
+    assert res.status_code == 200
+    assert res.json() == []
+
+
+# ---------------------------------------------------------------------------
+# Active-sale products keep their sale_price across all sale-aware listings
+# ---------------------------------------------------------------------------
+
+
+def test_active_sale_branches(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "SaleCat")
+
+    from datetime import datetime, timedelta, timezone
+
+    now = datetime.now(timezone.utc)
+    sale_extra = {
+        "status": "published",
+        "base_price": 100.0,
+        "sale_type": "percent",
+        "sale_value": 20,
+        "sale_start_at": (now - timedelta(days=1)).isoformat(),
+        "sale_end_at": (now + timedelta(days=1)).isoformat(),
+    }
+    base = _create_product(client, admin, cat["id"], "sale-base", **sale_extra)
+    sib = _create_product(client, admin, cat["id"], "sale-sib", **sale_extra)
+    ups = _create_product(client, admin, cat["id"], "sale-ups", **sale_extra)
+    assert base["sale_price"] is not None
+
+    # featured collection containing an on-sale product (sale-active branch)
+    res = client.post(
+        "/api/v1/catalog/collections/featured",
+        json={"name": "SaleColl", "product_ids": [base["id"]]},
+        headers=admin,
+    )
+    assert res.status_code == 201, res.text
+    coll = client.get("/api/v1/catalog/collections/featured").json()
+    sale_coll = next(c for c in coll if c["name"] == "SaleColl")
+    assert sale_coll["products"][0]["sale_price"] is not None
+
+    # recently-viewed of an on-sale product (sale-active branch). Use a
+    # standalone on-sale product (not in a collection / no relationships) to
+    # keep the ProductRead serialization free of unloaded nested relationships.
+    rv_prod = _create_product(client, admin, cat["id"], "sale-rv", **sale_extra)
+    assert rv_prod["sale_price"] is not None
+    sid = "sale-session"
+    assert (
+        client.get(f"/api/v1/catalog/products/sale-rv?session_id={sid}").status_code
+        == 200
+    )
+    rv = client.get(f"/api/v1/catalog/products/recently-viewed?session_id={sid}")
+    assert rv.status_code == 200, rv.text
+    assert any(p["sale_price"] is not None for p in rv.json())
+
+    # related + upsell of on-sale products (sale-active branch)
+    res = client.put(
+        "/api/v1/catalog/products/sale-base/relationships",
+        json={"related_product_ids": [sib["id"]], "upsell_product_ids": [ups["id"]]},
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+    rel = client.get("/api/v1/catalog/products/sale-base/related").json()
+    assert any(p["sale_price"] is not None for p in rel)
+    up = client.get("/api/v1/catalog/products/sale-base/upsells").json()
+    assert any(p["sale_price"] is not None for p in up)
+
+
+# ---------------------------------------------------------------------------
+# Merge without audit source + duplicate product + audit None payload
+# ---------------------------------------------------------------------------
+
+
+def test_merge_without_source_and_duplicate(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+
+    a = _create_category(client, admin, "MergeA")
+    b = _create_category(client, admin, "MergeB")
+
+    # merge WITHOUT ?source= -> audit-source-falsy branch (674->688 skip)
+    res = client.post(
+        f"/api/v1/catalog/categories/{a['slug']}/merge",
+        json={"target_slug": b["slug"]},
+        headers=admin,
+    )
+    assert res.status_code == 200, res.text
+
+    # duplicate a product (success body)
+    cat = _create_category(client, admin, "DupCat")
+    _create_product(client, admin, cat["id"], "dup-src", status="published")
+    res = client.post(
+        "/api/v1/catalog/products/dup-src/duplicate?source=storefront", headers=admin
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_audit_listing_with_null_payload(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "NullAuditCat")
+    product = _create_product(client, admin, cat["id"], "null-audit")
+
+    async def _seed() -> None:
+        from uuid import UUID
+
+        from app.models.catalog import ProductAuditLog
+
+        async with SessionLocal() as session:
+            session.add(
+                ProductAuditLog(
+                    product_id=UUID(product["id"]),
+                    user_id=None,
+                    action="catalog.product.touch",
+                    payload=None,  # falsy payload -> skips the json.loads branch
+                )
+            )
+            await session.commit()
+
+    asyncio.run(_seed())
+    res = client.get("/api/v1/catalog/products/null-audit/audit", headers=admin)
+    assert res.status_code == 200, res.text
+    entry = next(e for e in res.json() if e["action"] == "catalog.product.touch")
+    assert entry["payload"] is None

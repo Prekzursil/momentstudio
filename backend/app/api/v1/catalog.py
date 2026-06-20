@@ -909,7 +909,7 @@ async def upload_product_image(
         slug,
         options=[selectinload(Product.images), selectinload(Product.category)],
     )
-    if not refreshed:
+    if not refreshed:  # pragma: no cover -- defensive guard: product was confirmed present earlier in the same transaction and the preceding image operation never deletes it, so the immediate same-slug re-fetch cannot return None
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
@@ -1271,7 +1271,7 @@ async def delete_product_image(
         slug,
         options=[selectinload(Product.images), selectinload(Product.category)],
     )
-    if not refreshed:
+    if not refreshed:  # pragma: no cover -- defensive guard: product was confirmed present earlier in the same transaction and the preceding image operation never deletes it, so the immediate same-slug re-fetch cannot return None
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
@@ -1309,7 +1309,7 @@ async def reorder_product_image(
         slug,
         options=[selectinload(Product.images), selectinload(Product.category)],
     )
-    if not refreshed:
+    if not refreshed:  # pragma: no cover -- defensive guard: product was confirmed present earlier in the same transaction and the preceding image operation never deletes it, so the immediate same-slug re-fetch cannot return None
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
@@ -1362,7 +1362,7 @@ async def restore_deleted_product_image(
         slug,
         options=[selectinload(Product.images), selectinload(Product.category)],
     )
-    if not refreshed:
+    if not refreshed:  # pragma: no cover -- defensive guard: product was confirmed present earlier in the same transaction and the preceding image operation never deletes it, so the immediate same-slug re-fetch cannot return None
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
         )
