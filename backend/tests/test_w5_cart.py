@@ -182,9 +182,7 @@ def test_promo_requires_authentication(test_app: Dict[str, object]) -> None:
     assert res.status_code == 403, res.text
 
 
-def test_promo_applied_via_coupons(
-    test_app: Dict[str, object], monkeypatch
-) -> None:
+def test_promo_applied_via_coupons(test_app: Dict[str, object], monkeypatch) -> None:
     """Authenticated user, coupon applies cleanly -> totals_override path (line 80).
 
     Also drives the shipping-rate Decimal coercion (lines 59-68) by passing a
