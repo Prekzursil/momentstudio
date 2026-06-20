@@ -52,9 +52,7 @@ async def test_run_once_uses_configured_batch_limit(monkeypatch) -> None:
     recorder: list[str] = []
     seen: dict[str, object] = {}
 
-    monkeypatch.setattr(
-        scheduler, "SessionLocal", lambda: _FakeSession(recorder)
-    )
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: _FakeSession(recorder))
     monkeypatch.setattr(
         scheduler.settings, "account_deletion_batch_limit", 50, raising=False
     )
@@ -80,9 +78,7 @@ async def test_run_once_falls_back_to_default_limit(monkeypatch) -> None:
     recorder: list[str] = []
     seen: dict[str, int] = {}
 
-    monkeypatch.setattr(
-        scheduler, "SessionLocal", lambda: _FakeSession(recorder)
-    )
+    monkeypatch.setattr(scheduler, "SessionLocal", lambda: _FakeSession(recorder))
     # ``0`` is falsy -> ``or 200`` kicks in, then ``max(1, 200)``.
     monkeypatch.setattr(
         scheduler.settings, "account_deletion_batch_limit", 0, raising=False
@@ -279,9 +275,7 @@ def test_start_creates_task(monkeypatch) -> None:
         captured["stop"] = stop
         captured["work"] = work
 
-    monkeypatch.setattr(
-        scheduler.leader_lock, "run_as_leader", fake_run_as_leader
-    )
+    monkeypatch.setattr(scheduler.leader_lock, "run_as_leader", fake_run_as_leader)
 
     class _FakeTask:
         def __init__(self, coro: object) -> None:

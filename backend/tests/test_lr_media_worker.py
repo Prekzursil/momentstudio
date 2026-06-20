@@ -113,10 +113,14 @@ async def test_enqueue_due_retries_error(session_factory, monkeypatch) -> None:
 async def test_process_queued_jobs(session_factory, monkeypatch) -> None:
     async with session_factory() as session:
         session.add(
-            MediaJob(job_type=MediaJobType.usage_reconcile, status=MediaJobStatus.queued)
+            MediaJob(
+                job_type=MediaJobType.usage_reconcile, status=MediaJobStatus.queued
+            )
         )
         session.add(
-            MediaJob(job_type=MediaJobType.usage_reconcile, status=MediaJobStatus.queued)
+            MediaJob(
+                job_type=MediaJobType.usage_reconcile, status=MediaJobStatus.queued
+            )
         )
         await session.commit()
 
@@ -401,8 +405,6 @@ async def test_run_worker_redis_mode_skips_sweep_and_empty_candidate(
 
 @pytest.mark.anyio
 async def test_run_worker_redis_mode_loop_error(monkeypatch) -> None:
-    state = {"i": 0}
-
     class _Redis:
         async def set(self, *a, **k):  # noqa: ANN002, ANN003
             return None

@@ -172,7 +172,9 @@ def _make_user(
         async with factory() as session:
             user = await create_user(
                 session,
-                UserCreate(email=email, password="password123", name=email.split("@")[0]),
+                UserCreate(
+                    email=email, password="password123", name=email.split("@")[0]
+                ),
             )
             user.role = role
             user.email_verified = True
@@ -215,7 +217,9 @@ def _make_post(
                 version=1,
                 lang="en",
                 published_at=(
-                    datetime.now(timezone.utc) - timedelta(days=1) if published else None
+                    datetime.now(timezone.utc) - timedelta(days=1)
+                    if published
+                    else None
                 ),
                 **fields,
             )
@@ -277,7 +281,7 @@ def test_get_post_already_viewed_skips_count(test_app):
 def test_get_post_stale_cookie_pruned(test_app):
     client = test_app["client"]
     factory = test_app["session_factory"]
-    post_id = _make_post(factory)
+    _make_post(factory)
     other = "12345678-1234-5678-1234-567812345678"
     old_ts = int(time.time()) - blog_api.BLOG_VIEW_COOKIE_TTL_SECONDS - 10
     cookie = blog_api._encode_view_cookie([(other, old_ts)])
@@ -423,9 +427,7 @@ def test_neighbors_404(test_app):
 
 def test_preview_invalid_token(test_app):
     client = test_app["client"]
-    res = client.get(
-        "/api/v1/blog/posts/first-post/preview", params={"token": "bogus"}
-    )
+    res = client.get("/api/v1/blog/posts/first-post/preview", params={"token": "bogus"})
     assert res.status_code == 403
 
 
@@ -437,9 +439,7 @@ def test_preview_valid_token(test_app):
         content_key="blog.first-post",
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
     )
-    res = client.get(
-        "/api/v1/blog/posts/first-post/preview", params={"token": token}
-    )
+    res = client.get("/api/v1/blog/posts/first-post/preview", params={"token": token})
     assert res.status_code == 200
 
 
@@ -469,9 +469,7 @@ def test_create_preview_token_missing_post(test_app):
     client = test_app["client"]
     factory = test_app["session_factory"]
     _, admin = _make_user(factory, email="admin2@example.com", role=UserRole.admin)
-    res = client.post(
-        "/api/v1/blog/posts/gone/preview-token", headers=_auth(admin)
-    )
+    res = client.post("/api/v1/blog/posts/gone/preview-token", headers=_auth(admin))
     assert res.status_code == 404
 
 
@@ -531,9 +529,7 @@ def test_og_preview_post_missing(test_app):
         content_key="blog.gone",
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
     )
-    res = client.get(
-        "/api/v1/blog/posts/gone/og-preview.png", params={"token": token}
-    )
+    res = client.get("/api/v1/blog/posts/gone/og-preview.png", params={"token": token})
     assert res.status_code == 404
 
 
@@ -756,7 +752,6 @@ def test_create_comment_smtp_self_skip_branches(test_app, monkeypatch):
         headers=_auth(admin_token),
     )
     assert root.status_code == 201, root.text
-    root_id = root.json()["id"]
 
     # A parent author who does NOT want reply notifications.
     _, quiet_parent = _make_user(
@@ -858,9 +853,7 @@ def test_create_comment_admin_blank_email_skipped(test_app, monkeypatch):
     client = test_app["client"]
     factory = test_app["session_factory"]
     _make_post(factory)
-    _insert_blank_email_user(
-        factory, role=UserRole.admin, notify_blog_comments=True
-    )
+    _insert_blank_email_user(factory, role=UserRole.admin, notify_blog_comments=True)
     _, user = _make_user(factory, email="commenter9@example.com")
     res = client.post(
         "/api/v1/blog/posts/first-post/comments",
@@ -971,9 +964,7 @@ def test_admin_flag_hide_unhide_resolve(test_app):
     )
     _, admin = _make_user(factory, email="modadmin@example.com", role=UserRole.admin)
 
-    listed = client.get(
-        "/api/v1/blog/admin/comments/flagged", headers=_auth(admin)
-    )
+    listed = client.get("/api/v1/blog/admin/comments/flagged", headers=_auth(admin))
     assert listed.status_code == 200
 
     hide = client.post(

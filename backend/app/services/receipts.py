@@ -539,9 +539,7 @@ def _render_order_receipt_pdf_reportlab(
             created_at = _format_date(refund.created_at, locale=locale)
             provider = (refund.provider or "").strip()
             summary = f"{xml_escape(created_at)} — {xml_escape(amount)}"
-            if (
-                provider
-            ):  # pragma: no branch - defensive: build_order_receipt always sets provider to "manual" when empty, so this is always truthy here
+            if provider:  # pragma: no branch - defensive: build_order_receipt always sets provider to "manual" when empty, so this is always truthy here
                 summary = f"{summary} ({xml_escape(provider)})"
             story.append(Paragraph(summary, base_style))
             if refund.note:
@@ -766,9 +764,7 @@ def render_order_receipt_pdf_raster(
                 current = word
         if current:
             name_lines.append(current)
-        if (
-            not name_lines
-        ):  # pragma: no cover - defensive: name is normalized to a non-empty, non-whitespace string, so name.split() always yields >= 1 word
+        if not name_lines:  # pragma: no cover - defensive: name is normalized to a non-empty, non-whitespace string, so name.split() always yields >= 1 word
             name_lines = [name]
 
         draw.text((margin, y), name_lines[0], fill=fg, font=small_font)

@@ -163,7 +163,9 @@ async def test_simulate_shipping_free_over_threshold(
 # Webhook status helper + listing                                             #
 # --------------------------------------------------------------------------- #
 def test_webhook_status_helper() -> None:
-    assert ops_service._webhook_status(processed_at=None, last_error=" boom ") == "failed"
+    assert (
+        ops_service._webhook_status(processed_at=None, last_error=" boom ") == "failed"
+    )
     assert (
         ops_service._webhook_status(processed_at=_now(), last_error=None) == "processed"
     )
@@ -210,7 +212,9 @@ async def test_get_webhook_detail_validation_and_lookup(session_factory) -> None
         assert bad_provider.value.status_code == 400
 
         with pytest.raises(HTTPException) as missing_id:
-            await ops_service.get_webhook_detail(session, provider="stripe", event_id=" ")
+            await ops_service.get_webhook_detail(
+                session, provider="stripe", event_id=" "
+            )
         assert missing_id.value.status_code == 400
 
         with pytest.raises(HTTPException) as not_found_s:
@@ -321,9 +325,7 @@ async def test_retry_webhook_validation(session_factory) -> None:
     bg = BackgroundTasks()
     async with session_factory() as session:
         with pytest.raises(HTTPException) as bad_provider:
-            await ops_service.retry_webhook(
-                session, bg, provider="nope", event_id="x"
-            )
+            await ops_service.retry_webhook(session, bg, provider="nope", event_id="x")
         assert bad_provider.value.status_code == 400
 
         with pytest.raises(HTTPException) as missing_id:
@@ -594,7 +596,9 @@ async def test_tcp_connect_check_missing_host_and_bad_port() -> None:
     assert ok is False and err == "Missing host"
 
     ok, err = await ops_service._tcp_connect_check(
-        "localhost", "not-an-int", timeout_seconds=0.1  # type: ignore[arg-type]
+        "localhost",
+        "not-an-int",
+        timeout_seconds=0.1,  # type: ignore[arg-type]
     )
     assert ok is False and err == "Invalid port"
 
@@ -630,9 +634,7 @@ async def test_diagnostics_all_off(monkeypatch) -> None:
     monkeypatch.setattr(ops_service.settings, "smtp_enabled", False, raising=False)
     monkeypatch.setattr(ops_service.settings, "redis_url", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "media_root", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "private_media_root", "", raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "private_media_root", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "netopia_enabled", False, raising=False)
     monkeypatch.setattr(ops_service, "payments_provider", lambda: "fake")
 
@@ -650,9 +652,7 @@ async def test_diagnostics_smtp_missing_from(monkeypatch) -> None:
     monkeypatch.setattr(ops_service.settings, "smtp_from_email", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "redis_url", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "media_root", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "private_media_root", "", raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "private_media_root", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "netopia_enabled", False, raising=False)
     monkeypatch.setattr(ops_service, "payments_provider", lambda: "fake")
 
@@ -671,9 +671,7 @@ async def test_diagnostics_smtp_tcp(monkeypatch, tcp_ok) -> None:
     monkeypatch.setattr(ops_service.settings, "smtp_port", 587, raising=False)
     monkeypatch.setattr(ops_service.settings, "redis_url", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "media_root", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "private_media_root", "", raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "private_media_root", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "netopia_enabled", False, raising=False)
     monkeypatch.setattr(ops_service, "payments_provider", lambda: "fake")
 
@@ -692,9 +690,7 @@ async def test_diagnostics_redis_unavailable(monkeypatch) -> None:
         ops_service.settings, "redis_url", "redis://localhost", raising=False
     )
     monkeypatch.setattr(ops_service.settings, "media_root", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "private_media_root", "", raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "private_media_root", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "netopia_enabled", False, raising=False)
     monkeypatch.setattr(ops_service, "payments_provider", lambda: "fake")
     monkeypatch.setattr(ops_service, "get_redis", lambda: None)
@@ -711,9 +707,7 @@ async def test_diagnostics_redis_ping(monkeypatch, ping_ok) -> None:
         ops_service.settings, "redis_url", "redis://localhost", raising=False
     )
     monkeypatch.setattr(ops_service.settings, "media_root", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "private_media_root", "", raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "private_media_root", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "netopia_enabled", False, raising=False)
     monkeypatch.setattr(ops_service, "payments_provider", lambda: "fake")
 
@@ -734,9 +728,7 @@ async def test_diagnostics_redis_ping_exception(monkeypatch) -> None:
         ops_service.settings, "redis_url", "redis://localhost", raising=False
     )
     monkeypatch.setattr(ops_service.settings, "media_root", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "private_media_root", "", raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "private_media_root", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "netopia_enabled", False, raising=False)
     monkeypatch.setattr(ops_service, "payments_provider", lambda: "fake")
 
@@ -758,9 +750,7 @@ async def test_diagnostics_storage_ok(monkeypatch, tmp_path) -> None:
     private.mkdir()
     monkeypatch.setattr(ops_service.settings, "smtp_enabled", False, raising=False)
     monkeypatch.setattr(ops_service.settings, "redis_url", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "media_root", str(media), raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "media_root", str(media), raising=False)
     monkeypatch.setattr(
         ops_service.settings, "private_media_root", str(private), raising=False
     )
@@ -778,9 +768,7 @@ async def test_diagnostics_storage_issues(monkeypatch, tmp_path) -> None:
     a_file.write_text("x")
     monkeypatch.setattr(ops_service.settings, "smtp_enabled", False, raising=False)
     monkeypatch.setattr(ops_service.settings, "redis_url", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "media_root", str(missing), raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "media_root", str(missing), raising=False)
     monkeypatch.setattr(
         ops_service.settings, "private_media_root", str(a_file), raising=False
     )
@@ -800,9 +788,7 @@ async def test_diagnostics_storage_not_writable(monkeypatch, tmp_path) -> None:
     private.mkdir()
     monkeypatch.setattr(ops_service.settings, "smtp_enabled", False, raising=False)
     monkeypatch.setattr(ops_service.settings, "redis_url", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "media_root", str(media), raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "media_root", str(media), raising=False)
     monkeypatch.setattr(
         ops_service.settings, "private_media_root", str(private), raising=False
     )
@@ -823,9 +809,7 @@ async def test_diagnostics_payment_providers(monkeypatch, configured, prod) -> N
     monkeypatch.setattr(ops_service.settings, "smtp_enabled", False, raising=False)
     monkeypatch.setattr(ops_service.settings, "redis_url", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "media_root", "", raising=False)
-    monkeypatch.setattr(
-        ops_service.settings, "private_media_root", "", raising=False
-    )
+    monkeypatch.setattr(ops_service.settings, "private_media_root", "", raising=False)
     monkeypatch.setattr(ops_service.settings, "netopia_enabled", True, raising=False)
     monkeypatch.setattr(
         ops_service.settings,

@@ -227,7 +227,9 @@ def test_build_preview_url_without_variant_and_ttl_floor() -> None:
 
 def test_verify_preview_signature_bad_exp_returns_false() -> None:
     assert not md.verify_preview_signature(
-        uuid.uuid4(), exp="not-an-int", sig="x"  # type: ignore[arg-type]
+        uuid.uuid4(),
+        exp="not-an-int",
+        sig="x",  # type: ignore[arg-type]
     )
 
 

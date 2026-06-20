@@ -205,9 +205,7 @@ async def test_create_admin_quantity_exceeds(session_factory, monkeypatch) -> No
 # --------------------------------------------------------------------------- #
 @pytest.mark.anyio
 async def test_create_user_order_not_found(session_factory, monkeypatch) -> None:
-    monkeypatch.setattr(
-        svc.order_service, "get_order", lambda s, u, o: _async(None)
-    )
+    monkeypatch.setattr(svc.order_service, "get_order", lambda s, u, o: _async(None))
     async with session_factory() as session:
         user, _order, _item = await _seed_order(session)
         payload = ReturnRequestCreate(
@@ -292,9 +290,11 @@ async def test_create_user_defensive_and_invalid_item(
             order_id=order.id,
             reason="x",
             customer_message=None,
-            items=[ReturnRequestItemCreate.model_construct(
-                order_item_id=item.id, quantity=0
-            )],
+            items=[
+                ReturnRequestItemCreate.model_construct(
+                    order_item_id=item.id, quantity=0
+                )
+            ],
         )
         with pytest.raises(HTTPException) as exc:
             await svc.create_return_request_for_user(session, payload=bad, user=user)
@@ -317,9 +317,7 @@ async def test_create_user_defensive_and_invalid_item(
             items=[ReturnRequestItemCreate(order_item_id=item.id, quantity=99)],
         )
         with pytest.raises(HTTPException) as exc3:
-            await svc.create_return_request_for_user(
-                session, payload=over, user=user
-            )
+            await svc.create_return_request_for_user(session, payload=over, user=user)
         assert exc3.value.detail == "Invalid quantity"
 
 

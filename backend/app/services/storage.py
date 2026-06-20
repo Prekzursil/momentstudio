@@ -65,7 +65,9 @@ def save_upload(
     destination = (dest_root / f"{initial_stem}{initial_suffix}").resolve()
     try:
         destination.relative_to(dest_root)
-    except ValueError:  # pragma: no cover - defensive; the stem/suffix are sanitized via Path(...).name
+    except (
+        ValueError
+    ):  # pragma: no cover - defensive; the stem/suffix are sanitized via Path(...).name
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
         )
@@ -435,7 +437,9 @@ def _sanitize_svg(content: bytes) -> bytes:
         ) from exc
 
     def _local(tag: str) -> str:
-        if not isinstance(tag, str):  # pragma: no cover - defensive; defusedxml strips comment/PI nodes whose tag is non-str
+        if not isinstance(
+            tag, str
+        ):  # pragma: no cover - defensive; defusedxml strips comment/PI nodes whose tag is non-str
             return ""
         return tag.rsplit("}", 1)[-1].lower()
 
@@ -487,7 +491,9 @@ def _sanitize_svg(content: bytes) -> bytes:
                 parent.remove(child)
 
         attrib = getattr(parent, "attrib", None)
-        if not isinstance(attrib, dict):  # pragma: no cover - defensive; ElementTree elements always expose a dict attrib
+        if not isinstance(
+            attrib, dict
+        ):  # pragma: no cover - defensive; ElementTree elements always expose a dict attrib
             continue
         for key in list(attrib.keys()):
             key_str = str(key)

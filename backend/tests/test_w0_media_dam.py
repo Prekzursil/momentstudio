@@ -22,7 +22,6 @@ from app.models.media import (
     MediaAssetStatus,
     MediaAssetType,
     MediaJob,
-    MediaJobRetryPolicy,
     MediaJobStatus,
     MediaJobType,
     MediaVisibility,
@@ -86,8 +85,10 @@ def media_roots(tmp_path, monkeypatch):
 
 def test_is_publicly_servable() -> None:
     public_ok = _asset(
-        storage_key="k", public_url="/media/k",
-        visibility=MediaVisibility.public, status=MediaAssetStatus.approved,
+        storage_key="k",
+        public_url="/media/k",
+        visibility=MediaVisibility.public,
+        status=MediaAssetStatus.approved,
     )
     assert md._is_publicly_servable(public_ok) is True
     private_asset = _asset(storage_key="k", public_url="/media/k")
@@ -114,8 +115,10 @@ def test_storage_path_and_find_existing(media_roots) -> None:
 def test_asset_file_path_variants(media_roots) -> None:
     public, private = media_roots
     asset = _asset(
-        storage_key="orig/a.png", public_url="/media/orig/a.png",
-        visibility=MediaVisibility.public, status=MediaAssetStatus.approved,
+        storage_key="orig/a.png",
+        public_url="/media/orig/a.png",
+        visibility=MediaVisibility.public,
+        status=MediaAssetStatus.approved,
     )
     # preferred (public) exists
     pref = public / "orig" / "a.png"
@@ -155,8 +158,9 @@ def test_move_file_and_roots(media_roots) -> None:
     assert not src.exists()
 
     # _move_asset_file_roots: no storage_key -> no-op
-    md._move_asset_file_roots(_asset(storage_key="", public_url="/media/x"),
-                              to_public=True)
+    md._move_asset_file_roots(
+        _asset(storage_key="", public_url="/media/x"), to_public=True
+    )
     # _move_asset_file_roots: source missing -> no-op
     md._move_asset_file_roots(
         _asset(storage_key="nope/x.png", public_url="/media/nope/x.png"),
@@ -203,8 +207,10 @@ def test_move_variant_file_roots(media_roots) -> None:
 def test_ensure_asset_storage_placement(media_roots, monkeypatch) -> None:
     public, private = media_roots
     asset = _asset(
-        storage_key="e/a.png", public_url="/media/e/a.png",
-        visibility=MediaVisibility.public, status=MediaAssetStatus.approved,
+        storage_key="e/a.png",
+        public_url="/media/e/a.png",
+        visibility=MediaVisibility.public,
+        status=MediaAssetStatus.approved,
     )
     asset.variants = []
     src = private / "e" / "a.png"
@@ -246,17 +252,16 @@ def test_preview_url_sign_and_verify() -> None:
         asset_id, exp=exp, sig=sig, variant_profile="thumb"
     )
     # bad sig
-    assert md.verify_preview_signature(
-        asset_id, exp=exp, sig="deadbeef", variant_profile="thumb"
-    ) is False
+    assert (
+        md.verify_preview_signature(
+            asset_id, exp=exp, sig="deadbeef", variant_profile="thumb"
+        )
+        is False
+    )
     # non-int exp
-    assert md.verify_preview_signature(
-        asset_id, exp="notanint", sig=sig
-    ) is False
+    assert md.verify_preview_signature(asset_id, exp="notanint", sig=sig) is False
     # expired
-    assert md.verify_preview_signature(
-        asset_id, exp=1, sig=sig
-    ) is False
+    assert md.verify_preview_signature(asset_id, exp=1, sig=sig) is False
     # url without variant_profile
     url2 = md.build_preview_url(asset_id, ttl_seconds=10)
     assert "variant_profile" not in url2
@@ -289,8 +294,9 @@ def test_validate_policy_payload() -> None:
     # max_attempts out of range is blocked at schema level, so validate via schedule
     with pytest.raises(ValueError, match="positive integers"):
         md._validate_policy_payload(
-            MediaRetryPolicyUpdateRequest(backoff_schedule_seconds=[5, 10])
-            .model_copy(update={"backoff_schedule_seconds": [0]})
+            MediaRetryPolicyUpdateRequest(backoff_schedule_seconds=[5, 10]).model_copy(
+                update={"backoff_schedule_seconds": [0]}
+            )
         )
 
 
@@ -315,8 +321,10 @@ async def test_retry_policy_lifecycle() -> None:
             session,
             job_type="ingest",
             payload=MediaRetryPolicyUpdateRequest(
-                max_attempts=4, backoff_schedule_seconds=[1, 2, 3],
-                jitter_ratio=0.25, enabled=True,
+                max_attempts=4,
+                backoff_schedule_seconds=[1, 2, 3],
+                jitter_ratio=0.25,
+                enabled=True,
             ),
             updated_by_user_id=actor,
         )
@@ -445,8 +453,10 @@ async def test_list_assets_filters() -> None:
     await _init(engine)
     async with local() as session:
         asset = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved,
+            visibility=MediaVisibility.public,
             storage_key="originals/x/photo.png",
             public_url="/media/originals/x/photo.png",
             original_filename="photo.png",
@@ -461,11 +471,15 @@ async def test_list_assets_filters() -> None:
             _rows, meta = await md.list_assets(
                 session,
                 md.MediaListFilters(
-                    q="photo", asset_type="image", status="approved",
+                    q="photo",
+                    asset_type="image",
+                    status="approved",
                     visibility="public",
                     created_from=datetime(2025, 1, 1, tzinfo=UTC),
                     created_to=datetime(2025, 12, 31, tzinfo=UTC),
-                    include_trashed=True, tag="sometag", sort=sort,
+                    include_trashed=True,
+                    tag="sometag",
+                    sort=sort,
                 ),
             )
             assert meta["total_items"] >= 0
@@ -482,14 +496,20 @@ async def test_list_jobs_filters() -> None:
         asset_id = uuid.uuid4()
         session.add(
             MediaAsset(
-                id=asset_id, asset_type=MediaAssetType.image,
-                status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
-                storage_key="o/j.png", public_url="/media/o/j.png",
+                id=asset_id,
+                asset_type=MediaAssetType.image,
+                status=MediaAssetStatus.draft,
+                visibility=MediaVisibility.private,
+                storage_key="o/j.png",
+                public_url="/media/o/j.png",
             )
         )
         job = MediaJob(
-            id=uuid.uuid4(), asset_id=asset_id, job_type=MediaJobType.ingest,
-            status=MediaJobStatus.dead_letter, triage_state="open",
+            id=uuid.uuid4(),
+            asset_id=asset_id,
+            job_type=MediaJobType.ingest,
+            status=MediaJobStatus.dead_letter,
+            triage_state="open",
             sla_due_at=datetime(2000, 1, 1, tzinfo=UTC),
         )
         session.add(job)
@@ -500,11 +520,16 @@ async def test_list_jobs_filters() -> None:
         _rows, meta = await md.list_jobs(
             session,
             md.MediaJobListFilters(
-                status="dead_letter", job_type="ingest", asset_id=asset_id,
+                status="dead_letter",
+                job_type="ingest",
+                asset_id=asset_id,
                 created_from=datetime(2025, 1, 1, tzinfo=UTC),
                 created_to=datetime(2025, 12, 31, tzinfo=UTC),
-                triage_state="open", assigned_to_user_id=actor,
-                tag="jtag", sla_breached=True, dead_letter_only=True,
+                triage_state="open",
+                assigned_to_user_id=actor,
+                tag="jtag",
+                sla_breached=True,
+                dead_letter_only=True,
             ),
         )
         assert meta["total_items"] >= 0
@@ -523,8 +548,10 @@ async def test_asset_lifecycle(media_roots) -> None:
 
     async with local() as session:
         asset = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft,
+            visibility=MediaVisibility.private,
             storage_key="originals/a/img.png",
             public_url="/media/originals/a/img.png",
             original_filename="img.png",
@@ -547,8 +574,11 @@ async def test_asset_lifecycle(media_roots) -> None:
             session,
             asset,
             MediaAssetUpdateRequest(
-                status="approved", visibility="public",
-                rights_license="CC-BY", rights_owner="Me", rights_notes="note",
+                status="approved",
+                visibility="public",
+                rights_license="CC-BY",
+                rights_owner="Me",
+                rights_notes="note",
                 tags=["Hello World", "hello-world", ""],  # dedup + skip empty
                 i18n=[
                     MediaAssetUpdateI18nItem(lang="en", title="T", alt_text="A"),
@@ -563,8 +593,12 @@ async def test_asset_lifecycle(media_roots) -> None:
         asset = await md.get_asset_or_404(session, asset_id)
         # change_status to approved with actor
         await md.change_status(
-            session, asset=asset, to_status=MediaAssetStatus.approved,
-            actor_id=uuid.uuid4(), note="ok", set_approved_actor=True,
+            session,
+            asset=asset,
+            to_status=MediaAssetStatus.approved,
+            actor_id=uuid.uuid4(),
+            note="ok",
+            set_approved_actor=True,
         )
 
     async with local() as session:
@@ -596,15 +630,21 @@ async def test_purge_expired_trash(media_roots) -> None:
     await _init(engine)
     async with local() as session:
         old = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.trashed, visibility=MediaVisibility.private,
-            storage_key="trash/old.png", public_url="/media/trash/old.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.trashed,
+            visibility=MediaVisibility.private,
+            storage_key="trash/old.png",
+            public_url="/media/trash/old.png",
             trashed_at=datetime(2000, 1, 1, tzinfo=UTC),
         )
         fresh = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.trashed, visibility=MediaVisibility.private,
-            storage_key="trash/new.png", public_url="/media/trash/new.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.trashed,
+            visibility=MediaVisibility.private,
+            storage_key="trash/new.png",
+            public_url="/media/trash/new.png",
             trashed_at=datetime.now(UTC),
         )
         session.add_all([old, fresh])
@@ -731,12 +771,18 @@ def test_pure_helpers_sha_dims_roles(tmp_path) -> None:
     assert md.coerce_visibility("nonsense") == MediaVisibility.private
 
 
-def _seed_job(session, *, status, attempt=0, max_attempts=5, triage="open",
-              next_retry_at=None):
+def _seed_job(
+    session, *, status, attempt=0, max_attempts=5, triage="open", next_retry_at=None
+):
     job = MediaJob(
-        id=uuid.uuid4(), asset_id=None, job_type=MediaJobType.ingest,
-        status=status, attempt=attempt, max_attempts=max_attempts,
-        triage_state=triage, next_retry_at=next_retry_at,
+        id=uuid.uuid4(),
+        asset_id=None,
+        job_type=MediaJobType.ingest,
+        status=status,
+        attempt=attempt,
+        max_attempts=max_attempts,
+        triage_state=triage,
+        next_retry_at=next_retry_at,
     )
     session.add(job)
     return job
@@ -752,7 +798,9 @@ async def test_job_management(monkeypatch) -> None:
     async with local() as session:
         # due retry: failed + next_retry_at in past + attempt < max
         due = _seed_job(
-            session, status=MediaJobStatus.failed, attempt=1,
+            session,
+            status=MediaJobStatus.failed,
+            attempt=1,
             next_retry_at=datetime(2000, 1, 1, tzinfo=UTC),
         )
         await session.commit()
@@ -780,8 +828,9 @@ async def test_job_management(monkeypatch) -> None:
         exhausted = _seed_job(
             session, status=MediaJobStatus.failed, attempt=5, max_attempts=5
         )
-        dead = _seed_job(session, status=MediaJobStatus.dead_letter, attempt=5,
-                         max_attempts=5)
+        dead = _seed_job(
+            session, status=MediaJobStatus.dead_letter, attempt=5, max_attempts=5
+        )
         await session.commit()
         ids = [processing.id, exhausted.id, dead.id]
 
@@ -796,19 +845,28 @@ async def test_job_management(monkeypatch) -> None:
         job = await md.get_job_or_404(session, due_id)
         # triage update: all branches (set state, assign, sla, incident, tags)
         await md.update_job_triage(
-            session, job=job, actor_user_id=actor,
-            triage_state="resolved", assigned_to_user_id=actor,
+            session,
+            job=job,
+            actor_user_id=actor,
+            triage_state="resolved",
+            assigned_to_user_id=actor,
             sla_due_at=datetime(2030, 1, 1, tzinfo=UTC),
             incident_url="https://example.com/i",
-            add_tags=["urgent"], remove_tags=["stale"], note="done",
+            add_tags=["urgent"],
+            remove_tags=["stale"],
+            note="done",
         )
 
     async with local() as session:
         job = await md.get_job_or_404(session, due_id)
         # triage update: clear branches
         await md.update_job_triage(
-            session, job=job, actor_user_id=actor,
-            clear_assignee=True, clear_sla_due_at=True, clear_incident_url=True,
+            session,
+            job=job,
+            actor_user_id=actor,
+            clear_assignee=True,
+            clear_sla_due_at=True,
+            clear_incident_url=True,
         )
 
     async with local() as session:
@@ -822,19 +880,28 @@ async def test_ensure_public_asset() -> None:
     await _init(engine)
     async with local() as session:
         public_ok = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
-            storage_key="p/ok.png", public_url="/media/p/ok.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved,
+            visibility=MediaVisibility.public,
+            storage_key="p/ok.png",
+            public_url="/media/p/ok.png",
         )
         private_asset = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.approved, visibility=MediaVisibility.private,
-            storage_key="p/pr.png", public_url="/media/p/pr.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved,
+            visibility=MediaVisibility.private,
+            storage_key="p/pr.png",
+            public_url="/media/p/pr.png",
         )
         rejected = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.rejected, visibility=MediaVisibility.public,
-            storage_key="p/rj.png", public_url="/media/p/rj.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.rejected,
+            visibility=MediaVisibility.public,
+            storage_key="p/rj.png",
+            public_url="/media/p/rj.png",
         )
         session.add_all([public_ok, private_asset, rejected])
         await session.commit()
@@ -887,14 +954,20 @@ async def test_collections_crud() -> None:
     async with local() as session:
         # seed assets and add them as items
         a1 = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
-            storage_key="c/a1.png", public_url="/media/c/a1.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved,
+            visibility=MediaVisibility.public,
+            storage_key="c/a1.png",
+            public_url="/media/c/a1.png",
         )
         a2 = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
-            storage_key="c/a2.png", public_url="/media/c/a2.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved,
+            visibility=MediaVisibility.public,
+            storage_key="c/a2.png",
+            public_url="/media/c/a2.png",
         )
         session.add_all([a1, a2])
         await session.commit()
@@ -920,9 +993,12 @@ async def test_rebuild_usage_edges() -> None:
 
     async with local() as session:
         asset = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
-            storage_key="u/a.png", public_url="/media/u/a.png",
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved,
+            visibility=MediaVisibility.public,
+            storage_key="u/a.png",
+            public_url="/media/u/a.png",
         )
         category = Category(slug="c", name="C", sort_order=1)
         session.add_all([asset, category])
@@ -931,8 +1007,13 @@ async def test_rebuild_usage_edges() -> None:
         from app.models.catalog import ProductImage, ProductStatus
 
         product = Product(
-            category_id=category.id, slug="p", sku="SKU", name="P",
-            base_price=10, currency="RON", stock_quantity=1,
+            category_id=category.id,
+            slug="p",
+            sku="SKU",
+            name="P",
+            base_price=10,
+            currency="RON",
+            stock_quantity=1,
             status=ProductStatus.published,
             images=[ProductImage(url="/media/u/a.png", alt_text="a")],
         )
@@ -946,12 +1027,16 @@ async def test_rebuild_usage_edges() -> None:
         assert resp is not None
 
 
-def _seed_asset_with_file(session, *, public, private, key, dims=(8, 4),
-                          original_filename="my-photo.png"):
+def _seed_asset_with_file(
+    session, *, public, private, key, dims=(8, 4), original_filename="my-photo.png"
+):
     asset = MediaAsset(
-        id=uuid.uuid4(), asset_type=MediaAssetType.image,
-        status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
-        storage_key=key, public_url=md._public_url_from_storage_key(key),
+        id=uuid.uuid4(),
+        asset_type=MediaAssetType.image,
+        status=MediaAssetStatus.draft,
+        visibility=MediaVisibility.private,
+        storage_key=key,
+        public_url=md._public_url_from_storage_key(key),
         original_filename=original_filename,
     )
     session.add(asset)
@@ -973,8 +1058,11 @@ async def test_process_ingest_job_success(media_roots, monkeypatch) -> None:
         )
         await session.flush()
         job = await md.enqueue_job(
-            session, asset_id=asset.id, job_type=MediaJobType.ingest,
-            payload={"reason": "upload"}, created_by_user_id=None,
+            session,
+            asset_id=asset.id,
+            job_type=MediaJobType.ingest,
+            payload={"reason": "upload"},
+            created_by_user_id=None,
         )
         await session.commit()
         job_id, asset_id = job.id, asset.id
@@ -989,16 +1077,19 @@ async def test_process_ingest_job_success(media_roots, monkeypatch) -> None:
 
 
 @pytest.mark.anyio
-async def test_process_ingest_job_missing_file_dead_letters(media_roots,
-                                                            monkeypatch) -> None:
+async def test_process_ingest_job_missing_file_dead_letters(
+    media_roots, monkeypatch
+) -> None:
     public, private = media_roots
     monkeypatch.setattr(md, "get_redis", lambda: None)
     engine, local = _make_local()
     await _init(engine)
     async with local() as session:
         asset = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft,
+            visibility=MediaVisibility.private,
             storage_key="originals/missing/x.png",
             public_url="/media/originals/missing/x.png",
         )
@@ -1006,11 +1097,16 @@ async def test_process_ingest_job_missing_file_dead_letters(media_roots,
         await session.flush()
         # disabled retry policy in payload -> exception goes straight to dead_letter
         job = await md.enqueue_job(
-            session, asset_id=asset.id, job_type=MediaJobType.ingest,
+            session,
+            asset_id=asset.id,
+            job_type=MediaJobType.ingest,
             payload={
                 md.RETRY_POLICY_PAYLOAD_KEY: {
-                    "max_attempts": 1, "schedule": [60],
-                    "jitter_ratio": 0.0, "enabled": False, "version_ts": "s",
+                    "max_attempts": 1,
+                    "schedule": [60],
+                    "jitter_ratio": 0.0,
+                    "enabled": False,
+                    "version_ts": "s",
                 }
             },
             created_by_user_id=None,
@@ -1026,16 +1122,19 @@ async def test_process_ingest_job_missing_file_dead_letters(media_roots,
 
 
 @pytest.mark.anyio
-async def test_process_ingest_job_failure_schedules_retry(media_roots,
-                                                          monkeypatch) -> None:
+async def test_process_ingest_job_failure_schedules_retry(
+    media_roots, monkeypatch
+) -> None:
     public, private = media_roots
     monkeypatch.setattr(md, "get_redis", lambda: None)
     engine, local = _make_local()
     await _init(engine)
     async with local() as session:
         asset = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft,
+            visibility=MediaVisibility.private,
             storage_key="originals/m2/y.png",
             public_url="/media/originals/m2/y.png",
         )
@@ -1043,11 +1142,16 @@ async def test_process_ingest_job_failure_schedules_retry(media_roots,
         await session.flush()
         # enabled retry policy with attempts remaining -> failed + next_retry_at
         job = await md.enqueue_job(
-            session, asset_id=asset.id, job_type=MediaJobType.ingest,
+            session,
+            asset_id=asset.id,
+            job_type=MediaJobType.ingest,
             payload={
                 md.RETRY_POLICY_PAYLOAD_KEY: {
-                    "max_attempts": 3, "schedule": [60, 120],
-                    "jitter_ratio": 0.0, "enabled": True, "version_ts": "s",
+                    "max_attempts": 3,
+                    "schedule": [60, 120],
+                    "jitter_ratio": 0.0,
+                    "enabled": True,
+                    "version_ts": "s",
                 }
             },
             created_by_user_id=None,
@@ -1070,7 +1174,10 @@ async def test_process_ai_tag_duplicate_usage_jobs(media_roots, monkeypatch) -> 
     await _init(engine)
     async with local() as session:
         asset = _seed_asset_with_file(
-            session, public=public, private=private, key="originals/t/p.png",
+            session,
+            public=public,
+            private=private,
+            key="originals/t/p.png",
             original_filename="sunny-beach.png",
         )
         asset.width = 8
@@ -1079,24 +1186,35 @@ async def test_process_ai_tag_duplicate_usage_jobs(media_roots, monkeypatch) -> 
         await session.flush()
         # a duplicate with the same checksum
         dup = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft,
+            visibility=MediaVisibility.private,
             storage_key="originals/t/dup.png",
             public_url="/media/originals/t/dup.png",
             checksum_sha256="abc123checksum00",
         )
         session.add(dup)
         ai_job = await md.enqueue_job(
-            session, asset_id=asset.id, job_type=MediaJobType.ai_tag,
-            payload={}, created_by_user_id=None,
+            session,
+            asset_id=asset.id,
+            job_type=MediaJobType.ai_tag,
+            payload={},
+            created_by_user_id=None,
         )
         dup_job = await md.enqueue_job(
-            session, asset_id=asset.id, job_type=MediaJobType.duplicate_scan,
-            payload={}, created_by_user_id=None,
+            session,
+            asset_id=asset.id,
+            job_type=MediaJobType.duplicate_scan,
+            payload={},
+            created_by_user_id=None,
         )
         usage_job = await md.enqueue_job(
-            session, asset_id=None, job_type=MediaJobType.usage_reconcile,
-            payload={"limit": 10}, created_by_user_id=None,
+            session,
+            asset_id=None,
+            job_type=MediaJobType.usage_reconcile,
+            payload={"limit": 10},
+            created_by_user_id=None,
         )
         await session.commit()
         ai_id, dup_id, usage_id = ai_job.id, dup_job.id, usage_job.id
@@ -1116,13 +1234,19 @@ async def test_process_variant_job(media_roots, monkeypatch) -> None:
     await _init(engine)
     async with local() as session:
         asset = _seed_asset_with_file(
-            session, public=public, private=private, key="originals/v/p.png",
+            session,
+            public=public,
+            private=private,
+            key="originals/v/p.png",
             dims=(2000, 1000),
         )
         await session.flush()
         job = await md.enqueue_job(
-            session, asset_id=asset.id, job_type=MediaJobType.variant,
-            payload={"profile": "web-1280"}, created_by_user_id=None,
+            session,
+            asset_id=asset.id,
+            job_type=MediaJobType.variant,
+            payload={"profile": "web-1280"},
+            created_by_user_id=None,
         )
         await session.commit()
         job_id, asset_id = job.id, asset.id
@@ -1132,9 +1256,9 @@ async def test_process_variant_job(media_roots, monkeypatch) -> None:
         done = await md.process_job_inline(session, job)
         assert done.status == MediaJobStatus.completed
         variant = await session.scalar(
-            __import__("sqlalchemy").select(md.MediaVariant).where(
-                md.MediaVariant.asset_id == asset_id
-            )
+            __import__("sqlalchemy")
+            .select(md.MediaVariant)
+            .where(md.MediaVariant.asset_id == asset_id)
         )
         assert variant is not None
 
@@ -1153,8 +1277,11 @@ async def test_process_edit_job_with_crop_and_rotate(media_roots, monkeypatch) -
             )
             await session.flush()
             job = await md.enqueue_job(
-                session, asset_id=asset.id, job_type=MediaJobType.edit,
-                payload=payload, created_by_user_id=None,
+                session,
+                asset_id=asset.id,
+                job_type=MediaJobType.edit,
+                payload=payload,
+                created_by_user_id=None,
             )
             await session.commit()
             jid = job.id
@@ -1165,13 +1292,20 @@ async def test_process_edit_job_with_crop_and_rotate(media_roots, monkeypatch) -
 
     # wide image cropped to a taller target ratio -> current_ratio > target
     await _run_edit(
-        "originals/e1/p.png", (2000, 500),
-        {"rotate_cw": 90, "crop_aspect_w": 1, "crop_aspect_h": 1,
-         "resize_max_width": 500, "resize_max_height": 500},
+        "originals/e1/p.png",
+        (2000, 500),
+        {
+            "rotate_cw": 90,
+            "crop_aspect_w": 1,
+            "crop_aspect_h": 1,
+            "resize_max_width": 500,
+            "resize_max_height": 500,
+        },
     )
     # tall image cropped to a wider target ratio -> current_ratio < target
     await _run_edit(
-        "originals/e2/p.png", (500, 2000),
+        "originals/e2/p.png",
+        (500, 2000),
         {"rotate_cw": 0, "crop_aspect_w": 4, "crop_aspect_h": 1},
     )
 
@@ -1205,8 +1339,9 @@ def test_resolve_asset_preview_path(media_roots) -> None:
     with pytest.raises(ValueError, match="Variant not found"):
         md.resolve_asset_preview_path(asset, variant_profile="missing")
     # variant present but file missing -> FileNotFoundError
-    asset_gone = _AssetStub("r/a.png", "/media/r/a.png",
-                            [_Variant("gone", "r/gone.png")])
+    asset_gone = _AssetStub(
+        "r/a.png", "/media/r/a.png", [_Variant("gone", "r/gone.png")]
+    )
     with pytest.raises(FileNotFoundError, match="Variant file missing"):
         md.resolve_asset_preview_path(asset_gone, variant_profile="gone")
     # no variant_profile, asset file missing -> FileNotFoundError
@@ -1227,8 +1362,10 @@ async def test_soft_delete_restore_move_failure(media_roots, monkeypatch) -> Non
     await _init(engine)
     async with local() as session:
         asset = MediaAsset(
-            id=uuid.uuid4(), asset_type=MediaAssetType.image,
-            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            id=uuid.uuid4(),
+            asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved,
+            visibility=MediaVisibility.public,
             storage_key="originals/sd/p.png",
             public_url="/media/originals/sd/p.png",
         )

@@ -124,32 +124,47 @@ def test_message_threading_validation_and_guards() -> None:
             # Empty message rejected.
             with pytest.raises(HTTPException):
                 await support.add_contact_submission_message(
-                    session, submission=submission, message="  ", from_admin=False,
+                    session,
+                    submission=submission,
+                    message="  ",
+                    from_admin=False,
                     actor=customer,
                 )
             # Too long rejected.
             with pytest.raises(HTTPException):
                 await support.add_contact_submission_message(
-                    session, submission=submission, message="x" * 10_001,
-                    from_admin=False, actor=customer,
+                    session,
+                    submission=submission,
+                    message="x" * 10_001,
+                    from_admin=False,
+                    actor=customer,
                 )
             # Non-admin non-owner cannot post as admin.
             with pytest.raises(HTTPException):
                 await support.add_contact_submission_message(
-                    session, submission=submission, message="hi", from_admin=True,
+                    session,
+                    submission=submission,
+                    message="hi",
+                    from_admin=True,
                     actor=customer,
                 )
             # A different customer cannot post.
             with pytest.raises(HTTPException):
                 await support.add_contact_submission_message(
-                    session, submission=submission, message="hi", from_admin=False,
+                    session,
+                    submission=submission,
+                    message="hi",
+                    from_admin=False,
                     actor=other,
                 )
 
             # Customer reply (notifies staff).
             updated = await support.add_contact_submission_message(
-                session, submission=submission, message="please help",
-                from_admin=False, actor=customer,
+                session,
+                submission=submission,
+                message="please help",
+                from_admin=False,
+                actor=customer,
             )
             assert any(m.message == "please help" for m in updated.messages)
 
@@ -158,7 +173,10 @@ def test_message_threading_validation_and_guards() -> None:
             await session.commit()
             with pytest.raises(HTTPException):
                 await support.add_contact_submission_message(
-                    session, submission=submission, message="more", from_admin=False,
+                    session,
+                    submission=submission,
+                    message="more",
+                    from_admin=False,
                     actor=customer,
                 )
 
@@ -232,8 +250,11 @@ def test_admin_reply_no_mentions_en_customer() -> None:
 
             # Admin reply with no @mentions, EN customer (else lang branch).
             updated = await support.add_contact_submission_message(
-                session, submission=submission, message="thanks, resolved",
-                from_admin=True, actor=admin,
+                session,
+                submission=submission,
+                message="thanks, resolved",
+                from_admin=True,
+                actor=admin,
             )
             assert any(m.from_admin for m in updated.messages)
 
@@ -264,8 +285,11 @@ def test_admin_reply_anonymous_submission_no_customer_notify() -> None:
             await session.refresh(submission)
 
             updated = await support.add_contact_submission_message(
-                session, submission=submission, message="admin note here",
-                from_admin=True, actor=admin,
+                session,
+                submission=submission,
+                message="admin note here",
+                from_admin=True,
+                actor=admin,
             )
             assert any(m.from_admin for m in updated.messages)
 
@@ -284,8 +308,11 @@ def test_admin_reply_anonymous_submission_no_customer_notify() -> None:
             await session.commit()
             await session.refresh(dangling)
             updated2 = await support.add_contact_submission_message(
-                session, submission=dangling, message="reply to ghost",
-                from_admin=True, actor=admin,
+                session,
+                submission=dangling,
+                message="reply to ghost",
+                from_admin=True,
+                actor=admin,
             )
             assert any(m.from_admin for m in updated2.messages)
 
@@ -530,7 +557,11 @@ def test_canned_response_crud() -> None:
 
             # Inactive one for include_inactive filter.
             inactive = await support.create_canned_response(
-                session, title="Old", body_en="x", body_ro="y", is_active=False,
+                session,
+                title="Old",
+                body_en="x",
+                body_ro="y",
+                is_active=False,
                 actor=admin,
             )
 
@@ -562,7 +593,11 @@ def test_canned_response_crud() -> None:
 
             # Blank update values leave fields unchanged.
             unchanged = await support.update_canned_response(
-                session, record=record, title="  ", body_en="  ", body_ro="  ",
+                session,
+                record=record,
+                title="  ",
+                body_en="  ",
+                body_ro="  ",
                 actor=admin,
             )
             assert unchanged.title == "New Title"

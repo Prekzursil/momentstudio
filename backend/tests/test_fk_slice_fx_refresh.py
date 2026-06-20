@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
 
 from app.services import fx_refresh
 
@@ -39,9 +38,7 @@ class _FakeSessionCtx:
 def test_refresh_once_uses_session_and_store(monkeypatch) -> None:
     recorder: list = []
 
-    monkeypatch.setattr(
-        fx_refresh, "SessionLocal", lambda: _FakeSessionCtx(recorder)
-    )
+    monkeypatch.setattr(fx_refresh, "SessionLocal", lambda: _FakeSessionCtx(recorder))
 
     async def fake_refresh(session):
         recorder.append(session)
@@ -180,18 +177,14 @@ def test_refresh_loop_timeout_keeps_running(monkeypatch) -> None:
 
 
 def test_start_disabled_is_noop(monkeypatch) -> None:
-    monkeypatch.setattr(
-        fx_refresh.settings, "fx_refresh_enabled", False, raising=False
-    )
+    monkeypatch.setattr(fx_refresh.settings, "fx_refresh_enabled", False, raising=False)
     app = _FakeApp()
     fx_refresh.start(app)
     assert getattr(app.state, "fx_refresh_task", None) is None
 
 
 def test_start_idempotent_when_task_exists(monkeypatch) -> None:
-    monkeypatch.setattr(
-        fx_refresh.settings, "fx_refresh_enabled", True, raising=False
-    )
+    monkeypatch.setattr(fx_refresh.settings, "fx_refresh_enabled", True, raising=False)
     app = _FakeApp()
     app.state.fx_refresh_task = object()  # already running
     fx_refresh.start(app)
@@ -200,17 +193,13 @@ def test_start_idempotent_when_task_exists(monkeypatch) -> None:
 
 
 def test_start_creates_task_then_stop_cleans_up(monkeypatch) -> None:
-    monkeypatch.setattr(
-        fx_refresh.settings, "fx_refresh_enabled", True, raising=False
-    )
+    monkeypatch.setattr(fx_refresh.settings, "fx_refresh_enabled", True, raising=False)
 
     async def fake_run_as_leader(*, name, stop, work):
         # mimic the real loop: run the supplied work until stop is set.
         await stop.wait()
 
-    monkeypatch.setattr(
-        fx_refresh.leader_lock, "run_as_leader", fake_run_as_leader
-    )
+    monkeypatch.setattr(fx_refresh.leader_lock, "run_as_leader", fake_run_as_leader)
 
     async def scenario() -> None:
         app = _FakeApp()

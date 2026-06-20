@@ -9,10 +9,8 @@ real create + cancellation teardown).
 from __future__ import annotations
 
 import asyncio
-import types
 from types import SimpleNamespace
 
-import pytest
 
 from app.services import sameday_easybox_sync_scheduler as sched
 from tests.conftest import make_memory_session_factory
@@ -160,12 +158,8 @@ def test_start_and_stop_lifecycle(monkeypatch) -> None:
         sched.start(app)
         assert app.state.sameday_easybox_sync_scheduler_task is not None
         await sched.stop(app)
-        assert (
-            getattr(app.state, "sameday_easybox_sync_scheduler_task", None) is None
-        )
-        assert (
-            getattr(app.state, "sameday_easybox_sync_scheduler_stop", None) is None
-        )
+        assert getattr(app.state, "sameday_easybox_sync_scheduler_task", None) is None
+        assert getattr(app.state, "sameday_easybox_sync_scheduler_stop", None) is None
 
     asyncio.run(run())
 

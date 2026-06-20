@@ -91,9 +91,9 @@ def test_direct_handler_full_cycle() -> None:
             assert result is None
 
             # gone afterwards.
-            assert await address_service.get_address(
-                session, user_id, created.id
-            ) is None
+            assert (
+                await address_service.get_address(session, user_id, created.id) is None
+            )
 
     asyncio.run(_scenario())
 
@@ -197,8 +197,6 @@ def test_http_cycle(test_app: Dict[str, object]) -> None:
         == 404
     )
     assert (
-        client.delete(
-            f"/api/v1/me/addresses/{missing}", headers=headers
-        ).status_code
+        client.delete(f"/api/v1/me/addresses/{missing}", headers=headers).status_code
         == 404
     )

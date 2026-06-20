@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 import pytest
-import sqlalchemy as sa
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -41,7 +40,9 @@ def newsletter_app(monkeypatch) -> Dict[str, object]:
     app.dependency_overrides[get_session] = override_get_session
 
     # Captcha disabled by default -> verify() is a no-op; ensure that here.
-    monkeypatch.setattr(newsletter_api.settings, "captcha_enabled", False, raising=False)
+    monkeypatch.setattr(
+        newsletter_api.settings, "captcha_enabled", False, raising=False
+    )
 
     sent: list[tuple] = []
 
@@ -295,9 +296,7 @@ def test_subscribe_resubscribe_smtp_off(newsletter_app, monkeypatch) -> None:
 # confirm                                                                      #
 # --------------------------------------------------------------------------- #
 def test_confirm_invalid_token(newsletter_app, monkeypatch) -> None:
-    monkeypatch.setattr(
-        newsletter_tokens, "decode_newsletter_token", lambda **kw: None
-    )
+    monkeypatch.setattr(newsletter_tokens, "decode_newsletter_token", lambda **kw: None)
     client: TestClient = newsletter_app["client"]  # type: ignore[assignment]
     res = client.post("/api/v1/newsletter/confirm", json={"token": "bad-token-xx"})
     assert res.status_code == 400
@@ -348,9 +347,7 @@ def test_confirm_creates_subscriber_when_missing(newsletter_app, monkeypatch) ->
 # unsubscribe                                                                  #
 # --------------------------------------------------------------------------- #
 def test_unsubscribe_invalid_token(newsletter_app, monkeypatch) -> None:
-    monkeypatch.setattr(
-        newsletter_tokens, "decode_newsletter_token", lambda **kw: None
-    )
+    monkeypatch.setattr(newsletter_tokens, "decode_newsletter_token", lambda **kw: None)
     client: TestClient = newsletter_app["client"]  # type: ignore[assignment]
     res = client.get("/api/v1/newsletter/unsubscribe?token=bad")
     assert res.status_code == 400
@@ -383,7 +380,8 @@ def test_unsubscribe_get_json(newsletter_app, monkeypatch) -> None:
     )
     client: TestClient = newsletter_app["client"]  # type: ignore[assignment]
     res = client.get(
-        "/api/v1/newsletter/unsubscribe?token=ok", headers={"accept": "application/json"}
+        "/api/v1/newsletter/unsubscribe?token=ok",
+        headers={"accept": "application/json"},
     )
     assert res.status_code == 200, res.text
     assert res.json()["unsubscribed"] is True
@@ -424,7 +422,7 @@ def test_unsubscribe_post_no_body(newsletter_app, monkeypatch) -> None:
     monkeypatch.setattr(
         newsletter_tokens,
         "decode_newsletter_token",
-        lambda **kw: ("e@example.com" if kw.get("token") else None),
+        lambda **kw: "e@example.com" if kw.get("token") else None,
     )
     client: TestClient = newsletter_app["client"]  # type: ignore[assignment]
     res = client.post(
@@ -439,7 +437,7 @@ def test_unsubscribe_post_json_non_string_token(newsletter_app, monkeypatch) -> 
     monkeypatch.setattr(
         newsletter_tokens,
         "decode_newsletter_token",
-        lambda **kw: ("e@example.com" if kw.get("token") else None),
+        lambda **kw: "e@example.com" if kw.get("token") else None,
     )
     client: TestClient = newsletter_app["client"]  # type: ignore[assignment]
     # token present but not a string -> resolved stays empty -> 400

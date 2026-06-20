@@ -315,7 +315,9 @@ async def compute_totals_with_coupon(
         if diff != 0:
             idx = max(range(len(lines)), key=lambda i: lines[i].subtotal)
             adjusted = lines[idx].subtotal + diff
-            if adjusted < 0:  # pragma: no cover - defensive: diff is a rounding residual (cents), never below the largest line subtotal
+            if (
+                adjusted < 0
+            ):  # pragma: no cover - defensive: diff is a rounding residual (cents), never below the largest line subtotal
                 adjusted = Decimal("0.00")
             lines[idx] = TaxableProductLine(
                 product_id=lines[idx].product_id, subtotal=adjusted
@@ -711,7 +713,9 @@ async def evaluate_coupon_for_cart(
     seen: set[str] = set()
     deduped: list[str] = []
     for reason in reasons:
-        if reason in seen:  # pragma: no cover - defensive: each reason code is appended at most once across the checks above
+        if (
+            reason in seen
+        ):  # pragma: no cover - defensive: each reason code is appended at most once across the checks above
             continue
         seen.add(reason)
         deduped.append(reason)

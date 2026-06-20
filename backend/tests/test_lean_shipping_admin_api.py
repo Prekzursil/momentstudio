@@ -195,9 +195,7 @@ def test_list_sameday_sync_runs(ctx, monkeypatch) -> None:
     monkeypatch.setattr(
         shipping_admin_api.sameday_easybox_mirror, "list_sync_runs", _list
     )
-    res = ctx["client"].get(
-        "/api/v1/admin/shipping/sameday-sync/runs", headers=headers
-    )
+    res = ctx["client"].get("/api/v1/admin/shipping/sameday-sync/runs", headers=headers)
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["meta"]["total"] == 1
@@ -212,8 +210,6 @@ def test_run_sameday_sync_now(ctx, monkeypatch) -> None:
         return _run_ns()
 
     monkeypatch.setattr(shipping_admin_api.sameday_easybox_mirror, "sync_now", _sync)
-    res = ctx["client"].post(
-        "/api/v1/admin/shipping/sameday-sync/run", headers=headers
-    )
+    res = ctx["client"].post("/api/v1/admin/shipping/sameday-sync/run", headers=headers)
     assert res.status_code == 200, res.text
     assert res.json()["status"] == "success"

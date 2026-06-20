@@ -9,7 +9,6 @@ bad-secret / mismatch / match paths.
 
 from __future__ import annotations
 
-import base64
 
 from app.core import totp
 from app.core.config import settings

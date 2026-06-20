@@ -152,8 +152,6 @@ def test_metrics_requires_admin(routes_app) -> None:
     )
     assert login.status_code == 200, login.text
     token = login.json()["tokens"]["access_token"]
-    res = client.get(
-        "/api/v1/metrics", headers={"Authorization": f"Bearer {token}"}
-    )
+    res = client.get("/api/v1/metrics", headers={"Authorization": f"Bearer {token}"})
     assert res.status_code == 200
     assert isinstance(res.json(), dict)

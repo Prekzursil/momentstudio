@@ -61,9 +61,7 @@ def _valid_totp(secret: str) -> str:
     counter = int(datetime.now(timezone.utc).timestamp()) // int(
         settings.two_factor_totp_period_seconds
     )
-    return totp_core._totp(
-        key, counter, digits=int(settings.two_factor_totp_digits)
-    )
+    return totp_core._totp(key, counter, digits=int(settings.two_factor_totp_digits))
 
 
 # --------------------------------------------------------------------------- #
@@ -90,9 +88,7 @@ async def test_add_secondary_email_validation(session_factory) -> None:
 async def test_secondary_email_full_flow(session_factory) -> None:
     async with session_factory() as session:
         user = await _new_user(session)
-        secondary, token = await svc.add_secondary_email(
-            session, user, "extra@x.io"
-        )
+        secondary, token = await svc.add_secondary_email(session, user, "extra@x.io")
         assert secondary.verified is False
 
         listed = await svc.list_secondary_emails(session, user.id)
@@ -140,9 +136,7 @@ async def test_request_secondary_verification_guards(session_factory) -> None:
         user = await _new_user(session)
 
         with pytest.raises(HTTPException) as missing:
-            await svc.request_secondary_email_verification(
-                session, user, uuid.uuid4()
-            )
+            await svc.request_secondary_email_verification(session, user, uuid.uuid4())
         assert missing.value.status_code == 404
 
         secondary, _ = await svc.add_secondary_email(session, user, "v@x.io")
@@ -155,9 +149,7 @@ async def test_request_secondary_verification_guards(session_factory) -> None:
             ).token,
         )
         with pytest.raises(HTTPException) as already:
-            await svc.request_secondary_email_verification(
-                session, user, secondary.id
-            )
+            await svc.request_secondary_email_verification(session, user, secondary.id)
         assert already.value.status_code == 400
 
 
@@ -199,9 +191,7 @@ async def test_make_secondary_primary_guards_and_happy(session_factory) -> None:
         session.add(google_user)
         await session.commit()
         with pytest.raises(HTTPException) as g:
-            await svc.make_secondary_email_primary(
-                session, google_user, uuid.uuid4()
-            )
+            await svc.make_secondary_email_primary(session, google_user, uuid.uuid4())
         assert g.value.status_code == 400
 
         user = await _new_user(session)
@@ -209,18 +199,14 @@ async def test_make_secondary_primary_guards_and_happy(session_factory) -> None:
             await svc.make_secondary_email_primary(session, user, uuid.uuid4())
         assert missing.value.status_code == 404
 
-        secondary, token = await svc.add_secondary_email(
-            session, user, "promote@x.io"
-        )
+        secondary, token = await svc.add_secondary_email(session, user, "promote@x.io")
         with pytest.raises(HTTPException) as unverified:
             await svc.make_secondary_email_primary(session, user, secondary.id)
         assert unverified.value.status_code == 400
 
         await svc.confirm_secondary_email_verification(session, token.token)
         old_primary = user.email
-        updated = await svc.make_secondary_email_primary(
-            session, user, secondary.id
-        )
+        updated = await svc.make_secondary_email_primary(session, user, secondary.id)
         assert updated.email == "promote@x.io"
         # The old primary becomes a secondary email.
         secondaries = await svc.list_secondary_emails(session, user.id)
@@ -257,9 +243,7 @@ async def test_make_secondary_primary_reverifies_existing_old_secondary(
 
         # Seed a stale, unverified secondary that duplicates the current primary.
         session.add(
-            UserSecondaryEmail(
-                user_id=user.id, email=old_primary, verified=False
-            )
+            UserSecondaryEmail(user_id=user.id, email=old_primary, verified=False)
         )
         await session.commit()
 
@@ -313,15 +297,11 @@ async def test_email_lookup_helpers(session_factory) -> None:
 
         # Once verified, login_email resolves it too.
         await svc.confirm_secondary_email_verification(session, token.token)
-        assert (
-            await svc.get_user_by_login_email(session, "alt@x.io")
-        ).id == user.id
+        assert (await svc.get_user_by_login_email(session, "alt@x.io")).id == user.id
 
         # Primary email path of any_email/login_email.
         assert (await svc.get_user_by_any_email(session, user.email)).id == user.id
-        assert (
-            await svc.get_user_by_login_email(session, user.email)
-        ).id == user.id
+        assert (await svc.get_user_by_login_email(session, user.email)).id == user.id
 
 
 async def test_get_user_by_google_sub(session_factory) -> None:
@@ -420,9 +400,7 @@ async def test_generate_unique_username_collision(session_factory) -> None:
         # Second user with no username + an email whose sanitized base collides
         # with the first -> a numeric suffix is appended.
         base = svc._sanitize_username_from_email(first.email)
-        candidate = await svc._generate_unique_username(
-            session, f"{base}@x.io"
-        )
+        candidate = await svc._generate_unique_username(session, f"{base}@x.io")
         assert candidate != first.username
 
 
@@ -989,9 +967,7 @@ async def test_reset_token_create_and_confirm(session_factory) -> None:
         old = await session.get(PasswordResetToken, token.id)
         assert old.used is True
 
-        confirmed = await svc.confirm_reset_token(
-            session, token2.token, "NewPassword1"
-        )
+        confirmed = await svc.confirm_reset_token(session, token2.token, "NewPassword1")
         assert confirmed.id == user.id
 
         # Used token no longer valid.
@@ -1167,9 +1143,7 @@ async def test_exchange_google_code_not_configured(monkeypatch) -> None:
 
 async def test_exchange_google_code_success_and_failures(monkeypatch) -> None:
     monkeypatch.setattr(svc.settings, "google_client_id", "cid", raising=False)
-    monkeypatch.setattr(
-        svc.settings, "google_client_secret", "secret", raising=False
-    )
+    monkeypatch.setattr(svc.settings, "google_client_secret", "secret", raising=False)
     monkeypatch.setattr(
         svc.settings, "google_redirect_uri", "https://x/cb", raising=False
     )

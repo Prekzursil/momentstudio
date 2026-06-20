@@ -48,9 +48,7 @@ async def test_run_once_disabled(monkeypatch) -> None:
 
 
 @pytest.mark.anyio
-async def test_run_once_skips_when_pending_exists(
-    monkeypatch, session_factory
-) -> None:
+async def test_run_once_skips_when_pending_exists(monkeypatch, session_factory) -> None:
     monkeypatch.setattr(
         sched.settings, "media_usage_reconcile_enabled", True, raising=False
     )

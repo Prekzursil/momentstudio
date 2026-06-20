@@ -194,9 +194,7 @@ def test_upsert_restock_note_valid_variant(session_factory) -> None:
         async with session_factory() as session:
             cat = await _make_category(session)
             product = await _make_product(session, cat, slug="prod-vv")
-            variant = ProductVariant(
-                product_id=product.id, name="OK", stock_quantity=3
-            )
+            variant = ProductVariant(product_id=product.id, name="OK", stock_quantity=3)
             session.add(variant)
             await session.commit()
             # Valid variant for the product passes the guard (line 242 -> 247).
@@ -360,12 +358,8 @@ def test_list_restock_list_excludes_variants_when_disabled(session_factory) -> N
     async def scenario() -> None:
         async with session_factory() as session:
             cat = await _make_category(session, threshold=5)
-            product = await _make_product(
-                session, cat, slug="nv-prod", stock=1
-            )
-            variant = ProductVariant(
-                product_id=product.id, name="V", stock_quantity=0
-            )
+            product = await _make_product(session, cat, slug="nv-prod", stock=1)
+            variant = ProductVariant(product_id=product.id, name="V", stock_quantity=0)
             session.add(variant)
             await session.commit()
 
@@ -410,9 +404,7 @@ def test_list_restock_list_note_present_keeps_well_stocked_product(
         async with session_factory() as session:
             cat = await _make_category(session, threshold=5)
             # well-stocked product (not low) but with a restock note -> still listed
-            product = await _make_product(
-                session, cat, slug="ws-prod", stock=1000
-            )
+            product = await _make_product(session, cat, slug="ws-prod", stock=1000)
             await session.commit()
             await inventory.upsert_restock_note(
                 session,
@@ -485,9 +477,7 @@ def test_list_reservations_with_variant_filter(session_factory) -> None:
         async with session_factory() as session:
             cat = await _make_category(session)
             product = await _make_product(session, cat, slug="vf-prod", stock=10)
-            variant = ProductVariant(
-                product_id=product.id, name="VF", stock_quantity=5
-            )
+            variant = ProductVariant(product_id=product.id, name="VF", stock_quantity=5)
             session.add(variant)
             await session.flush()
 

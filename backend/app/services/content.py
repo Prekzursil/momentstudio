@@ -350,7 +350,9 @@ async def rename_page_slug(
         )
 
     resolved_target = await resolve_redirect_key(session, new_key)
-    if resolved_target == old_key:  # pragma: no cover -- defensive: resolve only follows a redirect FROM new_key, which is already rejected by the reserved_by_redirect guard above, so new_key never resolves to old_key here
+    if (
+        resolved_target == old_key
+    ):  # pragma: no cover -- defensive: resolve only follows a redirect FROM new_key, which is already rejected by the reserved_by_redirect guard above, so new_key never resolves to old_key here
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Page slug would create a redirect loop",
@@ -540,7 +542,9 @@ async def upsert_block(
                 block.published_at = published_at or now
             elif block.published_at is None:
                 block.published_at = now
-        elif block.status in (ContentStatus.draft, ContentStatus.review):  # pragma: no branch -- ContentStatus has exactly three members; the non-published case is always draft or review
+        elif (
+            block.status in (ContentStatus.draft, ContentStatus.review)
+        ):  # pragma: no branch -- ContentStatus has exactly three members; the non-published case is always draft or review
             block.published_at = None
             block.published_until = None
     elif "published_at" in data:
@@ -738,7 +742,9 @@ async def edit_image_asset(
                     max(1, min(crop_box[2], width)),
                     max(1, min(crop_box[3], height)),
                 )
-                if crop_box[2] <= crop_box[0] or crop_box[3] <= crop_box[1]:  # pragma: no cover -- defensive: the clamping above always yields a positive-area box for any real image, so a collapsed crop box is unreachable
+                if (
+                    crop_box[2] <= crop_box[0] or crop_box[3] <= crop_box[1]
+                ):  # pragma: no cover -- defensive: the clamping above always yields a positive-area box for any real image, so a collapsed crop box is unreachable
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid crop"
                     )
@@ -777,7 +783,9 @@ async def edit_image_asset(
             save_kwargs: dict[str, object] = {"optimize": True}
             image_to_save = img
             if out_format == "JPEG":
-                if image_to_save.mode not in ("RGB", "L"):  # pragma: no cover -- defensive: JPEG sources decode to RGB/L and crop/rotate/resize preserve the mode, so a non-RGB/L mode is unreachable here
+                if (
+                    image_to_save.mode not in ("RGB", "L")
+                ):  # pragma: no cover -- defensive: JPEG sources decode to RGB/L and crop/rotate/resize preserve the mode, so a non-RGB/L mode is unreachable here
                     image_to_save = image_to_save.convert("RGB")
                 save_kwargs.update({"quality": 90, "progressive": True})
             elif out_format == "WEBP":
@@ -1082,13 +1090,21 @@ async def rollback_to_version(
     block.title = snapshot.title
     block.body_markdown = snapshot.body_markdown
     block.status = snapshot.status
-    if hasattr(snapshot, "meta"):  # pragma: no branch -- ContentBlockVersion always defines a 'meta' column, so hasattr is always True (guard is for legacy snapshot schemas)
+    if hasattr(
+        snapshot, "meta"
+    ):  # pragma: no branch -- ContentBlockVersion always defines a 'meta' column, so hasattr is always True (guard is for legacy snapshot schemas)
         block.meta = snapshot.meta
-    if hasattr(snapshot, "lang"):  # pragma: no branch -- ContentBlockVersion always defines a 'lang' column, so hasattr is always True (guard is for legacy snapshot schemas)
+    if hasattr(
+        snapshot, "lang"
+    ):  # pragma: no branch -- ContentBlockVersion always defines a 'lang' column, so hasattr is always True (guard is for legacy snapshot schemas)
         block.lang = snapshot.lang
-    if hasattr(snapshot, "published_at"):  # pragma: no branch -- ContentBlockVersion always defines a 'published_at' column, so hasattr is always True (guard is for legacy snapshot schemas)
+    if hasattr(
+        snapshot, "published_at"
+    ):  # pragma: no branch -- ContentBlockVersion always defines a 'published_at' column, so hasattr is always True (guard is for legacy snapshot schemas)
         block.published_at = snapshot.published_at
-    if hasattr(snapshot, "published_until"):  # pragma: no branch -- ContentBlockVersion always defines a 'published_until' column, so hasattr is always True (guard is for legacy snapshot schemas)
+    if hasattr(
+        snapshot, "published_until"
+    ):  # pragma: no branch -- ContentBlockVersion always defines a 'published_until' column, so hasattr is always True (guard is for legacy snapshot schemas)
         block.published_until = snapshot.published_until
     if block.status in (ContentStatus.draft, ContentStatus.review):
         block.published_at = None

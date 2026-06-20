@@ -49,7 +49,6 @@ from app.schemas.coupons_v2 import (
     PromotionCreate,
     PromotionUpdate,
 )
-from app.services import coupons_v2 as coupons_service
 from app.services import email as email_service
 
 UTC = timezone.utc
@@ -209,9 +208,10 @@ def test_normalize_bulk_emails() -> None:
 
 
 def test_parse_bucket_config() -> None:
-    assert api._parse_bucket_config(
-        bucket_total=None, bucket_index=None, bucket_seed=None
-    ) is None
+    assert (
+        api._parse_bucket_config(bucket_total=None, bucket_index=None, bucket_seed=None)
+        is None
+    )
     cfg = api._parse_bucket_config(bucket_total=4, bucket_index=1, bucket_seed="s")
     assert cfg.total == 4 and cfg.index == 1 and cfg.seed == "s"
     with pytest.raises(ValueError, match="requires"):
@@ -315,7 +315,9 @@ async def test_eligibility_validate_my_coupons() -> None:
         user = await session.get(User, user_id)
         # eligibility (empty cart -> returns response object)
         resp = await api.coupon_eligibility(
-            session=session, current_user=user, shipping_method_id=None,
+            session=session,
+            current_user=user,
+            shipping_method_id=None,
             session_id=None,
         )
         assert hasattr(resp, "eligible")
@@ -323,15 +325,21 @@ async def test_eligibility_validate_my_coupons() -> None:
         # validate: not found
         with pytest.raises(HTTPException) as exc:
             await api.validate_coupon(
-                CouponValidateRequest(code="NOPE"), session=session,
-                current_user=user, shipping_method_id=None, session_id=None,
+                CouponValidateRequest(code="NOPE"),
+                session=session,
+                current_user=user,
+                shipping_method_id=None,
+                session_id=None,
             )
         assert exc.value.status_code == 404
 
         # validate: found
         offer = await api.validate_coupon(
-            CouponValidateRequest(code="save10"), session=session,
-            current_user=user, shipping_method_id=None, session_id=None,
+            CouponValidateRequest(code="save10"),
+            session=session,
+            current_user=user,
+            shipping_method_id=None,
+            session_id=None,
         )
         assert offer.coupon.code == "SAVE10"
 
@@ -370,42 +378,52 @@ async def test_admin_create_promotion_validations() -> None:
         with pytest.raises(HTTPException, match="percentage_off is required"):
             await api.admin_create_promotion(
                 PromotionCreate(name="P", discount_type="percent"),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
         # amount without amount_off
         with pytest.raises(HTTPException, match="amount_off is required"):
             await api.admin_create_promotion(
                 PromotionCreate(name="P", discount_type="amount"),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
         # free_shipping with amount set
         with pytest.raises(HTTPException, match="free_shipping"):
             await api.admin_create_promotion(
                 PromotionCreate(
-                    name="P", discount_type="free_shipping",
+                    name="P",
+                    discount_type="free_shipping",
                     amount_off=Decimal("5"),
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
         # both percentage and amount
         with pytest.raises(HTTPException, match="not both"):
             await api.admin_create_promotion(
                 PromotionCreate(
-                    name="P", discount_type="percent",
-                    percentage_off=Decimal("5"), amount_off=Decimal("5"),
+                    name="P",
+                    discount_type="percent",
+                    percentage_off=Decimal("5"),
+                    amount_off=Decimal("5"),
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         # happy path with key + scopes
         created = await api.admin_create_promotion(
             PromotionCreate(
-                name="Promo", key="MYKEY", discount_type="percent",
+                name="Promo",
+                key="MYKEY",
+                discount_type="percent",
                 percentage_off=Decimal("10"),
                 included_product_ids=[product_id],
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert created.name == "Promo"
         assert created.included_product_ids == [product_id]
@@ -415,10 +433,13 @@ async def test_admin_create_promotion_validations() -> None:
         with pytest.raises(HTTPException, match="key already exists"):
             await api.admin_create_promotion(
                 PromotionCreate(
-                    name="P2", key="MYKEY", discount_type="percent",
+                    name="P2",
+                    key="MYKEY",
+                    discount_type="percent",
                     percentage_off=Decimal("5"),
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
 
@@ -449,11 +470,14 @@ async def test_admin_list_and_update_promotion() -> None:
         updated = await api.admin_update_promotion(
             promo_id,
             PromotionUpdate(
-                name="Updated", key="NEWKEY", discount_type="percent",
+                name="Updated",
+                key="NEWKEY",
+                discount_type="percent",
                 percentage_off=Decimal("15"),
                 included_product_ids=[product_id],
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert updated.name == "Updated"
         assert updated.included_product_ids == [product_id]
@@ -475,7 +499,8 @@ async def test_admin_update_promotion_validation_errors() -> None:
             await api.admin_update_promotion(
                 promo_id,
                 PromotionUpdate(discount_type="amount", percentage_off=None),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
 
@@ -505,7 +530,8 @@ async def test_admin_coupon_crud() -> None:
         with pytest.raises(HTTPException, match="Promotion not found"):
             await api.admin_create_coupon(
                 CouponCreate(promotion_id=uuid.uuid4(), code="NEW1"),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -513,13 +539,15 @@ async def test_admin_coupon_crud() -> None:
         with pytest.raises(HTTPException, match="already exists"):
             await api.admin_create_coupon(
                 CouponCreate(promotion_id=promo_id, code="SAVE10"),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         created = await api.admin_create_coupon(
             CouponCreate(promotion_id=promo_id, code="newcode"),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert created.code == "NEWCODE"
 
@@ -532,8 +560,10 @@ async def test_admin_coupon_crud() -> None:
 
     async with local() as session:
         updated = await api.admin_update_coupon(
-            coupon_id, CouponUpdate(is_active=False, global_max_redemptions=3),
-            session=session, _=admin,
+            coupon_id,
+            CouponUpdate(is_active=False, global_max_redemptions=3),
+            session=session,
+            _=admin,
         )
         assert updated.is_active is False
 
@@ -572,7 +602,8 @@ async def test_admin_generate_coupon_code() -> None:
     async with local() as session:
         resp = await api.admin_generate_coupon_code(
             CouponCodeGenerateRequest(prefix="SALE", length=10),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert resp.code
 
@@ -594,7 +625,9 @@ async def test_admin_issue_coupon_to_user() -> None:
         with pytest.raises(HTTPException, match="User not found"):
             await api.admin_issue_coupon_to_user(
                 CouponIssueToUserRequest(user_id=uuid.uuid4(), promotion_id=promo_id),
-                bg, session=session, actor=admin,
+                bg,
+                session=session,
+                actor=admin,
             )
 
     async with local() as session:
@@ -602,16 +635,22 @@ async def test_admin_issue_coupon_to_user() -> None:
         with pytest.raises(HTTPException, match="Promotion not found"):
             await api.admin_issue_coupon_to_user(
                 CouponIssueToUserRequest(user_id=user_id, promotion_id=uuid.uuid4()),
-                bg, session=session, actor=admin,
+                bg,
+                session=session,
+                actor=admin,
             )
 
     async with local() as session:
         out = await api.admin_issue_coupon_to_user(
             CouponIssueToUserRequest(
-                user_id=user_id, promotion_id=promo_id, validity_days=30,
+                user_id=user_id,
+                promotion_id=promo_id,
+                validity_days=30,
                 send_email=True,
             ),
-            bg, session=session, actor=admin,
+            bg,
+            session=session,
+            actor=admin,
         )
         assert out.visibility == CouponVisibility.assigned
 
@@ -633,10 +672,13 @@ async def test_admin_issue_coupon_marketing_optout_and_past_end() -> None:
         with pytest.raises(HTTPException, match="must be in the future"):
             await api.admin_issue_coupon_to_user(
                 CouponIssueToUserRequest(
-                    user_id=user_id, promotion_id=promo_id,
+                    user_id=user_id,
+                    promotion_id=promo_id,
                     ends_at=datetime(2000, 1, 1),
                 ),
-                bg, session=session, actor=admin,
+                bg,
+                session=session,
+                actor=admin,
             )
 
     async with local() as session:
@@ -644,9 +686,13 @@ async def test_admin_issue_coupon_marketing_optout_and_past_end() -> None:
         with pytest.raises(HTTPException, match="opted in"):
             await api.admin_issue_coupon_to_user(
                 CouponIssueToUserRequest(
-                    user_id=user_id, promotion_id=promo_id, send_email=True,
+                    user_id=user_id,
+                    promotion_id=promo_id,
+                    send_email=True,
                 ),
-                bg, session=session, actor=admin,
+                bg,
+                session=session,
+                actor=admin,
             )
 
 
@@ -670,56 +716,76 @@ async def test_admin_assign_and_revoke_single() -> None:
     async with local() as session:
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_assign_coupon(
-                uuid.uuid4(), CouponAssignRequest(user_id=user_id),
-                bg, session=session, _=admin,
+                uuid.uuid4(),
+                CouponAssignRequest(user_id=user_id),
+                bg,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         # _find_user with neither user_id nor email -> 400
         with pytest.raises(HTTPException, match="Provide user_id or email"):
             await api.admin_assign_coupon(
-                coupon_id, CouponAssignRequest(send_email=False),
-                bg, session=session, _=admin,
+                coupon_id,
+                CouponAssignRequest(send_email=False),
+                bg,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         # assign (create)
         r = await api.admin_assign_coupon(
-            coupon_id, CouponAssignRequest(user_id=user_id, send_email=True),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponAssignRequest(user_id=user_id, send_email=True),
+            bg,
+            session=session,
+            _=admin,
         )
         assert r.status_code == 204
 
     async with local() as session:
         # assign again -> already active short-circuit
         r = await api.admin_assign_coupon(
-            coupon_id, CouponAssignRequest(user_id=user_id, send_email=False),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponAssignRequest(user_id=user_id, send_email=False),
+            bg,
+            session=session,
+            _=admin,
         )
         assert r.status_code == 204
 
     async with local() as session:
         # revoke (with email)
         r = await api.admin_revoke_coupon(
-            coupon_id, CouponRevokeRequest(user_id=user_id, reason="bye",
-                                           send_email=True),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponRevokeRequest(user_id=user_id, reason="bye", send_email=True),
+            bg,
+            session=session,
+            _=admin,
         )
         assert r.status_code == 204
 
     async with local() as session:
         # revoke again -> already revoked short-circuit
         r = await api.admin_revoke_coupon(
-            coupon_id, CouponRevokeRequest(user_id=user_id, send_email=False),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponRevokeRequest(user_id=user_id, send_email=False),
+            bg,
+            session=session,
+            _=admin,
         )
         assert r.status_code == 204
 
     async with local() as session:
         # assign restores a revoked assignment
         r = await api.admin_assign_coupon(
-            coupon_id, CouponAssignRequest(user_id=user_id, send_email=False),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponAssignRequest(user_id=user_id, send_email=False),
+            bg,
+            session=session,
+            _=admin,
         )
         assert r.status_code == 204
 
@@ -727,8 +793,11 @@ async def test_admin_assign_and_revoke_single() -> None:
         # revoke not found coupon
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_revoke_coupon(
-                uuid.uuid4(), CouponRevokeRequest(user_id=user_id),
-                bg, session=session, _=admin,
+                uuid.uuid4(),
+                CouponRevokeRequest(user_id=user_id),
+                bg,
+                session=session,
+                _=admin,
             )
 
 
@@ -749,8 +818,11 @@ async def test_admin_assign_revoke_marketing_optout() -> None:
         # revoke send_email but opted-out -> 400
         with pytest.raises(HTTPException, match="opted in"):
             await api.admin_revoke_coupon(
-                coupon_id, CouponRevokeRequest(user_id=user_id, send_email=True),
-                bg, session=session, _=admin,
+                coupon_id,
+                CouponRevokeRequest(user_id=user_id, send_email=True),
+                bg,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -761,8 +833,11 @@ async def test_admin_assign_revoke_marketing_optout() -> None:
         # assign send_email but opted-out -> 400 (find via email branch)
         with pytest.raises(HTTPException, match="opted in"):
             await api.admin_assign_coupon(
-                coupon_id, CouponAssignRequest(email="no2@a.com", send_email=True),
-                bg, session=session, _=admin,
+                coupon_id,
+                CouponAssignRequest(email="no2@a.com", send_email=True),
+                bg,
+                session=session,
+                _=admin,
             )
 
 
@@ -784,8 +859,8 @@ async def test_bulk_assign_and_revoke() -> None:
     admin = _Admin()
     bg = BackgroundTasks()
     async with local() as session:
-        u1 = await _seed_user(session, email="b1@a.com", notify_marketing=True)
-        u2 = await _seed_user(session, email="b2@a.com", notify_marketing=True)
+        await _seed_user(session, email="b1@a.com", notify_marketing=True)
+        await _seed_user(session, email="b2@a.com", notify_marketing=True)
         promo, coupon = await _seed_promo_coupon(session)
         await session.commit()
         coupon_id = coupon.id
@@ -793,8 +868,11 @@ async def test_bulk_assign_and_revoke() -> None:
     async with local() as session:
         # empty emails -> early return
         res = await api.admin_bulk_assign_coupon(
-            coupon_id, CouponBulkAssignRequest(emails=[]),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponBulkAssignRequest(emails=[]),
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.unique == 0
 
@@ -802,8 +880,11 @@ async def test_bulk_assign_and_revoke() -> None:
         # coupon not found
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_bulk_assign_coupon(
-                uuid.uuid4(), CouponBulkAssignRequest(emails=["b1@a.com"]),
-                bg, session=session, _=admin,
+                uuid.uuid4(),
+                CouponBulkAssignRequest(emails=["b1@a.com"]),
+                bg,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -812,7 +893,9 @@ async def test_bulk_assign_and_revoke() -> None:
             CouponBulkAssignRequest(
                 emails=["b1@a.com", "b2@a.com", "ghost@a.com"], send_email=True
             ),
-            bg, session=session, _=admin,
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.created == 2
         assert "ghost@a.com" in res.not_found_emails
@@ -820,8 +903,11 @@ async def test_bulk_assign_and_revoke() -> None:
     async with local() as session:
         # assign again -> already_active
         res = await api.admin_bulk_assign_coupon(
-            coupon_id, CouponBulkAssignRequest(emails=["b1@a.com"], send_email=False),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponBulkAssignRequest(emails=["b1@a.com"], send_email=False),
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.already_active == 1
 
@@ -832,29 +918,40 @@ async def test_bulk_assign_and_revoke() -> None:
             CouponBulkRevokeRequest(
                 emails=["b1@a.com", "b2@a.com"], reason="cleanup", send_email=True
             ),
-            bg, session=session, _=admin,
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.revoked == 2
 
     async with local() as session:
         # revoke again -> already_revoked
         res = await api.admin_bulk_revoke_coupon(
-            coupon_id, CouponBulkRevokeRequest(emails=["b1@a.com"], send_email=False),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponBulkRevokeRequest(emails=["b1@a.com"], send_email=False),
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.already_revoked == 1
 
     async with local() as session:
         # bulk revoke empty + not found coupon
         res = await api.admin_bulk_revoke_coupon(
-            coupon_id, CouponBulkRevokeRequest(emails=[]),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponBulkRevokeRequest(emails=[]),
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.unique == 0
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_bulk_revoke_coupon(
-                uuid.uuid4(), CouponBulkRevokeRequest(emails=["b1@a.com"]),
-                bg, session=session, _=admin,
+                uuid.uuid4(),
+                CouponBulkRevokeRequest(emails=["b1@a.com"]),
+                bg,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -863,8 +960,11 @@ async def test_bulk_assign_and_revoke() -> None:
         await session.commit()
     async with local() as session:
         res = await api.admin_bulk_revoke_coupon(
-            coupon_id, CouponBulkRevokeRequest(emails=["b3@a.com"], send_email=False),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponBulkRevokeRequest(emails=["b3@a.com"], send_email=False),
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.not_assigned == 1
 
@@ -884,13 +984,19 @@ async def test_bulk_assign_too_many() -> None:
     async with local() as session:
         with pytest.raises(HTTPException, match="Too many"):
             await api.admin_bulk_assign_coupon(
-                coupon_id, CouponBulkAssignRequest(emails=too_many),
-                bg, session=session, _=admin,
+                coupon_id,
+                CouponBulkAssignRequest(emails=too_many),
+                bg,
+                session=session,
+                _=admin,
             )
         with pytest.raises(HTTPException, match="Too many"):
             await api.admin_bulk_revoke_coupon(
-                coupon_id, CouponBulkRevokeRequest(emails=too_many),
-                bg, session=session, _=admin,
+                coupon_id,
+                CouponBulkRevokeRequest(emails=too_many),
+                bg,
+                session=session,
+                _=admin,
             )
 
 
@@ -906,7 +1012,7 @@ async def test_segment_preview_assign_revoke() -> None:
     admin = _Admin()
     async with local() as session:
         u1 = await _seed_user(session, email="s1@a.com")
-        u2 = await _seed_user(session, email="s2@a.com")
+        await _seed_user(session, email="s2@a.com")
         promo, coupon = await _seed_promo_coupon(session)
         session.add(CouponAssignment(coupon_id=coupon.id, user_id=u1.id))
         await session.commit()
@@ -916,8 +1022,10 @@ async def test_segment_preview_assign_revoke() -> None:
         # coupon not found
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_preview_segment_assign(
-                uuid.uuid4(), CouponBulkSegmentAssignRequest(),
-                session=session, _=admin,
+                uuid.uuid4(),
+                CouponBulkSegmentAssignRequest(),
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -928,14 +1036,17 @@ async def test_segment_preview_assign_revoke() -> None:
                 CouponBulkSegmentAssignRequest(
                     bucket_total=2, bucket_index=5, bucket_seed="s"
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         # non-bucket preview assign
         prev = await api.admin_preview_segment_assign(
-            coupon_id, CouponBulkSegmentAssignRequest(),
-            session=session, _=admin,
+            coupon_id,
+            CouponBulkSegmentAssignRequest(),
+            session=session,
+            _=admin,
         )
         assert prev.total_candidates == 2
         assert prev.already_active == 1
@@ -947,7 +1058,8 @@ async def test_segment_preview_assign_revoke() -> None:
             CouponBulkSegmentAssignRequest(
                 bucket_total=2, bucket_index=0, bucket_seed="seed"
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert prev.total_candidates >= 0
 
@@ -955,14 +1067,18 @@ async def test_segment_preview_assign_revoke() -> None:
         # revoke preview not found
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_preview_segment_revoke(
-                uuid.uuid4(), CouponBulkSegmentRevokeRequest(),
-                session=session, _=admin,
+                uuid.uuid4(),
+                CouponBulkSegmentRevokeRequest(),
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         prev = await api.admin_preview_segment_revoke(
-            coupon_id, CouponBulkSegmentRevokeRequest(),
-            session=session, _=admin,
+            coupon_id,
+            CouponBulkSegmentRevokeRequest(),
+            session=session,
+            _=admin,
         )
         assert prev.revoked == 1
 
@@ -972,7 +1088,8 @@ async def test_segment_preview_assign_revoke() -> None:
             CouponBulkSegmentRevokeRequest(
                 bucket_total=2, bucket_index=0, bucket_seed="seed"
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert prev.total_candidates >= 0
 
@@ -994,8 +1111,11 @@ async def test_start_segment_jobs_and_run() -> None:
         # coupon not found
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_start_segment_assign_job(
-                uuid.uuid4(), CouponBulkSegmentAssignRequest(),
-                bg, session=session, admin_user=admin,
+                uuid.uuid4(),
+                CouponBulkSegmentAssignRequest(),
+                bg,
+                session=session,
+                admin_user=admin,
             )
         # bad bucket config
         with pytest.raises(HTTPException, match="within bucket_total"):
@@ -1004,14 +1124,18 @@ async def test_start_segment_jobs_and_run() -> None:
                 CouponBulkSegmentAssignRequest(
                     bucket_total=2, bucket_index=9, bucket_seed="s"
                 ),
-                bg, session=session, admin_user=admin,
+                bg,
+                session=session,
+                admin_user=admin,
             )
 
     async with local() as session:
         job = await api.admin_start_segment_assign_job(
             coupon_id,
             CouponBulkSegmentAssignRequest(send_email=True),
-            bg, session=session, admin_user=admin,
+            bg,
+            session=session,
+            admin_user=admin,
         )
         assert job.status == CouponBulkJobStatus.pending
         assign_job_id = job.id
@@ -1020,13 +1144,18 @@ async def test_start_segment_jobs_and_run() -> None:
         job = await api.admin_start_segment_revoke_job(
             coupon_id,
             CouponBulkSegmentRevokeRequest(reason="r"),
-            bg, session=session, admin_user=admin,
+            bg,
+            session=session,
+            admin_user=admin,
         )
         revoke_job_id = job.id
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_start_segment_revoke_job(
-                uuid.uuid4(), CouponBulkSegmentRevokeRequest(),
-                bg, session=session, admin_user=admin,
+                uuid.uuid4(),
+                CouponBulkSegmentRevokeRequest(),
+                bg,
+                session=session,
+                admin_user=admin,
             )
 
     # Run the assign job end-to-end (background runner).
@@ -1219,8 +1348,9 @@ async def test_bulk_job_get_list_cancel_retry() -> None:
     async with local() as session:
         # retry not found
         with pytest.raises(HTTPException, match="Job not found"):
-            await api.admin_retry_bulk_job(uuid.uuid4(), bg, session=session,
-                                           admin_user=admin)
+            await api.admin_retry_bulk_job(
+                uuid.uuid4(), bg, session=session, admin_user=admin
+            )
         # retry a cancelled (finished) job -> creates new job
         new_job = await api.admin_retry_bulk_job(
             job_id, bg, session=session, admin_user=admin
@@ -1249,8 +1379,9 @@ async def test_retry_in_progress_rejected() -> None:
 
     async with local() as session:
         with pytest.raises(HTTPException, match="still in progress"):
-            await api.admin_retry_bulk_job(job_id, bg, session=session,
-                                           admin_user=admin)
+            await api.admin_retry_bulk_job(
+                job_id, bg, session=session, admin_user=admin
+            )
 
 
 @pytest.mark.anyio
@@ -1294,16 +1425,26 @@ async def test_admin_coupon_analytics() -> None:
         category, product = await _seed_category_product(session)
         promo, coupon = await _seed_promo_coupon(session)
         order = Order(
-            status=OrderStatus.paid, total_amount=Decimal("100"), currency="RON",
-            tax_amount=0, shipping_amount=0, fee_amount=0,
-            customer_email="o@a.com", customer_name="O",
+            status=OrderStatus.paid,
+            total_amount=Decimal("100"),
+            currency="RON",
+            tax_amount=0,
+            shipping_amount=0,
+            fee_amount=0,
+            customer_email="o@a.com",
+            customer_name="O",
             promo_code="SAVE10",
             created_at=datetime.now(UTC) - timedelta(days=1),
         )
         baseline = Order(
-            status=OrderStatus.paid, total_amount=Decimal("80"), currency="RON",
-            tax_amount=0, shipping_amount=0, fee_amount=0,
-            customer_email="b@a.com", customer_name="B",
+            status=OrderStatus.paid,
+            total_amount=Decimal("80"),
+            currency="RON",
+            tax_amount=0,
+            shipping_amount=0,
+            fee_amount=0,
+            customer_email="b@a.com",
+            customer_name="B",
             promo_code=None,
             created_at=datetime.now(UTC) - timedelta(days=1),
         )
@@ -1311,16 +1452,23 @@ async def test_admin_coupon_analytics() -> None:
         await session.flush()
         session.add(
             OrderItem(
-                order_id=order.id, product_id=product.id, quantity=2,
-                shipped_quantity=0, unit_price=Decimal("50"), subtotal=Decimal("100"),
+                order_id=order.id,
+                product_id=product.id,
+                quantity=2,
+                shipped_quantity=0,
+                unit_price=Decimal("50"),
+                subtotal=Decimal("100"),
                 created_at=datetime.now(UTC) - timedelta(days=1),
             )
         )
         redeemer = await _seed_user(session, email="redeemer@a.com")
         session.add(
             CouponRedemption(
-                coupon_id=coupon.id, order_id=order.id, user_id=redeemer.id,
-                discount_ron=Decimal("10"), shipping_discount_ron=Decimal("0"),
+                coupon_id=coupon.id,
+                order_id=order.id,
+                user_id=redeemer.id,
+                discount_ron=Decimal("10"),
+                shipping_discount_ron=Decimal("0"),
                 redeemed_at=datetime.now(UTC) - timedelta(days=1),
             )
         )
@@ -1331,28 +1479,43 @@ async def test_admin_coupon_analytics() -> None:
         # promotion not found
         with pytest.raises(HTTPException, match="Promotion not found"):
             await api.admin_coupon_analytics(
-                uuid.uuid4(), session=session, _=admin, coupon_id=None,
-                days=30, top_limit=10,
+                uuid.uuid4(),
+                session=session,
+                _=admin,
+                coupon_id=None,
+                days=30,
+                top_limit=10,
             )
 
     async with local() as session:
         # coupon mismatch -> 404
         other_promo = Promotion(
-            name="Other", discount_type=PromotionDiscountType.percent,
-            percentage_off=Decimal("5"), is_active=True, is_automatic=False,
+            name="Other",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("5"),
+            is_active=True,
+            is_automatic=False,
         )
         session.add(other_promo)
         await session.flush()
         with pytest.raises(HTTPException, match="Coupon not found"):
             await api.admin_coupon_analytics(
-                other_promo.id, session=session, _=admin, coupon_id=coupon_id,
-                days=30, top_limit=10,
+                other_promo.id,
+                session=session,
+                _=admin,
+                coupon_id=coupon_id,
+                days=30,
+                top_limit=10,
             )
 
     async with local() as session:
         resp = await api.admin_coupon_analytics(
-            promo_id, session=session, _=admin, coupon_id=coupon_id,
-            days=30, top_limit=10,
+            promo_id,
+            session=session,
+            _=admin,
+            coupon_id=coupon_id,
+            days=30,
+            top_limit=10,
         )
         assert resp.summary.redemptions == 1
         assert resp.summary.total_discount_ron == Decimal("10.00")
@@ -1375,20 +1538,26 @@ async def test_create_promotion_scope_validation_errors() -> None:
         with pytest.raises(HTTPException, match="products in scope do not exist"):
             await api.admin_create_promotion(
                 PromotionCreate(
-                    name="P", discount_type="percent", percentage_off=Decimal("5"),
+                    name="P",
+                    discount_type="percent",
+                    percentage_off=Decimal("5"),
                     included_product_ids=[uuid.uuid4()],
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         with pytest.raises(HTTPException, match="categories in scope do not exist"):
             await api.admin_create_promotion(
                 PromotionCreate(
-                    name="P", discount_type="percent", percentage_off=Decimal("5"),
+                    name="P",
+                    discount_type="percent",
+                    percentage_off=Decimal("5"),
                     included_category_ids=[uuid.uuid4()],
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
 
@@ -1406,20 +1575,28 @@ async def test_create_promotion_scope_overlap_errors() -> None:
         with pytest.raises(HTTPException, match="Products cannot be both"):
             await api.admin_create_promotion(
                 PromotionCreate(
-                    name="P", discount_type="percent", percentage_off=Decimal("5"),
-                    included_product_ids=[pid], excluded_product_ids=[pid],
+                    name="P",
+                    discount_type="percent",
+                    percentage_off=Decimal("5"),
+                    included_product_ids=[pid],
+                    excluded_product_ids=[pid],
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
         with pytest.raises(HTTPException, match="Categories cannot be both"):
             await api.admin_create_promotion(
                 PromotionCreate(
-                    name="P", discount_type="percent", percentage_off=Decimal("5"),
-                    included_category_ids=[cid], excluded_category_ids=[cid],
+                    name="P",
+                    discount_type="percent",
+                    percentage_off=Decimal("5"),
+                    included_category_ids=[cid],
+                    excluded_category_ids=[cid],
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
 
@@ -1434,13 +1611,23 @@ async def test_create_promotion_all_scope_types() -> None:
         session.add_all([cat_a, cat_b])
         await session.flush()
         p_in = Product(
-            category_id=cat_a.id, slug="pin", sku="PIN", name="PIN",
-            base_price=Decimal("10"), currency="RON", stock_quantity=5,
+            category_id=cat_a.id,
+            slug="pin",
+            sku="PIN",
+            name="PIN",
+            base_price=Decimal("10"),
+            currency="RON",
+            stock_quantity=5,
             status=ProductStatus.published,
         )
         p_ex = Product(
-            category_id=cat_a.id, slug="pex", sku="PEX", name="PEX",
-            base_price=Decimal("10"), currency="RON", stock_quantity=5,
+            category_id=cat_a.id,
+            slug="pex",
+            sku="PEX",
+            name="PEX",
+            base_price=Decimal("10"),
+            currency="RON",
+            stock_quantity=5,
             status=ProductStatus.published,
         )
         session.add_all([p_in, p_ex])
@@ -1450,11 +1637,16 @@ async def test_create_promotion_all_scope_types() -> None:
     async with local() as session:
         created = await api.admin_create_promotion(
             PromotionCreate(
-                name="Full", discount_type="percent", percentage_off=Decimal("5"),
-                included_product_ids=[ids[0]], excluded_product_ids=[ids[1]],
-                included_category_ids=[ids[2]], excluded_category_ids=[ids[3]],
+                name="Full",
+                discount_type="percent",
+                percentage_off=Decimal("5"),
+                included_product_ids=[ids[0]],
+                excluded_product_ids=[ids[1]],
+                included_category_ids=[ids[2]],
+                excluded_category_ids=[ids[3]],
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert created.included_product_ids == [ids[0]]
         assert created.excluded_product_ids == [ids[1]]
@@ -1467,8 +1659,12 @@ async def test_update_promotion_free_shipping_and_key_dup() -> None:
     admin = _Admin()
     async with local() as session:
         other = Promotion(
-            name="Other", key="TAKEN", discount_type=PromotionDiscountType.percent,
-            percentage_off=Decimal("5"), is_active=True, is_automatic=False,
+            name="Other",
+            key="TAKEN",
+            discount_type=PromotionDiscountType.percent,
+            percentage_off=Decimal("5"),
+            is_active=True,
+            is_automatic=False,
         )
         promo, _ = await _seed_promo_coupon(session)
         session.add(other)
@@ -1478,8 +1674,10 @@ async def test_update_promotion_free_shipping_and_key_dup() -> None:
     async with local() as session:
         with pytest.raises(HTTPException, match="free_shipping promotions cannot"):
             await api.admin_update_promotion(
-                promo_id, PromotionUpdate(discount_type="free_shipping"),
-                session=session, _=admin,
+                promo_id,
+                PromotionUpdate(discount_type="free_shipping"),
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -1487,7 +1685,8 @@ async def test_update_promotion_free_shipping_and_key_dup() -> None:
             await api.admin_update_promotion(
                 promo_id,
                 PromotionUpdate(percentage_off=Decimal("5"), amount_off=Decimal("5")),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -1497,7 +1696,8 @@ async def test_update_promotion_free_shipping_and_key_dup() -> None:
                 PromotionUpdate(
                     key="TAKEN", discount_type="percent", percentage_off=Decimal("5")
                 ),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
     async with local() as session:
@@ -1506,7 +1706,8 @@ async def test_update_promotion_free_shipping_and_key_dup() -> None:
             PromotionUpdate(
                 key="   ", discount_type="percent", percentage_off=Decimal("10")
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert updated.key is None
 
@@ -1526,7 +1727,8 @@ async def test_create_coupon_code_validation() -> None:
         with pytest.raises(HTTPException, match="code is required"):
             await api.admin_create_coupon(
                 CouponCreate(promotion_id=promo_id, code="   "),
-                session=session, _=admin,
+                session=session,
+                _=admin,
             )
 
 
@@ -1544,14 +1746,17 @@ async def test_bulk_job_runner_existing_assignments() -> None:
         session.add(CouponAssignment(coupon_id=coupon.id, user_id=active_user.id))
         session.add(
             CouponAssignment(
-                coupon_id=coupon.id, user_id=revoked_user.id,
+                coupon_id=coupon.id,
+                user_id=revoked_user.id,
                 revoked_at=datetime.now(UTC),
             )
         )
         assign_job = CouponBulkJob(
-            coupon_id=coupon.id, created_by_user_id=uuid.uuid4(),
+            coupon_id=coupon.id,
+            created_by_user_id=uuid.uuid4(),
             action=CouponBulkJobAction.assign,
-            status=CouponBulkJobStatus.pending, send_email=True,
+            status=CouponBulkJobStatus.pending,
+            send_email=True,
         )
         session.add(assign_job)
         await session.commit()
@@ -1569,9 +1774,11 @@ async def test_bulk_job_runner_existing_assignments() -> None:
     async with local() as session:
         await _seed_user(session, email="rn@a.com", notify_marketing=True)
         revoke_job = CouponBulkJob(
-            coupon_id=coupon_id, created_by_user_id=uuid.uuid4(),
+            coupon_id=coupon_id,
+            created_by_user_id=uuid.uuid4(),
             action=CouponBulkJobAction.revoke,
-            status=CouponBulkJobStatus.pending, send_email=True,
+            status=CouponBulkJobStatus.pending,
+            send_email=True,
             revoke_reason="cleanup",
         )
         session.add(revoke_job)
@@ -1588,9 +1795,11 @@ async def test_bulk_job_runner_existing_assignments() -> None:
     # Run the revoke job again -> already_revoked branch.
     async with local() as session:
         revoke_job2 = CouponBulkJob(
-            coupon_id=coupon_id, created_by_user_id=uuid.uuid4(),
+            coupon_id=coupon_id,
+            created_by_user_id=uuid.uuid4(),
             action=CouponBulkJobAction.revoke,
-            status=CouponBulkJobStatus.pending, send_email=False,
+            status=CouponBulkJobStatus.pending,
+            send_email=False,
         )
         session.add(revoke_job2)
         await session.commit()
@@ -1620,7 +1829,9 @@ async def test_bulk_assign_revoke_send_email_paths() -> None:
             CouponBulkAssignRequest(
                 emails=["opt1@a.com", "opt2@a.com"], send_email=True
             ),
-            bg, session=session, _=admin,
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.created == 2
 
@@ -1630,7 +1841,9 @@ async def test_bulk_assign_revoke_send_email_paths() -> None:
             CouponBulkRevokeRequest(
                 emails=["opt1@a.com", "opt2@a.com"], send_email=True
             ),
-            bg, session=session, _=admin,
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.revoked == 2
 
@@ -1644,10 +1857,14 @@ async def test_segment_jobs_bad_bucket_in_revoke_and_retry() -> None:
     async with local() as session:
         promo, coupon = await _seed_promo_coupon(session)
         bad_job = CouponBulkJob(
-            coupon_id=coupon.id, created_by_user_id=admin.id,
+            coupon_id=coupon.id,
+            created_by_user_id=admin.id,
             action=CouponBulkJobAction.assign,
-            status=CouponBulkJobStatus.failed, send_email=False,
-            bucket_total=2, bucket_index=5, bucket_seed="seed",
+            status=CouponBulkJobStatus.failed,
+            send_email=False,
+            bucket_total=2,
+            bucket_index=5,
+            bucket_seed="seed",
         )
         session.add(bad_job)
         await session.commit()
@@ -1660,7 +1877,9 @@ async def test_segment_jobs_bad_bucket_in_revoke_and_retry() -> None:
                 CouponBulkSegmentRevokeRequest(
                     bucket_total=2, bucket_index=9, bucket_seed="s"
                 ),
-                bg, session=session, admin_user=admin,
+                bg,
+                session=session,
+                admin_user=admin,
             )
 
     async with local() as session:
@@ -1687,13 +1906,18 @@ async def test_eligibility_validate_with_shipping_method() -> None:
     async with local() as session:
         user = await session.get(User, user_id)
         resp = await api.coupon_eligibility(
-            session=session, current_user=user, shipping_method_id=sm_id,
+            session=session,
+            current_user=user,
+            shipping_method_id=sm_id,
             session_id=None,
         )
         assert hasattr(resp, "eligible")
         offer = await api.validate_coupon(
-            CouponValidateRequest(code="SAVE10"), session=session,
-            current_user=user, shipping_method_id=sm_id, session_id=None,
+            CouponValidateRequest(code="SAVE10"),
+            session=session,
+            current_user=user,
+            shipping_method_id=sm_id,
+            session_id=None,
         )
         assert offer.coupon.code == "SAVE10"
 
@@ -1725,8 +1949,10 @@ async def test_update_promotion_switch_to_percent_missing_value() -> None:
     admin = _Admin()
     async with local() as session:
         promo = Promotion(
-            name="FS", discount_type=PromotionDiscountType.free_shipping,
-            is_active=True, is_automatic=False,
+            name="FS",
+            discount_type=PromotionDiscountType.free_shipping,
+            is_active=True,
+            is_automatic=False,
         )
         session.add(promo)
         await session.commit()
@@ -1736,8 +1962,10 @@ async def test_update_promotion_switch_to_percent_missing_value() -> None:
         # switch to percent without supplying percentage_off -> 400
         with pytest.raises(HTTPException, match="percentage_off is required"):
             await api.admin_update_promotion(
-                promo_id, PromotionUpdate(discount_type="percent"),
-                session=session, _=admin,
+                promo_id,
+                PromotionUpdate(discount_type="percent"),
+                session=session,
+                _=admin,
             )
 
 
@@ -1758,7 +1986,9 @@ async def test_issue_coupon_sends_email_for_optin_user() -> None:
             CouponIssueToUserRequest(
                 user_id=user_id, promotion_id=promo_id, send_email=True
             ),
-            bg, session=session, actor=admin,
+            bg,
+            session=session,
+            actor=admin,
         )
         assert out.code
     # send_email branch queued a background task
@@ -1784,15 +2014,18 @@ async def test_single_assign_restore_revoked() -> None:
 
     async with local() as session:
         r = await api.admin_assign_coupon(
-            coupon_id, CouponAssignRequest(user_id=user_id, send_email=True),
-            bg, session=session, _=admin,
+            coupon_id,
+            CouponAssignRequest(user_id=user_id, send_email=True),
+            bg,
+            session=session,
+            _=admin,
         )
         assert r.status_code == 204
         assignment = (
             await session.execute(
-                __import__("sqlalchemy").select(CouponAssignment).where(
-                    CouponAssignment.user_id == user_id
-                )
+                __import__("sqlalchemy")
+                .select(CouponAssignment)
+                .where(CouponAssignment.user_id == user_id)
             )
         ).scalar_one()
         assert assignment.revoked_at is None
@@ -1812,9 +2045,7 @@ async def test_bulk_revoke_user_not_in_map() -> None:
             CouponAssignment(
                 coupon_id=coupon.id,
                 user_id=(
-                    await session.execute(
-                        __import__("sqlalchemy").select(User.id)
-                    )
+                    await session.execute(__import__("sqlalchemy").select(User.id))
                 ).scalar_one(),
             )
         )
@@ -1829,7 +2060,9 @@ async def test_bulk_revoke_user_not_in_map() -> None:
             CouponBulkRevokeRequest(
                 emails=["present@a.com", "absent@a.com"], send_email=False
             ),
-            bg, session=session, _=admin,
+            bg,
+            session=session,
+            _=admin,
         )
         assert "absent@a.com" in res.not_found_emails
         assert res.revoked == 1
@@ -1856,17 +2089,17 @@ async def test_bucket_preview_and_runner_with_assignments() -> None:
         await session.flush()
         # Give one in-bucket user an active assignment and one a revoked one.
         in_bucket = [
-            u for u in users
+            u
+            for u in users
             if api._bucket_index_for_user(user_id=u.id, seed=seed, total=total) == 0
         ]
         assert in_bucket, "need at least one user in bucket 0"
-        session.add(
-            CouponAssignment(coupon_id=coupon.id, user_id=in_bucket[0].id)
-        )
+        session.add(CouponAssignment(coupon_id=coupon.id, user_id=in_bucket[0].id))
         if len(in_bucket) > 1:
             session.add(
                 CouponAssignment(
-                    coupon_id=coupon.id, user_id=in_bucket[1].id,
+                    coupon_id=coupon.id,
+                    user_id=in_bucket[1].id,
                     revoked_at=datetime.now(UTC),
                 )
             )
@@ -1878,7 +2111,8 @@ async def test_bucket_preview_and_runner_with_assignments() -> None:
             CouponBulkSegmentAssignRequest(
                 bucket_total=total, bucket_index=0, bucket_seed=seed
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert prev.already_active >= 1
 
@@ -1888,17 +2122,22 @@ async def test_bucket_preview_and_runner_with_assignments() -> None:
             CouponBulkSegmentRevokeRequest(
                 bucket_total=total, bucket_index=0, bucket_seed=seed
             ),
-            session=session, _=admin,
+            session=session,
+            _=admin,
         )
         assert prev.total_candidates >= 1
 
     # bucketed runner (assign) with send_email -> exercises bucket loop + notify
     async with local() as session:
         job = CouponBulkJob(
-            coupon_id=coupon_id, created_by_user_id=uuid.uuid4(),
+            coupon_id=coupon_id,
+            created_by_user_id=uuid.uuid4(),
             action=CouponBulkJobAction.assign,
-            status=CouponBulkJobStatus.pending, send_email=True,
-            bucket_total=total, bucket_index=0, bucket_seed=seed,
+            status=CouponBulkJobStatus.pending,
+            send_email=True,
+            bucket_total=total,
+            bucket_index=0,
+            bucket_seed=seed,
             total_candidates=5,
         )
         session.add(job)
@@ -1932,7 +2171,9 @@ async def test_bulk_assign_restores_revoked() -> None:
         res = await api.admin_bulk_assign_coupon(
             coupon_id,
             CouponBulkAssignRequest(emails=["rev@a.com"], send_email=True),
-            bg, session=session, _=admin,
+            bg,
+            session=session,
+            _=admin,
         )
         assert res.restored == 1
 
@@ -1951,14 +2192,20 @@ async def test_runner_no_email_bucket() -> None:
             await _seed_user(session, email=f"ne{i}@a.com", notify_marketing=True)
         await session.flush()
         users = (
-            await session.execute(__import__("sqlalchemy").select(User.id))
-        ).scalars().all()
+            (await session.execute(__import__("sqlalchemy").select(User.id)))
+            .scalars()
+            .all()
+        )
         idx = api._bucket_index_for_user(user_id=users[0], seed=seed, total=total)
         job = CouponBulkJob(
-            coupon_id=coupon.id, created_by_user_id=uuid.uuid4(),
+            coupon_id=coupon.id,
+            created_by_user_id=uuid.uuid4(),
             action=CouponBulkJobAction.assign,
-            status=CouponBulkJobStatus.pending, send_email=False,
-            bucket_total=total, bucket_index=idx, bucket_seed=seed,
+            status=CouponBulkJobStatus.pending,
+            send_email=False,
+            bucket_total=total,
+            bucket_index=idx,
+            bucket_seed=seed,
             total_candidates=1,
         )
         session.add(job)

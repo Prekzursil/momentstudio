@@ -35,7 +35,9 @@ def session_factory(monkeypatch):
     return factory
 
 
-def _make_order(*, created_at: datetime, status=OrderStatus.pending_payment, **kw) -> Order:
+def _make_order(
+    *, created_at: datetime, status=OrderStatus.pending_payment, **kw
+) -> Order:
     return Order(
         status=status,
         customer_email="c@example.com",

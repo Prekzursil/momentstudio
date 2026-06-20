@@ -65,7 +65,9 @@ async def _admin(session: Any, *, role: UserRole = UserRole.admin) -> User:
 class _FakeRequest:
     """Minimal stand-in for fastapi.Request used by audit-logging handlers."""
 
-    def __init__(self, ua: str = "pytest-agent", host: str | None = "127.0.0.1") -> None:
+    def __init__(
+        self, ua: str = "pytest-agent", host: str | None = "127.0.0.1"
+    ) -> None:
         self.headers = {"user-agent": ua}
         self.client = type("C", (), {"host": host})() if host is not None else None
 
@@ -271,17 +273,13 @@ def test_admin_summary_with_seeded_orders_and_alerts(
 
         paid = _mk_order(OrderStatus.paid, "100", now - timedelta(hours=1))
         refunded = _mk_order(OrderStatus.refunded, "50", now - timedelta(hours=2))
-        pending = _mk_order(
-            OrderStatus.pending_payment, "30", now - timedelta(hours=3)
-        )
+        pending = _mk_order(OrderStatus.pending_payment, "30", now - timedelta(hours=3))
         test_order = _mk_order(OrderStatus.paid, "999", now - timedelta(hours=1))
         session.add_all([paid, refunded, pending, test_order])
         await session.flush()
         session.add(OrderTag(order_id=test_order.id, tag="test"))
         session.add(
-            OrderRefund(
-                order_id=refunded.id, amount=Decimal("20"), provider="stripe"
-            )
+            OrderRefund(order_id=refunded.id, amount=Decimal("20"), provider="stripe")
         )
         session.add(
             ReturnRequest(
@@ -385,9 +383,7 @@ def test_admin_send_scheduled_report_success(
         async def fake_send(_session: Any, *, kind: str, force: bool) -> dict:
             return {"kind": kind, "force": force, "sent": True}
 
-        monkeypatch.setattr(
-            ad.admin_reports_service, "send_report_now", fake_send
-        )
+        monkeypatch.setattr(ad.admin_reports_service, "send_report_now", fake_send)
         result = await ad.admin_send_scheduled_report(
             request=_FakeRequest(),
             payload={"kind": "Daily", "force": True},
@@ -408,9 +404,7 @@ def test_admin_send_scheduled_report_value_error(
         async def fake_send(_session: Any, *, kind: str, force: bool) -> dict:
             raise ValueError("unknown kind")
 
-        monkeypatch.setattr(
-            ad.admin_reports_service, "send_report_now", fake_send
-        )
+        monkeypatch.setattr(ad.admin_reports_service, "send_report_now", fake_send)
         with pytest.raises(HTTPException) as exc:
             await ad.admin_send_scheduled_report(
                 request=_FakeRequest(host=None),
@@ -432,9 +426,7 @@ def test_admin_send_scheduled_report_unexpected_error(
         async def fake_send(_session: Any, *, kind: str, force: bool) -> dict:
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(
-            ad.admin_reports_service, "send_report_now", fake_send
-        )
+        monkeypatch.setattr(ad.admin_reports_service, "send_report_now", fake_send)
         with pytest.raises(RuntimeError):
             await ad.admin_send_scheduled_report(
                 request=_FakeRequest(),
@@ -540,7 +532,9 @@ def _seed_sales_orders(session: Any) -> Callable[[], Any]:
         await session.flush()
         session.add(
             OrderRefund(
-                order_id=refunded.id, amount=Decimal("15"), provider="paypal",
+                order_id=refunded.id,
+                amount=Decimal("15"),
+                provider="paypal",
                 created_at=now - timedelta(days=1),
             )
         )
@@ -557,9 +551,7 @@ def test_admin_channel_breakdown_populated(
         result = await ad.admin_channel_breakdown(
             session=session, _=None, range_days=30, range_from=None, range_to=None
         )
-        assert any(
-            row["key"] == "stripe" for row in result["payment_methods"]
-        )
+        assert any(row["key"] == "stripe" for row in result["payment_methods"])
 
     run(session_factory, scenario)
 
@@ -600,9 +592,7 @@ def test_admin_payments_health(session_factory: async_sessionmaker) -> None:
             )
         )
         await session.commit()
-        result = await ad.admin_payments_health(
-            session=session, _=None, since_hours=24
-        )
+        result = await ad.admin_payments_health(session=session, _=None, since_hours=24)
         providers = {p["provider"]: p for p in result["providers"]}
         assert providers["stripe"]["webhook_errors"] == 1
         assert providers["paypal"]["webhook_errors"] == 1
@@ -842,7 +832,11 @@ def test_admin_channel_attribution_tracked(
             AnalyticsEvent(
                 event="session_start",
                 session_id="sess-1",
-                payload={"utm_source": "Google", "utm_medium": "cpc", "utm_campaign": "spring"},
+                payload={
+                    "utm_source": "Google",
+                    "utm_medium": "cpc",
+                    "utm_campaign": "spring",
+                },
                 created_at=now - timedelta(days=1, hours=1),
             )
         )
@@ -1776,9 +1770,7 @@ def test_admin_audit_export_csv(
     async def scenario(session: Any) -> None:
         owner = await _admin(session, role=UserRole.owner)
         await _seed_audit_rows(session)()
-        monkeypatch.setattr(
-            ad.step_up_service, "require_step_up", lambda *a, **k: None
-        )
+        monkeypatch.setattr(ad.step_up_service, "require_step_up", lambda *a, **k: None)
         # redacted export
         resp = await ad.admin_audit_export_csv(
             request=_FakeRequest(),
@@ -1811,9 +1803,7 @@ def test_admin_audit_export_csv_forbidden(
 ) -> None:
     async def scenario(session: Any) -> None:
         admin = await _admin(session)
-        monkeypatch.setattr(
-            ad.step_up_service, "require_step_up", lambda *a, **k: None
-        )
+        monkeypatch.setattr(ad.step_up_service, "require_step_up", lambda *a, **k: None)
         with pytest.raises(HTTPException) as exc:
             await ad.admin_audit_export_csv(
                 request=_FakeRequest(),
@@ -1836,15 +1826,9 @@ def test_admin_audit_retention(
         await _admin(session)
         await _seed_audit_rows(session)()
         # Enable a retention policy so the cutoff branch runs.
-        monkeypatch.setattr(
-            settings, "audit_retention_days_product", 30, raising=False
-        )
-        monkeypatch.setattr(
-            settings, "audit_retention_days_content", 0, raising=False
-        )
-        monkeypatch.setattr(
-            settings, "audit_retention_days_security", 0, raising=False
-        )
+        monkeypatch.setattr(settings, "audit_retention_days_product", 30, raising=False)
+        monkeypatch.setattr(settings, "audit_retention_days_content", 0, raising=False)
+        monkeypatch.setattr(settings, "audit_retention_days_security", 0, raising=False)
         result = await ad.admin_audit_retention(session=session, _=None)
         assert result["policies"]["product"]["enabled"] is True
         assert result["policies"]["content"]["enabled"] is False
@@ -1896,12 +1880,8 @@ def test_admin_audit_retention_purge_executes(
         monkeypatch.setattr(
             settings, "audit_retention_days_security", 30, raising=False
         )
-        monkeypatch.setattr(
-            settings, "audit_retention_days_product", 0, raising=False
-        )
-        monkeypatch.setattr(
-            settings, "audit_retention_days_content", 0, raising=False
-        )
+        monkeypatch.setattr(settings, "audit_retention_days_product", 0, raising=False)
+        monkeypatch.setattr(settings, "audit_retention_days_content", 0, raising=False)
         result = await ad.admin_audit_retention_purge(
             payload={"confirm": "PURGE", "dry_run": False},
             session=session,

@@ -53,7 +53,9 @@ async def _make_user(session) -> User:  # noqa: ANN001
 # rp_id / rp_name / allowed_origins                                            #
 # --------------------------------------------------------------------------- #
 def test_rp_id_explicit(monkeypatch) -> None:
-    monkeypatch.setattr(passkeys.settings, "webauthn_rp_id", " example.com ", raising=False)
+    monkeypatch.setattr(
+        passkeys.settings, "webauthn_rp_id", " example.com ", raising=False
+    )
     assert passkeys.rp_id() == "example.com"
 
 
@@ -438,9 +440,7 @@ async def test_delete_passkey_success(session_factory) -> None:
         session.add(pk)
         await session.commit()
         await session.refresh(pk)
-        assert await passkeys.delete_passkey(
-            session, user_id=user.id, passkey_id=pk.id
-        )
+        assert await passkeys.delete_passkey(session, user_id=user.id, passkey_id=pk.id)
 
 
 @pytest.mark.anyio

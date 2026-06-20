@@ -51,7 +51,9 @@ def _stub_services(monkeypatch):
     monkeypatch.setattr(
         wh.checkout_settings_service, "get_checkout_settings", _settings
     )
-    monkeypatch.setattr(wh.settings, "admin_alert_email", "alerts@example.com", raising=False)
+    monkeypatch.setattr(
+        wh.settings, "admin_alert_email", "alerts@example.com", raising=False
+    )
     yield
 
 
@@ -238,9 +240,7 @@ def test_process_paypal_ignored_cases(monkeypatch) -> None:
     async def run() -> None:
         async with factory() as session:
             # Wrong event type -> early return.
-            await wh.process_paypal_event(
-                session, bg, {"event_type": "OTHER"}
-            )
+            await wh.process_paypal_event(session, bg, {"event_type": "OTHER"})
             # Approved but no resource id.
             await wh.process_paypal_event(
                 session, bg, {"event_type": "CHECKOUT.ORDER.APPROVED", "resource": {}}
@@ -368,7 +368,9 @@ def test_payment_intent_no_id_and_not_found() -> None:
         async with factory() as session:
             # No intent id -> skipped.
             await wh.process_stripe_event(
-                session, bg, {"type": "payment_intent.succeeded", "data": {"object": {}}}
+                session,
+                bg,
+                {"type": "payment_intent.succeeded", "data": {"object": {}}},
             )
             # Intent id with no matching order.
             await wh.process_stripe_event(

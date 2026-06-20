@@ -128,9 +128,7 @@ async def test_run_as_leader_acquires_and_runs_then_unlocks(monkeypatch) -> None
     async def work(stop) -> None:  # noqa: ANN001
         worked["v"] = True
 
-    await leader_lock.run_as_leader(
-        name="lock-a", stop=asyncio.Event(), work=work
-    )
+    await leader_lock.run_as_leader(name="lock-a", stop=asyncio.Event(), work=work)
     assert worked["v"] is True
     assert any("pg_advisory_unlock" in s for s in statements)
 
@@ -155,9 +153,7 @@ async def test_run_as_leader_not_acquired_then_stops(monkeypatch) -> None:
         raise AssertionError("work should not run when lock not acquired")
 
     await asyncio.wait_for(
-        leader_lock.run_as_leader(
-            name="lock-b", stop=stop, work=work, retry_seconds=5
-        ),
+        leader_lock.run_as_leader(name="lock-b", stop=stop, work=work, retry_seconds=5),
         timeout=5,
     )
 
@@ -195,9 +191,7 @@ async def test_run_as_leader_unexpected_error_then_stops(monkeypatch) -> None:
         pass
 
     await asyncio.wait_for(
-        leader_lock.run_as_leader(
-            name="lock-d", stop=stop, work=work, retry_seconds=0
-        ),
+        leader_lock.run_as_leader(name="lock-d", stop=stop, work=work, retry_seconds=0),
         timeout=5,
     )
     assert calls["n"] == 1

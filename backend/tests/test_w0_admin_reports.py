@@ -143,22 +143,60 @@ def test_cooldown_active_branches() -> None:
     pe = datetime(2025, 1, 6, 8, 0, tzinfo=UTC)
 
     # no last attempt -> not active
-    assert ca(now=now, period_end=pe, last_attempt_at=None,
-              last_attempt_period_end=pe, cooldown_minutes=60) is False
+    assert (
+        ca(
+            now=now,
+            period_end=pe,
+            last_attempt_at=None,
+            last_attempt_period_end=pe,
+            cooldown_minutes=60,
+        )
+        is False
+    )
     # no last attempt period -> not active
-    assert ca(now=now, period_end=pe, last_attempt_at=now,
-              last_attempt_period_end=None, cooldown_minutes=60) is False
+    assert (
+        ca(
+            now=now,
+            period_end=pe,
+            last_attempt_at=now,
+            last_attempt_period_end=None,
+            cooldown_minutes=60,
+        )
+        is False
+    )
     # different period -> not active
-    assert ca(now=now, period_end=pe, last_attempt_at=now,
-              last_attempt_period_end=pe - timedelta(days=7),
-              cooldown_minutes=60) is False
+    assert (
+        ca(
+            now=now,
+            period_end=pe,
+            last_attempt_at=now,
+            last_attempt_period_end=pe - timedelta(days=7),
+            cooldown_minutes=60,
+        )
+        is False
+    )
     # within cooldown -> active
-    assert ca(now=now, period_end=pe, last_attempt_at=now - timedelta(minutes=5),
-              last_attempt_period_end=pe, cooldown_minutes=60) is True
+    assert (
+        ca(
+            now=now,
+            period_end=pe,
+            last_attempt_at=now - timedelta(minutes=5),
+            last_attempt_period_end=pe,
+            cooldown_minutes=60,
+        )
+        is True
+    )
     # cooldown elapsed -> not active
-    assert ca(now=now, period_end=pe,
-              last_attempt_at=now - timedelta(minutes=120),
-              last_attempt_period_end=pe, cooldown_minutes=60) is False
+    assert (
+        ca(
+            now=now,
+            period_end=pe,
+            last_attempt_at=now - timedelta(minutes=120),
+            last_attempt_period_end=pe,
+            cooldown_minutes=60,
+        )
+        is False
+    )
 
 
 def test_parse_settings_defaults_and_state() -> None:
@@ -200,8 +238,9 @@ async def _init(session_local: async_sessionmaker) -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def _seed_owner(session: AsyncSession, *, email="owner@example.com",
-                      preferred_language="en") -> User:
+async def _seed_owner(
+    session: AsyncSession, *, email="owner@example.com", preferred_language="en"
+) -> User:
     owner = User(
         email=email,
         username="owner",
@@ -258,28 +297,48 @@ async def test_compute_summary_top_products_low_stock() -> None:
         category, product = await _seed_catalog(session)
 
         paid = Order(
-            status=OrderStatus.paid, total_amount=100, currency="RON",
-            tax_amount=0, shipping_amount=0, fee_amount=0,
-            customer_email="c@example.com", customer_name="C",
+            status=OrderStatus.paid,
+            total_amount=100,
+            currency="RON",
+            tax_amount=0,
+            shipping_amount=0,
+            fee_amount=0,
+            customer_email="c@example.com",
+            customer_name="C",
             created_at=datetime(2025, 1, 5, 12, 0, tzinfo=UTC),
         )
         refunded = Order(
-            status=OrderStatus.refunded, total_amount=40, currency="RON",
-            tax_amount=0, shipping_amount=0, fee_amount=0,
-            customer_email="c2@example.com", customer_name="C2",
+            status=OrderStatus.refunded,
+            total_amount=40,
+            currency="RON",
+            tax_amount=0,
+            shipping_amount=0,
+            fee_amount=0,
+            customer_email="c2@example.com",
+            customer_name="C2",
             created_at=datetime(2025, 1, 6, 12, 0, tzinfo=UTC),
         )
         refunded_missing = Order(
-            status=OrderStatus.refunded, total_amount=30, currency="RON",
-            tax_amount=0, shipping_amount=0, fee_amount=0,
-            customer_email="c3@example.com", customer_name="C3",
+            status=OrderStatus.refunded,
+            total_amount=30,
+            currency="RON",
+            tax_amount=0,
+            shipping_amount=0,
+            fee_amount=0,
+            customer_email="c3@example.com",
+            customer_name="C3",
             created_at=datetime(2025, 1, 7, 12, 0, tzinfo=UTC),
         )
         # Test-tagged order must be excluded from every aggregate.
         tagged = Order(
-            status=OrderStatus.paid, total_amount=999, currency="RON",
-            tax_amount=0, shipping_amount=0, fee_amount=0,
-            customer_email="t@example.com", customer_name="T",
+            status=OrderStatus.paid,
+            total_amount=999,
+            currency="RON",
+            tax_amount=0,
+            shipping_amount=0,
+            fee_amount=0,
+            customer_email="t@example.com",
+            customer_name="T",
             created_at=datetime(2025, 1, 8, 12, 0, tzinfo=UTC),
         )
         session.add_all([paid, refunded, refunded_missing, tagged])
@@ -288,8 +347,12 @@ async def test_compute_summary_top_products_low_stock() -> None:
         session.add(OrderRefund(order_id=refunded.id, amount=Decimal("10")))
         session.add(
             OrderItem(
-                order_id=paid.id, product_id=product.id, quantity=2,
-                shipped_quantity=0, unit_price=50, subtotal=100,
+                order_id=paid.id,
+                product_id=product.id,
+                quantity=2,
+                shipped_quantity=0,
+                unit_price=50,
+                subtotal=100,
                 created_at=datetime(2025, 1, 5, 12, 0, tzinfo=UTC),
             )
         )
@@ -329,9 +392,9 @@ async def test_effective_recipients_branches(monkeypatch) -> None:
 
     # Explicit recipients short-circuit.
     async with session_local() as session:
-        assert await admin_reports._effective_recipients(
-            session, ["x@a.com"]
-        ) == ["x@a.com"]
+        assert await admin_reports._effective_recipients(session, ["x@a.com"]) == [
+            "x@a.com"
+        ]
 
     # Owner email fallback.
     async with session_local() as session:
@@ -345,9 +408,7 @@ async def test_effective_recipients_branches(monkeypatch) -> None:
     # No owner, settings.admin_alert_email fallback.
     empty_local = _make_session_local()
     await _init(empty_local)
-    monkeypatch.setattr(
-        admin_reports.settings, "admin_alert_email", "alert@a.com"
-    )
+    monkeypatch.setattr(admin_reports.settings, "admin_alert_email", "alert@a.com")
     async with empty_local() as session:
         assert await admin_reports._effective_recipients(session, None) == [
             "alert@a.com"

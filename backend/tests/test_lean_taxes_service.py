@@ -168,12 +168,20 @@ def test_group_crud_lifecycle() -> None:
             # Duplicate code rejected.
             with pytest.raises(HTTPException):
                 await taxes.create_tax_group(
-                    session, code="standard", name="x", description=None, is_default=False
+                    session,
+                    code="standard",
+                    name="x",
+                    description=None,
+                    is_default=False,
                 )
 
             # A second default unsets the first.
             second = await taxes.create_tax_group(
-                session, code="reduced", name="Reduced", description=None, is_default=True
+                session,
+                code="reduced",
+                name="Reduced",
+                description=None,
+                is_default=True,
             )
             assert second.is_default is True
 
@@ -260,9 +268,7 @@ def test_rate_upsert_and_delete() -> None:
             assert updated.vat_rate_percent == Decimal("21.00")
 
             # Delete the rate.
-            await taxes.delete_tax_rate(
-                session, group_id=group.id, country_code="RO"
-            )
+            await taxes.delete_tax_rate(session, group_id=group.id, country_code="RO")
             remaining = await taxes.upsert_tax_rate(
                 session, group=group, country_code="RO", vat_rate_percent=Decimal("5")
             )
@@ -278,18 +284,24 @@ def test_vat_rates_for_products_branches() -> None:
     async def run() -> None:
         async with factory() as session:
             # Empty inputs / no country -> empty.
-            assert await taxes.vat_rates_for_products(
-                session,
-                product_ids=set(),
-                country_code="RO",
-                fallback_rate_percent=Decimal("19"),
-            ) == {}
-            assert await taxes.vat_rates_for_products(
-                session,
-                product_ids={uuid4()},
-                country_code=None,
-                fallback_rate_percent=Decimal("19"),
-            ) == {}
+            assert (
+                await taxes.vat_rates_for_products(
+                    session,
+                    product_ids=set(),
+                    country_code="RO",
+                    fallback_rate_percent=Decimal("19"),
+                )
+                == {}
+            )
+            assert (
+                await taxes.vat_rates_for_products(
+                    session,
+                    product_ids={uuid4()},
+                    country_code=None,
+                    fallback_rate_percent=Decimal("19"),
+                )
+                == {}
+            )
 
             default_group = TaxGroup(code="standard", name="Standard", is_default=True)
             reduced = TaxGroup(code="reduced", name="Reduced")
@@ -504,7 +516,9 @@ def test_compute_cart_vat_line_fully_discounted_positive_rate() -> None:
                 TaxableProductLine(product_id=p1.id, subtotal=Decimal("10.00")),
                 TaxableProductLine(product_id=p2.id, subtotal=Decimal("10.00")),
             ]
-            checkout = CheckoutSettings(vat_enabled=True, vat_rate_percent=Decimal("19"))
+            checkout = CheckoutSettings(
+                vat_enabled=True, vat_rate_percent=Decimal("19")
+            )
             # Discount equals the entire subtotal so every line's taxable base
             # is driven to <= 0 (exercises the per-line base<=0 continue) while
             # the configured rate stays positive.

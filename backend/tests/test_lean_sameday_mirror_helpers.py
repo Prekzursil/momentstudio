@@ -61,12 +61,8 @@ def test_to_lat_lng_variants() -> None:
     assert m._to_lat_lng({"lat": 44.4, "lng": 26.1}) == (44.4, 26.1)
     assert m._to_lat_lng({"latitude": 44.4, "longitude": 26.1}) == (44.4, 26.1)
     assert m._to_lat_lng({"latitude": 44.4, "lon": 26.1}) == (44.4, 26.1)
-    assert m._to_lat_lng(
-        {"geometry": {"coordinates": [26.1, 44.4]}}
-    ) == (44.4, 26.1)
-    assert m._to_lat_lng(
-        {"location": {"lat": 44.4, "lng": 26.1}}
-    ) == (44.4, 26.1)
+    assert m._to_lat_lng({"geometry": {"coordinates": [26.1, 44.4]}}) == (44.4, 26.1)
+    assert m._to_lat_lng({"location": {"lat": 44.4, "lng": 26.1}}) == (44.4, 26.1)
     assert m._to_lat_lng({}) is None
     # Out-of-range coordinates rejected.
     assert m._to_lat_lng({"lat": 999, "lng": 999}) is None
@@ -123,12 +119,26 @@ def test_normalize_row_payload_json_truncation() -> None:
 
 def test_dedupe_lockers() -> None:
     a = m._NormalizedLocker(
-        external_id="dup", name="A", address=None, city=None, county=None,
-        postal_code=None, lat=1.0, lng=2.0, source_payload_json=None,
+        external_id="dup",
+        name="A",
+        address=None,
+        city=None,
+        county=None,
+        postal_code=None,
+        lat=1.0,
+        lng=2.0,
+        source_payload_json=None,
     )
     b = m._NormalizedLocker(
-        external_id="dup", name="B", address=None, city=None, county=None,
-        postal_code=None, lat=3.0, lng=4.0, source_payload_json=None,
+        external_id="dup",
+        name="B",
+        address=None,
+        city=None,
+        county=None,
+        postal_code=None,
+        lat=3.0,
+        lng=4.0,
+        source_payload_json=None,
     )
     out = m._dedupe_lockers([a, b])
     assert len(out) == 1 and out[0].name == "B"
@@ -459,9 +469,10 @@ def test_fetch_raw_payload_direct_success(monkeypatch) -> None:
 def test_to_lat_lng_geometry_and_location_fallbacks() -> None:
     # lat/lng absent, latitude/longitude absent, latitude/lon absent ->
     # geometry coordinates used (exercises the chained fallbacks).
-    assert m._to_lat_lng(
-        {"lat": None, "geometry": {"coordinates": [26.1, 44.4]}}
-    ) == (44.4, 26.1)
+    assert m._to_lat_lng({"lat": None, "geometry": {"coordinates": [26.1, 44.4]}}) == (
+        44.4,
+        26.1,
+    )
     # Out-of-range geometry -> falls through to location.
     assert m._to_lat_lng(
         {
@@ -558,9 +569,7 @@ def test_should_run_scheduled_sync(monkeypatch):
             )
             assert await m.should_run_scheduled_sync(session) is False
 
-            monkeypatch.setattr(
-                settings, "sameday_mirror_enabled", True, raising=False
-            )
+            monkeypatch.setattr(settings, "sameday_mirror_enabled", True, raising=False)
             monkeypatch.setattr(
                 settings, "sameday_mirror_sync_interval_seconds", 300, raising=False
             )
@@ -650,9 +659,12 @@ def test_detect_schema_drift_paths():
     )
 
     # No previous success -> no drift.
-    assert m._detect_schema_drift(
-        previous_success=None, schema_signature="x", normalization_ratio=1.0
-    ) is False
+    assert (
+        m._detect_schema_drift(
+            previous_success=None, schema_signature="x", normalization_ratio=1.0
+        )
+        is False
+    )
 
     prev = ShippingLockerSyncRun(
         provider=ShippingLockerProvider.sameday,
@@ -661,17 +673,26 @@ def test_detect_schema_drift_paths():
         normalization_ratio=0.95,
     )
     # Signature change -> drift.
-    assert m._detect_schema_drift(
-        previous_success=prev, schema_signature="new-sig", normalization_ratio=0.95
-    ) is True
+    assert (
+        m._detect_schema_drift(
+            previous_success=prev, schema_signature="new-sig", normalization_ratio=0.95
+        )
+        is True
+    )
     # Large ratio drop below the min threshold -> drift.
-    assert m._detect_schema_drift(
-        previous_success=prev, schema_signature="old-sig", normalization_ratio=0.10
-    ) is True
+    assert (
+        m._detect_schema_drift(
+            previous_success=prev, schema_signature="old-sig", normalization_ratio=0.10
+        )
+        is True
+    )
     # Stable signature + ratio -> no drift.
-    assert m._detect_schema_drift(
-        previous_success=prev, schema_signature="old-sig", normalization_ratio=0.95
-    ) is False
+    assert (
+        m._detect_schema_drift(
+            previous_success=prev, schema_signature="old-sig", normalization_ratio=0.95
+        )
+        is False
+    )
 
 
 def test_challenge_failure_streak_breaks_on_non_challenge(monkeypatch):
@@ -745,8 +766,15 @@ def test_upsert_snapshot_unchanged_and_inactive(monkeypatch):
 
     def _item(ext, **kw):
         defaults = dict(
-            external_id=ext, name="L", address=None, city=None, county=None,
-            postal_code=None, lat=44.4, lng=26.1, source_payload_json=None,
+            external_id=ext,
+            name="L",
+            address=None,
+            city=None,
+            county=None,
+            postal_code=None,
+            lat=44.4,
+            lng=26.1,
+            source_payload_json=None,
         )
         defaults.update(kw)
         return m._NormalizedLocker(**defaults)

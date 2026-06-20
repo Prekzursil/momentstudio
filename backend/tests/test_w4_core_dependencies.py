@@ -149,9 +149,7 @@ async def test_require_admin_mfa_with_2fa(session_factory, monkeypatch):
 
 async def test_require_admin_mfa_with_passkey(session_factory, monkeypatch):
     monkeypatch.setattr(settings, "admin_mfa_required", True, raising=False)
-    user = await _add_user(
-        session_factory, role=UserRole.admin, with_passkey=True
-    )
+    user = await _add_user(session_factory, role=UserRole.admin, with_passkey=True)
     async with session_factory() as session:
         await deps._require_admin_mfa(session, user)
 
@@ -171,9 +169,7 @@ async def test_require_admin_mfa_missing_raises(session_factory, monkeypatch):
 
 
 def test_parse_ip_networks():
-    out = deps._parse_ip_networks(
-        ["10.0.0.0/8", "  ", "", "not-an-ip", "192.168.1.1"]
-    )
+    out = deps._parse_ip_networks(["10.0.0.0/8", "  ", "", "not-an-ip", "192.168.1.1"])
     assert len(out) == 2
     assert deps._parse_ip_networks(None) == []
 
@@ -459,9 +455,7 @@ async def test_get_current_user_deletion_due(session_factory):
 
 
 async def test_get_current_user_deleted_at(session_factory):
-    user = await _add_user(
-        session_factory, deleted_at=datetime.now(timezone.utc)
-    )
+    user = await _add_user(session_factory, deleted_at=datetime.now(timezone.utc))
     token = _make_token({"type": "access", "sub": str(user.id)})
     async with session_factory() as session:
         with pytest.raises(HTTPException) as exc:
@@ -476,18 +470,16 @@ async def test_get_current_user_deleted_at(session_factory):
 
 async def test_get_current_user_optional_paths(session_factory):
     async with session_factory() as session:
-        assert await deps.get_current_user_optional(FakeRequest(), None, session) is None
         assert (
-            await deps.get_current_user_optional(
-                FakeRequest(), _creds("bad"), session
-            )
+            await deps.get_current_user_optional(FakeRequest(), None, session) is None
+        )
+        assert (
+            await deps.get_current_user_optional(FakeRequest(), _creds("bad"), session)
             is None
         )
         wrong = _make_token({"type": "refresh", "sub": str(uuid4())})
         assert (
-            await deps.get_current_user_optional(
-                FakeRequest(), _creds(wrong), session
-            )
+            await deps.get_current_user_optional(FakeRequest(), _creds(wrong), session)
             is None
         )
         bad_sub = _make_token({"type": "access", "sub": "x"})
@@ -507,14 +499,10 @@ async def test_get_current_user_optional_paths(session_factory):
 
 
 async def test_get_current_user_optional_impersonator_bad(session_factory):
-    token = _make_token(
-        {"type": "access", "sub": str(uuid4()), "impersonator": "bad"}
-    )
+    token = _make_token({"type": "access", "sub": str(uuid4()), "impersonator": "bad"})
     async with session_factory() as session:
         assert (
-            await deps.get_current_user_optional(
-                FakeRequest(), _creds(token), session
-            )
+            await deps.get_current_user_optional(FakeRequest(), _creds(token), session)
             is None
         )
 
@@ -550,9 +538,7 @@ async def test_get_current_user_optional_deletion_due(session_factory):
     token = _make_token({"type": "access", "sub": str(user.id)})
     async with session_factory() as session:
         assert (
-            await deps.get_current_user_optional(
-                FakeRequest(), _creds(token), session
-            )
+            await deps.get_current_user_optional(FakeRequest(), _creds(token), session)
             is None
         )
 
@@ -562,9 +548,7 @@ async def test_get_current_user_optional_deleted_at(session_factory):
     token = _make_token({"type": "access", "sub": str(user.id)})
     async with session_factory() as session:
         assert (
-            await deps.get_current_user_optional(
-                FakeRequest(), _creds(token), session
-            )
+            await deps.get_current_user_optional(FakeRequest(), _creds(token), session)
             is None
         )
 

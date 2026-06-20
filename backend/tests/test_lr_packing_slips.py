@@ -128,15 +128,11 @@ def test_register_fonts_registers_truetype(monkeypatch, tmp_path) -> None:
     # Pretend the DejaVu fonts exist and capture registration calls.
     monkeypatch.setattr(ps.Path, "exists", lambda self: True)
     registered: list[str] = []
-    monkeypatch.setattr(
-        ps.pdfmetrics, "getRegisteredFontNames", lambda: []
-    )
+    monkeypatch.setattr(ps.pdfmetrics, "getRegisteredFontNames", lambda: [])
     monkeypatch.setattr(
         ps.pdfmetrics, "registerFont", lambda font: registered.append("font")
     )
-    monkeypatch.setattr(
-        ps.pdfmetrics, "registerFontFamily", lambda *a, **k: None
-    )
+    monkeypatch.setattr(ps.pdfmetrics, "registerFontFamily", lambda *a, **k: None)
 
     class _FakeTTFont:
         def __init__(self, name, path):  # noqa: ANN001
@@ -174,9 +170,7 @@ def test_register_fonts_skips_already_registered(monkeypatch) -> None:
         lambda: ["MomentSans", "MomentSansBold"],
     )
     calls: list[int] = []
-    monkeypatch.setattr(
-        ps.pdfmetrics, "registerFont", lambda font: calls.append(1)
-    )
+    monkeypatch.setattr(ps.pdfmetrics, "registerFont", lambda font: calls.append(1))
     monkeypatch.setattr(ps.pdfmetrics, "registerFontFamily", lambda *a, **k: None)
     out = ps._register_reportlab_fonts()
     assert out == ("MomentSans", "MomentSansBold")
@@ -196,8 +190,12 @@ def _order(**kw):
         currency="RON",
         user=None,
         shipping_address=SimpleNamespace(
-            line1="1 St", line2="", city="Buc", region="IF",
-            postal_code="010", country="RO",
+            line1="1 St",
+            line2="",
+            city="Buc",
+            region="IF",
+            postal_code="010",
+            country="RO",
         ),
         billing_address=None,
         items=[

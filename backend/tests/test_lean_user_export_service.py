@@ -13,7 +13,6 @@ import asyncio
 import json
 from pathlib import Path
 
-import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.core import security
@@ -51,7 +50,9 @@ def test_run_user_export_job_missing_job() -> None:
     from uuid import uuid4
 
     async def run() -> None:
-        await user_export.run_user_export_job(engine, job_id=uuid4())  # no row -> return
+        await user_export.run_user_export_job(
+            engine, job_id=uuid4()
+        )  # no row -> return
 
     asyncio.run(run())
 

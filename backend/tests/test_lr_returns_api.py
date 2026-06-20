@@ -187,9 +187,7 @@ def test_admin_get_return_not_found(returns_app) -> None:
     SessionLocal = returns_app["session_factory"]  # type: ignore[assignment]
     client: TestClient = returns_app["client"]  # type: ignore[assignment]
     token = _admin_token(client, SessionLocal)
-    res = client.get(
-        f"/api/v1/returns/admin/{uuid.uuid4()}", headers=_auth(token)
-    )
+    res = client.get(f"/api/v1/returns/admin/{uuid.uuid4()}", headers=_auth(token))
     assert res.status_code == 404
 
 
@@ -198,9 +196,7 @@ def test_admin_get_return_ok(returns_app) -> None:
     client: TestClient = returns_app["client"]  # type: ignore[assignment]
     token = _admin_token(client, SessionLocal)
     return_id, _order_id = asyncio.run(_seed_return(SessionLocal))
-    res = client.get(
-        f"/api/v1/returns/admin/{return_id}", headers=_auth(token)
-    )
+    res = client.get(f"/api/v1/returns/admin/{return_id}", headers=_auth(token))
     assert res.status_code == 200, res.text
     assert res.json()["has_return_label"] is False
 
@@ -210,9 +206,7 @@ def test_admin_list_returns_for_order(returns_app) -> None:
     client: TestClient = returns_app["client"]  # type: ignore[assignment]
     token = _admin_token(client, SessionLocal)
     _return_id, order_id = asyncio.run(_seed_return(SessionLocal))
-    res = client.get(
-        f"/api/v1/returns/admin/by-order/{order_id}", headers=_auth(token)
-    )
+    res = client.get(f"/api/v1/returns/admin/by-order/{order_id}", headers=_auth(token))
     assert res.status_code == 200, res.text
     assert len(res.json()) == 1
 
@@ -254,9 +248,7 @@ def test_admin_endpoints_with_pii_reveal(returns_app) -> None:
     assert lst.status_code == 200, lst.text
     assert lst.json()["items"][0]["customer_email"] == "retcust@example.com"
 
-    got = client.get(
-        f"/api/v1/returns/admin/{return_id}?include_pii=true", headers=h
-    )
+    got = client.get(f"/api/v1/returns/admin/{return_id}?include_pii=true", headers=h)
     assert got.status_code == 200, got.text
     assert got.json()["customer_email"] == "retcust@example.com"
 
@@ -449,9 +441,7 @@ def test_label_upload_download_delete_flow(returns_app) -> None:
     assert res2.status_code == 200, res2.text
 
     # Download it.
-    dl = client.get(
-        f"/api/v1/returns/admin/{return_id}/label", headers=_auth(token)
-    )
+    dl = client.get(f"/api/v1/returns/admin/{return_id}/label", headers=_auth(token))
     assert dl.status_code == 200, dl.text
     assert dl.headers["Cache-Control"] == "no-store"
 
@@ -587,9 +577,7 @@ def test_label_download_no_label(returns_app) -> None:
     client: TestClient = returns_app["client"]  # type: ignore[assignment]
     token = _admin_token(client, SessionLocal)
     return_id, _order_id = asyncio.run(_seed_return(SessionLocal))
-    res = client.get(
-        f"/api/v1/returns/admin/{return_id}/label", headers=_auth(token)
-    )
+    res = client.get(f"/api/v1/returns/admin/{return_id}/label", headers=_auth(token))
     assert res.status_code == 404  # no label uploaded yet
 
 
@@ -628,9 +616,7 @@ def test_by_order_skips_missing_detail(returns_app, monkeypatch) -> None:
         return None  # detail vanished between list and fetch -> continue (202)
 
     monkeypatch.setattr(returns_api.returns_service, "get_return_request", fake_detail)
-    res = client.get(
-        f"/api/v1/returns/admin/by-order/{order_id}", headers=_auth(token)
-    )
+    res = client.get(f"/api/v1/returns/admin/by-order/{order_id}", headers=_auth(token))
     assert res.status_code == 200
     assert res.json() == []
 
@@ -663,7 +649,9 @@ def test_customer_create_skips_email_when_missing(returns_app, monkeypatch) -> N
 
     created = SimpleNamespace(
         id=uuid.uuid4(),
-        order=SimpleNamespace(customer_email=None, reference_code="X", customer_name="N"),
+        order=SimpleNamespace(
+            customer_email=None, reference_code="X", customer_name="N"
+        ),
         user=None,
         items=[],
         status=ReturnRequestStatus.requested,
@@ -777,7 +765,5 @@ def test_label_download_path_missing(returns_app, monkeypatch) -> None:
     monkeypatch.setattr(
         returns_api.private_storage, "resolve_private_path", fake_resolve
     )
-    res = client.get(
-        f"/api/v1/returns/admin/{return_id}/label", headers=_auth(token)
-    )
+    res = client.get(f"/api/v1/returns/admin/{return_id}/label", headers=_auth(token))
     assert res.status_code == 404

@@ -36,7 +36,9 @@ def session_factory():
 @pytest.fixture(autouse=True)
 def _private_root(tmp_path, monkeypatch):
     monkeypatch.setattr(svc.settings, "private_media_root", str(tmp_path))
-    monkeypatch.setattr(svc.private_storage.settings, "private_media_root", str(tmp_path))
+    monkeypatch.setattr(
+        svc.private_storage.settings, "private_media_root", str(tmp_path)
+    )
     return tmp_path
 
 

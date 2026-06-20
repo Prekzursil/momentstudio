@@ -33,7 +33,9 @@ def _reset_paypal_state(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "paypal_webhook_id_sandbox", "", raising=False)
     monkeypatch.setattr(settings, "paypal_webhook_id_live", "", raising=False)
     monkeypatch.setattr(settings, "payments_provider", "real", raising=False)
-    monkeypatch.setattr(settings, "frontend_origin", "https://shop.test/", raising=False)
+    monkeypatch.setattr(
+        settings, "frontend_origin", "https://shop.test/", raising=False
+    )
     yield
     svc._token_cache.clear()
 
@@ -252,7 +254,9 @@ async def test_get_access_token_success_and_cache(monkeypatch: pytest.MonkeyPatc
 
 
 @pytest.mark.anyio
-async def test_get_access_token_expired_cache_refreshes(monkeypatch: pytest.MonkeyPatch):
+async def test_get_access_token_expired_cache_refreshes(
+    monkeypatch: pytest.MonkeyPatch,
+):
     async def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200, json={"access_token": "fresh", "expires_in": 3600}, request=request
@@ -476,7 +480,9 @@ async def test_create_order_itemized_bad_unit_value(monkeypatch: pytest.MonkeyPa
 async def test_create_order_itemized_invalid_total(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(settings, "paypal_currency", "RON", raising=False)
 
-    def order_resp(request: httpx.Request) -> httpx.Response:  # pragma: no cover -- order call never reached
+    def order_resp(
+        request: httpx.Request,
+    ) -> httpx.Response:  # pragma: no cover -- order call never reached
         return httpx.Response(200, json={"id": "x"}, request=request)
 
     _mock_httpx(monkeypatch, _token_only_handler(order_resp))
@@ -615,9 +621,7 @@ async def test_create_order_itemized_links_not_list(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(settings, "paypal_currency", "RON", raising=False)
 
     def order_resp(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, json={"id": "O6", "links": "nope"}, request=request
-        )
+        return httpx.Response(200, json={"id": "O6", "links": "nope"}, request=request)
 
     _mock_httpx(monkeypatch, _token_only_handler(order_resp))
     with pytest.raises(svc.HTTPException):
@@ -673,11 +677,7 @@ async def test_capture_order_success(monkeypatch: pytest.MonkeyPatch):
     def cap_resp(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
-            json={
-                "purchase_units": [
-                    {"payments": {"captures": [{"id": "CAP123"}]}}
-                ]
-            },
+            json={"purchase_units": [{"payments": {"captures": [{"id": "CAP123"}]}}]},
             request=request,
         )
 

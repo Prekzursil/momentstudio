@@ -8,7 +8,7 @@ monkeypatched media root and stubbed thumbnail generation.
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -378,7 +378,7 @@ def test_resolve_redirect_chain():
     final, err = svc._resolve_redirect_chain("a", {"a": "b", "b": "a"})
     assert err == "Redirect loop"
     # too deep
-    chain = {f"k{i}": f"k{i+1}" for i in range(20)}
+    chain = {f"k{i}": f"k{i + 1}" for i in range(20)}
     final, err = svc._resolve_redirect_chain("k0", chain, max_hops=3)
     assert err == "Redirect chain too deep"
 
@@ -425,7 +425,7 @@ async def test_resolve_redirect_key_loop(factory):
 async def test_resolve_redirect_key_too_deep(factory):
     async with factory() as session:
         for i in range(12):
-            session.add(ContentRedirect(from_key=f"k{i}", to_key=f"k{i+1}"))
+            session.add(ContentRedirect(from_key=f"k{i}", to_key=f"k{i + 1}"))
         await session.commit()
         with pytest.raises(HTTPException) as exc:
             await svc.resolve_redirect_key(session, "k0", max_hops=3)
@@ -452,15 +452,11 @@ async def test_get_published_by_key(factory):
 
 
 async def test_get_published_by_key_following_redirects(factory):
-    await _add_block(
-        factory, key="page.new", status=ContentStatus.published, lang="en"
-    )
+    await _add_block(factory, key="page.new", status=ContentStatus.published, lang="en")
     async with factory() as session:
         session.add(ContentRedirect(from_key="page.old", to_key="page.new"))
         await session.commit()
-        block = await svc.get_published_by_key_following_redirects(
-            session, "page.old"
-        )
+        block = await svc.get_published_by_key_following_redirects(session, "page.old")
         assert block is not None and block.key == "page.new"
 
 
@@ -481,7 +477,9 @@ async def test_upsert_block_create_draft(factory):
         title="New", body_markdown="Body", status=ContentStatus.draft, lang="en"
     )
     async with factory() as session:
-        block = await svc.upsert_block(session, "page.created", payload, actor_id=uuid4())
+        block = await svc.upsert_block(
+            session, "page.created", payload, actor_id=uuid4()
+        )
         assert block.version == 1
         assert block.needs_translation_ro is True
 
@@ -791,9 +789,7 @@ async def test_set_translation_status_missing(factory):
 
 
 async def test_rollback_to_version(factory):
-    await _add_block(
-        factory, key="page.rb", lang="en", status=ContentStatus.published
-    )
+    await _add_block(factory, key="page.rb", lang="en", status=ContentStatus.published)
     async with factory() as session:
         block = await svc.get_block_by_key(session, "page.rb")
         session.add(
@@ -1178,7 +1174,9 @@ async def test_edit_image_asset_jpeg_with_tags(factory, media_root):
     src = media_root / "src.jpg"
     Image.new("RGB", (300, 200), (0, 128, 0)).save(src, format="JPEG")
     block = await _add_block(factory, key="page.eij", lang="en")
-    image = await _add_image(factory, block, url="/media/src.jpg", focal_x=60, focal_y=40)
+    image = await _add_image(
+        factory, block, url="/media/src.jpg", focal_x=60, focal_y=40
+    )
     async with factory() as session:
         session.add(ContentImageTag(content_image_id=image.id, tag="nature"))
         await session.commit()
@@ -1189,12 +1187,16 @@ async def test_edit_image_asset_jpeg_with_tags(factory, media_root):
             payload=ContentImageEditRequest(resize_max_height=50),
         )
         tags = (
-            await session.execute(
-                select(ContentImageTag.tag).where(
-                    ContentImageTag.content_image_id == out.id
+            (
+                await session.execute(
+                    select(ContentImageTag.tag).where(
+                        ContentImageTag.content_image_id == out.id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert "nature" in tags
 
 
@@ -1378,7 +1380,7 @@ async def test_check_content_links_redirect_loop(factory, naive_now):
         session.add(ContentRedirect(from_key="page.lp1", to_key="page.lp2"))
         session.add(ContentRedirect(from_key="page.lp2", to_key="page.lp1"))
         await session.commit()
-    block = await _add_block(
+    await _add_block(
         factory, key="page.loopcheck", lang="en", body_markdown="[x](/pages/lp1)"
     )
     async with factory() as session:
@@ -1500,9 +1502,7 @@ async def test_upsert_update_translation_meta_only(factory):
 async def test_upsert_update_publish_no_published_at(factory):
     """status->published without published_at and with block.published_at None
     sets published_at=now (line 541->.. elif branch)."""
-    await _add_block(
-        factory, key="page.pubnow", lang="en", status=ContentStatus.draft
-    )
+    await _add_block(factory, key="page.pubnow", lang="en", status=ContentStatus.draft)
     async with factory() as session:
         block = await svc.upsert_block(
             session,
@@ -1700,7 +1700,9 @@ async def test_check_content_links_image_blank_url(factory, naive_now):
         assert issues == []
 
 
-async def test_check_content_links_preview_no_content_refs(factory, naive_now, tmp_path, monkeypatch):
+async def test_check_content_links_preview_no_content_refs(
+    factory, naive_now, tmp_path, monkeypatch
+):
     """A preview with only product/category refs (no page/blog) leaves
     resolved_targets empty (2051->2067)."""
     monkeypatch.setattr(settings, "media_root", str(tmp_path), raising=False)
@@ -1804,9 +1806,7 @@ async def test_apply_find_replace_translation_only(factory):
 
 
 async def test_apply_find_replace_translation_sanitize_error(factory):
-    await _add_block(
-        factory, key="page.trse", lang="en", title="x", body_markdown="x"
-    )
+    await _add_block(factory, key="page.trse", lang="en", title="x", body_markdown="x")
     async with factory() as session:
         block = await svc.get_block_by_key(session, "page.trse")
         session.add(
@@ -1825,7 +1825,9 @@ async def test_apply_find_replace_translation_sanitize_error(factory):
         assert errors and errors[0]["key"] == "page.trse"
 
 
-async def test_check_content_links_register_extras(factory, naive_now, tmp_path, monkeypatch):
+async def test_check_content_links_register_extras(
+    factory, naive_now, tmp_path, monkeypatch
+):
     """Covers register() + issue branches: leading-slash-less media, blog refs,
     existing media file, draft target (not public), and expired published_until.
     """
@@ -1974,13 +1976,13 @@ async def test_check_content_links_expired_until(factory, naive_now):
         assert any(i.reason == "Content is not publicly visible" for i in issues)
 
 
-async def test_check_content_links_preview_branch_extras(factory, naive_now, tmp_path, monkeypatch):
+async def test_check_content_links_preview_branch_extras(
+    factory, naive_now, tmp_path, monkeypatch
+):
     monkeypatch.setattr(settings, "media_root", str(tmp_path), raising=False)
     await _seed_link_target(factory)
     now = datetime.now(timezone.utc)
-    await _add_block(
-        factory, key="page.pvdraft", lang="en", status=ContentStatus.draft
-    )
+    await _add_block(factory, key="page.pvdraft", lang="en", status=ContentStatus.draft)
     await _add_block(
         factory,
         key="page.pvexp",

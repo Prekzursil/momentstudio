@@ -110,7 +110,10 @@ def test_product_update_currency_normalizes_and_rejects() -> None:
 
 
 def test_product_update_couriers_none_passthrough() -> None:
-    assert ProductUpdate(shipping_disallowed_couriers=None).shipping_disallowed_couriers is None
+    assert (
+        ProductUpdate(shipping_disallowed_couriers=None).shipping_disallowed_couriers
+        is None
+    )
 
 
 def test_product_update_couriers_validated() -> None:
@@ -131,7 +134,13 @@ def test_product_update_long_description_validator() -> None:
 
 
 def test_translation_long_description_validator() -> None:
-    assert ProductTranslationUpsert(name="N", long_description=None).long_description is None
-    assert ProductTranslationUpsert(name="N", long_description="fine").long_description == "fine"
+    assert (
+        ProductTranslationUpsert(name="N", long_description=None).long_description
+        is None
+    )
+    assert (
+        ProductTranslationUpsert(name="N", long_description="fine").long_description
+        == "fine"
+    )
     with pytest.raises(ValidationError, match="Invalid rich text content"):
         ProductTranslationUpsert(name="N", long_description="<ScRiPt>bad")

@@ -177,15 +177,15 @@ def test_save_upload_renames_to_canonical_suffix(_media_root) -> None:
 def test_save_upload_svg_sanitized(_media_root) -> None:
     svg = b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"
     up = _upload(svg, filename="logo.svg", content_type="image/svg+xml")
-    url, name = storage.save_upload(
-        up, allowed_content_types=("image/svg+xml",)
-    )
+    url, name = storage.save_upload(up, allowed_content_types=("image/svg+xml",))
     final = Path(_media_root) / url.removeprefix("/media/")
     assert b"script" not in final.read_bytes().lower()
 
 
 def test_save_upload_too_large(_media_root) -> None:
-    up = _upload(_png_bytes(size=(200, 200)), filename="big.png", content_type="image/png")
+    up = _upload(
+        _png_bytes(size=(200, 200)), filename="big.png", content_type="image/png"
+    )
     with pytest.raises(HTTPException):
         storage.save_upload(up, max_bytes=10)
 
@@ -224,9 +224,11 @@ def test_save_upload_no_allowed_content_types(_media_root) -> None:
 
 
 def test_save_upload_svg_too_large(_media_root) -> None:
-    big_svg = b"<svg xmlns='http://www.w3.org/2000/svg'>" + b" " * (
-        storage._SVG_MAX_BYTES + 10
-    ) + b"</svg>"
+    big_svg = (
+        b"<svg xmlns='http://www.w3.org/2000/svg'>"
+        + b" " * (storage._SVG_MAX_BYTES + 10)
+        + b"</svg>"
+    )
     up = _upload(big_svg, filename="big.svg", content_type="image/svg+xml")
     with pytest.raises(HTTPException):
         storage.save_upload(up, allowed_content_types=("image/svg+xml",))
@@ -319,7 +321,9 @@ def test_detect_image_mime_path_svg_and_bad(_media_root, tmp_path) -> None:
     assert storage._detect_image_mime_path(notimg) is None
 
 
-def test_detect_image_mime_path_dimension_bomb(_media_root, tmp_path, monkeypatch) -> None:
+def test_detect_image_mime_path_dimension_bomb(
+    _media_root, tmp_path, monkeypatch
+) -> None:
     monkeypatch.setattr(settings, "upload_image_max_pixels", 10, raising=False)
     big = Path(tmp_path) / "big.png"
     big.write_bytes(_png_bytes(size=(100, 100)))
@@ -395,10 +399,7 @@ def test_sanitize_svg_with_comment_nonstr_tag() -> None:
     # An XML comment yields an element whose .tag is not a str, exercising the
     # non-str guard in the local-tag helper.
     svg = (
-        "<svg xmlns='http://www.w3.org/2000/svg'>"
-        "<!-- a comment -->"
-        "<rect/>"
-        "</svg>"
+        "<svg xmlns='http://www.w3.org/2000/svg'><!-- a comment --><rect/></svg>"
     ).encode()
     out = storage._sanitize_svg(svg)
     assert b"rect" in out.lower()

@@ -199,7 +199,9 @@ def test_scope_sets_skips_empty_entity_and_unknown_type() -> None:
             mode=PromotionScopeMode.include,
         ),
     ]
-    inc_p, exc_p, inc_c, exc_c = svc._promotion_scope_sets(SimpleNamespace(scopes=scopes))
+    inc_p, exc_p, inc_c, exc_c = svc._promotion_scope_sets(
+        SimpleNamespace(scopes=scopes)
+    )
     assert exc_p == {pid}
     assert inc_c == {cid}
     assert inc_p == set() and exc_c == set()
@@ -320,7 +322,10 @@ async def test_compute_totals_with_coupon(monkeypatch, session_factory) -> None:
         [
             _item("100.00", 1, product_id=pid),
             SimpleNamespace(
-                unit_price_at_add=Decimal("0"), quantity=1, product_id=None, product=None
+                unit_price_at_add=Decimal("0"),
+                quantity=1,
+                product_id=None,
+                product=None,
             ),  # missing product id -> line skipped (304-305)
         ]
     )
@@ -516,9 +521,7 @@ async def test_generate_unique_coupon_code_success_and_exhausted(
     session_factory, monkeypatch
 ) -> None:
     async with session_factory() as session:
-        code = await svc.generate_unique_coupon_code(
-            session, prefix="uniq", length=8
-        )
+        code = await svc.generate_unique_coupon_code(session, prefix="uniq", length=8)
         assert code
 
         # Force every candidate to collide -> attempts exhausted -> 500.
@@ -737,9 +740,7 @@ async def test_reserve_coupon_inactive_and_assigned_and_caps(session_factory) ->
         assert assign_exc.value.status_code == 400
 
         # Global cap reached.
-        capped = await _make_coupon(
-            session, code="RSV-CAP", global_max_redemptions=1
-        )
+        capped = await _make_coupon(session, code="RSV-CAP", global_max_redemptions=1)
         order_c1 = await _make_order(session, user)
         await svc.reserve_coupon_for_order(
             session,
@@ -793,7 +794,8 @@ async def test_redeem_coupon_guards_and_happy(session_factory) -> None:
 
         # No promo code -> no-op.
         await svc.redeem_coupon_for_order(
-            session, order=SimpleNamespace(promo_code="", user_id=user.id, id=uuid.uuid4())
+            session,
+            order=SimpleNamespace(promo_code="", user_id=user.id, id=uuid.uuid4()),
         )
         # No user id -> no-op.
         await svc.redeem_coupon_for_order(
@@ -826,7 +828,7 @@ async def test_redeem_coupon_guards_and_happy(session_factory) -> None:
 
         # Redeem with NO prior reservation -> the reservation-copy block is
         # skipped (branch 930->935) and a zero-discount redemption is created.
-        coupon2 = await _make_coupon(session, code="RDM-NORSV")
+        await _make_coupon(session, code="RDM-NORSV")
         order2 = await _make_order(session, user, promo_code="RDM-NORSV")
         await svc.redeem_coupon_for_order(session, order=order2)
 
@@ -875,7 +877,7 @@ async def test_apply_discount_code_eligible_and_ineligible(
 
     async with session_factory() as session:
         user = await _make_user(session)
-        coupon = await _make_coupon(session, code="APPLY-OK")
+        await _make_coupon(session, code="APPLY-OK")
 
         pid = uuid.uuid4()
         cart = _cart([_item("100.00", 1, product_id=pid)])
@@ -972,9 +974,7 @@ async def test_evaluate_min_subtotal_and_first_order(session_factory) -> None:
         assert result.eligible is False
 
 
-async def _seed_scoped_coupon(
-    session_factory, *, code, entity_id, mode
-) -> None:
+async def _seed_scoped_coupon(session_factory, *, code, entity_id, mode) -> None:
     from app.models.coupons_v2 import PromotionScope, PromotionScopeEntityType
 
     async with session_factory() as session:
@@ -1132,9 +1132,7 @@ async def test_reserve_assigned_with_assignment_and_release_active(
         await svc.release_coupon_for_order(session, order=order, reason="cancel")
         leftover = (
             await session.execute(
-                select(CouponReservation).where(
-                    CouponReservation.order_id == order.id
-                )
+                select(CouponReservation).where(CouponReservation.order_id == order.id)
             )
         ).scalar_one_or_none()
         assert leftover is None

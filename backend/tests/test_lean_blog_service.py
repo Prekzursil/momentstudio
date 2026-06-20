@@ -237,9 +237,7 @@ def test_meta_summary() -> None:
         blog._meta_summary({"summary": {"en": "  "}}, lang="en", base_lang="ro") is None
     )
     # string summary, base lang same as requested lang
-    assert (
-        blog._meta_summary({"summary": " S "}, lang="ro", base_lang="ro") == "S"
-    )
+    assert blog._meta_summary({"summary": " S "}, lang="ro", base_lang="ro") == "S"
     # string summary, different lang -> None
     assert blog._meta_summary({"summary": "S"}, lang="en", base_lang="ro") is None
     # string summary, no lang at all -> returned
@@ -430,9 +428,7 @@ def test_list_published_posts_with_comment_sort_and_author(
         )
         commenter = await _make_user(session, email="c@x.com")
         session.add(
-            BlogComment(
-                content_block_id=block.id, user_id=commenter.id, body="nice"
-            )
+            BlogComment(content_block_id=block.id, user_id=commenter.id, body="nice")
         )
         await session.commit()
         blocks, total = await blog.list_published_posts(
@@ -544,24 +540,18 @@ def test_get_published_post(session_factory: async_sessionmaker) -> None:
 def test_get_post_neighbors(session_factory: async_sessionmaker) -> None:
     async def scenario(session: Any) -> None:
         now = datetime.now(timezone.utc)
-        await _make_post(
-            session, slug="older", published_at=now - timedelta(days=3)
-        )
+        await _make_post(session, slug="older", published_at=now - timedelta(days=3))
         current = await _make_post(
             session, slug="current", published_at=now - timedelta(days=2)
         )
-        await _make_post(
-            session, slug="newer", published_at=now - timedelta(days=1)
-        )
+        await _make_post(session, slug="newer", published_at=now - timedelta(days=1))
         tr = ContentBlockTranslation(
             content_block_id=current.id, lang="en", title="C", body_markdown="C"
         )
         session.add(tr)
         await session.commit()
         session.expire_all()
-        newer, older = await blog.get_post_neighbors(
-            session, slug="current", lang="en"
-        )
+        newer, older = await blog.get_post_neighbors(session, slug="current", lang="en")
         assert newer is not None and older is not None
         assert blog._extract_slug(newer.key) == "newer"
         assert blog._extract_slug(older.key) == "older"
@@ -571,9 +561,7 @@ def test_get_post_neighbors(session_factory: async_sessionmaker) -> None:
 
 def test_get_post_neighbors_missing(session_factory: async_sessionmaker) -> None:
     async def scenario(session: Any) -> None:
-        newer, older = await blog.get_post_neighbors(
-            session, slug="ghost", lang=None
-        )
+        newer, older = await blog.get_post_neighbors(session, slug="ghost", lang=None)
         assert newer is None and older is None
 
     run(session_factory, scenario)
@@ -585,31 +573,21 @@ def test_get_post_neighbors_no_lang_and_edges(
     async def scenario(session: Any) -> None:
         now = datetime.now(timezone.utc)
         # Only one post: current is both the newest and oldest -> no neighbors.
-        await _make_post(
-            session, slug="solo", published_at=now - timedelta(days=2)
-        )
+        await _make_post(session, slug="solo", published_at=now - timedelta(days=2))
         # lang=None -> skips translation branches (408->411, 430->435).
-        newer, older = await blog.get_post_neighbors(
-            session, slug="solo", lang=None
-        )
+        newer, older = await blog.get_post_neighbors(session, slug="solo", lang=None)
         assert newer is None and older is None
 
         # Two posts: an older neighbor exists but no newer one, with lang set
         # so the newer-None / older-present sub-branches are taken (431->433).
-        await _make_post(
-            session, slug="prev", published_at=now - timedelta(days=3)
-        )
-        newer, older = await blog.get_post_neighbors(
-            session, slug="solo", lang="en"
-        )
+        await _make_post(session, slug="prev", published_at=now - timedelta(days=3))
+        newer, older = await blog.get_post_neighbors(session, slug="solo", lang="en")
         assert newer is None
         assert older is not None
 
         # Now query from the oldest post: a newer neighbor exists but no older
         # one, with lang set so the older-None sub-branch is taken (433->435).
-        newer2, older2 = await blog.get_post_neighbors(
-            session, slug="prev", lang="en"
-        )
+        newer2, older2 = await blog.get_post_neighbors(session, slug="prev", lang="en")
         assert newer2 is not None
         assert older2 is None
 
@@ -644,9 +622,7 @@ def test_list_comment_threads_all_sorts(
     async def scenario(session: Any) -> None:
         author = await _make_user(session, email="t@x.com")
         block = await _make_post(session, slug="tpost")
-        root = BlogComment(
-            content_block_id=block.id, user_id=author.id, body="root"
-        )
+        root = BlogComment(content_block_id=block.id, user_id=author.id, body="root")
         session.add(root)
         await session.commit()
         await session.refresh(root)
@@ -659,14 +635,12 @@ def test_list_comment_threads_all_sorts(
         session.add(reply)
         await session.commit()
         for sort in ("newest", "oldest", "top"):
-            threads, total_threads, total_comments = (
-                await blog.list_comment_threads(
-                    session,
-                    content_block_id=block.id,
-                    page=1,
-                    limit=10,
-                    sort=sort,
-                )
+            threads, total_threads, total_comments = await blog.list_comment_threads(
+                session,
+                content_block_id=block.id,
+                page=1,
+                limit=10,
+                sort=sort,
             )
             assert total_threads == 1
             assert total_comments == 2
@@ -936,16 +910,12 @@ def test_soft_delete_comment_forbidden(
         owner = await _make_user(session, email="o@x.com")
         other = await _make_user(session, email="oo@x.com")
         block = await _make_post(session, slug="sd2")
-        comment = BlogComment(
-            content_block_id=block.id, user_id=owner.id, body="mine"
-        )
+        comment = BlogComment(content_block_id=block.id, user_id=owner.id, body="mine")
         session.add(comment)
         await session.commit()
         await session.refresh(comment)
         with pytest.raises(HTTPException) as exc:
-            await blog.soft_delete_comment(
-                session, comment_id=comment.id, actor=other
-            )
+            await blog.soft_delete_comment(session, comment_id=comment.id, actor=other)
         assert exc.value.status_code == 403
 
     run(session_factory, scenario)
@@ -957,21 +927,15 @@ def test_soft_delete_comment_owner_and_idempotent(
     async def scenario(session: Any) -> None:
         owner = await _make_user(session, email="own@x.com")
         block = await _make_post(session, slug="sd3")
-        comment = BlogComment(
-            content_block_id=block.id, user_id=owner.id, body="mine"
-        )
+        comment = BlogComment(content_block_id=block.id, user_id=owner.id, body="mine")
         session.add(comment)
         await session.commit()
         await session.refresh(comment)
-        await blog.soft_delete_comment(
-            session, comment_id=comment.id, actor=owner
-        )
+        await blog.soft_delete_comment(session, comment_id=comment.id, actor=owner)
         await session.refresh(comment)
         assert comment.is_deleted is True
         # second call returns early (already deleted)
-        await blog.soft_delete_comment(
-            session, comment_id=comment.id, actor=owner
-        )
+        await blog.soft_delete_comment(session, comment_id=comment.id, actor=owner)
 
     run(session_factory, scenario)
 
@@ -1063,9 +1027,7 @@ def test_flag_comment_own(session_factory: async_sessionmaker) -> None:
     async def scenario(session: Any) -> None:
         actor = await _make_user(session, email="fo@x.com")
         block = await _make_post(session, slug="fo1")
-        comment = BlogComment(
-            content_block_id=block.id, user_id=actor.id, body="mine"
-        )
+        comment = BlogComment(content_block_id=block.id, user_id=actor.id, body="mine")
         session.add(comment)
         await session.commit()
         await session.refresh(comment)
@@ -1083,9 +1045,7 @@ def test_flag_comment_new_and_existing(
         owner = await _make_user(session, email="fco@x.com")
         flagger = await _make_user(session, email="fcf@x.com")
         block = await _make_post(session, slug="fc1")
-        comment = BlogComment(
-            content_block_id=block.id, user_id=owner.id, body="post"
-        )
+        comment = BlogComment(content_block_id=block.id, user_id=owner.id, body="post")
         session.add(comment)
         await session.commit()
         await session.refresh(comment)
@@ -1094,9 +1054,7 @@ def test_flag_comment_new_and_existing(
         )
         assert first.reason == "spam"
         # second flag by same user returns existing
-        second = await blog.flag_comment(
-            session, comment_id=comment.id, actor=flagger
-        )
+        second = await blog.flag_comment(session, comment_id=comment.id, actor=flagger)
         assert second.id == first.id
 
     run(session_factory, scenario)
@@ -1109,9 +1067,7 @@ def test_flag_comment_new_and_existing(
 
 def test_list_flagged_comments_empty(session_factory: async_sessionmaker) -> None:
     async def scenario(session: Any) -> None:
-        items, total = await blog.list_flagged_comments(
-            session, page=1, limit=10
-        )
+        items, total = await blog.list_flagged_comments(session, page=1, limit=10)
         assert items == []
         assert total == 0
 
@@ -1125,21 +1081,15 @@ def test_list_flagged_comments_populated(
         owner = await _make_user(session, email="lfo@x.com")
         flagger = await _make_user(session, email="lff@x.com")
         block = await _make_post(session, slug="lf1")
-        comment = BlogComment(
-            content_block_id=block.id, user_id=owner.id, body="bad"
-        )
+        comment = BlogComment(content_block_id=block.id, user_id=owner.id, body="bad")
         session.add(comment)
         await session.commit()
         await session.refresh(comment)
         session.add(
-            BlogCommentFlag(
-                comment_id=comment.id, user_id=flagger.id, reason="spam"
-            )
+            BlogCommentFlag(comment_id=comment.id, user_id=flagger.id, reason="spam")
         )
         await session.commit()
-        items, total = await blog.list_flagged_comments(
-            session, page=0, limit=999
-        )
+        items, total = await blog.list_flagged_comments(session, page=0, limit=999)
         assert total == 1
         assert items[0]["flag_count"] == 1
 
@@ -1188,17 +1138,13 @@ def test_set_comment_hidden_toggle(session_factory: async_sessionmaker) -> None:
         admin = await _make_user(session, email="sht@x.com", role=UserRole.admin)
         owner = await _make_user(session, email="shto@x.com")
         block = await _make_post(session, slug="sh1")
-        comment = BlogComment(
-            content_block_id=block.id, user_id=owner.id, body="x"
-        )
+        comment = BlogComment(content_block_id=block.id, user_id=owner.id, body="x")
         session.add(comment)
         await session.commit()
         await session.refresh(comment)
         flagger = await _make_user(session, email="shtf@x.com")
         session.add(
-            BlogCommentFlag(
-                comment_id=comment.id, user_id=flagger.id, reason="r"
-            )
+            BlogCommentFlag(comment_id=comment.id, user_id=flagger.id, reason="r")
         )
         await session.commit()
 
@@ -1242,16 +1188,12 @@ def test_resolve_comment_flags_count(session_factory: async_sessionmaker) -> Non
         owner = await _make_user(session, email="rfo@x.com")
         flagger = await _make_user(session, email="rff@x.com")
         block = await _make_post(session, slug="rf1")
-        comment = BlogComment(
-            content_block_id=block.id, user_id=owner.id, body="x"
-        )
+        comment = BlogComment(content_block_id=block.id, user_id=owner.id, body="x")
         session.add(comment)
         await session.commit()
         await session.refresh(comment)
         session.add(
-            BlogCommentFlag(
-                comment_id=comment.id, user_id=flagger.id, reason="r"
-            )
+            BlogCommentFlag(comment_id=comment.id, user_id=flagger.id, reason="r")
         )
         await session.commit()
         count = await blog.resolve_comment_flags(
@@ -1274,9 +1216,7 @@ def test_subscription_recipients(session_factory: async_sessionmaker) -> None:
         sub_user.email_verified = True
         await session.commit()
         session.add(
-            BlogCommentSubscription(
-                content_block_id=block.id, user_id=sub_user.id
-            )
+            BlogCommentSubscription(content_block_id=block.id, user_id=sub_user.id)
         )
         await session.commit()
         recipients = await blog.list_comment_subscription_recipients(
@@ -1299,11 +1239,7 @@ def test_is_comment_subscription_enabled(
             )
             is False
         )
-        session.add(
-            BlogCommentSubscription(
-                content_block_id=block.id, user_id=user.id
-            )
-        )
+        session.add(BlogCommentSubscription(content_block_id=block.id, user_id=user.id))
         await session.commit()
         assert (
             await blog.is_comment_subscription_enabled(

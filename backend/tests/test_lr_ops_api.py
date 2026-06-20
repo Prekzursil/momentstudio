@@ -45,9 +45,7 @@ def ops_app(monkeypatch) -> Dict[str, object]:
     async def _noop_audit(*a, **k):  # noqa: ANN002, ANN003
         return None
 
-    monkeypatch.setattr(
-        ops_api.audit_chain_service, "add_admin_audit_log", _noop_audit
-    )
+    monkeypatch.setattr(ops_api.audit_chain_service, "add_admin_audit_log", _noop_audit)
 
     client = TestClient(app)
     yield {"client": client, "session_factory": SessionLocal}
@@ -331,9 +329,7 @@ def test_admin_email_endpoints(ops_app) -> None:
         client.get("/api/v1/ops/admin/email-failures/stats", headers=h).status_code
         == 200
     )
-    assert (
-        client.get("/api/v1/ops/admin/email-failures", headers=h).status_code == 200
-    )
+    assert client.get("/api/v1/ops/admin/email-failures", headers=h).status_code == 200
     assert client.get("/api/v1/ops/admin/email-events", headers=h).status_code == 200
 
 

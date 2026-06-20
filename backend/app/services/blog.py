@@ -324,7 +324,9 @@ async def list_published_posts(
     for block in blocks:
         _apply_translation(block, lang)
 
-    if query_text or tag_text or series_text:  # pragma: no branch -- guarded above: line 283 returns early when all three are empty, so this is always True here
+    if (
+        query_text or tag_text or series_text
+    ):  # pragma: no branch -- guarded above: line 283 returns early when all three are empty, so this is always True here
         filtered: list[ContentBlock] = []
         for block in blocks:
             meta = getattr(block, "meta", None) or {}

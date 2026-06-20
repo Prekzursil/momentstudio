@@ -63,9 +63,7 @@ def test_save_private_bytes_round_trip(_root) -> None:
 
 
 def test_save_private_bytes_sanitizes_filename(_root) -> None:
-    rel = ps.save_private_bytes(
-        b"x", subdir="exports", filename="../../escape.bin"
-    )
+    rel = ps.save_private_bytes(b"x", subdir="exports", filename="../../escape.bin")
     # Path(...).name strips traversal -> file lands inside the subdir.
     assert rel.endswith("escape.bin")
     assert "exports/" in rel

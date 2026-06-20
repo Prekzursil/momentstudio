@@ -12,7 +12,6 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-import httpx
 import pytest
 
 from app.core.config import settings
@@ -76,15 +75,17 @@ def test_normalize_image_url_variants() -> None:
     assert st._normalize_image_url("", base_url=base) is None
     assert st._normalize_image_url("data:image/png;base64,x", base_url=base) is None
     assert st._normalize_image_url("javascript:alert(1)", base_url=base) is None
-    assert st._normalize_image_url(
-        "//cdninstagram.com/a.jpg", base_url=base
-    ) == "https://cdninstagram.com/a.jpg"
+    assert (
+        st._normalize_image_url("//cdninstagram.com/a.jpg", base_url=base)
+        == "https://cdninstagram.com/a.jpg"
+    )
     assert st._normalize_image_url("/rel/a.jpg", base_url=base) == (
         "https://instagram.com/rel/a.jpg"
     )
-    assert st._normalize_image_url(
-        "https://cdn.example.com/a.jpg", base_url=base
-    ) == "https://cdn.example.com/a.jpg"
+    assert (
+        st._normalize_image_url("https://cdn.example.com/a.jpg", base_url=base)
+        == "https://cdn.example.com/a.jpg"
+    )
     # A bare relative string with no scheme -> rejected.
     assert st._normalize_image_url("plainstring", base_url=base) is None
 
@@ -116,9 +117,9 @@ def test_meta_image_parser_branches() -> None:
 
 def test_extract_first_image_and_instagram() -> None:
     html = (
-        '<html><head>'
+        "<html><head>"
         '<meta property="og:image" content="https://cdninstagram.com/og.jpg">'
-        '</head></html>'
+        "</head></html>"
     )
     assert st._extract_first_image(html, base_url="https://instagram.com/") == (
         "https://cdninstagram.com/og.jpg"
@@ -133,21 +134,24 @@ def test_extract_first_image_and_instagram() -> None:
     )
 
     ig_html = '"profile_pic_url_hd":"https:\\/\\/cdninstagram.com\\/p.jpg"'
-    assert st._extract_instagram_profile_image(
-        ig_html, base_url="https://instagram.com/"
-    ) == "https://cdninstagram.com/p.jpg"
-    assert st._extract_instagram_profile_image(
-        "no match here", base_url="https://x/"
-    ) is None
+    assert (
+        st._extract_instagram_profile_image(ig_html, base_url="https://instagram.com/")
+        == "https://cdninstagram.com/p.jpg"
+    )
+    assert (
+        st._extract_instagram_profile_image("no match here", base_url="https://x/")
+        is None
+    )
 
     # First match normalizes to None (data: URL) -> loop continues to the next.
     ig_mixed = (
         '"profile_pic_url":"data:image/png;base64,zzz"'
         '"profile_pic_url_hd":"https:\\/\\/cdninstagram.com\\/good.jpg"'
     )
-    assert st._extract_instagram_profile_image(
-        ig_mixed, base_url="https://instagram.com/"
-    ) == "https://cdninstagram.com/good.jpg"
+    assert (
+        st._extract_instagram_profile_image(ig_mixed, base_url="https://instagram.com/")
+        == "https://cdninstagram.com/good.jpg"
+    )
 
 
 def test_json_unescape() -> None:
@@ -173,9 +177,10 @@ def test_user_agent_and_local_url() -> None:
     assert st._user_agent_for_host(None) == st._UA
 
     assert st._is_local_thumbnail_url("/media/social/x.jpg") is True
-    assert st._is_local_thumbnail_url(
-        "https://shop.example.com/media/social/x.jpg"
-    ) is True
+    assert (
+        st._is_local_thumbnail_url("https://shop.example.com/media/social/x.jpg")
+        is True
+    )
     assert st._is_local_thumbnail_url("") is False
     assert st._is_local_thumbnail_url("https://cdn/x.jpg") is False
 
@@ -188,7 +193,9 @@ def test_hex_timestamp_and_signed_url() -> None:
     assert isinstance(ts, datetime)
 
     # A url with a near-future "oe" expiry looks signed/expiring.
-    soon = format(int((datetime.now(timezone.utc) + timedelta(days=1)).timestamp()), "x")
+    soon = format(
+        int((datetime.now(timezone.utc) + timedelta(days=1)).timestamp()), "x"
+    )
     assert st._looks_signed_or_expiring(f"https://cdn/a.jpg?oe={soon}") is True
     # No expiry param.
     assert st._looks_signed_or_expiring("https://cdn/a.jpg") is False
@@ -196,7 +203,9 @@ def test_hex_timestamp_and_signed_url() -> None:
     assert st._looks_signed_or_expiring("ftp://x/a") is False
     assert st._looks_signed_or_expiring("") is False
     # Far-future expiry -> not "expiring".
-    far = format(int((datetime.now(timezone.utc) + timedelta(days=400)).timestamp()), "x")
+    far = format(
+        int((datetime.now(timezone.utc) + timedelta(days=400)).timestamp()), "x"
+    )
     assert st._looks_signed_or_expiring(f"https://cdn/a.jpg?oe={far}") is False
 
 
@@ -282,16 +291,12 @@ def _png_bytes() -> bytes:
 
 
 def test_fetch_page_thumbnail_candidate(monkeypatch) -> None:
-    html = (
-        b'<meta property="og:image" content="https://cdninstagram.com/og.jpg">'
-    )
+    html = b'<meta property="og:image" content="https://cdninstagram.com/og.jpg">'
     resp = _FakeStreamResp(html, "https://instagram.com/page/")
     monkeypatch.setattr(
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(stream_resp=resp)
     )
-    out = asyncio.run(
-        st._fetch_page_thumbnail_candidate("https://instagram.com/page/")
-    )
+    out = asyncio.run(st._fetch_page_thumbnail_candidate("https://instagram.com/page/"))
     assert out == "https://cdninstagram.com/og.jpg"
 
 
@@ -301,9 +306,7 @@ def test_fetch_page_thumbnail_instagram_profile_fallback(monkeypatch) -> None:
     monkeypatch.setattr(
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(stream_resp=resp)
     )
-    out = asyncio.run(
-        st._fetch_page_thumbnail_candidate("https://instagram.com/user/")
-    )
+    out = asyncio.run(st._fetch_page_thumbnail_candidate("https://instagram.com/user/"))
     assert out == "https://cdninstagram.com/p.jpg"
 
 
@@ -319,9 +322,7 @@ def test_fetch_page_thumbnail_truncates_large_html(monkeypatch) -> None:
     monkeypatch.setattr(
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(stream_resp=resp)
     )
-    out = asyncio.run(
-        st._fetch_page_thumbnail_candidate("https://facebook.com/page/")
-    )
+    out = asyncio.run(st._fetch_page_thumbnail_candidate("https://facebook.com/page/"))
     assert out == "https://cdninstagram.com/og.jpg"
 
 
@@ -330,9 +331,7 @@ def test_fetch_page_thumbnail_none(monkeypatch) -> None:
     monkeypatch.setattr(
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(stream_resp=resp)
     )
-    out = asyncio.run(
-        st._fetch_page_thumbnail_candidate("https://facebook.com/page/")
-    )
+    out = asyncio.run(st._fetch_page_thumbnail_candidate("https://facebook.com/page/"))
     assert out is None
 
 
@@ -360,9 +359,7 @@ def test_download_thumbnail_bytes_guards(monkeypatch) -> None:
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(get_resp=resp)
     )
     with pytest.raises(ValueError):
-        asyncio.run(
-            st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg")
-        )
+        asyncio.run(st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg"))
 
     # Empty body.
     resp = _FakeGetResp(b"", "https://cdninstagram.com/a.jpg", "image/png")
@@ -370,9 +367,7 @@ def test_download_thumbnail_bytes_guards(monkeypatch) -> None:
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(get_resp=resp)
     )
     with pytest.raises(ValueError):
-        asyncio.run(
-            st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg")
-        )
+        asyncio.run(st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg"))
 
     # Too large.
     big = b"x" * (st._MAX_IMAGE_BYTES + 1)
@@ -381,9 +376,7 @@ def test_download_thumbnail_bytes_guards(monkeypatch) -> None:
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(get_resp=resp)
     )
     with pytest.raises(ValueError):
-        asyncio.run(
-            st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg")
-        )
+        asyncio.run(st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg"))
 
     # Unsupported content type.
     resp = _FakeGetResp(b"abc", "https://cdninstagram.com/a.jpg", "text/html")
@@ -391,16 +384,15 @@ def test_download_thumbnail_bytes_guards(monkeypatch) -> None:
         st.httpx, "AsyncClient", lambda **kw: _FakeClient(get_resp=resp)
     )
     with pytest.raises(ValueError):
-        asyncio.run(
-            st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg")
-        )
+        asyncio.run(st._download_thumbnail_bytes("https://cdninstagram.com/a.jpg"))
 
 
 def test_persist_thumbnail(monkeypatch) -> None:
     # Already-local thumbnail is returned unchanged.
-    assert asyncio.run(
-        st._persist_thumbnail("src", "/media/social/x.jpg")
-    ) == "/media/social/x.jpg"
+    assert (
+        asyncio.run(st._persist_thumbnail("src", "/media/social/x.jpg"))
+        == "/media/social/x.jpg"
+    )
     # Empty candidate -> None.
     assert asyncio.run(st._persist_thumbnail("src", "")) is None
 
@@ -495,7 +487,10 @@ def test_hydrate_site_social_meta(monkeypatch) -> None:
             {"url": "https://instagram.com/a", "thumbnail_url": "https://cdn/old.jpg"},
             {"url": "https://instagram.com/boom", "thumbnail_url": "https://cdn/x.jpg"},
             {"url": "", "thumbnail_url": ""},  # skipped (no url)
-            {"url": "https://instagram.com/local", "thumbnail_url": "/media/social/k.jpg"},  # no persist needed
+            {
+                "url": "https://instagram.com/local",
+                "thumbnail_url": "/media/social/k.jpg",
+            },  # no persist needed
             "not-a-dict",
         ],
         "facebook_pages": "not-a-list",

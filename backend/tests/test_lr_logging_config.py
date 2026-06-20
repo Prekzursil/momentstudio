@@ -83,8 +83,13 @@ def test_json_safe_arbitrary_object_str_fallback_truncated() -> None:
 # --------------------------------------------------------------------------- #
 def _make_record() -> logging.LogRecord:
     return logging.LogRecord(
-        name="t", level=logging.INFO, pathname=__file__, lineno=1,
-        msg="hello", args=(), exc_info=None,
+        name="t",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=1,
+        msg="hello",
+        args=(),
+        exc_info=None,
     )
 
 
@@ -137,8 +142,13 @@ def test_json_formatter_includes_exception() -> None:
         import sys
 
         record = logging.LogRecord(
-            name="t", level=logging.ERROR, pathname=__file__, lineno=1,
-            msg="err", args=(), exc_info=sys.exc_info(),
+            name="t",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="err",
+            args=(),
+            exc_info=sys.exc_info(),
         )
     payload = json.loads(JsonFormatter().format(record))
     assert "ValueError: boom" in payload["exception"]

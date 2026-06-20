@@ -60,9 +60,7 @@ def _live(**overrides):
 def test_upsert_row_sqlite_path_inserts_and_updates(session_factory) -> None:
     async def scenario() -> None:
         async with session_factory() as session:
-            row = await fx_store._upsert_row(
-                session, is_override=False, data=_read()
-            )
+            row = await fx_store._upsert_row(session, is_override=False, data=_read())
             assert float(row.eur_per_ron) == 0.2
             # second call exercises on_conflict_do_update
             row2 = await fx_store._upsert_row(
@@ -89,9 +87,7 @@ def test_upsert_row_generic_dialect_insert_then_update(session_factory) -> None:
         async with session_factory() as session:
             session.get_bind = lambda: _FakeBind()  # type: ignore[assignment]
             # First call: no existing row -> ORM insert + commit + refresh.
-            row = await fx_store._upsert_row(
-                session, is_override=False, data=_read()
-            )
+            row = await fx_store._upsert_row(session, is_override=False, data=_read())
             assert float(row.eur_per_ron) == 0.2
             # Second call: existing row -> in-place update branch.
             row2 = await fx_store._upsert_row(
@@ -170,9 +166,7 @@ def test_upsert_row_generic_integrity_error_reraises_when_still_absent(
             monkeypatch.setattr(session, "commit", integrity_commit)
 
             with pytest.raises(IntegrityError):
-                await fx_store._upsert_row(
-                    session, is_override=False, data=_read()
-                )
+                await fx_store._upsert_row(session, is_override=False, data=_read())
             # restore a working commit so teardown/rollback is clean
             monkeypatch.setattr(session, "commit", real_commit)
 
@@ -185,9 +179,7 @@ def test_get_effective_rates_override_then_last_known_then_live(
     async def scenario() -> None:
         async with session_factory() as session:
             # No rows yet -> fetch live and persist as last_known.
-            monkeypatch.setattr(
-                fx_rates, "get_fx_rates", _async_return(_live())
-            )
+            monkeypatch.setattr(fx_rates, "get_fx_rates", _async_return(_live()))
             first = await fx_store.get_effective_rates(session)
             assert first.eur_per_ron == 0.2
 
@@ -284,9 +276,7 @@ def test_get_admin_status_with_override(session_factory) -> None:
     _run(scenario())
 
 
-def test_get_admin_status_falls_back_to_effective(
-    session_factory, monkeypatch
-) -> None:
+def test_get_admin_status_falls_back_to_effective(session_factory, monkeypatch) -> None:
     async def scenario() -> None:
         async with session_factory() as session:
             monkeypatch.setattr(fx_rates, "get_fx_rates", _async_return(_live()))
@@ -334,14 +324,13 @@ def test_upsert_row_sqlite_missing_after_upsert_raises(
 
     async def scenario() -> None:
         async with session_factory() as session:
+
             async def none_get_row(sess, *, is_override):
                 return None
 
             monkeypatch.setattr(fx_store, "_get_row", none_get_row)
             with pytest.raises(RuntimeError, match="fx_rate_upsert_failed"):
-                await fx_store._upsert_row(
-                    session, is_override=False, data=_read()
-                )
+                await fx_store._upsert_row(session, is_override=False, data=_read())
 
     _run(scenario())
 

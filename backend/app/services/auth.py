@@ -178,13 +178,17 @@ def _sanitize_username_from_email(email: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "-", local).strip("._-")
     if not cleaned:
         cleaned = "user"
-    if not cleaned[0].isalnum():  # pragma: no cover - defensive: strip("._-") already removes any leading non-alnum the sub() could produce
+    if not cleaned[
+        0
+    ].isalnum():  # pragma: no cover - defensive: strip("._-") already removes any leading non-alnum the sub() could produce
         cleaned = f"u{cleaned}"
     cleaned = cleaned[:30]
     while len(cleaned) < 3:
         cleaned = f"{cleaned}0"
         cleaned = cleaned[:30]
-    if not USERNAME_ALLOWED_RE.match(cleaned):  # pragma: no cover - defensive: the sub()/strip()/pad steps above always yield an allowed 3-30 char username
+    if not USERNAME_ALLOWED_RE.match(
+        cleaned
+    ):  # pragma: no cover - defensive: the sub()/strip()/pad steps above always yield an allowed 3-30 char username
         cleaned = f"user-{secrets.token_hex(3)}"[:30]
     return cleaned
 
@@ -240,7 +244,9 @@ async def _try_reuse_name_tag(
             .select_from(User)
             .where(User.name == name, User.name_tag == tag, User.id != user_id)
         )
-        if int(existing or 0) == 0:  # pragma: no cover - branch: loop only re-iterates when a historical tag is still taken by another user (rare race)
+        if (
+            int(existing or 0) == 0
+        ):  # pragma: no cover - branch: loop only re-iterates when a historical tag is still taken by another user (rare race)
             return tag
     return None
 
@@ -422,7 +428,9 @@ async def complete_google_registration(
     await session.commit()
     await session.refresh(user)
 
-    if not _profile_is_complete(user):  # pragma: no cover - defensive: every required profile field is assigned above before this re-check
+    if not _profile_is_complete(
+        user
+    ):  # pragma: no cover - defensive: every required profile field is assigned above before this re-check
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Profile incomplete"
         )
@@ -440,7 +448,9 @@ async def update_username(session: AsyncSession, user: User, new_username: str) 
             .order_by(UserUsernameHistory.created_at.desc())
             .limit(1)
         )
-        if last and isinstance(last, datetime):  # pragma: no cover - branch: a complete profile always has a username-history row, so `last` is never falsy
+        if (
+            last and isinstance(last, datetime)
+        ):  # pragma: no cover - branch: a complete profile always has a username-history row, so `last` is never falsy
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             if datetime.now(timezone.utc) - last < USERNAME_CHANGE_COOLDOWN:
@@ -486,7 +496,9 @@ async def update_display_name(session: AsyncSession, user: User, new_name: str) 
             .order_by(UserDisplayNameHistory.created_at.desc())
             .limit(1)
         )
-        if last and isinstance(last, datetime):  # pragma: no cover - branch: a complete profile always has a display-name-history row, so `last` is never falsy
+        if (
+            last and isinstance(last, datetime)
+        ):  # pragma: no cover - branch: a complete profile always has a display-name-history row, so `last` is never falsy
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             if datetime.now(timezone.utc) - last < DISPLAY_NAME_CHANGE_COOLDOWN:
@@ -628,7 +640,9 @@ async def update_email(session: AsyncSession, user: User, new_email: str) -> Use
             .order_by(UserEmailHistory.created_at.desc())
             .limit(1)
         )
-        if last and isinstance(last, datetime):  # pragma: no cover - branch: when history_count>1 a created_at row always exists, so `last` is never falsy
+        if (
+            last and isinstance(last, datetime)
+        ):  # pragma: no cover - branch: when history_count>1 a created_at row always exists, so `last` is never falsy
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
@@ -846,7 +860,9 @@ async def make_secondary_email_primary(
             .order_by(UserEmailHistory.created_at.desc())
             .limit(1)
         )
-        if last and isinstance(last, datetime):  # pragma: no cover - branch: when history_count>1 a created_at row always exists, so `last` is never falsy
+        if (
+            last and isinstance(last, datetime)
+        ):  # pragma: no cover - branch: when history_count>1 a created_at row always exists, so `last` is never falsy
             if last.tzinfo is None:
                 last = last.replace(tzinfo=timezone.utc)
             if datetime.now(timezone.utc) - last < EMAIL_CHANGE_COOLDOWN:
@@ -872,7 +888,9 @@ async def make_secondary_email_primary(
 
     await session.delete(secondary)
 
-    if old_primary and old_primary != new_primary:  # pragma: no cover - branch: a promoted secondary always differs from the old primary, so the guard is always true
+    if (
+        old_primary and old_primary != new_primary
+    ):  # pragma: no cover - branch: a promoted secondary always differs from the old primary, so the guard is always true
         existing_old_secondary = await session.scalar(
             select(UserSecondaryEmail).where(
                 UserSecondaryEmail.user_id == user.id,

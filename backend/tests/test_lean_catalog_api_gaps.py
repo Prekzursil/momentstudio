@@ -171,13 +171,9 @@ def test_category_audit_and_error_paths(test_app: Dict[str, object]) -> None:
     assert res.status_code == 404
 
     # translations: list, upsert (+audit), delete (+audit), and their 404s
-    res = client.get(
-        f"/api/v1/catalog/categories/{slug}/translations", headers=admin
-    )
+    res = client.get(f"/api/v1/catalog/categories/{slug}/translations", headers=admin)
     assert res.status_code == 200
-    res = client.get(
-        "/api/v1/catalog/categories/nope/translations", headers=admin
-    )
+    res = client.get("/api/v1/catalog/categories/nope/translations", headers=admin)
     assert res.status_code == 404
 
     res = client.put(
@@ -276,9 +272,7 @@ def test_category_image_upload_and_previews(test_app: Dict[str, object]) -> None
     assert body["can_delete"] is False
     assert body["child_count"] == 1
     # delete preview 404
-    res = client.get(
-        "/api/v1/catalog/categories/nope/delete/preview", headers=admin
-    )
+    res = client.get("/api/v1/catalog/categories/nope/delete/preview", headers=admin)
     assert res.status_code == 404
 
 
@@ -487,106 +481,176 @@ def test_product_not_found_paths(test_app: Dict[str, object]) -> None:
     image_id = "00000000-0000-0000-0000-000000000001"
 
     # admin (require_admin_section) product-not-found endpoints
-    assert client.patch(
-        f"/api/v1/catalog/products/{missing}", json={"name": "x"}, headers=admin
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/translations", headers=admin
-    ).status_code == 404
-    assert client.put(
-        f"/api/v1/catalog/products/{missing}/translations/ro",
-        json={"name": "x"},
-        headers=admin,
-    ).status_code == 404
-    assert client.delete(
-        f"/api/v1/catalog/products/{missing}/translations/ro", headers=admin
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/relationships", headers=admin
-    ).status_code == 404
-    assert client.put(
-        f"/api/v1/catalog/products/{missing}/relationships",
-        json={"related_product_ids": [], "upsell_product_ids": []},
-        headers=admin,
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/audit", headers=admin
-    ).status_code == 404
-    assert client.delete(
-        f"/api/v1/catalog/products/{missing}", headers=admin
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/{missing}/images",
-        files={"file": ("t.png", _png_bytes(), "image/png")},
-        headers=admin,
-    ).status_code == 404
-    assert client.put(
-        f"/api/v1/catalog/products/{missing}/variants",
-        json={"variants": [], "delete_variant_ids": []},
-        headers=admin,
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/{missing}/duplicate", headers=admin
-    ).status_code == 404
-    assert client.delete(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}", headers=admin
-    ).status_code == 404
-    assert client.patch(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}/sort?sort_order=1",
-        headers=admin,
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/images/deleted", headers=admin
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}/restore", headers=admin
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}/translations",
-        headers=admin,
-    ).status_code == 404
-    assert client.put(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}/translations/ro",
-        json={"alt_text": "x"},
-        headers=admin,
-    ).status_code == 404
-    assert client.delete(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}/translations/ro",
-        headers=admin,
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}/stats", headers=admin
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/{missing}/images/{image_id}/reprocess",
-        headers=admin,
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/{missing}/reviews/{image_id}/approve",
-        headers=admin,
-    ).status_code == 404
+    assert (
+        client.patch(
+            f"/api/v1/catalog/products/{missing}", json={"name": "x"}, headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/{missing}/translations", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.put(
+            f"/api/v1/catalog/products/{missing}/translations/ro",
+            json={"name": "x"},
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/catalog/products/{missing}/translations/ro", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/{missing}/relationships", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.put(
+            f"/api/v1/catalog/products/{missing}/relationships",
+            json={"related_product_ids": [], "upsell_product_ids": []},
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/{missing}/audit", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(f"/api/v1/catalog/products/{missing}", headers=admin).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/{missing}/images",
+            files={"file": ("t.png", _png_bytes(), "image/png")},
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.put(
+            f"/api/v1/catalog/products/{missing}/variants",
+            json={"variants": [], "delete_variant_ids": []},
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/{missing}/duplicate", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.patch(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}/sort?sort_order=1",
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/{missing}/images/deleted", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}/restore",
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}/translations",
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.put(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}/translations/ro",
+            json={"alt_text": "x"},
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}/translations/ro",
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}/stats", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/{missing}/images/{image_id}/reprocess",
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/{missing}/reviews/{image_id}/approve",
+            headers=admin,
+        ).status_code
+        == 404
+    )
 
     # optional-auth / profile-gated product-not-found endpoints
     assert client.get(f"/api/v1/catalog/products/{missing}").status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
-    ).status_code == 404
-    assert client.delete(
-        f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/{missing}/reviews",
-        json={"author_name": "A", "rating": 5},
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/related"
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/{missing}/upsells"
-    ).status_code == 404
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/{missing}/reviews",
+            json={"author_name": "A", "rating": 5},
+        ).status_code
+        == 404
+    )
+    assert client.get(f"/api/v1/catalog/products/{missing}/related").status_code == 404
+    assert client.get(f"/api/v1/catalog/products/{missing}/upsells").status_code == 404
 
 
 # ---------------------------------------------------------------------------
@@ -602,26 +666,41 @@ def test_product_image_not_found_paths(test_app: Dict[str, object]) -> None:
     _create_product(client, admin, cat["id"], "img-prod", status="published")
     bad_image = "00000000-0000-0000-0000-0000000000aa"
 
-    assert client.get(
-        f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations",
-        headers=admin,
-    ).status_code == 404
-    assert client.put(
-        f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations/ro",
-        json={"alt_text": "x"},
-        headers=admin,
-    ).status_code == 404
-    assert client.delete(
-        f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations/ro",
-        headers=admin,
-    ).status_code == 404
-    assert client.get(
-        f"/api/v1/catalog/products/img-prod/images/{bad_image}/stats", headers=admin
-    ).status_code == 404
-    assert client.post(
-        f"/api/v1/catalog/products/img-prod/images/{bad_image}/reprocess",
-        headers=admin,
-    ).status_code == 404
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations",
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.put(
+            f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations/ro",
+            json={"alt_text": "x"},
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations/ro",
+            headers=admin,
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/api/v1/catalog/products/img-prod/images/{bad_image}/stats", headers=admin
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            f"/api/v1/catalog/products/img-prod/images/{bad_image}/reprocess",
+            headers=admin,
+        ).status_code
+        == 404
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -689,30 +768,39 @@ def test_unpublished_product_hidden_from_public(test_app: Dict[str, object]) -> 
 
     # Anonymous / customer cannot see a draft product -> 404 (visibility branch).
     assert client.get("/api/v1/catalog/products/draft-prod").status_code == 404
-    assert client.get(
-        "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
-    ).status_code == 404
-    assert client.post(
-        "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
-    ).status_code == 404
-    assert client.delete(
-        "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
-    ).status_code == 404
-    assert client.post(
-        "/api/v1/catalog/products/draft-prod/reviews",
-        json={"author_name": "A", "rating": 5},
-    ).status_code == 404
-    assert client.get(
-        "/api/v1/catalog/products/draft-prod/related"
-    ).status_code == 404
-    assert client.get(
-        "/api/v1/catalog/products/draft-prod/upsells"
-    ).status_code == 404
+    assert (
+        client.get(
+            "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
+        ).status_code
+        == 404
+    )
+    assert (
+        client.delete(
+            "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
+        ).status_code
+        == 404
+    )
+    assert (
+        client.post(
+            "/api/v1/catalog/products/draft-prod/reviews",
+            json={"author_name": "A", "rating": 5},
+        ).status_code
+        == 404
+    )
+    assert client.get("/api/v1/catalog/products/draft-prod/related").status_code == 404
+    assert client.get("/api/v1/catalog/products/draft-prod/upsells").status_code == 404
 
     # Admin CAN see the draft product (is_admin branch true).
-    assert client.get(
-        "/api/v1/catalog/products/draft-prod", headers=admin
-    ).status_code == 200
+    assert (
+        client.get("/api/v1/catalog/products/draft-prod", headers=admin).status_code
+        == 200
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -729,9 +817,7 @@ def test_related_and_upsell_with_data(test_app: Dict[str, object]) -> None:
     sibling = _create_product(
         client, admin, cat["id"], "rel-sibling", status="published"
     )
-    upsell = _create_product(
-        client, admin, cat["id"], "rel-upsell", status="published"
-    )
+    upsell = _create_product(client, admin, cat["id"], "rel-upsell", status="published")
 
     # Configure distinct related + upsell relationships (overlapping ids are
     # de-duplicated server-side in favour of "related", so use separate products).
@@ -765,16 +851,12 @@ def test_related_and_upsell_with_data(test_app: Dict[str, object]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_featured_collection_with_product_and_404(
-    test_app: Dict[str, object]
-) -> None:
+def test_featured_collection_with_product_and_404(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]
     admin = auth_headers(create_admin_token(SessionLocal))
     cat = _create_category(client, admin, "CollCat")
-    product = _create_product(
-        client, admin, cat["id"], "coll-prod", status="published"
-    )
+    product = _create_product(client, admin, cat["id"], "coll-prod", status="published")
 
     res = client.post(
         "/api/v1/catalog/collections/featured",
@@ -899,9 +981,7 @@ def test_product_image_lifecycle_success(test_app: Dict[str, object]) -> None:
         f"/api/v1/catalog/products/imglife/images/{image_id}", headers=admin
     )
     assert res.status_code == 200, res.text
-    res = client.get(
-        "/api/v1/catalog/products/imglife/images/deleted", headers=admin
-    )
+    res = client.get("/api/v1/catalog/products/imglife/images/deleted", headers=admin)
     assert res.status_code == 200, res.text
     res = client.post(
         f"/api/v1/catalog/products/imglife/images/{image_id}/restore", headers=admin
@@ -946,9 +1026,7 @@ def test_review_create_and_approve(test_app: Dict[str, object]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_category_endpoints_without_audit_source(
-    test_app: Dict[str, object]
-) -> None:
+def test_category_endpoints_without_audit_source(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]
     admin = auth_headers(create_admin_token(SessionLocal))

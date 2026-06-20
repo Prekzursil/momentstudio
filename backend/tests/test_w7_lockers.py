@@ -57,9 +57,7 @@ def test_haversine_zero_and_positive() -> None:
 
 
 def test_build_query_sameday_and_fan() -> None:
-    q_sd = svc._build_query(
-        LockerProvider.sameday, lat=44.0, lng=26.0, radius_m=5000
-    )
+    q_sd = svc._build_query(LockerProvider.sameday, lat=44.0, lng=26.0, radius_m=5000)
     assert "easybox" in q_sd and "parcel_locker" in q_sd
     q_fan = svc._build_query(
         LockerProvider.fan_courier, lat=44.0, lng=26.0, radius_m=5000
@@ -146,9 +144,12 @@ def test_parse_overpass_node_way_skip_and_sort() -> None:
 
 
 def test_parse_overpass_empty_elements() -> None:
-    assert svc._parse_overpass_json(
-        {}, provider=LockerProvider.sameday, lat=44.0, lng=26.0
-    ) == []
+    assert (
+        svc._parse_overpass_json(
+            {}, provider=LockerProvider.sameday, lat=44.0, lng=26.0
+        )
+        == []
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -173,9 +174,7 @@ def test_fan_configured(monkeypatch) -> None:
 
 
 def test_sameday_base_url_ok_and_error(monkeypatch) -> None:
-    monkeypatch.setattr(
-        svc.settings, "sameday_api_base_url", "https://x/", False
-    )
+    monkeypatch.setattr(svc.settings, "sameday_api_base_url", "https://x/", False)
     assert svc._sameday_base_url() == "https://x"
     monkeypatch.setattr(svc.settings, "sameday_api_base_url", "", False)
     with pytest.raises(svc.LockersNotConfiguredError):
@@ -208,9 +207,7 @@ def test_parse_fan_expires_at_variants() -> None:
     assert svc._parse_fan_expires_at("", now=now) == now + timedelta(hours=23)
     assert svc._parse_fan_expires_at("2031-05-06 07:08", now=now).year == 2031
     assert svc._parse_fan_expires_at("2031-05-06 07:08:09", now=now).second == 9
-    assert svc._parse_fan_expires_at("garbage", now=now) == now + timedelta(
-        hours=1
-    )
+    assert svc._parse_fan_expires_at("garbage", now=now) == now + timedelta(hours=1)
 
 
 # --------------------------------------------------------------------------- #
@@ -336,9 +333,7 @@ async def test_fan_get_token_not_configured(monkeypatch) -> None:
 @respx.mock
 async def test_fan_get_token_data_dict_and_empty(monkeypatch) -> None:
     svc._fan_auth = None
-    monkeypatch.setattr(
-        svc.settings, "fan_api_base_url", "https://fan.example", False
-    )
+    monkeypatch.setattr(svc.settings, "fan_api_base_url", "https://fan.example", False)
     monkeypatch.setattr(svc.settings, "fan_api_username", "u", False)
     monkeypatch.setattr(svc.settings, "fan_api_password", "p", False)
 
@@ -364,9 +359,7 @@ async def test_fan_get_token_data_dict_and_empty(monkeypatch) -> None:
 async def test_fan_get_token_payload_not_dict(monkeypatch) -> None:
     """Top-level payload is a list -> data_obj becomes {} -> empty token."""
     svc._fan_auth = None
-    monkeypatch.setattr(
-        svc.settings, "fan_api_base_url", "https://fan.example", False
-    )
+    monkeypatch.setattr(svc.settings, "fan_api_base_url", "https://fan.example", False)
     monkeypatch.setattr(svc.settings, "fan_api_username", "u", False)
     monkeypatch.setattr(svc.settings, "fan_api_password", "p", False)
     respx.post("https://fan.example/login").mock(
@@ -383,9 +376,7 @@ async def test_fan_get_token_payload_not_dict(monkeypatch) -> None:
 @respx.mock
 async def test_load_fan_lockers_skips_and_maps(monkeypatch) -> None:
     monkeypatch.setattr(svc, "_fan_get_token", _fake_async("tok"))
-    monkeypatch.setattr(
-        svc.settings, "fan_api_base_url", "https://fan.example", False
-    )
+    monkeypatch.setattr(svc.settings, "fan_api_base_url", "https://fan.example", False)
     payload = {
         "data": [
             {
@@ -533,9 +524,7 @@ async def test_list_lockers_cache_hit(monkeypatch) -> None:
         expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         items=cached_items,
     )
-    out = await svc.list_lockers(
-        provider=LockerProvider.sameday, lat=44.0, lng=26.0
-    )
+    out = await svc.list_lockers(provider=LockerProvider.sameday, lat=44.0, lng=26.0)
     assert out is cached_items
 
 
@@ -570,9 +559,7 @@ async def test_list_lockers_mirror_runtimeerror_maps(monkeypatch) -> None:
     async def boom(*a, **k):  # type: ignore[no-untyped-def]
         raise RuntimeError("mirror down")
 
-    monkeypatch.setattr(
-        svc.sameday_easybox_mirror, "list_nearby_lockers", boom
-    )
+    monkeypatch.setattr(svc.sameday_easybox_mirror, "list_nearby_lockers", boom)
     # No cache -> the LockersNotConfiguredError propagates out of except.
     with pytest.raises(svc.LockersNotConfiguredError):
         await svc.list_lockers(
@@ -607,9 +594,7 @@ async def test_list_lockers_mirror_without_session(monkeypatch) -> None:
             return False
 
     monkeypatch.setattr(svc, "SessionLocal", lambda: _Sess())
-    out = await svc.list_lockers(
-        provider=LockerProvider.sameday, lat=44.0, lng=26.0
-    )
+    out = await svc.list_lockers(provider=LockerProvider.sameday, lat=44.0, lng=26.0)
     assert out == items
 
 
@@ -620,9 +605,7 @@ async def test_list_lockers_official_source(monkeypatch) -> None:
     monkeypatch.setattr(svc, "_sameday_configured", lambda: True)
     pts = [_point(lat=44.0, lng=26.0)]
     monkeypatch.setattr(svc, "_get_all_lockers", _fake_async(pts))
-    out = await svc.list_lockers(
-        provider=LockerProvider.sameday, lat=44.0, lng=26.0
-    )
+    out = await svc.list_lockers(provider=LockerProvider.sameday, lat=44.0, lng=26.0)
     assert out and out[0].id == "sameday:1"
 
 
@@ -632,13 +615,9 @@ async def test_list_lockers_overpass_disabled(monkeypatch) -> None:
     monkeypatch.setattr(svc.settings, "sameday_mirror_enabled", False, False)
     monkeypatch.setattr(svc, "_sameday_configured", lambda: False)
     monkeypatch.setattr(svc, "_fan_configured", lambda: False)
-    monkeypatch.setattr(
-        svc.settings, "lockers_use_overpass_fallback", False, False
-    )
+    monkeypatch.setattr(svc.settings, "lockers_use_overpass_fallback", False, False)
     with pytest.raises(svc.LockersNotConfiguredError):
-        await svc.list_lockers(
-            provider=LockerProvider.fan_courier, lat=44.0, lng=26.0
-        )
+        await svc.list_lockers(provider=LockerProvider.fan_courier, lat=44.0, lng=26.0)
 
 
 @pytest.mark.anyio("asyncio")
@@ -646,9 +625,7 @@ async def test_list_lockers_overpass_disabled(monkeypatch) -> None:
 async def test_list_lockers_overpass_fetch(monkeypatch) -> None:
     monkeypatch.setattr(svc.settings, "sameday_mirror_enabled", False, False)
     monkeypatch.setattr(svc, "_fan_configured", lambda: False)
-    monkeypatch.setattr(
-        svc.settings, "lockers_use_overpass_fallback", True, False
-    )
+    monkeypatch.setattr(svc.settings, "lockers_use_overpass_fallback", True, False)
     respx.post(svc._OVERPASS_URL).mock(
         return_value=httpx.Response(
             200,
@@ -721,7 +698,5 @@ async def test_list_lockers_error_returns_stale_cache(monkeypatch) -> None:
         expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
         items=stale,
     )
-    out = await svc.list_lockers(
-        provider=LockerProvider.sameday, lat=44.0, lng=26.0
-    )
+    out = await svc.list_lockers(provider=LockerProvider.sameday, lat=44.0, lng=26.0)
     assert out is stale

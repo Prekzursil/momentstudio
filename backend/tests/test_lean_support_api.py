@@ -306,9 +306,7 @@ def test_admin_submission_detail_update_reply(ctx, monkeypatch) -> None:
     sub_id = asyncio.run(_seed())
 
     # Detail without PII (masked).
-    res = client.get(
-        f"/api/v1/support/admin/submissions/{sub_id}", headers=headers
-    )
+    res = client.get(f"/api/v1/support/admin/submissions/{sub_id}", headers=headers)
     assert res.status_code == 200
 
     # Detail with PII reveal (monkeypatch require_pii_reveal to allow).
@@ -322,9 +320,7 @@ def test_admin_submission_detail_update_reply(ctx, monkeypatch) -> None:
     assert res.status_code == 200
 
     # Detail of a missing submission -> 404.
-    res = client.get(
-        f"/api/v1/support/admin/submissions/{uuid4()}", headers=headers
-    )
+    res = client.get(f"/api/v1/support/admin/submissions/{uuid4()}", headers=headers)
     assert res.status_code == 404
 
     # Update status with PII reveal (covers the include_pii update branch).

@@ -149,9 +149,7 @@ def test_seed_custom_profile_inline_translation_and_nonmatching_file(
 
             from app.models.content import ContentBlock
 
-            count = await session.scalar(
-                select(func.count()).select_from(ContentBlock)
-            )
+            count = await session.scalar(select(func.count()).select_from(ContentBlock))
             assert count == 1
 
     asyncio.run(run())

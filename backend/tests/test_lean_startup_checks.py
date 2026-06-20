@@ -75,9 +75,7 @@ def test_validate_passes_with_optional_integrations_enabled(monkeypatch) -> None
     monkeypatch.setattr(settings, "captcha_provider", "turnstile", raising=False)
     monkeypatch.setattr(settings, "turnstile_secret_key", "secret", raising=False)
     monkeypatch.setattr(settings, "netopia_enabled", True, raising=False)
-    monkeypatch.setattr(
-        startup_checks.settings, "stripe_env", "live", raising=False
-    )
+    monkeypatch.setattr(startup_checks.settings, "stripe_env", "live", raising=False)
 
     # Netopia reports configured; stripe live key is not a test key.
     from app.services import netopia as netopia_service

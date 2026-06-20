@@ -167,9 +167,7 @@ async def test_get_static_page_not_found(monkeypatch) -> None:
         _afn(None),
     )
     with pytest.raises(HTTPException) as ei:
-        await c.get_static_page(
-            slug="about", session=object(), lang=None, user=None
-        )
+        await c.get_static_page(slug="about", session=object(), lang=None, user=None)
     assert ei.value.status_code == 404
 
 
@@ -183,9 +181,7 @@ async def test_get_static_page_hidden(monkeypatch) -> None:
         _afn(blk),
     )
     with pytest.raises(HTTPException) as ei:
-        await c.get_static_page(
-            slug="about", session=object(), lang=None, user=None
-        )
+        await c.get_static_page(slug="about", session=object(), lang=None, user=None)
     assert ei.value.status_code == 404
 
 
@@ -199,9 +195,7 @@ async def test_get_static_page_requires_auth(monkeypatch) -> None:
         _afn(blk),
     )
     with pytest.raises(HTTPException) as ei:
-        await c.get_static_page(
-            slug="about", session=object(), lang=None, user=None
-        )
+        await c.get_static_page(slug="about", session=object(), lang=None, user=None)
     assert ei.value.status_code == 401
 
 
@@ -242,9 +236,7 @@ async def test_preview_static_page_bad_token(monkeypatch) -> None:
 
 @pytest.mark.anyio("asyncio")
 async def test_preview_static_page_not_found(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c, "decode_content_preview_token", lambda t: "page.about"
-    )
+    monkeypatch.setattr(c, "decode_content_preview_token", lambda t: "page.about")
     monkeypatch.setattr(c.content_service, "slugify_page_slug", lambda s: "about")
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
     resp = SimpleNamespace(headers={})
@@ -262,9 +254,7 @@ async def test_preview_static_page_not_found(monkeypatch) -> None:
 
 @pytest.mark.anyio("asyncio")
 async def test_preview_static_page_requires_auth(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c, "decode_content_preview_token", lambda t: "page.about"
-    )
+    monkeypatch.setattr(c, "decode_content_preview_token", lambda t: "page.about")
     monkeypatch.setattr(c.content_service, "slugify_page_slug", lambda s: "about")
     blk = _block(key="page.about", meta={"requires_auth": True})
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(blk))
@@ -283,9 +273,7 @@ async def test_preview_static_page_requires_auth(monkeypatch) -> None:
 
 @pytest.mark.anyio("asyncio")
 async def test_preview_static_page_ok(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c, "decode_content_preview_token", lambda t: "page.about"
-    )
+    monkeypatch.setattr(c, "decode_content_preview_token", lambda t: "page.about")
     monkeypatch.setattr(c.content_service, "slugify_page_slug", lambda s: "about")
     blk = _block(key="page.about")
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(blk))
@@ -413,9 +401,7 @@ async def test_get_content_site_social_hydration(monkeypatch) -> None:
     monkeypatch.setattr(
         c.social_thumbnails, "hydrate_site_social_meta", _afn({"hydrated": True})
     )
-    out = await c.get_content(
-        key="site.social", session=object(), lang=None, user=None
-    )
+    out = await c.get_content(key="site.social", session=object(), lang=None, user=None)
     assert out.meta == {"hydrated": True}
 
 
@@ -436,9 +422,7 @@ async def test_get_content_site_social_non_dict_meta(monkeypatch) -> None:
         return {"ok": True}
 
     monkeypatch.setattr(c.social_thumbnails, "hydrate_site_social_meta", hydrate)
-    out = await c.get_content(
-        key="site.social", session=object(), lang=None, user=None
-    )
+    out = await c.get_content(key="site.social", session=object(), lang=None, user=None)
     assert captured["meta"] is None  # non-dict meta passed as None
     assert out.meta == {"ok": True}
 
@@ -463,31 +447,23 @@ async def test_preview_home_bad_token(monkeypatch) -> None:
     monkeypatch.setattr(c, "decode_content_preview_token", lambda t: "wrong")
     resp = SimpleNamespace(headers={})
     with pytest.raises(HTTPException) as ei:
-        await c.preview_home(
-            response=resp, token="t", session=object(), lang=None
-        )
+        await c.preview_home(response=resp, token="t", session=object(), lang=None)
     assert ei.value.status_code == 403
 
 
 @pytest.mark.anyio("asyncio")
 async def test_preview_home_sections_not_found(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c, "decode_content_preview_token", lambda t: "home.sections"
-    )
+    monkeypatch.setattr(c, "decode_content_preview_token", lambda t: "home.sections")
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
     resp = SimpleNamespace(headers={})
     with pytest.raises(HTTPException) as ei:
-        await c.preview_home(
-            response=resp, token="t", session=object(), lang=None
-        )
+        await c.preview_home(response=resp, token="t", session=object(), lang=None)
     assert ei.value.status_code == 404
 
 
 @pytest.mark.anyio("asyncio")
 async def test_preview_home_ok_with_and_without_story(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c, "decode_content_preview_token", lambda t: "home.sections"
-    )
+    monkeypatch.setattr(c, "decode_content_preview_token", lambda t: "home.sections")
     sections = _block(key="home.sections")
     story = _block(key="home.story")
 
@@ -501,18 +477,14 @@ async def test_preview_home_ok_with_and_without_story(monkeypatch) -> None:
 
     monkeypatch.setattr(c.content_service, "get_block_by_key", get_block)
     resp = SimpleNamespace(headers={})
-    out = await c.preview_home(
-        response=resp, token="t", session=object(), lang=None
-    )
+    out = await c.preview_home(response=resp, token="t", session=object(), lang=None)
     assert out.story is not None
 
     async def get_block_no_story(session, key, lang=None):
         return sections if key == "home.sections" else None
 
     monkeypatch.setattr(c.content_service, "get_block_by_key", get_block_no_story)
-    out2 = await c.preview_home(
-        response=resp, token="t", session=object(), lang=None
-    )
+    out2 = await c.preview_home(response=resp, token="t", session=object(), lang=None)
     assert out2.story is None
 
 
@@ -587,9 +559,7 @@ async def test_admin_fetch_social_thumbnail_http_error(monkeypatch) -> None:
 
 @pytest.mark.anyio("asyncio")
 async def test_admin_fetch_social_thumbnail_empty(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c.social_thumbnails, "fetch_social_thumbnail_url", _afn("")
-    )
+    monkeypatch.setattr(c.social_thumbnails, "fetch_social_thumbnail_url", _afn(""))
     with pytest.raises(HTTPException) as ei:
         await c.admin_fetch_social_thumbnail(
             payload=SimpleNamespace(url="x"), _=_user()
@@ -690,9 +660,7 @@ async def test_admin_list_scheduling_default_window_pagination(
 async def test_admin_list_scheduling_aware_window_start(session_factory) -> None:
     now = datetime.now(timezone.utc)
     async with session_factory() as session:
-        await _seed_block(
-            session, key="page.x", published_at=now + timedelta(days=1)
-        )
+        await _seed_block(session, key="page.x", published_at=now + timedelta(days=1))
         out = await c.admin_list_scheduling(
             session=session,
             window_days=90,
@@ -873,9 +841,7 @@ async def test_admin_import_redirects_invalid_too_long_same(
 ) -> None:
     long_key = "page." + ("x" * 130)
     csv_text = (
-        "/pages/ ,page.real\n"
-        + f"{long_key},page.real2\n"
-        + "page.same,page.same\n"
+        "/pages/ ,page.real\n" + f"{long_key},page.real2\n" + "page.same,page.same\n"
     )
     async with session_factory() as session:
         out = await c.admin_import_redirects(
@@ -962,9 +928,7 @@ async def _seed_image(session, block, **kw):
 # --------------------------- sitemap / structured data --------------------- #
 @pytest.mark.anyio("asyncio")
 async def test_admin_sitemap_preview(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c.sitemap_service, "build_sitemap_urls", _afn({"en": ["/a"]})
-    )
+    monkeypatch.setattr(c.sitemap_service, "build_sitemap_urls", _afn({"en": ["/a"]}))
     out = await c.admin_sitemap_preview(session=object(), _=_user())
     assert out.by_lang == {"en": ["/a"]}
 
@@ -1017,9 +981,7 @@ async def test_admin_delete_redirect_ok(session_factory) -> None:
 async def test_admin_get_content_not_found(monkeypatch) -> None:
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
     with pytest.raises(HTTPException) as ei:
-        await c.admin_get_content(
-            key="x", session=object(), lang=None, _=_user()
-        )
+        await c.admin_get_content(key="x", session=object(), lang=None, _=_user())
     assert ei.value.status_code == 404
 
 
@@ -1051,9 +1013,7 @@ async def test_admin_update_content(monkeypatch) -> None:
 @pytest.mark.anyio("asyncio")
 async def test_admin_delete_content_not_blog() -> None:
     with pytest.raises(HTTPException) as ei:
-        await c.admin_delete_content(
-            key="page.about", session=object(), admin=_user()
-        )
+        await c.admin_delete_content(key="page.about", session=object(), admin=_user())
     assert ei.value.status_code == 400
 
 
@@ -1061,9 +1021,7 @@ async def test_admin_delete_content_not_blog() -> None:
 async def test_admin_delete_content_not_found(monkeypatch) -> None:
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
     with pytest.raises(HTTPException) as ei:
-        await c.admin_delete_content(
-            key="blog.post", session=object(), admin=_user()
-        )
+        await c.admin_delete_content(key="blog.post", session=object(), admin=_user())
     assert ei.value.status_code == 404
 
 
@@ -1186,9 +1144,7 @@ async def test_admin_list_content_images_filters_and_sorts(
 
         # key filter + q filter + sort variations
         for sort in ("newest", "oldest", "key_asc", "key_desc"):
-            out = await _list_images(
-                session, key="page.gallery", q="cdn", sort=sort
-            )
+            out = await _list_images(session, key="page.gallery", q="cdn", sort=sort)
             assert out.meta.total_items == 2
         # tag filter (join path) + tags surfaced
         out_tag = await _list_images(session, tag="HERO")
@@ -1474,9 +1430,7 @@ async def test_admin_delete_content_image_ok(session_factory, monkeypatch) -> No
     async with session_factory() as session:
         blk = await _seed_block(session, key="page.delblk")
         img = await _seed_image(session, blk)
-        monkeypatch.setattr(
-            c.content_service, "delete_image_asset", _afn(None)
-        )
+        monkeypatch.setattr(c.content_service, "delete_image_asset", _afn(None))
         resp = await c.admin_delete_content_image(
             image_id=img.id,
             delete_versions=True,
@@ -1489,7 +1443,6 @@ async def test_admin_delete_content_image_ok(session_factory, monkeypatch) -> No
 # =========================================================================== #
 # Part 5: media DAM asset handlers (media_dam fully mocked)
 # =========================================================================== #
-from app.models.media import MediaAssetStatus, MediaJobType  # noqa: E402
 
 
 def _patch_media(monkeypatch, **overrides):
@@ -1904,9 +1857,7 @@ async def test_admin_media_asset_usage(monkeypatch) -> None:
         get_asset_or_404=_afn("asset"),
         rebuild_usage_edges=_afn("usage"),
     )
-    out = await c.admin_media_asset_usage(
-        asset_id=uuid4(), session=object(), _=_user()
-    )
+    out = await c.admin_media_asset_usage(asset_id=uuid4(), session=object(), _=_user())
     assert out == "usage"
 
 
@@ -1914,9 +1865,7 @@ async def test_admin_media_asset_usage(monkeypatch) -> None:
 async def test_admin_media_asset_usage_not_found(monkeypatch) -> None:
     _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
     with pytest.raises(HTTPException) as ei:
-        await c.admin_media_asset_usage(
-            asset_id=uuid4(), session=object(), _=_user()
-        )
+        await c.admin_media_asset_usage(asset_id=uuid4(), session=object(), _=_user())
     assert ei.value.status_code == 404
 
 
@@ -2101,7 +2050,7 @@ async def test_admin_media_asset_edit_not_found(monkeypatch) -> None:
 # =========================================================================== #
 # Part 6: media jobs / retry-policies / collections / tools / pages / versions
 # =========================================================================== #
-from app.models.content import ContentAuditLog, ContentBlockVersion  # noqa: E402
+from app.models.content import ContentBlockVersion  # noqa: E402
 
 
 # --------------------------- admin_list_media_jobs ------------------------- #
@@ -2192,9 +2141,7 @@ async def test_admin_media_retry_policy_history_ok(monkeypatch) -> None:
 
 @pytest.mark.anyio("asyncio")
 async def test_admin_media_retry_policy_history_value_error(monkeypatch) -> None:
-    _patch_media(
-        monkeypatch, list_retry_policy_history=_araise(ValueError("bad"))
-    )
+    _patch_media(monkeypatch, list_retry_policy_history=_araise(ValueError("bad")))
     with pytest.raises(HTTPException) as ei:
         await c.admin_media_retry_policy_history(
             job_type="x", page=1, limit=20, session=object(), _=_user()
@@ -2292,9 +2239,7 @@ async def test_admin_mark_media_retry_policy_known_good_ok(monkeypatch) -> None:
 async def test_admin_mark_media_retry_policy_known_good_value_error(
     monkeypatch,
 ) -> None:
-    _patch_media(
-        monkeypatch, mark_retry_policy_known_good=_araise(ValueError("bad"))
-    )
+    _patch_media(monkeypatch, mark_retry_policy_known_good=_araise(ValueError("bad")))
     with pytest.raises(HTTPException) as ei:
         await c.admin_mark_media_retry_policy_known_good(
             job_type="x", note=None, session=object(), admin=_user()
@@ -2324,9 +2269,7 @@ async def test_admin_reset_media_retry_policy_value_error(monkeypatch) -> None:
 @pytest.mark.anyio("asyncio")
 async def test_admin_reset_all_media_retry_policies(monkeypatch) -> None:
     _patch_media(monkeypatch, reset_all_retry_policies=_afn([]))
-    out = await c.admin_reset_all_media_retry_policies(
-        session=object(), admin=_user()
-    )
+    out = await c.admin_reset_all_media_retry_policies(session=object(), admin=_user())
     assert out.items == []
 
 
@@ -2368,9 +2311,7 @@ async def test_admin_media_usage_reconcile_redis(monkeypatch) -> None:
         get_redis=lambda: object(),
         job_to_read=lambda j: j,
     )
-    bt = SimpleNamespace(
-        add_task=lambda *a, **k: (_ for _ in ()).throw(AssertionError)
-    )
+    bt = SimpleNamespace(add_task=lambda *a, **k: (_ for _ in ()).throw(AssertionError))
     out = await c.admin_media_usage_reconcile(
         background_tasks=bt,
         session=SimpleNamespace(commit=_afn(None)),
@@ -2382,9 +2323,7 @@ async def test_admin_media_usage_reconcile_redis(monkeypatch) -> None:
 # --------------------------- jobs: get / retry / bulk / triage / events ---- #
 @pytest.mark.anyio("asyncio")
 async def test_admin_get_media_job_ok(monkeypatch) -> None:
-    _patch_media(
-        monkeypatch, get_job_or_404=_afn("job"), job_to_read=lambda j: j
-    )
+    _patch_media(monkeypatch, get_job_or_404=_afn("job"), job_to_read=lambda j: j)
     out = await c.admin_get_media_job(job_id=uuid4(), session=object(), _=_user())
     assert out == "job"
 
@@ -2405,9 +2344,7 @@ async def test_admin_retry_media_job_ok(monkeypatch) -> None:
         manual_retry_job=_afn("retried"),
         job_to_read=lambda j: j,
     )
-    out = await c.admin_retry_media_job(
-        job_id=uuid4(), session=object(), admin=_user()
-    )
+    out = await c.admin_retry_media_job(job_id=uuid4(), session=object(), admin=_user())
     assert out == "retried"
 
 
@@ -2415,9 +2352,7 @@ async def test_admin_retry_media_job_ok(monkeypatch) -> None:
 async def test_admin_retry_media_job_not_found(monkeypatch) -> None:
     _patch_media(monkeypatch, get_job_or_404=_araise(ValueError()))
     with pytest.raises(HTTPException) as ei:
-        await c.admin_retry_media_job(
-            job_id=uuid4(), session=object(), admin=_user()
-        )
+        await c.admin_retry_media_job(job_id=uuid4(), session=object(), admin=_user())
     assert ei.value.status_code == 404
 
 
@@ -2560,9 +2495,7 @@ async def test_admin_link_check(monkeypatch) -> None:
 async def test_admin_link_check_preview(monkeypatch) -> None:
     from app.schemas.content import ContentLinkCheckPreviewRequest
 
-    monkeypatch.setattr(
-        c.content_service, "check_content_links_preview", _afn([])
-    )
+    monkeypatch.setattr(c.content_service, "check_content_links_preview", _afn([]))
     out = await c.admin_link_check_preview(
         payload=ContentLinkCheckPreviewRequest(key="page.x"),
         session=object(),
@@ -2590,9 +2523,7 @@ async def test_admin_find_replace_preview(monkeypatch) -> None:
 async def test_admin_find_replace_apply(monkeypatch) -> None:
     from app.schemas.content import ContentFindReplaceApplyRequest
 
-    monkeypatch.setattr(
-        c.content_service, "apply_find_replace", _afn((1, 2, 3, []))
-    )
+    monkeypatch.setattr(c.content_service, "apply_find_replace", _afn((1, 2, 3, [])))
     out = await c.admin_find_replace_apply(
         payload=ContentFindReplaceApplyRequest(find="x", replace="y"),
         session=object(),
@@ -2620,9 +2551,7 @@ async def test_admin_list_pages(session_factory) -> None:
 async def test_admin_update_translation_status(monkeypatch) -> None:
     from app.schemas.content import ContentTranslationStatusUpdate
 
-    monkeypatch.setattr(
-        c.content_service, "set_translation_status", _afn(_block())
-    )
+    monkeypatch.setattr(c.content_service, "set_translation_status", _afn(_block()))
     out = await c.admin_update_translation_status(
         key="page.x",
         payload=ContentTranslationStatusUpdate(needs_translation_en=True),
@@ -2687,9 +2616,7 @@ async def test_admin_preview_content_ok(monkeypatch) -> None:
 async def test_admin_list_content_audit_not_found(monkeypatch) -> None:
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
     with pytest.raises(HTTPException) as ei:
-        await c.admin_list_content_audit(
-            key="page.x", session=object(), _=_user()
-        )
+        await c.admin_list_content_audit(key="page.x", session=object(), _=_user())
     assert ei.value.status_code == 404
 
 
@@ -2718,9 +2645,7 @@ async def test_admin_list_content_audit_ok(monkeypatch) -> None:
 async def test_admin_list_content_versions_not_found(monkeypatch) -> None:
     monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
     with pytest.raises(HTTPException) as ei:
-        await c.admin_list_content_versions(
-            key="page.x", session=object(), _=_user()
-        )
+        await c.admin_list_content_versions(key="page.x", session=object(), _=_user())
     assert ei.value.status_code == 404
 
 
@@ -2744,9 +2669,7 @@ async def test_admin_list_content_versions_ok(session_factory, monkeypatch) -> N
         blk = await _seed_block(session, key="page.versioned")
         await _seed_version(session, blk, version=1)
         await _seed_version(session, blk, version=2)
-        monkeypatch.setattr(
-            c.content_service, "get_block_by_key", _afn(blk)
-        )
+        monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(blk))
         out = await c.admin_list_content_versions(
             key="page.versioned", session=session, _=_user()
         )
@@ -2791,9 +2714,7 @@ async def test_admin_get_content_version_ok(session_factory, monkeypatch) -> Non
 
 @pytest.mark.anyio("asyncio")
 async def test_admin_rollback_content_version(monkeypatch) -> None:
-    monkeypatch.setattr(
-        c.content_service, "rollback_to_version", _afn(_block())
-    )
+    monkeypatch.setattr(c.content_service, "rollback_to_version", _afn(_block()))
     out = await c.admin_rollback_content_version(
         key="page.x", version=1, session=object(), admin=_user()
     )
