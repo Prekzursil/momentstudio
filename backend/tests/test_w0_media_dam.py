@@ -845,3 +845,102 @@ async def test_ensure_public_asset() -> None:
         assert await md.ensure_public_asset(session, ids[1]) is None
         assert await md.ensure_public_asset(session, ids[2]) is None
         assert await md.ensure_public_asset(session, uuid.uuid4()) is None
+
+
+@pytest.mark.anyio
+async def test_collections_crud() -> None:
+    from app.schemas.media import MediaCollectionUpsertRequest
+
+    engine, local = _make_local()
+    await _init(engine)
+    actor = uuid.uuid4()
+
+    async with local() as session:
+        # empty list initially
+        assert await md.list_collections(session) == []
+
+    async with local() as session:
+        # create
+        created = await md.upsert_collection(
+            session,
+            collection_id=None,
+            payload=MediaCollectionUpsertRequest(
+                name="Gallery", slug="gallery", visibility="public"
+            ),
+            actor_id=actor,
+        )
+        collection_id = created.id
+        assert created.name == "Gallery"
+
+    async with local() as session:
+        # update existing
+        updated = await md.upsert_collection(
+            session,
+            collection_id=collection_id,
+            payload=MediaCollectionUpsertRequest(
+                name="Gallery 2", slug="gallery-2", visibility="private"
+            ),
+            actor_id=actor,
+        )
+        assert updated.name == "Gallery 2"
+
+    async with local() as session:
+        # seed assets and add them as items
+        a1 = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            storage_key="c/a1.png", public_url="/media/c/a1.png",
+        )
+        a2 = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            storage_key="c/a2.png", public_url="/media/c/a2.png",
+        )
+        session.add_all([a1, a2])
+        await session.commit()
+        asset_ids = [a1.id, a2.id]
+
+    async with local() as session:
+        await md.replace_collection_items(
+            session, collection_id=collection_id, asset_ids=asset_ids
+        )
+
+    async with local() as session:
+        cols = await md.list_collections(session)
+        assert len(cols) == 1
+        assert cols[0].item_count == 2
+
+
+@pytest.mark.anyio
+async def test_rebuild_usage_edges() -> None:
+    from app.models.catalog import Category, Product
+
+    engine, local = _make_local()
+    await _init(engine)
+
+    async with local() as session:
+        asset = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            storage_key="u/a.png", public_url="/media/u/a.png",
+        )
+        category = Category(slug="c", name="C", sort_order=1)
+        session.add_all([asset, category])
+        await session.flush()
+        # a product whose image references the asset public_url
+        from app.models.catalog import ProductImage, ProductStatus
+
+        product = Product(
+            category_id=category.id, slug="p", sku="SKU", name="P",
+            base_price=10, currency="RON", stock_quantity=1,
+            status=ProductStatus.published,
+            images=[ProductImage(url="/media/u/a.png", alt_text="a")],
+        )
+        session.add(product)
+        await session.commit()
+        asset_id = asset.id
+
+    async with local() as session:
+        asset = await session.get(MediaAsset, asset_id)
+        resp = await md.rebuild_usage_edges(session, asset, commit=True)
+        assert resp is not None
