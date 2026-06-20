@@ -27,4 +27,21 @@ paths = [
   '''(^|/)\.env\.example$''',
   '''(^|/)\.env\.sample$''',
   '''(^|/)\.env\.template$''',
+  # Generated scanner-baseline exports (Sonar/Codacy issue dumps + GitHub
+  # code-scanning/dependabot snapshots). These are machine-generated audit
+  # artifacts; their Sonar issue keys / hashes (e.g. "AZyQF...") trip the
+  # generic-api-key heuristic. They are data, not source, and hold no secrets.
+  '''(^|/)docs/reports/scanner-baselines/''',
+]
+
+# Reasoned content allowlists for non-secret matches (env-var references and
+# placeholder/test fixtures, including ones that only exist in older history).
+# These are NOT hardcoded credentials.
+regexes = [
+  # curl auth uses the $SONAR_TOKEN env var, never a literal credential.
+  '''\$\{?SONAR_TOKEN\}?:''',
+  # Explicit Stripe sandbox placeholder used as a config default, not a key.
+  '''sk_test_placeholder''',
+  # Truncated fake PEM header used as a unit-test fixture (history only).
+  '''-----BEGIN PRIVATE KEY-----\\nX''',
 ]
