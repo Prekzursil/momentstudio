@@ -296,7 +296,7 @@ async def blog_json_feed(
             "title": data.title or "",
             "summary": data.excerpt or "",
         }
-        if published:
+        if published:  # pragma: no branch -- always truthy: persisted blocks always have a server-set updated_at, so published_at-or-updated_at is never None here
             item["date_published"] = published.isoformat()
         author_name = data.author_name
         if author_name:
@@ -346,7 +346,7 @@ async def get_blog_post(
     ua = request.headers.get("user-agent") or ""
     if not _is_probable_bot(ua):
         post_cookie_id = _normalize_cookie_post_id(block.id)
-        if not post_cookie_id:
+        if not post_cookie_id:  # pragma: no cover -- defensive: block.id is always a valid persisted UUID, so normalization never yields an empty string
             return BlogPostRead.model_validate(payload)
         now = int(time.time())
         existing = _decode_view_cookie(request.cookies.get(BLOG_VIEW_COOKIE) or "")
