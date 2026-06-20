@@ -17,6 +17,13 @@
 [tool.coverage.run]
 branch = true
 source = ["backend/app"]
+# The app runs async routes via Starlette's anyio portal (a worker thread that
+# drives a greenlet-based event loop under the TestClient). Without declaring
+# these concurrency libraries, coverage's tracer is not installed in those
+# contexts and silently under-counts EXECUTED async route-handler lines. This is
+# a correctness fix for measuring the async surface, NOT a relaxation of the
+# 100% gate.
+concurrency = ["thread", "greenlet"]
 omit = [
     "*/alembic/*",
     "*/migrations/*",
