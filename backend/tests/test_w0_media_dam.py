@@ -27,6 +27,8 @@ from app.models.media import (
     MediaVisibility,
 )
 from app.schemas.media import (
+    MediaAssetUpdateI18nItem,
+    MediaAssetUpdateRequest,
     MediaRetryPolicyRollbackRequest,
     MediaRetryPolicyUpdateRequest,
 )
@@ -507,3 +509,105 @@ async def test_list_jobs_filters() -> None:
         # default branch
         _rows, meta = await md.list_jobs(session, md.MediaJobListFilters())
         assert meta["total_items"] == 1
+
+
+@pytest.mark.anyio
+async def test_asset_lifecycle(media_roots) -> None:
+    """get_or_404, apply_asset_update (incl public transition), change_status,
+    soft_delete, restore, purge, purge_expired_trash."""
+    public, private = media_roots
+    engine, local = _make_local()
+    await _init(engine)
+
+    async with local() as session:
+        asset = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+            storage_key="originals/a/img.png",
+            public_url="/media/originals/a/img.png",
+            original_filename="img.png",
+        )
+        session.add(asset)
+        await session.commit()
+        asset_id = asset.id
+    # put the file in the private root so move/purge paths run
+    f = private / "originals" / "a" / "img.png"
+    f.parent.mkdir(parents=True)
+    f.write_bytes(b"img")
+
+    async with local() as session:
+        # get_or_404 missing -> ValueError
+        with pytest.raises(ValueError, match="Asset not found"):
+            await md.get_asset_or_404(session, uuid.uuid4())
+        asset = await md.get_asset_or_404(session, asset_id)
+        # update: approve + make public (triggers file move) + rights + tags + i18n
+        await md.apply_asset_update(
+            session,
+            asset,
+            MediaAssetUpdateRequest(
+                status="approved", visibility="public",
+                rights_license="CC-BY", rights_owner="Me", rights_notes="note",
+                tags=["Hello World", "hello-world", ""],  # dedup + skip empty
+                i18n=[
+                    MediaAssetUpdateI18nItem(lang="en", title="T", alt_text="A"),
+                    MediaAssetUpdateI18nItem(lang="en", title="dup"),  # dup lang skip
+                    MediaAssetUpdateI18nItem(lang="ro", caption="C"),
+                ],
+            ),
+        )
+        await session.commit()
+
+    async with local() as session:
+        asset = await md.get_asset_or_404(session, asset_id)
+        # change_status to approved with actor
+        await md.change_status(
+            session, asset=asset, to_status=MediaAssetStatus.approved,
+            actor_id=uuid.uuid4(), note="ok", set_approved_actor=True,
+        )
+
+    async with local() as session:
+        asset = await md.get_asset_or_404(session, asset_id)
+        await md.soft_delete_asset(session, asset, uuid.uuid4())
+        assert asset.status == MediaAssetStatus.trashed
+
+    async with local() as session:
+        asset = await md.get_asset_or_404(session, asset_id)
+        # restore when not trashed -> early return
+        restored = await md.restore_asset(session, asset, uuid.uuid4())
+        assert restored.status == MediaAssetStatus.draft
+        # restore again now that it is draft -> no-op early return
+        again = await md.restore_asset(session, restored, uuid.uuid4())
+        assert again.status == MediaAssetStatus.draft
+
+    async with local() as session:
+        asset = await md.get_asset_or_404(session, asset_id)
+        await md.purge_asset(session, asset)
+
+    async with local() as session:
+        assert await session.get(MediaAsset, asset_id) is None
+
+
+@pytest.mark.anyio
+async def test_purge_expired_trash(media_roots) -> None:
+    public, private = media_roots
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        old = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.trashed, visibility=MediaVisibility.private,
+            storage_key="trash/old.png", public_url="/media/trash/old.png",
+            trashed_at=datetime(2000, 1, 1, tzinfo=UTC),
+        )
+        fresh = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.trashed, visibility=MediaVisibility.private,
+            storage_key="trash/new.png", public_url="/media/trash/new.png",
+            trashed_at=datetime.now(UTC),
+        )
+        session.add_all([old, fresh])
+        await session.commit()
+
+    async with local() as session:
+        purged = await md.purge_expired_trash(session)
+        assert purged == 1
