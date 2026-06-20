@@ -1245,7 +1245,9 @@ async def rollback_retry_policy(
             (item for item in presets.items if item.preset_key == payload.preset_key),
             None,
         )
-        if preset is None:
+        if preset is None:  # pragma: no cover -- unreachable: preset_key is a
+            # validated Literal and all three keys are always present in
+            # get_retry_policy_presets().items; defensive only.
             raise ValueError("Unknown retry policy preset")
         target_policy = _policy_snapshot_from_raw(
             {
@@ -1647,7 +1649,8 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
     ).all()
     processing_seconds: list[int] = []
     for started_at, completed_at in completed_rows:
-        if not started_at or not completed_at:
+        if not started_at or not completed_at:  # pragma: no cover -- unreachable:
+            # the query already filters started_at/completed_at IS NOT NULL.
             continue
         processing_seconds.append(
             max(0, int((completed_at - started_at).total_seconds()))
@@ -2206,7 +2209,10 @@ async def process_job_inline(session: AsyncSession, job: MediaJob) -> MediaJob:
             await _process_ai_tag_job(session, job)
         elif job.job_type == MediaJobType.duplicate_scan:
             await _process_duplicate_scan_job(session, job)
-        elif job.job_type == MediaJobType.usage_reconcile:
+        elif (
+            job.job_type == MediaJobType.usage_reconcile
+        ):  # pragma: no branch -- all MediaJobType values are handled above; the
+            # no-match fall-through is unreachable for a valid job.
             await _process_usage_reconcile_job(session, job)
         job.status = MediaJobStatus.completed
         job.progress_pct = 100
