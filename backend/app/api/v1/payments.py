@@ -189,7 +189,7 @@ async def stripe_webhook(
         if updated:
             updated.processed_at = None
             if isinstance(exc, HTTPException):
-                updated.last_error = str(exc.detail)
+                updated.last_error = str(getattr(exc, "detail", exc))
             else:
                 updated.last_error = str(exc)
             session.add(updated)
@@ -300,7 +300,7 @@ async def paypal_webhook(
         if updated:
             updated.processed_at = None
             if isinstance(exc, HTTPException):
-                updated.last_error = str(exc.detail)
+                updated.last_error = str(getattr(exc, "detail", exc))
             else:
                 updated.last_error = str(exc)
             session.add(updated)
