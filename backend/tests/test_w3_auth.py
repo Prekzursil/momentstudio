@@ -571,3 +571,70 @@ def test_update_training_mode_allowed_for_staff(test_app) -> None:
     )
     assert res.status_code == 200
     assert res.json()["admin_training_mode"] is True
+
+
+# --------------------------------------------------------------------------- #
+# logout                                                                       #
+# --------------------------------------------------------------------------- #
+def test_logout_with_refresh_token(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    body = _register(client, email="lo1@x.io", username="lo1")
+    refresh = body["tokens"]["refresh_token"]
+    res = client.post("/api/v1/auth/logout", json={"refresh_token": refresh})
+    assert res.status_code == 204
+
+
+def test_logout_without_token_no_cookie(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    res = client.post("/api/v1/auth/logout", json={"refresh_token": ""})
+    assert res.status_code == 204
+
+
+# --------------------------------------------------------------------------- #
+# password/change                                                              #
+# --------------------------------------------------------------------------- #
+def test_change_password_wrong_current(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="cp1@x.io", username="cp1")["tokens"][
+        "access_token"
+    ]
+    res = client.post(
+        "/api/v1/auth/password/change",
+        headers=_auth_headers(token),
+        json={"current_password": "wrong", "new_password": "newsecret"},
+    )
+    assert res.status_code == 400
+    assert "incorrect" in res.json()["detail"]
+
+
+def test_change_password_success(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="cp2@x.io", username="cp2")["tokens"][
+        "access_token"
+    ]
+    res = client.post(
+        "/api/v1/auth/password/change",
+        headers=_auth_headers(token),
+        json={"current_password": "supersecret", "new_password": "brandnewsecret"},
+    )
+    assert res.status_code == 200
+    assert res.json()["detail"] == "Password updated"
+    # The new password now works for login.
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "cp2@x.io", "password": "brandnewsecret"},
+    )
+    assert login.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# email verification request                                                   #
+# --------------------------------------------------------------------------- #
+def test_request_email_verification(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="vr1@x.io", username="vr1")["tokens"][
+        "access_token"
+    ]
+    res = client.post("/api/v1/auth/verify/request", headers=_auth_headers(token))
+    assert res.status_code == 202
+    assert "Verification email sent" in res.json()["detail"]
