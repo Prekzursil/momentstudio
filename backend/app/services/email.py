@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Sequence
 from urllib.parse import urlencode
 
-import anyio
+import anyio.to_thread
 
 try:
     import jinja2

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from functools import partial
 from uuid import UUID
 
-import anyio
+import anyio.to_thread
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

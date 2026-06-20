@@ -11,7 +11,7 @@ from typing import Any, Callable
 from urllib.parse import quote_plus
 from uuid import UUID
 
-import anyio
+import anyio.to_thread
 from fastapi import (
     APIRouter,
     Depends,
@@ -88,7 +88,8 @@ from app.schemas.checkout import (
     StripeConfirmResponse,
 )
 from app.schemas.user import UserCreate
-from app.schemas.address import AddressCreate
+from app.schemas.address import AddressCreate, AddressRead
+from app.schemas.order_fraud import AdminOrderFraudSignal
 from app.services import payments
 from app.services import netopia as netopia_service
 from app.services import paypal as paypal_service
@@ -450,8 +451,8 @@ def _delivery_from_payload(
         return (
             courier_clean,
             delivery_clean,
-            locker_id.strip(),
-            locker_name.strip(),
+            (locker_id or "").strip(),
+            (locker_name or "").strip(),
             (locker_address or "").strip() or None,
             float(locker_lat),
             float(locker_lng),
@@ -876,10 +877,10 @@ async def checkout(
                 phone=phone,
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
-                city=payload.billing_city,
+                city=payload.billing_city or payload.city,
                 region=payload.billing_region,
-                postal_code=payload.billing_postal_code,
-                country=payload.billing_country,
+                postal_code=payload.billing_postal_code or payload.postal_code,
+                country=payload.billing_country or payload.country,
                 is_default_shipping=False,
                 is_default_billing=default_billing,
             ),
@@ -1349,7 +1350,7 @@ async def confirm_stripe_checkout(
     else:
         payment_intent_id = getattr(checkout_session, "payment_intent", None) or (
             checkout_session.get("payment_intent")
-            if hasattr(checkout_session, "get")
+            if checkout_session is not None and hasattr(checkout_session, "get")
             else None
         )
         if payment_intent_id and not order.stripe_payment_intent_id:
@@ -1659,7 +1660,9 @@ async def list_my_orders(
         limit=limit,
         pending_count=int(pending_count),
     )
-    return OrderListResponse(items=list(rows), meta=meta)
+    return OrderListResponse(
+        items=[OrderRead.model_validate(order) for order in rows], meta=meta
+    )
 
 
 @router.get("/admin", response_model=list[OrderRead])
@@ -1677,7 +1680,7 @@ async def admin_search_orders(
     request: Request,
     q: str | None = Query(default=None, max_length=200),
     user_id: UUID | None = Query(default=None),
-    status: str | None = Query(default=None),
+    status_filter: str | None = Query(default=None, alias="status"),
     tag: str | None = Query(default=None, max_length=50),
     sla: str | None = Query(default=None, max_length=30),
     fraud: str | None = Query(default=None, max_length=30),
@@ -1692,7 +1695,7 @@ async def admin_search_orders(
 ) -> AdminOrderListResponse:
     if include_pii:
         pii_service.require_pii_reveal(admin, request=request)
-    status_clean = (status or "").strip().lower() if status else None
+    status_clean = (status_filter or "").strip().lower() if status_filter else None
     pending_any = False
     parsed_status = None
     parsed_statuses: list[OrderStatus] | None = None
@@ -2031,6 +2034,14 @@ async def admin_download_document_export(
     return FileResponse(path, media_type=media_type, filename=filename, headers=headers)
 
 
+def _admin_address_read(
+    addr: Address | dict[str, Any] | None,
+) -> AddressRead | None:
+    if addr is None:
+        return None
+    return AddressRead.model_validate(addr)
+
+
 async def _serialize_admin_order(
     session: AsyncSession,
     order: Order,
@@ -2087,12 +2098,12 @@ async def _serialize_admin_order(
             if getattr(order, "user", None)
             else None
         ),
-        shipping_address=(
+        shipping_address=_admin_address_read(
             order.shipping_address
             if include_pii
             else _masked_address(getattr(order, "shipping_address", None))
         ),
-        billing_address=(
+        billing_address=_admin_address_read(
             order.billing_address
             if include_pii
             else _masked_address(getattr(order, "billing_address", None))
@@ -2104,7 +2115,9 @@ async def _serialize_admin_order(
         refunds=getattr(order, "refunds", []) or [],
         admin_notes=getattr(order, "admin_notes", []) or [],
         tags=[t.tag for t in (getattr(order, "tags", None) or [])],
-        fraud_signals=fraud_signals,
+        fraud_signals=[
+            AdminOrderFraudSignal.model_validate(signal) for signal in fraud_signals
+        ],
         shipments=getattr(order, "shipments", []) or [],
     )
 
@@ -2179,7 +2192,9 @@ async def admin_list_order_email_events(
 
     rows = (await session.execute(stmt)).scalars().all()
     to_email_value = (
-        cleaned_email if include_pii else pii_service.mask_email(cleaned_email)
+        cleaned_email
+        if include_pii
+        else (pii_service.mask_email(cleaned_email) or cleaned_email)
     )
     return [
         AdminOrderEmailEventRead(
@@ -2619,10 +2634,10 @@ async def guest_checkout(
                 phone=phone,
                 line1=payload.billing_line1 or payload.line1,
                 line2=payload.billing_line2,
-                city=payload.billing_city,
+                city=payload.billing_city or payload.city,
                 region=payload.billing_region,
-                postal_code=payload.billing_postal_code,
-                country=payload.billing_country,
+                postal_code=payload.billing_postal_code or payload.postal_code,
+                country=payload.billing_country or payload.country,
                 is_default_shipping=False,
                 is_default_billing=bool(
                     payload.save_address and payload.create_account
@@ -3605,7 +3620,7 @@ async def admin_send_delivery_email(
         order,
         getattr(order.user, "preferred_language", None) if order.user else None,
     )
-    return order
+    return OrderRead.model_validate(order)
 
 
 @router.post("/admin/{order_id}/confirmation-email", response_model=OrderRead)
@@ -3653,7 +3668,7 @@ async def admin_send_confirmation_email(
         getattr(order.user, "preferred_language", None) if order.user else None,
         receipt_share_days=checkout_settings.receipt_share_days,
     )
-    return order
+    return OrderRead.model_validate(order)
 
 
 @router.post("/admin/{order_id}/items/{item_id}/fulfill", response_model=AdminOrderRead)
@@ -4052,7 +4067,7 @@ async def admin_capture_payment(
             ),
             url=_account_orders_url(updated),
         )
-    return updated
+    return OrderRead.model_validate(updated)
 
 
 @router.post("/admin/{order_id}/void-payment", response_model=OrderRead)
@@ -4100,7 +4115,7 @@ async def admin_void_payment(
             ),
             url=_account_orders_url(updated),
         )
-    return updated
+    return OrderRead.model_validate(updated)
 
 
 @router.post(
@@ -4120,7 +4135,8 @@ async def create_shipping_method(
 async def list_shipping_methods(
     session: AsyncSession = Depends(get_session),
 ) -> list[ShippingMethodRead]:
-    return await order_service.list_shipping_methods(session)
+    methods = await order_service.list_shipping_methods(session)
+    return [ShippingMethodRead.model_validate(method) for method in methods]
 
 
 @router.get("/{order_id}", response_model=OrderRead)
@@ -4441,7 +4457,7 @@ async def request_order_cancellation(
         url=_account_orders_url(order),
     )
 
-    return order
+    return OrderRead.model_validate(order)
 
 
 @router.post("/{order_id}/reorder", response_model=CartRead)

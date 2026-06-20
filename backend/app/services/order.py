@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
 import logging
-from typing import Sequence
+from typing import Sequence, TypedDict
 from uuid import UUID
 import secrets
 import string
@@ -1820,6 +1820,14 @@ async def list_order_tag_stats(session: AsyncSession) -> list[tuple[str, int]]:
     return rows
 
 
+class _OrderTagRenameResult(TypedDict):
+    from_tag: str
+    to_tag: str
+    updated: int
+    merged: int
+    total: int
+
+
 async def rename_order_tag(
     session: AsyncSession,
     *,
@@ -1827,7 +1835,7 @@ async def rename_order_tag(
     to_tag: str,
     actor_user_id: UUID | None = None,
     max_affected_orders: int = 5000,
-) -> dict[str, object]:
+) -> "_OrderTagRenameResult":
     from_clean = _normalize_order_tag(from_tag)
     to_clean = _normalize_order_tag(to_tag)
     if not from_clean:

@@ -2,7 +2,7 @@ import json
 from functools import partial
 from uuid import UUID
 
-import anyio
+import anyio.to_thread
 from fastapi import (
     APIRouter,
     Depends,

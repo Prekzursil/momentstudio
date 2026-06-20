@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -106,7 +107,7 @@ async def list_cart_reservations(
     now: datetime | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> tuple[datetime, list[dict]]:
+) -> tuple[datetime, list[dict[str, Any]]]:
     now_value = now or datetime.now(timezone.utc)
     cutoff = _cart_reservation_cutoff(now_value)
 
@@ -133,7 +134,7 @@ async def list_cart_reservations(
         .offset(offset)
     )
     rows = (await session.execute(stmt)).all()
-    items: list[dict] = []
+    items: list[dict[str, Any]] = []
     for cart_id, updated_at, customer_email, quantity in rows:
         items.append(
             {
@@ -153,7 +154,7 @@ async def list_order_reservations(
     variant_id: UUID | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     open_statuses = {
         OrderStatus.pending_payment,
         OrderStatus.pending_acceptance,
@@ -200,7 +201,7 @@ async def list_order_reservations(
         .offset(offset)
     )
     rows = (await session.execute(stmt)).all()
-    items: list[dict] = []
+    items: list[dict[str, Any]] = []
     for (
         order_id,
         reference_code,

@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlsplit
 from pathlib import Path
 from typing import Any
 
-import anyio
+import anyio.to_thread
 from fastapi import HTTPException, status
 from PIL import Image, ImageOps
 from sqlalchemy import String, cast, func, or_, select, update

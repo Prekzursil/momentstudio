@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 from uuid import UUID, uuid4
 
-import anyio
+import anyio.to_thread
 from PIL import Image
 from sqlalchemy import String, and_, delete, func, or_, select
 from sqlalchemy.exc import MissingGreenlet

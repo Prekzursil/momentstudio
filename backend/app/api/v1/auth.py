@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 from uuid import UUID
 
-import anyio
+import anyio.to_thread
 import jwt
 
 from fastapi import (

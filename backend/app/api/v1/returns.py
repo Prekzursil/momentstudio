@@ -6,7 +6,7 @@ from functools import partial
 from pathlib import Path
 from uuid import UUID
 
-import anyio
+import anyio.to_thread
 from fastapi import (
     APIRouter,
     BackgroundTasks,

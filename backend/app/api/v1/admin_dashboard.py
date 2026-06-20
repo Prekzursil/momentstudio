@@ -2,9 +2,10 @@ import csv
 import io
 import re
 import unicodedata
+from collections.abc import Sequence
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, TypedDict
 from uuid import UUID
 
 from fastapi import (
@@ -34,7 +35,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import aliased, selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Subquery
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.core import security
 from app.core.config import settings
@@ -59,6 +61,7 @@ from app.schemas.catalog_admin import (
     AdminProductListItem,
     AdminProductListResponse,
 )
+from app.schemas.admin_common import AdminPaginationMeta
 from app.schemas.catalog import StockAdjustmentCreate, StockAdjustmentRead
 from app.schemas.admin_dashboard_search import (
     AdminDashboardSearchResponse,
@@ -75,7 +78,9 @@ from app.schemas.admin_dashboard_scheduled import (
 )
 from app.schemas.auth import RefreshSessionResponse
 from app.schemas.inventory import (
+    CartReservationItem,
     CartReservationsResponse,
+    OrderReservationItem,
     OrderReservationsResponse,
     RestockListResponse,
     RestockNoteRead,
@@ -129,10 +134,14 @@ from app.schemas.user_admin import (
     AdminUserInternalUpdate,
     AdminUserRoleUpdateRequest,
     AdminUserSecurityUpdate,
+    AdminUserAddress,
     AdminUserListItem,
     AdminUserListResponse,
+    AdminUserOrderSummary,
     AdminUserProfileResponse,
     AdminUserProfileUser,
+    AdminUserSecurityEventSummary,
+    AdminUserTicketSummary,
 )
 from app.schemas.gdpr_admin import (
     AdminGdprDeletionRequestItem,
@@ -186,9 +195,18 @@ async def _get_dashboard_alert_thresholds(
     return record
 
 
+class _AlertThresholdsPayload(TypedDict):
+    failed_payments_min_count: int
+    failed_payments_min_delta_pct: float | None
+    refund_requests_min_count: int
+    refund_requests_min_rate_pct: float | None
+    stockouts_min_count: int
+    updated_at: datetime | None
+
+
 def _dashboard_alert_thresholds_payload(
     record: AdminDashboardAlertThresholds,
-) -> dict[str, object]:
+) -> _AlertThresholdsPayload:
     return {
         "failed_payments_min_count": int(
             getattr(record, "failed_payments_min_count", 1) or 1
@@ -1264,7 +1282,9 @@ async def admin_refunds_breakdown(
 
     providers: list[dict] = []
     for provider, count, amount in current_provider:
-        _, prev_count, prev_amount = prev_provider_map.get(provider, (provider, 0, 0.0))
+        prev_row = prev_provider_map.get(provider)
+        prev_count = prev_row[1] if prev_row is not None else 0
+        prev_amount = prev_row[2] if prev_row is not None else 0.0
         providers.append(
             {
                 "provider": provider,
@@ -2242,9 +2262,9 @@ async def search_products(
             deleted_slug=getattr(prod, "deleted_slug", None),
             sku=prod.sku,
             name=prod.name,
-            base_price=float(prod.base_price),
+            base_price=prod.base_price,
             sale_type=prod.sale_type,
-            sale_value=float(prod.sale_value) if prod.sale_value is not None else None,
+            sale_value=prod.sale_value,
             currency=prod.currency,
             status=prod.status,
             is_active=prod.is_active,
@@ -2267,12 +2287,12 @@ async def search_products(
     ]
     return AdminProductListResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=AdminPaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -2304,9 +2324,9 @@ async def restore_product(
         deleted_slug=getattr(prod, "deleted_slug", None),
         sku=prod.sku,
         name=prod.name,
-        base_price=float(prod.base_price),
+        base_price=prod.base_price,
         sale_type=prod.sale_type,
-        sale_value=float(prod.sale_value) if prod.sale_value is not None else None,
+        sale_value=prod.sale_value,
         currency=prod.currency,
         status=prod.status,
         is_active=prod.is_active,
@@ -2469,9 +2489,9 @@ async def products_by_ids(
             slug=prod.slug,
             sku=prod.sku,
             name=prod.name,
-            base_price=float(prod.base_price),
+            base_price=prod.base_price,
             sale_type=prod.sale_type,
-            sale_value=float(prod.sale_value) if prod.sale_value is not None else None,
+            sale_value=prod.sale_value,
             currency=prod.currency,
             status=prod.status,
             is_active=prod.is_active,
@@ -2611,12 +2631,12 @@ async def search_users(
 
     return AdminUserListResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=AdminPaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -2715,12 +2735,12 @@ async def admin_user_segment_repeat_buyers(
 
     return AdminUserSegmentResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=AdminPaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -2807,12 +2827,12 @@ async def admin_user_segment_high_aov(
 
     return AdminUserSegmentResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=AdminPaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -2923,7 +2943,7 @@ async def admin_user_profile(
         .all()
     )
 
-    addresses_payload: list[dict[str, Any]] | list[Address]
+    addresses_payload: list[dict[str, Any]] | Sequence[Address]
     if include_pii:
         addresses_payload = addresses
     else:
@@ -2973,10 +2993,13 @@ async def admin_user_profile(
                 getattr(user, "password_reset_required", False)
             ),
         ),
-        addresses=addresses_payload,
-        orders=orders,
-        tickets=tickets,
-        security_events=security_events,
+        addresses=[AdminUserAddress.model_validate(addr) for addr in addresses_payload],
+        orders=[AdminUserOrderSummary.model_validate(order) for order in orders],
+        tickets=[AdminUserTicketSummary.model_validate(ticket) for ticket in tickets],
+        security_events=[
+            AdminUserSecurityEventSummary.model_validate(event)
+            for event in security_events
+        ],
     )
 
 
@@ -3334,7 +3357,7 @@ async def admin_audit(
     }
 
 
-def _audit_union_subquery() -> object:
+def _audit_union_subquery() -> Subquery:
     prod_actor = aliased(User)
     prod = aliased(Product)
     products_q = (
@@ -3408,7 +3431,7 @@ def _audit_union_subquery() -> object:
 
 
 def _audit_filters(
-    audit: object,
+    audit: Subquery,
     *,
     entity: str | None,
     action: str | None,
@@ -3761,8 +3784,7 @@ async def admin_audit_retention_purge(
             expired = int(counts[key]["expired"] or 0)
             if cutoff is None or expired <= 0:
                 continue
-            table = model.__table__
-            await session.execute(delete(table).where(table.c.created_at < cutoff))
+            await session.execute(delete(model).where(model.created_at < cutoff))
             deleted[key] = expired
 
         await audit_chain_service.add_admin_audit_log(
@@ -4019,12 +4041,12 @@ async def admin_gdpr_export_jobs(
 
     return AdminGdprExportJobsResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=AdminPaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -4048,7 +4070,7 @@ async def admin_gdpr_retry_export_job(
         )
 
     engine = session.bind
-    if engine is None:
+    if not isinstance(engine, AsyncEngine):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database engine unavailable",
@@ -4260,12 +4282,12 @@ async def admin_gdpr_deletion_requests(
 
     return AdminGdprDeletionRequestsResponse(
         items=items,
-        meta={
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "page": page,
-            "limit": limit,
-        },
+        meta=AdminPaginationMeta(
+            total_items=total_items,
+            total_pages=total_pages,
+            page=page,
+            limit=limit,
+        ),
     )
 
 
@@ -5042,9 +5064,10 @@ async def list_stock_adjustments(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("inventory")),
 ) -> list[StockAdjustmentRead]:
-    return await catalog_service.list_stock_adjustments(
+    adjustments = await catalog_service.list_stock_adjustments(
         session, product_id=product_id, limit=limit, offset=offset
     )
+    return [StockAdjustmentRead.model_validate(adj) for adj in adjustments]
 
 
 @router.get("/stock-adjustments/export")
@@ -5147,9 +5170,10 @@ async def apply_stock_adjustment(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin_section("inventory")),
 ) -> StockAdjustmentRead:
-    return await catalog_service.apply_stock_adjustment(
+    adjustment = await catalog_service.apply_stock_adjustment(
         session, payload=payload, user_id=current_user.id
     )
+    return StockAdjustmentRead.model_validate(adjustment)
 
 
 @router.get("/inventory/restock-list", response_model=RestockListResponse)
@@ -5206,19 +5230,19 @@ async def inventory_reserved_carts(
         limit=limit,
         offset=offset,
     )
-    items: list[dict] = []
+    items: list[CartReservationItem] = []
     for row in rows:
         email_raw = str(row.get("customer_email") or "").strip() or None
         email_value = email_raw
         if email_value and not include_pii:
             email_value = pii_service.mask_email(email_value) or email_value
         items.append(
-            {
-                "cart_id": row.get("cart_id"),
-                "updated_at": row.get("updated_at"),
-                "customer_email": email_value,
-                "quantity": int(row.get("quantity") or 0),
-            }
+            CartReservationItem(
+                cart_id=row["cart_id"],
+                updated_at=row["updated_at"],
+                customer_email=email_value,
+                quantity=int(row.get("quantity") or 0),
+            )
         )
 
     return CartReservationsResponse(cutoff=cutoff, items=items)
@@ -5258,21 +5282,21 @@ async def inventory_reserved_orders(
         limit=limit,
         offset=offset,
     )
-    items: list[dict] = []
+    items: list[OrderReservationItem] = []
     for row in rows:
         email_raw = str(row.get("customer_email") or "").strip() or None
         email_value = email_raw
         if email_value and not include_pii:
             email_value = pii_service.mask_email(email_value) or email_value
         items.append(
-            {
-                "order_id": row.get("order_id"),
-                "reference_code": row.get("reference_code"),
-                "status": row.get("status"),
-                "created_at": row.get("created_at"),
-                "customer_email": email_value,
-                "quantity": int(row.get("quantity") or 0),
-            }
+            OrderReservationItem(
+                order_id=row["order_id"],
+                reference_code=row.get("reference_code"),
+                status=row["status"],
+                created_at=row["created_at"],
+                customer_email=email_value,
+                quantity=int(row.get("quantity") or 0),
+            )
         )
 
     return OrderReservationsResponse(items=items)
