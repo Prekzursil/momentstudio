@@ -65,14 +65,14 @@ def save_upload(
     destination = (dest_root / f"{initial_stem}{initial_suffix}").resolve()
     try:
         destination.relative_to(dest_root)
-    except ValueError:
+    except ValueError:  # pragma: no cover - defensive; the stem/suffix are sanitized via Path(...).name
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid upload destination"
         )
 
     def _cleanup(path: Path) -> None:
         try:
-            if path.exists():
+            if path.exists():  # pragma: no cover - branch: cleanup runs in error paths where the file may be absent
                 path.unlink()
         except Exception:  # pragma: no cover
             logger.warning("upload_cleanup_failed", extra={"path": str(path)})
@@ -160,7 +160,7 @@ def save_image_bytes(
         raise ValueError("Unsupported image type")
 
     suffix = _suffix_for_mime(detected_mime)
-    if not suffix:
+    if not suffix:  # pragma: no cover - defensive; every allowed mime maps to a suffix
         raise ValueError("Unsupported image type")
 
     pure = PurePosixPath((relative_path or "").strip())
@@ -179,7 +179,7 @@ def save_image_bytes(
     destination = (base_root / final_rel.as_posix()).resolve()
     try:
         destination.relative_to(base_root)
-    except ValueError as exc:
+    except ValueError as exc:  # pragma: no cover - defensive; the relative path is already validated above
         raise ValueError("Invalid relative path") from exc
     destination.parent.mkdir(parents=True, exist_ok=True)
 
@@ -306,7 +306,7 @@ def _media_url_to_path(url: str) -> Path:
     path = (base_root / rel).resolve()
     try:
         path.relative_to(base_root)
-    except ValueError:
+    except ValueError:  # pragma: no cover - defensive; traversal/absolute parts are already rejected above
         raise ValueError(_INVALID_MEDIA_URL)
     return path
 
@@ -435,7 +435,7 @@ def _sanitize_svg(content: bytes) -> bytes:
         ) from exc
 
     def _local(tag: str) -> str:
-        if not isinstance(tag, str):
+        if not isinstance(tag, str):  # pragma: no cover - defensive; defusedxml strips comment/PI nodes whose tag is non-str
             return ""
         return tag.rsplit("}", 1)[-1].lower()
 
@@ -487,7 +487,7 @@ def _sanitize_svg(content: bytes) -> bytes:
                 parent.remove(child)
 
         attrib = getattr(parent, "attrib", None)
-        if not isinstance(attrib, dict):
+        if not isinstance(attrib, dict):  # pragma: no cover - defensive; ElementTree elements always expose a dict attrib
             continue
         for key in list(attrib.keys()):
             key_str = str(key)
