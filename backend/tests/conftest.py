@@ -4,6 +4,7 @@ from collections.abc import Generator
 
 import pytest
 from sqlalchemy.ext import asyncio as sa_asyncio
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 # Keep pytest output high-signal by disabling outbound Sentry capture in tests.
 os.environ["SENTRY_DSN"] = ""
@@ -27,6 +28,27 @@ sa_asyncio.create_async_engine = _tracked_create_async_engine  # type: ignore[as
 @pytest.fixture(scope="module")
 def anyio_backend() -> str:
     return "asyncio"
+
+
+def make_memory_session_factory() -> async_sessionmaker:
+    """Create an in-memory SQLite async session factory with all tables created.
+
+    Mirrors the per-test engine pattern used across the suite so unit tests for
+    service-layer DB helpers can run without a real database. Import the models
+    package first so every table is registered on ``Base.metadata``.
+    """
+    import app.models  # noqa: F401  (register all ORM tables on Base.metadata)
+    from app.db.base import Base
+
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def _init() -> None:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    asyncio.run(_init())
+    return session_factory
 
 
 @pytest.fixture(autouse=True)
