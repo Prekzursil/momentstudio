@@ -402,3 +402,314 @@ def test_category_csv_import_errors(test_app: Dict[str, object]) -> None:
         headers=admin,
     )
     assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Public listing / lang / sale branches
+# ---------------------------------------------------------------------------
+
+
+def test_public_listing_lang_and_sale_branches(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin_token = create_admin_token(SessionLocal)
+    admin = auth_headers(admin_token)
+
+    cat = _create_category(client, admin, "Lighting")
+    _create_product(
+        client, admin, cat["id"], "lamp", status="published", base_price=20.0
+    )
+
+    # categories with lang + staff include_hidden -> translation + staff branch
+    res = client.get(
+        "/api/v1/catalog/categories?lang=ro&include_hidden=true", headers=admin
+    )
+    assert res.status_code == 200, res.text
+
+    # products list with lang -> translation branch + price bounds
+    res = client.get("/api/v1/catalog/products?lang=ro")
+    assert res.status_code == 200, res.text
+
+    # price-bounds with category_slug=sale alias branch
+    res = client.get("/api/v1/catalog/products/price-bounds?category_slug=sale")
+    assert res.status_code == 200, res.text
+
+    # list products with category_slug=sale alias branch
+    res = client.get("/api/v1/catalog/products?category_slug=sale")
+    assert res.status_code == 200, res.text
+
+    # product feed (json) + feed.csv with lang
+    assert client.get("/api/v1/catalog/products/feed?lang=ro").status_code == 200
+    assert client.get("/api/v1/catalog/products/feed.csv?lang=ro").status_code == 200
+
+    # get single product with lang (translation loader branches)
+    res = client.get("/api/v1/catalog/products/lamp?lang=ro")
+    assert res.status_code == 200, res.text
+
+    # recently-viewed with lang
+    res = client.get("/api/v1/catalog/products/recently-viewed?lang=ro")
+    assert res.status_code == 200, res.text
+
+    # featured collections with lang
+    res = client.get("/api/v1/catalog/collections/featured?lang=ro")
+    assert res.status_code == 200, res.text
+
+
+def test_csv_import_too_large(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+
+    # Exceed the CSV import size guard (_read_upload_csv_bytes -> 400 too large).
+    from app.api.v1 import catalog as catalog_api
+
+    oversized = b"a" * (catalog_api._CSV_IMPORT_MAX_BYTES + 10)
+    res = client.post(
+        "/api/v1/catalog/products/import",
+        files={"file": ("big.csv", oversized, "text/csv")},
+        headers=admin,
+    )
+    assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Product endpoints: 404 (product-not-found) paths across the admin surface
+# ---------------------------------------------------------------------------
+
+
+def test_product_not_found_paths(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    user_token, _ = create_user_token(SessionLocal)
+    user = {"Authorization": f"Bearer {user_token}"}
+    missing = "no-such-product"
+    image_id = "00000000-0000-0000-0000-000000000001"
+
+    # admin (require_admin_section) product-not-found endpoints
+    assert client.patch(
+        f"/api/v1/catalog/products/{missing}", json={"name": "x"}, headers=admin
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/translations", headers=admin
+    ).status_code == 404
+    assert client.put(
+        f"/api/v1/catalog/products/{missing}/translations/ro",
+        json={"name": "x"},
+        headers=admin,
+    ).status_code == 404
+    assert client.delete(
+        f"/api/v1/catalog/products/{missing}/translations/ro", headers=admin
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/relationships", headers=admin
+    ).status_code == 404
+    assert client.put(
+        f"/api/v1/catalog/products/{missing}/relationships",
+        json={"related_product_ids": [], "upsell_product_ids": []},
+        headers=admin,
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/audit", headers=admin
+    ).status_code == 404
+    assert client.delete(
+        f"/api/v1/catalog/products/{missing}", headers=admin
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/{missing}/images",
+        files={"file": ("t.png", _png_bytes(), "image/png")},
+        headers=admin,
+    ).status_code == 404
+    assert client.put(
+        f"/api/v1/catalog/products/{missing}/variants",
+        json={"variants": [], "delete_variant_ids": []},
+        headers=admin,
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/{missing}/duplicate", headers=admin
+    ).status_code == 404
+    assert client.delete(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}", headers=admin
+    ).status_code == 404
+    assert client.patch(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}/sort?sort_order=1",
+        headers=admin,
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/images/deleted", headers=admin
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}/restore", headers=admin
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}/translations",
+        headers=admin,
+    ).status_code == 404
+    assert client.put(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}/translations/ro",
+        json={"alt_text": "x"},
+        headers=admin,
+    ).status_code == 404
+    assert client.delete(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}/translations/ro",
+        headers=admin,
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}/stats", headers=admin
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/{missing}/images/{image_id}/reprocess",
+        headers=admin,
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/{missing}/reviews/{image_id}/approve",
+        headers=admin,
+    ).status_code == 404
+
+    # optional-auth / profile-gated product-not-found endpoints
+    assert client.get(f"/api/v1/catalog/products/{missing}").status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
+    ).status_code == 404
+    assert client.delete(
+        f"/api/v1/catalog/products/{missing}/back-in-stock", headers=user
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/{missing}/reviews",
+        json={"author_name": "A", "rating": 5},
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/related"
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/{missing}/upsells"
+    ).status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Product image endpoints: image-not-found 404 paths on a real product
+# ---------------------------------------------------------------------------
+
+
+def test_product_image_not_found_paths(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    cat = _create_category(client, admin, "ImgCat")
+    _create_product(client, admin, cat["id"], "img-prod", status="published")
+    bad_image = "00000000-0000-0000-0000-0000000000aa"
+
+    assert client.get(
+        f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations",
+        headers=admin,
+    ).status_code == 404
+    assert client.put(
+        f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations/ro",
+        json={"alt_text": "x"},
+        headers=admin,
+    ).status_code == 404
+    assert client.delete(
+        f"/api/v1/catalog/products/img-prod/images/{bad_image}/translations/ro",
+        headers=admin,
+    ).status_code == 404
+    assert client.get(
+        f"/api/v1/catalog/products/img-prod/images/{bad_image}/stats", headers=admin
+    ).status_code == 404
+    assert client.post(
+        f"/api/v1/catalog/products/img-prod/images/{bad_image}/reprocess",
+        headers=admin,
+    ).status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Audit endpoint: valid JSON payload, invalid JSON payload, and joined email
+# ---------------------------------------------------------------------------
+
+
+def test_product_audit_listing_payload_variants(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin_token = create_admin_token(SessionLocal)
+    admin = auth_headers(admin_token)
+    cat = _create_category(client, admin, "AuditCat")
+    product = _create_product(client, admin, cat["id"], "audit-prod")
+
+    async def _seed_audit() -> None:
+        from uuid import UUID
+
+        from app.models.catalog import ProductAuditLog
+
+        product_uuid = UUID(product["id"])
+        async with SessionLocal() as session:
+            session.add(
+                ProductAuditLog(
+                    product_id=product_uuid,
+                    user_id=None,
+                    action="catalog.product.update",
+                    payload='{"changed": ["name"]}',
+                )
+            )
+            session.add(
+                ProductAuditLog(
+                    product_id=product_uuid,
+                    user_id=None,
+                    action="catalog.product.note",
+                    payload="not-json{",  # triggers JSONDecodeError -> raw fallback
+                )
+            )
+            await session.commit()
+
+    asyncio.run(_seed_audit())
+
+    res = client.get("/api/v1/catalog/products/audit-prod/audit", headers=admin)
+    assert res.status_code == 200, res.text
+    entries = res.json()
+    actions = {e["action"] for e in entries}
+    assert "catalog.product.update" in actions
+    raw_entry = next(e for e in entries if e["action"] == "catalog.product.note")
+    assert raw_entry["payload"] == {"raw": "not-json{"}
+
+
+# ---------------------------------------------------------------------------
+# Public visibility 404s: an unpublished product is hidden from anonymous users
+# ---------------------------------------------------------------------------
+
+
+def test_unpublished_product_hidden_from_public(test_app: Dict[str, object]) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    SessionLocal = test_app["session_factory"]
+    admin = auth_headers(create_admin_token(SessionLocal))
+    user_token, _ = create_user_token(SessionLocal)
+    user = {"Authorization": f"Bearer {user_token}"}
+    cat = _create_category(client, admin, "DraftCat")
+    _create_product(client, admin, cat["id"], "draft-prod", status="draft")
+
+    # Anonymous / customer cannot see a draft product -> 404 (visibility branch).
+    assert client.get("/api/v1/catalog/products/draft-prod").status_code == 404
+    assert client.get(
+        "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
+    ).status_code == 404
+    assert client.post(
+        "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
+    ).status_code == 404
+    assert client.delete(
+        "/api/v1/catalog/products/draft-prod/back-in-stock", headers=user
+    ).status_code == 404
+    assert client.post(
+        "/api/v1/catalog/products/draft-prod/reviews",
+        json={"author_name": "A", "rating": 5},
+    ).status_code == 404
+    assert client.get(
+        "/api/v1/catalog/products/draft-prod/related"
+    ).status_code == 404
+    assert client.get(
+        "/api/v1/catalog/products/draft-prod/upsells"
+    ).status_code == 404
+
+    # Admin CAN see the draft product (is_admin branch true).
+    assert client.get(
+        "/api/v1/catalog/products/draft-prod", headers=admin
+    ).status_code == 200
