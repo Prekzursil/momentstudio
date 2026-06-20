@@ -120,9 +120,7 @@ async def _get_or_create_cached_amount_off_coupon(
     except Exception:
         return None
 
-    coupon_id = getattr(coupon_obj, "id", None) or (
-        coupon_obj.get("id") if hasattr(coupon_obj, "get") else None
-    )
+    coupon_id = getattr(coupon_obj, "id", None)
     if not coupon_id:
         return None
 
@@ -299,9 +297,7 @@ async def create_checkout_session(
                 coupon_obj = stripe.Coupon.create(
                     duration="once", amount_off=discount_value, currency="ron"
                 )
-                coupon_id = getattr(coupon_obj, "id", None) or (
-                    coupon_obj.get("id") if hasattr(coupon_obj, "get") else None
-                )
+                coupon_id = getattr(coupon_obj, "id", None)
             if coupon_id:
                 discounts_param = [{"coupon": str(coupon_id)}]
 
@@ -325,12 +321,8 @@ async def create_checkout_session(
             detail="Stripe checkout session creation failed",
         ) from exc
 
-    session_id_raw = getattr(session_obj, "id", None) or (
-        session_obj.get("id") if hasattr(session_obj, "get") else None
-    )
-    checkout_url_raw = getattr(session_obj, "url", None) or (
-        session_obj.get("url") if hasattr(session_obj, "get") else None
-    )
+    session_id_raw = getattr(session_obj, "id", None)
+    checkout_url_raw = getattr(session_obj, "url", None)
     if not session_id_raw or not checkout_url_raw:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -380,7 +372,9 @@ async def handle_webhook_event(
         )
     init_stripe()
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, secret)
+        event = cast(
+            dict[str, Any], stripe.Webhook.construct_event(payload, sig_header, secret)
+        )
     except Exception as exc:  # broad for Stripe signature errors
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload"
@@ -437,7 +431,7 @@ async def capture_payment_intent(intent_id: str) -> dict:
         )
     init_stripe()
     try:
-        return stripe.PaymentIntent.capture(intent_id)
+        return cast(dict[str, Any], stripe.PaymentIntent.capture(intent_id))
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
@@ -453,7 +447,7 @@ async def void_payment_intent(intent_id: str) -> dict:
         )
     init_stripe()
     try:
-        return stripe.PaymentIntent.cancel(intent_id)
+        return cast(dict[str, Any], stripe.PaymentIntent.cancel(intent_id))
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
@@ -474,7 +468,7 @@ async def refund_payment_intent(
         payload: dict = {"payment_intent": intent_id}
         if amount_cents is not None:
             payload["amount"] = int(amount_cents)
-        return stripe.Refund.create(**payload)
+        return cast(dict[str, Any], stripe.Refund.create(**payload))
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)

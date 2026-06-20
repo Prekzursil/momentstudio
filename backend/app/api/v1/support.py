@@ -555,7 +555,7 @@ _DEFAULT_SUPPORT_FIRST_REPLY_HOURS = 24
 _DEFAULT_SUPPORT_RESOLUTION_HOURS = 72
 
 
-def _parse_sla_hours(value: object | None, *, fallback: int) -> int:
+def _parse_sla_hours(value: int | str | float | None, *, fallback: int) -> int:
     try:
         raw = int(value) if value is not None else fallback
     except Exception:

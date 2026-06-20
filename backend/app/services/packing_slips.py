@@ -10,6 +10,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
+    Flowable,
     PageBreak,
     Paragraph,
     SimpleDocTemplate,
@@ -171,7 +172,7 @@ def render_batch_packing_slips_pdf(
         title=title or _DEFAULT_TITLE,
     )
 
-    story: list[object] = []
+    story: list[Flowable] = []
     for idx, order in enumerate(orders):
         if idx:
             story.append(PageBreak())

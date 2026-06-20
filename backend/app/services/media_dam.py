@@ -1500,6 +1500,8 @@ async def get_telemetry(session: AsyncSession) -> MediaTelemetryResponse:
                 raw = await _await_if_needed(redis.get(str(key)))
                 if not raw:
                     return False
+                if isinstance(raw, bytes):
+                    raw = raw.decode("utf-8")
                 payload = json_loads(raw)
                 last_seen_raw = payload.get("last_seen_at")
                 try:

@@ -92,12 +92,13 @@ async def upsert_tax_rate(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Tax group not found"
         )
-    return await taxes_service.upsert_tax_rate(
+    rate = await taxes_service.upsert_tax_rate(
         session,
         group=group,
         country_code=payload.country_code,
         vat_rate_percent=payload.vat_rate_percent,
     )
+    return TaxRateRead.model_validate(rate)
 
 
 @router.delete(

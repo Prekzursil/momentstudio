@@ -31,7 +31,7 @@ async def add_wishlist_item(
     product = await wishlist_service.add_to_wishlist(
         session, current_user.id, product_id
     )
-    return product
+    return ProductRead.model_validate(product)
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

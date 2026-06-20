@@ -393,10 +393,10 @@ async def netopia_webhook(
         )
 
     try:
-        order_info = event.get("order") if isinstance(event.get("order"), dict) else {}
-        payment_info = (
-            event.get("payment") if isinstance(event.get("payment"), dict) else {}
-        )
+        order_raw = event.get("order")
+        order_info = order_raw if isinstance(order_raw, dict) else {}
+        payment_raw = event.get("payment")
+        payment_info = payment_raw if isinstance(payment_raw, dict) else {}
         order_id_raw = str(order_info.get("orderID") or "").strip()
         ntp_id = str(payment_info.get("ntpID") or "").strip() or None
         payment_message = str(payment_info.get("message") or "").strip() or None

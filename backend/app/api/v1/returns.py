@@ -102,9 +102,7 @@ async def create_my_return_request(
 
     to_email = getattr(created.order, "customer_email", None)
     if to_email:
-        lang = (
-            created.user.preferred_language if getattr(created, "user", None) else None
-        )
+        lang = created.user.preferred_language if created.user else None
         background_tasks.add_task(
             email_service.send_return_request_created, to_email, created, lang=lang
         )
@@ -225,9 +223,7 @@ async def admin_create_return(
 
     to_email = getattr(created.order, "customer_email", None)
     if to_email:
-        lang = (
-            created.user.preferred_language if getattr(created, "user", None) else None
-        )
+        lang = created.user.preferred_language if created.user else None
         background_tasks.add_task(
             email_service.send_return_request_created, to_email, created, lang=lang
         )
@@ -267,9 +263,7 @@ async def admin_update_return(
     next_status = ReturnRequestStatus(updated.status)
     to_email = getattr(updated.order, "customer_email", None)
     if to_email and next_status != prev_status:
-        lang = (
-            updated.user.preferred_language if getattr(updated, "user", None) else None
-        )
+        lang = updated.user.preferred_language if updated.user else None
         background_tasks.add_task(
             email_service.send_return_request_status_update,
             to_email,

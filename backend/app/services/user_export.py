@@ -72,8 +72,9 @@ async def run_user_export_job(engine: AsyncEngine, *, job_id: UUID) -> None:
             job.file_path = export_path.relative_to(private_root).as_posix()
             job.progress = 100
             job.status = UserDataExportStatus.succeeded
-            job.finished_at = datetime.now(timezone.utc)
-            job.expires_at = job.finished_at + timedelta(days=7)
+            finished_at = datetime.now(timezone.utc)
+            job.finished_at = finished_at
+            job.expires_at = finished_at + timedelta(days=7)
             session.add(job)
             await session.commit()
 

@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.models.blog import BlogComment, BlogCommentFlag, BlogCommentSubscription
 from app.models.content import ContentBlock, ContentStatus
 from app.models.user import User, UserRole
+from app.schemas.blog import BlogPostListItem
 
 
 BLOG_KEY_PREFIX = "blog."
@@ -434,7 +435,7 @@ async def get_post_neighbors(
     return newer, older
 
 
-def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
+def to_list_item(block: ContentBlock, *, lang: str | None = None) -> BlogPostListItem:
     meta = getattr(block, "meta", None) or {}
     images = sorted(getattr(block, "images", []) or [], key=lambda img: img.sort_order)
     cover = _meta_cover_image_url(meta)
@@ -455,22 +456,28 @@ def to_list_item(block: ContentBlock, *, lang: str | None = None) -> dict:
     excerpt = summary or _excerpt(_plain_text_from_markdown(block.body_markdown))
     series = meta.get("series")
     author_name = _author_public_name(getattr(block, "author", None))
-    return {
-        "slug": _extract_slug(block.key),
-        "title": block.title,
-        "excerpt": excerpt,
-        "published_at": block.published_at,
-        "cover_image_url": cover,
-        "cover_focal_x": getattr(cover_image, "focal_x", None) if cover_image else None,
-        "cover_focal_y": getattr(cover_image, "focal_y", None) if cover_image else None,
-        "cover_fit": _meta_cover_fit(meta),
-        "tags": _normalize_tags(meta.get("tags")),
-        "series": (
-            series.strip() if isinstance(series, str) and series.strip() else None
-        ),
-        "author_name": author_name,
-        "reading_time_minutes": reading_time_minutes,
-    }
+    return BlogPostListItem.model_validate(
+        {
+            "slug": _extract_slug(block.key),
+            "title": block.title,
+            "excerpt": excerpt,
+            "published_at": block.published_at,
+            "cover_image_url": cover,
+            "cover_focal_x": getattr(cover_image, "focal_x", None)
+            if cover_image
+            else None,
+            "cover_focal_y": getattr(cover_image, "focal_y", None)
+            if cover_image
+            else None,
+            "cover_fit": _meta_cover_fit(meta),
+            "tags": _normalize_tags(meta.get("tags")),
+            "series": (
+                series.strip() if isinstance(series, str) and series.strip() else None
+            ),
+            "author_name": author_name,
+            "reading_time_minutes": reading_time_minutes,
+        }
+    )
 
 
 def to_read(block: ContentBlock, *, lang: str | None = None) -> dict:

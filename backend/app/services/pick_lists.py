@@ -10,7 +10,14 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Flowable,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from app.services.packing_slips import _register_reportlab_fonts
 
@@ -160,7 +167,7 @@ def render_pick_list_pdf(
         title=title or _DEFAULT_TITLE,
     )
 
-    story: list[object] = []
+    story: list[Flowable] = []
     story.append(Paragraph("Picking list / Listă colectare", h1))
 
     if orders:

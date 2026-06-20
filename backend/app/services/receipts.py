@@ -14,7 +14,14 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Flowable,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from app.core.config import settings
 from app.schemas.receipt import (
@@ -90,7 +97,7 @@ def _as_decimal(value: object | None) -> Decimal:
 def build_order_receipt(
     order, items: Sequence | None = None, *, redacted: bool = False
 ) -> ReceiptRead:
-    items = items or getattr(order, "items", []) or []
+    items = list(items) if items else list(getattr(order, "items", []) or [])
     currency = getattr(order, "currency", "RON") or "RON"
     frontend_origin = settings.frontend_origin.rstrip("/")
 
@@ -252,7 +259,7 @@ def _render_order_receipt_pdf_reportlab(
 ) -> bytes:
     """Render a bilingual (RO/EN) receipt PDF with clickable product links."""
 
-    items = items or getattr(order, "items", []) or []
+    items = list(items) if items else list(getattr(order, "items", []) or [])
     locale = _order_locale(order)
     receipt = build_order_receipt(order, items, redacted=redacted)
 
@@ -302,7 +309,7 @@ def _render_order_receipt_pdf_reportlab(
         title=f"Receipt {receipt.reference_code or receipt.order_id}",
     )
 
-    story: list[object] = []
+    story: list[Flowable] = []
 
     story.append(Paragraph("Receipt / Chitanță", h1))
     story.append(Spacer(1, 6))
@@ -587,7 +594,7 @@ def render_order_receipt_pdf_raster(
     Kept as a fallback in case the PDF engine/font stack fails.
     """
 
-    items = items or getattr(order, "items", []) or []
+    items = list(items) if items else list(getattr(order, "items", []) or [])
     locale = _order_locale(order)
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     created_at = getattr(order, "created_at", None)

@@ -4,6 +4,7 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
+from typing import Literal
 from xml.etree import ElementTree
 
 import sqlalchemy as sa
@@ -64,6 +65,15 @@ BLOG_VIEW_COOKIE = "blog_viewed"
 BLOG_VIEW_COOKIE_TTL_SECONDS = 6 * 60 * 60
 
 
+def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+    value = settings.cookie_samesite.lower()
+    if value == "strict":
+        return "strict"
+    if value == "none":
+        return "none"
+    return "lax"
+
+
 def _site_base_url() -> str:
     return str(settings.public_base_url or settings.frontend_origin or "").rstrip("/")
 
@@ -121,6 +131,8 @@ def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
         if not post_id:
             continue
         if not isinstance(ts, int):
+            if ts is None:
+                continue
             try:
                 ts = int(ts)
             except Exception:
@@ -235,9 +247,9 @@ async def blog_rss_feed(
     for block in blocks:
         item = ElementTree.SubElement(channel, "item")
         data = blog_service.to_list_item(block, lang=lang)
-        slug = str(data.get("slug") or "")
-        title = str(data.get("title") or "")
-        excerpt = str(data.get("excerpt") or "")
+        slug = str(data.slug or "")
+        title = str(data.title or "")
+        excerpt = str(data.excerpt or "")
         link = f"{base}/blog/{slug}?lang={chosen_lang}"
 
         ElementTree.SubElement(item, "title").text = title
@@ -275,27 +287,27 @@ async def blog_json_feed(
     items: list[dict] = []
     for block in blocks:
         data = blog_service.to_list_item(block, lang=lang)
-        slug = str(data.get("slug") or "")
+        slug = str(data.slug or "")
         url = f"{base}/blog/{slug}?lang={chosen_lang}"
         published = block.published_at or block.updated_at
         item: dict = {
             "id": url,
             "url": url,
-            "title": data.get("title") or "",
-            "summary": data.get("excerpt") or "",
+            "title": data.title or "",
+            "summary": data.excerpt or "",
         }
         if published:
             item["date_published"] = published.isoformat()
-        author_name = data.get("author_name")
+        author_name = data.author_name
         if author_name:
             item["authors"] = [{"name": author_name}]
-        image = data.get("cover_image_url")
+        image = data.cover_image_url
         if image:
             item["image"] = image
-        tags = data.get("tags") or []
+        tags = data.tags or []
         if tags:
             item["tags"] = tags
-        series = data.get("series")
+        series = data.series
         if series:
             item["_series"] = series
         items.append(item)
@@ -355,7 +367,7 @@ async def get_blog_post(
                 _encode_view_cookie([(post_cookie_id, now)]),
                 httponly=True,
                 secure=settings.secure_cookies,
-                samesite=settings.cookie_samesite.lower(),
+                samesite=_cookie_samesite(),
                 path="/",
                 max_age=BLOG_VIEW_COOKIE_TTL_SECONDS,
             )
