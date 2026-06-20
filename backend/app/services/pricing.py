@@ -129,7 +129,7 @@ def compute_totals(
             rounding=rounding,
         )
     total = taxable + shipping_q + fee + vat
-    if total < 0:
+    if total < 0:  # pragma: no cover - unreachable: all summands are clamped >= 0
         total = Decimal("0.00")
     total = quantize_money(total, rounding=rounding)
     return PricingBreakdown(

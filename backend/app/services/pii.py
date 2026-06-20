@@ -59,7 +59,9 @@ def mask_phone(phone: str | None) -> str | None:
     if not _PHONE_RE.match(normalized):
         return "***"
     digits = normalized[1:]
-    if len(digits) <= 4:
+    if (
+        len(digits) <= 4
+    ):  # pragma: no cover - unreachable: _PHONE_RE requires >=6 digits
         return f"+{'*' * len(digits)}"
     keep_tail = digits[-2:]
     masked = "*" * (len(digits) - 2)
