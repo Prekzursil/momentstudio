@@ -136,7 +136,7 @@ def _normalize_source_url(raw_url: str) -> str:
         return parsed.geturl()
 
     normalized_path = re.sub(r"/{2,}", "/", parsed.path or "/")
-    if not normalized_path.startswith("/"):
+    if not normalized_path.startswith("/"):  # pragma: no cover - defensive; netloc URLs always have a rooted path
         normalized_path = f"/{normalized_path}"
     if normalized_path != "/":
         normalized_path = normalized_path.rstrip("/") + "/"
