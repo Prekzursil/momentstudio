@@ -936,3 +936,344 @@ async def test_admin_import_redirects_create_update_skip(session_factory) -> Non
     assert out.created == 1
     assert out.updated == 1
     assert out.skipped == 1
+
+
+# =========================================================================== #
+# Part 3: seo / content CRUD / content image asset handlers
+# =========================================================================== #
+from app.models.content import ContentImage, ContentImageTag  # noqa: E402
+
+
+async def _seed_image(session, block, **kw):
+    base = dict(
+        content_block_id=block.id,
+        url="https://cdn/x.png",
+        alt_text="alt",
+        sort_order=1,
+    )
+    base.update(kw)
+    img = ContentImage(**base)
+    session.add(img)
+    await session.commit()
+    await session.refresh(img)
+    return img
+
+
+# --------------------------- sitemap / structured data --------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_sitemap_preview(monkeypatch) -> None:
+    monkeypatch.setattr(
+        c.sitemap_service, "build_sitemap_urls", _afn({"en": ["/a"]})
+    )
+    out = await c.admin_sitemap_preview(session=object(), _=_user())
+    assert out.by_lang == {"en": ["/a"]}
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_validate_structured_data(monkeypatch) -> None:
+    monkeypatch.setattr(
+        c.structured_data_service,
+        "validate_structured_data",
+        _afn(
+            {
+                "checked_products": 1,
+                "checked_pages": 2,
+                "errors": 0,
+                "warnings": 0,
+                "issues": [],
+            }
+        ),
+    )
+    out = await c.admin_validate_structured_data(session=object(), _=_user())
+    assert out is not None
+
+
+# --------------------------- admin_delete_redirect ------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_delete_redirect_not_found(session_factory) -> None:
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_delete_redirect(
+                redirect_id=uuid4(), session=session, _=_user()
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_delete_redirect_ok(session_factory) -> None:
+    async with session_factory() as session:
+        r = ContentRedirect(from_key="page.a", to_key="page.b")
+        session.add(r)
+        await session.commit()
+        await session.refresh(r)
+        resp = await c.admin_delete_redirect(
+            redirect_id=r.id, session=session, _=_user()
+        )
+    assert resp.status_code == 204
+
+
+# --------------------------- admin_get_content ----------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_content_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_get_content(
+            key="x", session=object(), lang=None, _=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_get_content_ok(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(_block()))
+    out = await c.admin_get_content(
+        key="page.about", session=object(), lang="en", _=_user()
+    )
+    assert out.key == "page.about"
+
+
+# --------------------------- admin_update_content -------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content(monkeypatch) -> None:
+    from app.schemas.content import ContentBlockUpdate
+
+    monkeypatch.setattr(c.content_service, "upsert_block", _afn(_block()))
+    out = await c.admin_update_content(
+        key="page.about",
+        payload=ContentBlockUpdate(),
+        session=object(),
+        admin=_user(),
+    )
+    assert out.key == "page.about"
+
+
+# --------------------------- admin_delete_content -------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_delete_content_not_blog() -> None:
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_delete_content(
+            key="page.about", session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_delete_content_not_found(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_delete_content(
+            key="blog.post", session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_delete_content_ok(session_factory) -> None:
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="blog.post")
+        resp = await c.admin_delete_content(
+            key="blog.post", session=session, admin=_user()
+        )
+    assert resp.status_code == 204
+    assert blk is not None
+
+
+# --------------------------- admin_create_content -------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_create_content_exists(monkeypatch) -> None:
+    from app.schemas.content import ContentBlockCreate
+
+    monkeypatch.setattr(
+        c.content_service, "validate_page_key_for_create", lambda k: None
+    )
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(_block()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_create_content(
+            key="page.new",
+            payload=ContentBlockCreate(title="T", body_markdown="b"),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 400
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_create_content_ok(monkeypatch) -> None:
+    from app.schemas.content import ContentBlockCreate
+
+    monkeypatch.setattr(
+        c.content_service, "validate_page_key_for_create", lambda k: None
+    )
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    monkeypatch.setattr(c.content_service, "upsert_block", _afn(_block()))
+    out = await c.admin_create_content(
+        key="page.new",
+        payload=ContentBlockCreate(title="T", body_markdown="b"),
+        session=object(),
+        admin=_user(),
+    )
+    assert out.key == "page.about"
+
+
+# --------------------------- admin_upload_content_image -------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_upload_content_image_existing_block(monkeypatch) -> None:
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(_block()))
+    monkeypatch.setattr(c.content_service, "add_image", _afn(_block()))
+    out = await c.admin_upload_content_image(
+        key="page.about",
+        file=object(),
+        session=object(),
+        admin=_user(),
+        lang=None,
+    )
+    assert out.key == "page.about"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upload_content_image_creates_bucket(monkeypatch) -> None:
+    # block missing -> implicit create path
+    monkeypatch.setattr(c.content_service, "get_block_by_key", _afn(None))
+    monkeypatch.setattr(c.content_service, "upsert_block", _afn(_block()))
+    monkeypatch.setattr(c.content_service, "add_image", _afn(_block()))
+    out = await c.admin_upload_content_image(
+        key="assets.bucket",
+        file=object(),
+        session=object(),
+        admin=_user(),
+        lang="en",
+    )
+    assert out.key == "page.about"
+
+
+# --------------------------- admin_list_content_images --------------------- #
+async def _list_images(session, **kw):
+    base = dict(
+        session=session,
+        key=None,
+        q=None,
+        tag=None,
+        sort="newest",
+        created_from=None,
+        created_to=None,
+        page=1,
+        limit=24,
+        _=_user(),
+    )
+    base.update(kw)
+    return await c.admin_list_content_images(**base)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_images_empty(session_factory) -> None:
+    async with session_factory() as session:
+        out = await _list_images(session)
+    assert out.meta.total_items == 0
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_images_filters_and_sorts(
+    session_factory,
+) -> None:
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.gallery")
+        img1 = await _seed_image(session, blk, url="https://cdn/1.png")
+        img2 = await _seed_image(session, blk, url="https://cdn/2.png")
+        # two distinct tags exercise the setdefault/append + sorted(set()) paths
+        session.add(ContentImageTag(content_image_id=img1.id, tag="hero"))
+        session.add(ContentImageTag(content_image_id=img1.id, tag="banner"))
+        await session.commit()
+
+        # key filter + q filter + sort variations
+        for sort in ("newest", "oldest", "key_asc", "key_desc"):
+            out = await _list_images(
+                session, key="page.gallery", q="cdn", sort=sort
+            )
+            assert out.meta.total_items == 2
+        # tag filter (join path) + tags surfaced
+        out_tag = await _list_images(session, tag="HERO")
+        assert out_tag.meta.total_items == 1
+        # tag_map surfaces ALL tags for the matched image, sorted+deduped.
+        assert out_tag.items[0].tags == ["banner", "hero"]
+        assert img2 is not None
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_images_date_filters(session_factory) -> None:
+    now = datetime.now(timezone.utc)
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.g2")
+        await _seed_image(session, blk)
+        out = await _list_images(
+            session,
+            created_from=now - timedelta(days=1),
+            created_to=now + timedelta(days=1),
+        )
+    assert out.meta.total_items >= 0
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_content_images_invalid_date_range(
+    session_factory,
+) -> None:
+    now = datetime.now(timezone.utc)
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await _list_images(
+                session,
+                created_from=now + timedelta(days=2),
+                created_to=now - timedelta(days=2),
+            )
+    assert ei.value.status_code == 400
+
+
+# --------------------------- admin_update_content_image -------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content_image_not_found(session_factory) -> None:
+    from app.schemas.content import ContentImageAssetUpdate
+
+    async with session_factory() as session:
+        with pytest.raises(HTTPException) as ei:
+            await c.admin_update_content_image(
+                image_id=uuid4(),
+                payload=ContentImageAssetUpdate(alt_text="x"),
+                session=session,
+                _=_user(),
+            )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content_image_ok(session_factory) -> None:
+    from app.schemas.content import ContentImageAssetUpdate
+
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.imgblk")
+        img = await _seed_image(session, blk)
+        session.add(ContentImageTag(content_image_id=img.id, tag="t1"))
+        await session.commit()
+        out = await c.admin_update_content_image(
+            image_id=img.id,
+            payload=ContentImageAssetUpdate(alt_text="New Alt"),
+            session=session,
+            _=_user(),
+        )
+    assert out.alt_text == "New Alt"
+    assert out.content_key == "page.imgblk"
+    assert out.tags == ["t1"]
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_content_image_blank_alt(session_factory) -> None:
+    from app.schemas.content import ContentImageAssetUpdate
+
+    async with session_factory() as session:
+        blk = await _seed_block(session, key="page.imgblk2")
+        img = await _seed_image(session, blk)
+        out = await c.admin_update_content_image(
+            image_id=img.id,
+            payload=ContentImageAssetUpdate(alt_text="   "),  # blank -> None
+            session=session,
+            _=_user(),
+        )
+    assert out.alt_text is None
