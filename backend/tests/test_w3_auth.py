@@ -25,7 +25,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.content import ContentBlock, ContentStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.user_export import UserDataExportJob, UserDataExportStatus
 
 
@@ -406,3 +406,168 @@ def test_download_export_job_success(test_app, monkeypatch, tmp_path) -> None:
     assert res.status_code == 200
     assert res.json() == {"ok": True}
     assert "no-store" in res.headers.get("cache-control", "")
+
+
+# --------------------------------------------------------------------------- #
+# Account deletion lifecycle (/me/delete/status, /me/delete, /me/delete/cancel) #
+# --------------------------------------------------------------------------- #
+def test_account_delete_status(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="ad0@x.io", username="ad0")["tokens"][
+        "access_token"
+    ]
+    res = client.get("/api/v1/auth/me/delete/status", headers=_auth_headers(token))
+    assert res.status_code == 200
+    assert res.json()["requested_at"] is None
+
+
+def test_request_account_deletion_wrong_confirm(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="ad1@x.io", username="ad1")["tokens"][
+        "access_token"
+    ]
+    res = client.post(
+        "/api/v1/auth/me/delete",
+        headers=_auth_headers(token),
+        json={"confirm": "nope", "password": "supersecret"},
+    )
+    assert res.status_code == 400
+    assert "DELETE" in res.json()["detail"]
+
+
+def test_request_account_deletion_wrong_password(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="ad2@x.io", username="ad2")["tokens"][
+        "access_token"
+    ]
+    res = client.post(
+        "/api/v1/auth/me/delete",
+        headers=_auth_headers(token),
+        json={"confirm": "DELETE", "password": "wrongpass"},
+    )
+    assert res.status_code == 400
+    assert "Invalid password" in res.json()["detail"]
+
+
+def test_request_account_deletion_success_then_already_scheduled(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="ad3@x.io", username="ad3")["tokens"][
+        "access_token"
+    ]
+    res = client.post(
+        "/api/v1/auth/me/delete",
+        headers=_auth_headers(token),
+        json={"confirm": "delete", "password": "supersecret"},
+    )
+    assert res.status_code == 200
+    assert res.json()["scheduled_for"] is not None
+
+    # A second request while one is scheduled -> 400.
+    res2 = client.post(
+        "/api/v1/auth/me/delete",
+        headers=_auth_headers(token),
+        json={"confirm": "DELETE", "password": "supersecret"},
+    )
+    assert res2.status_code == 400
+    assert "already scheduled" in res2.json()["detail"]
+
+
+def test_cancel_account_deletion(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="ad4@x.io", username="ad4")["tokens"][
+        "access_token"
+    ]
+    client.post(
+        "/api/v1/auth/me/delete",
+        headers=_auth_headers(token),
+        json={"confirm": "DELETE", "password": "supersecret"},
+    )
+    res = client.post("/api/v1/auth/me/delete/cancel", headers=_auth_headers(token))
+    assert res.status_code == 200
+    assert res.json()["scheduled_for"] is None
+
+
+# --------------------------------------------------------------------------- #
+# Preferences: language / notifications / training-mode                        #
+# --------------------------------------------------------------------------- #
+def test_update_language(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="ln1@x.io", username="ln1")["tokens"][
+        "access_token"
+    ]
+    res = client.patch(
+        "/api/v1/auth/me/language",
+        headers=_auth_headers(token),
+        json={"preferred_language": "ro"},
+    )
+    assert res.status_code == 200
+    assert res.json()["preferred_language"] == "ro"
+
+
+def test_update_notification_preferences(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="nt1@x.io", username="nt1")["tokens"][
+        "access_token"
+    ]
+    res = client.patch(
+        "/api/v1/auth/me/notifications",
+        headers=_auth_headers(token),
+        json={
+            "notify_blog_comments": False,
+            "notify_blog_comment_replies": True,
+            "notify_marketing": False,
+        },
+    )
+    assert res.status_code == 200
+
+
+def test_update_notification_preferences_partial(test_app) -> None:
+    # Empty body -> every ``is not None`` guard is False (no-op update path).
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="nt2@x.io", username="nt2")["tokens"][
+        "access_token"
+    ]
+    res = client.patch(
+        "/api/v1/auth/me/notifications", headers=_auth_headers(token), json={}
+    )
+    assert res.status_code == 200
+
+
+def test_update_training_mode_forbidden_for_customer(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    token = _register(client, email="tm1@x.io", username="tm1")["tokens"][
+        "access_token"
+    ]
+    res = client.patch(
+        "/api/v1/auth/me/training-mode",
+        headers=_auth_headers(token),
+        json={"enabled": True},
+    )
+    assert res.status_code == 403
+
+
+def test_update_training_mode_allowed_for_staff(test_app) -> None:
+    client: TestClient = test_app["client"]  # type: ignore[assignment]
+    factory = test_app["session_factory"]
+    token = _register(client, email="tm2@x.io", username="tm2")["tokens"][
+        "access_token"
+    ]
+
+    async def promote() -> None:
+        async with factory() as session:
+            user = (
+                await session.execute(select(User).where(User.email == "tm2@x.io"))
+            ).scalar_one()
+            user.role = UserRole.admin
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(promote())
+
+    res = client.patch(
+        "/api/v1/auth/me/training-mode",
+        headers=_auth_headers(token),
+        json={"enabled": True},
+    )
+    assert res.status_code == 200
+    assert res.json()["admin_training_mode"] is True
