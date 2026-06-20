@@ -124,8 +124,8 @@ async def test_loop_logs_unexpected_error(monkeypatch) -> None:
 
 
 def test_loop_interval_clamped_to_minimum(monkeypatch) -> None:
-    # The ``max(30, ...)`` clamp is exercised by driving the loop with a tiny
-    # configured interval; we stop after the first run via a stubbed _run_once.
+    # A configured interval below the floor must be clamped to 30 seconds; this
+    # asserts the exact timeout the loop hands to ``asyncio.wait_for``.
     monkeypatch.setattr(
         sched.settings, "admin_reports_poll_interval_seconds", 1, raising=False
     )
@@ -133,22 +133,19 @@ def test_loop_interval_clamped_to_minimum(monkeypatch) -> None:
     seen = {"interval": None}
 
     async def fake_run_once() -> None:
-        stop.set()
+        return None
 
     monkeypatch.setattr(sched, "_run_once", fake_run_once)
-
-    real_wait_for = asyncio.wait_for
 
     async def shim_wait_for(awaitable, timeout):  # noqa: ANN001
         seen["interval"] = timeout
         awaitable.close()
+        stop.set()  # end the loop on the next predicate check
         raise asyncio.TimeoutError
 
     monkeypatch.setattr(sched.asyncio, "wait_for", shim_wait_for)
     asyncio.run(sched._loop(stop))
-    # Loop exits because stop is set after the run; clamp not asserted via timeout
-    # here (stop short-circuits the wait), so just confirm one run happened.
-    assert stop.is_set()
+    assert seen["interval"] == 30
 
 
 # --------------------------------------------------------------------------- #
