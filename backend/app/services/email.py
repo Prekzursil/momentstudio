@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "emails"
 env = None
-if jinja2 is not None:
+if jinja2 is not None:  # pragma: no branch -- jinja2 is a required dependency; the None arc is import-guard-only
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(TEMPLATE_PATH),
         autoescape=jinja2.select_autoescape(["html", "xml"]),
