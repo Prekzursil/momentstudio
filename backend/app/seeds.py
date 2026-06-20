@@ -139,7 +139,7 @@ def _resolve_profile_dir(profile: str) -> Path:
     if profile_dir is None:
         available = _available_profiles_display()
         raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
-    if not profile_dir.is_dir():
+    if not profile_dir.is_dir():  # pragma: no cover - defensive TOCTOU; _profile_dirs() already filtered is_dir
         available = _available_profiles_display()
         raise SystemExit(f"Unknown seed profile '{profile}'. Available: {available}")
     return profile_dir
@@ -350,7 +350,7 @@ async def main(profile: str) -> None:
     await engine.dispose()
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - CLI entry point
     parser = argparse.ArgumentParser(description="Seed catalog/content bootstrap data")
     parser.add_argument(
         "--profile", default="default", help="Seed profile (e.g. default, adrianaart)"
