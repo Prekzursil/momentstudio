@@ -24,6 +24,7 @@ from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
@@ -910,5 +911,582 @@ def test_admin_channel_attribution_direct(
             limit=12,
         )
         assert result["channels"][0]["source"] == "direct"
+
+    run(session_factory, scenario)
+
+
+# ---------------------------------------------------------------------------
+# global search / products / orders / users / segments / content / coupons
+# ---------------------------------------------------------------------------
+
+
+def _patch_pii_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow include_pii=True paths without real step-up/permission checks."""
+    monkeypatch.setattr(ad.pii_service, "require_pii_reveal", lambda *a, **k: None)
+
+
+async def _seed_product(session: Any, *, slug: str = "p1", name: str = "Prod") -> Any:
+    from app.models.catalog import Category, Product
+
+    cat = await session.scalar(select(Category).where(Category.slug == "cat"))
+    if cat is None:
+        cat = Category(name="Cat", slug="cat", low_stock_threshold=5)
+        session.add(cat)
+        await session.flush()
+    product = Product(
+        name=name,
+        slug=slug,
+        sku=f"SKU-{slug}",
+        base_price=Decimal("20"),
+        stock_quantity=3,
+        category_id=cat.id,
+        is_active=True,
+    )
+    session.add(product)
+    await session.commit()
+    await session.refresh(product)
+    return product
+
+
+def test_admin_global_search_blank(session_factory: async_sessionmaker) -> None:
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        resp = await ad.admin_global_search(
+            request=_FakeRequest(),
+            q="   ",
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert resp.items == []
+
+    run(session_factory, scenario)
+
+
+def test_admin_global_search_by_uuid(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.models.order import Order, OrderStatus
+
+    async def scenario(session: Any) -> None:
+        _patch_pii_ok(monkeypatch)
+        admin = await _admin(session)
+        product = await _seed_product(session)
+        order = Order(
+            user_id=admin.id,
+            status=OrderStatus.paid,
+            total_amount=Decimal("10"),
+            payment_method="stripe",
+            customer_email="admin@x.com",
+            customer_name="Admin",
+            reference_code="REF1",
+        )
+        session.add(order)
+        await session.commit()
+        resp = await ad.admin_global_search(
+            request=_FakeRequest(),
+            q=str(order.id),
+            include_pii=True,
+            session=session,
+            current_user=admin,
+        )
+        assert any(i.type == "order" for i in resp.items)
+        resp2 = await ad.admin_global_search(
+            request=_FakeRequest(),
+            q=str(product.id),
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert any(i.type == "product" for i in resp2.items)
+        resp3 = await ad.admin_global_search(
+            request=_FakeRequest(),
+            q=str(admin.id),
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert any(i.type == "user" for i in resp3.items)
+
+    run(session_factory, scenario)
+
+
+def test_admin_global_search_by_text(session_factory: async_sessionmaker) -> None:
+    from app.models.order import Order, OrderStatus
+
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        await _seed_product(session, slug="widget", name="Widget")
+        order = Order(
+            user_id=admin.id,
+            status=OrderStatus.paid,
+            total_amount=Decimal("10"),
+            payment_method="stripe",
+            customer_email="findme@x.com",
+            customer_name="Find Me",
+            reference_code="REFTEXT",
+        )
+        session.add(order)
+        await session.commit()
+        resp = await ad.admin_global_search(
+            request=_FakeRequest(),
+            q="widget",
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert any(i.type == "product" for i in resp.items)
+        resp2 = await ad.admin_global_search(
+            request=_FakeRequest(),
+            q="findme",
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert any(i.type == "order" for i in resp2.items)
+        resp3 = await ad.admin_global_search(
+            request=_FakeRequest(),
+            q="admin@x",
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert any(i.type == "user" for i in resp3.items)
+
+    run(session_factory, scenario)
+
+
+def test_admin_products_and_search(session_factory: async_sessionmaker) -> None:
+    from app.models.catalog import ProductStatus
+
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        await _seed_product(session, slug="prodx", name="ProdX")
+        listing = await ad.admin_products(session=session, _=None)
+        assert listing[0]["slug"] == "prodx"
+
+        result = await ad.search_products(
+            session=session,
+            _=None,
+            q="prodx",
+            status=ProductStatus.draft,
+            category_slug="cat",
+            missing_translations=True,
+            missing_translation_lang=None,
+            deleted=False,
+            page=1,
+            limit=25,
+        )
+        assert result.meta.total_items >= 1
+        result2 = await ad.search_products(
+            session=session,
+            _=None,
+            q=None,
+            status=None,
+            category_slug=None,
+            missing_translations=False,
+            missing_translation_lang="en",
+            deleted=False,
+            page=1,
+            limit=25,
+        )
+        assert result2.meta.page == 1
+
+    run(session_factory, scenario)
+
+
+def test_restore_product(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        product = await _seed_product(session, slug="del", name="Del")
+        with pytest.raises(HTTPException) as exc:
+            await ad.restore_product(
+                product_id=product.id, session=session, current_user=admin
+            )
+        assert exc.value.status_code == 404
+
+        product.is_deleted = True
+        await session.commit()
+
+        async def fake_restore(_s: Any, prod: Any, *, user_id: Any) -> None:
+            prod.is_deleted = False
+
+        monkeypatch.setattr(
+            ad.catalog_service, "restore_soft_deleted_product", fake_restore
+        )
+        restored = await ad.restore_product(
+            product_id=product.id, session=session, current_user=admin
+        )
+        assert restored.slug == "del"
+
+    run(session_factory, scenario)
+
+
+def test_duplicate_check_products(session_factory: async_sessionmaker) -> None:
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        await _seed_product(session, slug="dup-product", name="Dup Product")
+        result = await ad.duplicate_check_products(
+            session=session,
+            _=None,
+            name="Dup Product",
+            sku="SKU-dup-product",
+            exclude_slug="other-slug",
+        )
+        assert result.slug_base is not None
+        assert result.suggested_slug is not None
+        assert len(result.name_matches) >= 1
+        empty = await ad.duplicate_check_products(
+            session=session, _=None, name=None, sku=None, exclude_slug=None
+        )
+        assert empty.slug_base is None
+
+    run(session_factory, scenario)
+
+
+def test_duplicate_check_unique_name(session_factory: async_sessionmaker) -> None:
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        result = await ad.duplicate_check_products(
+            session=session,
+            _=None,
+            name="Totally Fresh Name",
+            sku=None,
+            exclude_slug=None,
+        )
+        assert result.suggested_slug == result.slug_base
+
+    run(session_factory, scenario)
+
+
+def test_products_by_ids(session_factory: async_sessionmaker) -> None:
+    from app.schemas.catalog_admin import AdminProductByIdsRequest
+
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        product = await _seed_product(session, slug="byid", name="ById")
+        empty = await ad.products_by_ids(
+            payload=AdminProductByIdsRequest(ids=[]), session=session, _=None
+        )
+        assert empty == []
+        result = await ad.products_by_ids(
+            payload=AdminProductByIdsRequest(ids=[product.id]),
+            session=session,
+            _=None,
+        )
+        assert result[0].slug == "byid"
+
+    run(session_factory, scenario)
+
+
+def test_products_by_ids_too_many(session_factory: async_sessionmaker) -> None:
+    import uuid as _uuid
+
+    from app.schemas.catalog_admin import AdminProductByIdsRequest
+
+    async def scenario(session: Any) -> None:
+        await _admin(session)
+        ids = [_uuid.uuid4() for _ in range(201)]
+        with pytest.raises(HTTPException) as exc:
+            await ad.products_by_ids(
+                payload=AdminProductByIdsRequest(ids=ids), session=session, _=None
+            )
+        assert exc.value.status_code == 400
+
+    run(session_factory, scenario)
+
+
+def test_admin_orders_and_users(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.models.order import Order, OrderStatus
+
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        order = Order(
+            user_id=admin.id,
+            status=OrderStatus.paid,
+            total_amount=Decimal("10"),
+            payment_method="stripe",
+            customer_email="admin@x.com",
+            customer_name="Admin",
+        )
+        guest = Order(
+            user_id=None,
+            status=OrderStatus.paid,
+            total_amount=Decimal("5"),
+            payment_method="stripe",
+            customer_email="g@x.com",
+            customer_name="Guest",
+        )
+        session.add_all([order, guest])
+        await session.commit()
+        masked = await ad.admin_orders(
+            request=_FakeRequest(),
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert len(masked) == 2
+        _patch_pii_ok(monkeypatch)
+        revealed = await ad.admin_orders(
+            request=_FakeRequest(),
+            include_pii=True,
+            session=session,
+            current_user=admin,
+        )
+        assert len(revealed) == 2
+
+        users_masked = await ad.admin_users(
+            request=_FakeRequest(),
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert len(users_masked) >= 1
+        users_revealed = await ad.admin_users(
+            request=_FakeRequest(),
+            include_pii=True,
+            session=session,
+            current_user=admin,
+        )
+        assert len(users_revealed) >= 1
+
+    run(session_factory, scenario)
+
+
+def test_search_users(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        _patch_pii_ok(monkeypatch)
+        result = await ad.search_users(
+            request=_FakeRequest(),
+            q="admin",
+            role=UserRole.admin,
+            page=1,
+            limit=25,
+            include_pii=True,
+            session=session,
+            current_user=admin,
+        )
+        assert result.meta.total_items >= 1
+
+    run(session_factory, scenario)
+
+
+def _seed_repeat_buyer(session: Any) -> Callable[[], Any]:
+    async def _seed() -> Any:
+        from app.models.order import Order, OrderStatus
+
+        buyer = await create_user(
+            session,
+            UserCreate(email="rep@x.com", password="password123", name="Rep"),
+        )
+        buyer.role = UserRole.customer
+        for _ in range(3):
+            session.add(
+                Order(
+                    user_id=buyer.id,
+                    status=OrderStatus.paid,
+                    total_amount=Decimal("100"),
+                    payment_method="stripe",
+                    customer_email="rep@x.com",
+                    customer_name="Rep",
+                )
+            )
+        await session.commit()
+        return buyer
+
+    return _seed
+
+
+def test_admin_user_segment_repeat_buyers(
+    session_factory: async_sessionmaker,
+) -> None:
+    async def scenario(session: Any) -> None:
+        owner = await _admin(session, role=UserRole.owner)
+        await _seed_repeat_buyer(session)()
+        result = await ad.admin_user_segment_repeat_buyers(
+            request=_FakeRequest(),
+            q="rep",
+            min_orders=2,
+            page=1,
+            limit=25,
+            include_pii=False,
+            session=session,
+            current_user=owner,
+        )
+        assert result.meta.total_items >= 1
+        assert result.items[0].orders_count == 3
+
+    run(session_factory, scenario)
+
+
+def test_admin_user_segment_high_aov(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        await _seed_repeat_buyer(session)()
+        _patch_pii_ok(monkeypatch)
+        result = await ad.admin_user_segment_high_aov(
+            request=_FakeRequest(),
+            q="rep",
+            min_orders=1,
+            min_aov=50.0,
+            page=1,
+            limit=25,
+            include_pii=True,
+            session=session,
+            current_user=admin,
+        )
+        assert result.items[0].avg_order_value == 100.0
+
+    run(session_factory, scenario)
+
+
+def test_admin_user_aliases(session_factory: async_sessionmaker) -> None:
+    import uuid as _uuid
+
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        target = await create_user(
+            session,
+            UserCreate(email="al@x.com", password="password123", name="Al"),
+        )
+        await session.commit()
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_user_aliases(
+                user_id=_uuid.uuid4(),
+                request=_FakeRequest(),
+                include_pii=False,
+                session=session,
+                current_user=admin,
+            )
+        assert exc.value.status_code == 404
+        result = await ad.admin_user_aliases(
+            user_id=target.id,
+            request=_FakeRequest(),
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert result["user"]["id"] == str(target.id)
+
+    run(session_factory, scenario)
+
+
+def test_admin_user_profile(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import uuid as _uuid
+
+    from app.models.address import Address
+    from app.models.order import Order, OrderStatus
+
+    async def scenario(session: Any) -> None:
+        admin = await _admin(session)
+        target = await create_user(
+            session,
+            UserCreate(email="pr@x.com", password="password123", name="Pr"),
+        )
+        await session.flush()
+        session.add(
+            Address(
+                user_id=target.id,
+                label="Home",
+                phone="0712345678",
+                line1="Str 1",
+                line2="Ap 2",
+                city="Buc",
+                region="B",
+                postal_code="010101",
+                country="RO",
+            )
+        )
+        session.add(
+            Order(
+                user_id=target.id,
+                status=OrderStatus.paid,
+                total_amount=Decimal("10"),
+                payment_method="stripe",
+                customer_email="pr@x.com",
+                customer_name="Pr",
+            )
+        )
+        await session.commit()
+        with pytest.raises(HTTPException) as exc:
+            await ad.admin_user_profile(
+                user_id=_uuid.uuid4(),
+                request=_FakeRequest(),
+                include_pii=False,
+                session=session,
+                current_user=admin,
+            )
+        assert exc.value.status_code == 404
+        masked = await ad.admin_user_profile(
+            user_id=target.id,
+            request=_FakeRequest(),
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+        assert masked.user.id == target.id
+        _patch_pii_ok(monkeypatch)
+        revealed = await ad.admin_user_profile(
+            user_id=target.id,
+            request=_FakeRequest(),
+            include_pii=True,
+            session=session,
+            current_user=admin,
+        )
+        assert revealed.user.email == "pr@x.com"
+
+    run(session_factory, scenario)
+
+
+def test_admin_content_and_coupons(session_factory: async_sessionmaker) -> None:
+    from app.models.content import ContentBlock, ContentStatus
+    from app.models.promo import PromoCode
+
+    async def scenario(session: Any) -> None:
+        author = await _admin(session)
+        block = ContentBlock(
+            key="blog.c1",
+            title="C1",
+            body_markdown="b",
+            status=ContentStatus.published,
+            author_id=author.id,
+        )
+        block_no_author = ContentBlock(
+            key="blog.c2", title="C2", body_markdown="b", status=ContentStatus.draft
+        )
+        session.add_all([block, block_no_author])
+        session.add(
+            PromoCode(
+                code="SAVE10",
+                percentage_off=Decimal("10"),
+                amount_off=None,
+                active=True,
+            )
+        )
+        session.add(
+            PromoCode(
+                code="OFF5",
+                percentage_off=None,
+                amount_off=Decimal("5"),
+                active=True,
+            )
+        )
+        await session.commit()
+        content = await ad.admin_content(session=session, _=None)
+        assert any(c["author"] is not None for c in content)
+        assert any(c["author"] is None for c in content)
+        coupons = await ad.admin_coupons(session=session, _=None)
+        assert len(coupons) == 2
 
     run(session_factory, scenario)
