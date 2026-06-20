@@ -1445,3 +1445,615 @@ async def test_admin_delete_content_image_ok(session_factory, monkeypatch) -> No
             admin=_user(),
         )
     assert resp.status_code == 204
+
+
+# =========================================================================== #
+# Part 5: media DAM asset handlers (media_dam fully mocked)
+# =========================================================================== #
+from app.models.media import MediaAssetStatus, MediaJobType  # noqa: E402
+
+
+def _patch_media(monkeypatch, **overrides):
+    """Install async/sync stubs onto media_dam; overrides win."""
+    defaults = {
+        "asset_to_read": lambda row: row,
+        "job_to_read": lambda job: job,
+        "coerce_visibility": lambda v: v,
+        "get_redis": lambda: None,
+    }
+    for name, fn in defaults.items():
+        if name not in overrides:
+            monkeypatch.setattr(c.media_dam, name, fn)
+    for name, fn in overrides.items():
+        monkeypatch.setattr(c.media_dam, name, fn)
+
+
+# --------------------------- admin_list_media_assets ----------------------- #
+async def _list_assets(session=None, **kw):
+    base = dict(
+        q="",
+        tag="",
+        asset_type="",
+        status_filter="",
+        visibility="",
+        include_trashed=False,
+        created_from=None,
+        created_to=None,
+        page=1,
+        limit=24,
+        sort="newest",
+        session=session or object(),
+        _=_user(),
+    )
+    base.update(kw)
+    return await c.admin_list_media_assets(**base)
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_assets_ok(monkeypatch) -> None:
+    # rows empty so items validate trivially; meta is a dict[str, int].
+    _patch_media(
+        monkeypatch,
+        list_assets=_afn(([], {"total_items": 0, "total_pages": 1})),
+    )
+    out = await _list_assets(
+        created_from="2030-01-01T00:00:00", created_to="2030-02-01T00:00:00"
+    )
+    assert out.items == []
+    assert out.meta["total_items"] == 0
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_assets_bad_date(monkeypatch) -> None:
+    _patch_media(monkeypatch)
+    with pytest.raises(HTTPException) as ei:
+        await _list_assets(created_from="not-a-date")
+    assert ei.value.status_code == 400
+    assert "filters" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_assets_bad_range(monkeypatch) -> None:
+    _patch_media(monkeypatch)
+    with pytest.raises(HTTPException) as ei:
+        await _list_assets(
+            created_from="2030-02-01T00:00:00", created_to="2030-01-01T00:00:00"
+        )
+    assert ei.value.status_code == 400
+    assert "range" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_list_media_assets_value_error(monkeypatch) -> None:
+    _patch_media(monkeypatch, list_assets=_araise(ValueError("bad sort")))
+    with pytest.raises(HTTPException) as ei:
+        await _list_assets()
+    assert ei.value.status_code == 400
+
+
+# --------------------------- admin_upload_media_asset ---------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_upload_media_asset_no_job(monkeypatch) -> None:
+    result = SimpleNamespace(asset="A", ingest_job_id=None)
+    _patch_media(monkeypatch, create_asset_from_upload=_afn(result))
+    out = await c.admin_upload_media_asset(
+        file=object(),
+        visibility="private",
+        auto_finalize=True,
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "A"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upload_media_asset_auto_finalize(monkeypatch) -> None:
+    result = SimpleNamespace(asset=SimpleNamespace(id=uuid4()), ingest_job_id=uuid4())
+    _patch_media(
+        monkeypatch,
+        create_asset_from_upload=_afn(result),
+        get_job_or_404=_afn("job"),
+        process_job_inline=_afn(None),
+        get_asset_or_404=_afn("finalized"),
+        asset_to_read=lambda a: a,
+    )
+    out = await c.admin_upload_media_asset(
+        file=object(),
+        visibility="private",
+        auto_finalize=True,
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "finalized"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_upload_media_asset_finalize_value_error(monkeypatch) -> None:
+    asset = SimpleNamespace(id=uuid4())
+    result = SimpleNamespace(asset=asset, ingest_job_id=uuid4())
+    _patch_media(
+        monkeypatch,
+        create_asset_from_upload=_afn(result),
+        get_job_or_404=_araise(ValueError("nope")),
+    )
+    out = await c.admin_upload_media_asset(
+        file=object(),
+        visibility="private",
+        auto_finalize=True,
+        session=object(),
+        admin=_user(),
+    )
+    assert out is asset  # falls through to return result.asset
+
+
+# --------------------------- admin_finalize_media_asset -------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_finalize_media_asset_not_found(monkeypatch) -> None:
+    from app.schemas.media import MediaFinalizeRequest
+
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_finalize_media_asset(
+            asset_id=uuid4(),
+            payload=MediaFinalizeRequest(),
+            background_tasks=SimpleNamespace(add_task=lambda *a, **k: None),
+            session=SimpleNamespace(commit=_afn(None)),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_finalize_media_asset_all_jobs(monkeypatch) -> None:
+    from app.schemas.media import MediaFinalizeRequest
+
+    queued = []
+    job = SimpleNamespace(id=uuid4())
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        enqueue_job=_afn(job),
+        queue_job=_afn(None),
+        get_redis=lambda: None,  # triggers background task path
+        job_to_read=lambda j: j,
+    )
+    bt = SimpleNamespace(add_task=lambda *a, **k: queued.append(a))
+    out = await c.admin_finalize_media_asset(
+        asset_id=uuid4(),
+        payload=MediaFinalizeRequest(run_ai_tagging=True, run_duplicate_scan=True),
+        background_tasks=bt,
+        session=SimpleNamespace(commit=_afn(None)),
+        admin=_user(),
+    )
+    assert out is job
+    assert queued  # background task scheduled
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_finalize_media_asset_with_redis(monkeypatch) -> None:
+    from app.schemas.media import MediaFinalizeRequest
+
+    job = SimpleNamespace(id=uuid4())
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        enqueue_job=_afn(job),
+        queue_job=_afn(None),
+        get_redis=lambda: object(),  # redis present -> no background task
+        job_to_read=lambda j: j,
+    )
+    bt = SimpleNamespace(add_task=lambda *a, **k: (_ for _ in ()).throw(AssertionError))
+    out = await c.admin_finalize_media_asset(
+        asset_id=uuid4(),
+        payload=MediaFinalizeRequest(run_ai_tagging=False, run_duplicate_scan=False),
+        background_tasks=bt,
+        session=SimpleNamespace(commit=_afn(None)),
+        admin=_user(),
+    )
+    assert out is job
+
+
+# --------------------------- _run_media_job_in_background ------------------ #
+class _BgSession:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+
+@pytest.mark.anyio("asyncio")
+async def test_run_media_job_in_background_ok(monkeypatch) -> None:
+    import app.db.session as dbsession
+
+    monkeypatch.setattr(dbsession, "SessionLocal", lambda: _BgSession())
+    _patch_media(
+        monkeypatch,
+        get_job_or_404=_afn("job"),
+        process_job_inline=_afn(None),
+    )
+    await c._run_media_job_in_background(uuid4())
+
+
+@pytest.mark.anyio("asyncio")
+async def test_run_media_job_in_background_error(monkeypatch) -> None:
+    import app.db.session as dbsession
+
+    monkeypatch.setattr(dbsession, "SessionLocal", lambda: _BgSession())
+    _patch_media(monkeypatch, get_job_or_404=_araise(RuntimeError("boom")))
+    # Exception is swallowed/logged -> returns None without raising.
+    await c._run_media_job_in_background(uuid4())
+
+
+# --------------------------- update / approve / reject / delete ------------ #
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_asset(monkeypatch) -> None:
+    from app.schemas.media import MediaAssetUpdateRequest
+
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        apply_asset_update=_afn(None),
+        asset_to_read=lambda a: a,
+    )
+    out = await c.admin_update_media_asset(
+        asset_id=uuid4(),
+        payload=MediaAssetUpdateRequest(),
+        session=SimpleNamespace(commit=_afn(None)),
+        _=_user(),
+    )
+    assert out == "asset"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_update_media_asset_not_found(monkeypatch) -> None:
+    from app.schemas.media import MediaAssetUpdateRequest
+
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_update_media_asset(
+            asset_id=uuid4(),
+            payload=MediaAssetUpdateRequest(),
+            session=object(),
+            _=_user(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_approve_media_asset(monkeypatch) -> None:
+    from app.schemas.media import MediaApproveRequest
+
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        change_status=_afn("approved"),
+        asset_to_read=lambda a: a,
+    )
+    out = await c.admin_approve_media_asset(
+        asset_id=uuid4(),
+        payload=MediaApproveRequest(note="ok"),
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "approved"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_approve_media_asset_not_found(monkeypatch) -> None:
+    from app.schemas.media import MediaApproveRequest
+
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_approve_media_asset(
+            asset_id=uuid4(),
+            payload=MediaApproveRequest(),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_reject_media_asset(monkeypatch) -> None:
+    from app.schemas.media import MediaRejectRequest
+
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        change_status=_afn("rejected"),
+        asset_to_read=lambda a: a,
+    )
+    out = await c.admin_reject_media_asset(
+        asset_id=uuid4(),
+        payload=MediaRejectRequest(note="no"),
+        session=object(),
+        admin=_user(),
+    )
+    assert out == "rejected"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_reject_media_asset_not_found(monkeypatch) -> None:
+    from app.schemas.media import MediaRejectRequest
+
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_reject_media_asset(
+            asset_id=uuid4(),
+            payload=MediaRejectRequest(),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_soft_delete_media_asset(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        soft_delete_asset=_afn(None),
+    )
+    resp = await c.admin_soft_delete_media_asset(
+        asset_id=uuid4(), session=object(), admin=_user()
+    )
+    assert resp.status_code == 204
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_soft_delete_media_asset_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_soft_delete_media_asset(
+            asset_id=uuid4(), session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_restore_media_asset(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        restore_asset=_afn("restored"),
+        asset_to_read=lambda a: a,
+    )
+    out = await c.admin_restore_media_asset(
+        asset_id=uuid4(), session=object(), admin=_user()
+    )
+    assert out == "restored"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_restore_media_asset_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_restore_media_asset(
+            asset_id=uuid4(), session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_purge_media_asset(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        purge_asset=_afn(None),
+    )
+    resp = await c.admin_purge_media_asset(
+        asset_id=uuid4(), session=object(), admin=_user()
+    )
+    assert resp.status_code == 204
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_purge_media_asset_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_purge_media_asset(
+            asset_id=uuid4(), session=object(), admin=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_usage(monkeypatch) -> None:
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        rebuild_usage_edges=_afn("usage"),
+    )
+    out = await c.admin_media_asset_usage(
+        asset_id=uuid4(), session=object(), _=_user()
+    )
+    assert out == "usage"
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_usage_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_asset_usage(
+            asset_id=uuid4(), session=object(), _=_user()
+        )
+    assert ei.value.status_code == 404
+
+
+# --------------------------- admin_media_asset_preview --------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_preview_not_found(monkeypatch) -> None:
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_asset_preview(
+            asset_id=uuid4(),
+            exp=1,
+            sig="x" * 16,
+            variant_profile=None,
+            session=object(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_preview_bad_sig(monkeypatch) -> None:
+    asset = SimpleNamespace(id=uuid4())
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn(asset),
+        verify_preview_signature=lambda *a, **k: False,
+    )
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_asset_preview(
+            asset_id=asset.id,
+            exp=1,
+            sig="x" * 16,
+            variant_profile=None,
+            session=object(),
+        )
+    assert ei.value.status_code == 403
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_preview_variant_not_found(monkeypatch) -> None:
+    asset = SimpleNamespace(id=uuid4())
+
+    def _resolve(*a, **k):
+        raise ValueError("no variant")
+
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn(asset),
+        verify_preview_signature=lambda *a, **k: True,
+        resolve_asset_preview_path=_resolve,
+    )
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_asset_preview(
+            asset_id=asset.id,
+            exp=1,
+            sig="x" * 16,
+            variant_profile="web",
+            session=object(),
+        )
+    assert ei.value.status_code == 404
+    assert "Variant" in ei.value.detail
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_preview_file_missing(monkeypatch) -> None:
+    asset = SimpleNamespace(id=uuid4())
+
+    def _resolve(*a, **k):
+        raise FileNotFoundError()
+
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn(asset),
+        verify_preview_signature=lambda *a, **k: True,
+        resolve_asset_preview_path=_resolve,
+    )
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_asset_preview(
+            asset_id=asset.id,
+            exp=1,
+            sig="x" * 16,
+            variant_profile=None,
+            session=object(),
+        )
+    assert ei.value.status_code == 404
+    assert "missing" in ei.value.detail.lower()
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_preview_ok(monkeypatch, tmp_path) -> None:
+    asset = SimpleNamespace(id=uuid4())
+    f = tmp_path / "img.png"
+    f.write_bytes(b"data")
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn(asset),
+        verify_preview_signature=lambda *a, **k: True,
+        resolve_asset_preview_path=lambda *a, **k: str(f),
+    )
+    resp = await c.admin_media_asset_preview(
+        asset_id=asset.id,
+        exp=1,
+        sig="x" * 16,
+        variant_profile=None,
+        session=object(),
+    )
+    assert resp.headers["Cache-Control"] == "private, no-store"
+
+
+# --------------------------- variants / edit ------------------------------- #
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_variants(monkeypatch) -> None:
+    from app.schemas.media import MediaVariantRequest
+
+    job = SimpleNamespace(id=uuid4())
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        enqueue_job=_afn(job),
+        process_job_inline=_afn(None),
+        job_to_read=lambda j: j,
+    )
+    out = await c.admin_media_asset_variants(
+        asset_id=uuid4(),
+        payload=MediaVariantRequest(profile="web-640"),
+        session=SimpleNamespace(commit=_afn(None)),
+        admin=_user(),
+    )
+    assert out is job
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_variants_not_found(monkeypatch) -> None:
+    from app.schemas.media import MediaVariantRequest
+
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_asset_variants(
+            asset_id=uuid4(),
+            payload=MediaVariantRequest(),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 404
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_edit(monkeypatch) -> None:
+    from app.schemas.media import MediaEditRequest
+
+    job = SimpleNamespace(id=uuid4())
+    _patch_media(
+        monkeypatch,
+        get_asset_or_404=_afn("asset"),
+        enqueue_job=_afn(job),
+        process_job_inline=_afn(None),
+        job_to_read=lambda j: j,
+    )
+    out = await c.admin_media_asset_edit(
+        asset_id=uuid4(),
+        payload=MediaEditRequest(rotate_cw=90),
+        session=SimpleNamespace(commit=_afn(None)),
+        admin=_user(),
+    )
+    assert out is job
+
+
+@pytest.mark.anyio("asyncio")
+async def test_admin_media_asset_edit_not_found(monkeypatch) -> None:
+    from app.schemas.media import MediaEditRequest
+
+    _patch_media(monkeypatch, get_asset_or_404=_araise(ValueError()))
+    with pytest.raises(HTTPException) as ei:
+        await c.admin_media_asset_edit(
+            asset_id=uuid4(),
+            payload=MediaEditRequest(rotate_cw=90),
+            session=object(),
+            admin=_user(),
+        )
+    assert ei.value.status_code == 404
