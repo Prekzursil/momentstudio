@@ -20,11 +20,16 @@ from app.models.media import (
     MediaAsset,
     MediaAssetStatus,
     MediaAssetType,
+    MediaJob,
     MediaJobRetryPolicy,
+    MediaJobStatus,
     MediaJobType,
     MediaVisibility,
 )
-from app.schemas.media import MediaRetryPolicyUpdateRequest
+from app.schemas.media import (
+    MediaRetryPolicyRollbackRequest,
+    MediaRetryPolicyUpdateRequest,
+)
 from app.services import media_dam as md
 
 UTC = timezone.utc
@@ -360,3 +365,145 @@ async def test_retry_policy_history() -> None:
         assert isinstance(events, list)
         assert len(events) >= 1
         assert meta["total_items"] >= 1
+
+
+@pytest.mark.anyio
+async def test_retry_policy_presets_known_good_rollback() -> None:
+    engine, local = _make_local()
+    await _init(engine)
+    actor = uuid.uuid4()
+
+    async with local() as session:
+        # presets with no history -> all fallbacks used
+        presets = await md.get_retry_policy_presets(session, job_type="ingest")
+        assert len(presets.items) == 3
+        assert presets.items[1].fallback_used is True  # last_change fallback
+        assert presets.items[2].fallback_used is True  # known_good fallback
+
+    async with local() as session:
+        # create a policy and an update event so last_change has a source
+        await md.upsert_retry_policy(
+            session,
+            job_type="ingest",
+            payload=MediaRetryPolicyUpdateRequest(max_attempts=5),
+            updated_by_user_id=actor,
+        )
+
+    async with local() as session:
+        # mark known-good
+        evt = await md.mark_retry_policy_known_good(
+            session, job_type="ingest", actor_user_id=actor, note="ok"
+        )
+        assert evt.action == "mark_known_good"
+
+    async with local() as session:
+        # presets now resolve known_good + last_change from events
+        presets = await md.get_retry_policy_presets(session, job_type="ingest")
+        assert presets.items[2].fallback_used is False  # known_good resolved
+        assert presets.items[1].fallback_used is False  # last_change resolved
+
+    async with local() as session:
+        # rollback to a preset (preset_key branch)
+        out = await md.rollback_retry_policy(
+            session,
+            job_type="ingest",
+            payload=MediaRetryPolicyRollbackRequest(preset_key="factory_default"),
+            actor_user_id=actor,
+        )
+        assert out.job_type == MediaJobType.ingest
+
+    async with local() as session:
+        # rollback to a specific history event (event_id branch)
+        events, _meta = await md.list_retry_policy_history(session, job_type="ingest")
+        target = events[-1]
+        out = await md.rollback_retry_policy(
+            session,
+            job_type="ingest",
+            payload=MediaRetryPolicyRollbackRequest(event_id=target.id),
+            actor_user_id=actor,
+        )
+        assert out.job_type == MediaJobType.ingest
+
+    async with local() as session:
+        # rollback with unknown event_id -> ValueError
+        with pytest.raises(ValueError, match="history event not found"):
+            await md.rollback_retry_policy(
+                session,
+                job_type="ingest",
+                payload=MediaRetryPolicyRollbackRequest(event_id=uuid.uuid4()),
+                actor_user_id=actor,
+            )
+
+
+@pytest.mark.anyio
+async def test_list_assets_filters() -> None:
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset = MediaAsset(
+            id=uuid.uuid4(), asset_type=MediaAssetType.image,
+            status=MediaAssetStatus.approved, visibility=MediaVisibility.public,
+            storage_key="originals/x/photo.png",
+            public_url="/media/originals/x/photo.png",
+            original_filename="photo.png",
+            created_at=datetime(2025, 1, 5, tzinfo=UTC),
+        )
+        session.add(asset)
+        await session.commit()
+
+    async with local() as session:
+        # exercise every filter branch + each sort option
+        for sort in ("newest", "oldest", "name_asc", "name_desc", "unknown"):
+            _rows, meta = await md.list_assets(
+                session,
+                md.MediaListFilters(
+                    q="photo", asset_type="image", status="approved",
+                    visibility="public",
+                    created_from=datetime(2025, 1, 1, tzinfo=UTC),
+                    created_to=datetime(2025, 12, 31, tzinfo=UTC),
+                    include_trashed=True, tag="sometag", sort=sort,
+                ),
+            )
+            assert meta["total_items"] >= 0
+        # default branch (no filters)
+        _rows, meta = await md.list_assets(session, md.MediaListFilters())
+        assert meta["total_items"] == 1
+
+
+@pytest.mark.anyio
+async def test_list_jobs_filters() -> None:
+    engine, local = _make_local()
+    await _init(engine)
+    async with local() as session:
+        asset_id = uuid.uuid4()
+        session.add(
+            MediaAsset(
+                id=asset_id, asset_type=MediaAssetType.image,
+                status=MediaAssetStatus.draft, visibility=MediaVisibility.private,
+                storage_key="o/j.png", public_url="/media/o/j.png",
+            )
+        )
+        job = MediaJob(
+            id=uuid.uuid4(), asset_id=asset_id, job_type=MediaJobType.ingest,
+            status=MediaJobStatus.dead_letter, triage_state="open",
+            sla_due_at=datetime(2000, 1, 1, tzinfo=UTC),
+        )
+        session.add(job)
+        await session.commit()
+    actor = uuid.uuid4()
+
+    async with local() as session:
+        _rows, meta = await md.list_jobs(
+            session,
+            md.MediaJobListFilters(
+                status="dead_letter", job_type="ingest", asset_id=asset_id,
+                created_from=datetime(2025, 1, 1, tzinfo=UTC),
+                created_to=datetime(2025, 12, 31, tzinfo=UTC),
+                triage_state="open", assigned_to_user_id=actor,
+                tag="jtag", sla_breached=True, dead_letter_only=True,
+            ),
+        )
+        assert meta["total_items"] >= 0
+        # default branch
+        _rows, meta = await md.list_jobs(session, md.MediaJobListFilters())
+        assert meta["total_items"] == 1
