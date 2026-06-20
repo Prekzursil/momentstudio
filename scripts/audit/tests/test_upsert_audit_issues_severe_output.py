@@ -54,7 +54,7 @@ def _write_findings(tmp_path: Path) -> None:
 
 
 def _expected_output_path(tmp_path: Path) -> Path:
-    return tmp_path / "artifacts" / "audit-evidence" / "severe-issues-upserted.json"
+    return tmp_path / "artifacts" / "audit-evidence" / "severe-issues.json"
 
 
 def test_main_writes_severe_output_and_excludes_non_severe(
@@ -86,7 +86,7 @@ def test_main_writes_severe_output_and_excludes_non_severe(
         "--findings",
         "artifacts/audit-evidence/deterministic-findings.json",
         "--severe-output",
-        "artifacts/audit-evidence/severe-issues-upserted.json",
+        "artifacts/audit-evidence/severe-issues.json",
         "--skip-digest",
     ]
     monkeypatch.setattr(sys, "argv", argv)

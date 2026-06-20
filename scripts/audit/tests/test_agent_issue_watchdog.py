@@ -19,7 +19,7 @@ def test_split_repo_rejects_malformed_tokens() -> None:
     module = _load_module()
     owner, repo = module._split_repo("Prekzursil/momentstudio")
     assert owner == "Prekzursil"
-    assert repo == "AdrianaArt"
+    assert repo == "momentstudio"
 
     for invalid in [
         "bad owner/AdrianaArt",
