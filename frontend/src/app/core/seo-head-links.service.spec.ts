@@ -68,4 +68,57 @@ describe('SeoHeadLinksService', () => {
       '/blog?lang=ro&page=2&q=ceramic',
     );
   });
+
+  it('defaults to an empty query when none is supplied', () => {
+    const href = service.setLocalizedCanonical('/about', 'en');
+    expect(href).not.toContain('?');
+  });
+
+  it('normalizes empty and slash-less paths', () => {
+    expect(service.setLocalizedCanonical('', 'en')).toMatch(/\/$/);
+    expect(service.setLocalizedCanonical('shop', 'en')).toContain('/shop');
+  });
+
+  it('skips undefined, non-finite, and blank query values', () => {
+    const href = service.setLocalizedCanonical('/x', 'en', {
+      a: undefined,
+      b: Number.NaN,
+      c: '   ',
+      d: 'keep',
+      n: 5,
+    });
+    expect(href).toContain('d=keep');
+    expect(href).toContain('n=5');
+    expect(href).not.toContain('a=');
+    expect(href).not.toContain('b=');
+    expect(href).not.toContain('c=');
+  });
+
+  describe('origin resolution', () => {
+    function configureWithOrigin(origin: string | undefined): SeoHeadLinksService {
+      const fakeDoc = {
+        defaultView: { location: { origin } },
+        querySelector: () => null,
+        querySelectorAll: () => [] as unknown as NodeListOf<HTMLLinkElement>,
+        createElement: (tag: string) => document.createElement(tag),
+        head: { appendChild: () => undefined },
+      } as unknown as Document;
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [SeoHeadLinksService, { provide: DOCUMENT, useValue: fakeDoc }],
+      });
+      return TestBed.inject(SeoHeadLinksService);
+    }
+
+    it('uses the document defaultView origin when present', () => {
+      const svc = configureWithOrigin('https://from-doc.test');
+      expect(svc.setLocalizedCanonical('/p', 'en')).toContain('https://from-doc.test');
+    });
+
+    it('falls back to window then configured base url', () => {
+      const svc = configureWithOrigin(undefined);
+      const href = svc.setLocalizedCanonical('/p', 'en');
+      expect(href.startsWith('http')).toBeTrue();
+    });
+  });
 });
