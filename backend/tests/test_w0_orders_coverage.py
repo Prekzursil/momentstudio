@@ -5498,35 +5498,41 @@ def test_admin_create_refund_zero_record(test_app, monkeypatch) -> None:
 # Final coverage: naive-datetime + reward-issued branches                      #
 # --------------------------------------------------------------------------- #
 def test_admin_search_sla_naive_started_at(test_app, monkeypatch) -> None:
-    # An overdue pending_acceptance order produces an SLA row whose started_at is
-    # a naive datetime under SQLite -> _ensure_utc replace(tzinfo=utc) (1783).
+    # An overdue pending_acceptance order yields an SLA row whose started_at is a
+    # naive datetime under SQLite -> _ensure_utc replace(tzinfo=utc) (1787).
     from datetime import datetime
 
     client = test_app["client"]
     sf = test_app["session_factory"]
     _, uid = create_user_token(sf, email="slanaive@example.com")
-    oid = _seed_order(
-        sf, user_id=uid, payment_method="cod", status=OrderStatus.pending_acceptance
-    )
 
-    async def _backdate():
-        from sqlalchemy.future import select as _select
-
+    async def _seed():
         async with sf() as session:
-            row = await session.execute(_select(Order).where(Order.id == oid))
-            o = row.scalars().first()
-            # Naive datetime (no tzinfo) far in the past so it is overdue.
-            o.created_at = datetime(2020, 1, 1)
+            o = Order(
+                user_id=uid,
+                status=OrderStatus.pending_acceptance,
+                reference_code="SLA-NAIVE",
+                customer_email="slanaive@example.com",
+                customer_name="N",
+                total_amount=Decimal("1.00"),
+                payment_method="cod",
+                currency="RON",
+                created_at=datetime(2020, 1, 1),  # naive + far past -> overdue
+            )
             session.add(o)
             await session.commit()
 
-    asyncio.run(_backdate())
+    asyncio.run(_seed())
     res = client.get(
         "/api/v1/orders/admin/search",
         params={"sla": "any_overdue"},
         headers=auth_headers(_admin(test_app)),
     )
     assert res.status_code == 200, res.text
+    items = res.json()["items"]
+    assert items, res.text
+    assert items[0]["sla_started_at"] is not None
+    assert items[0]["sla_overdue"] is True
 
 
 def test_guest_email_confirm_naive_expiry(test_app) -> None:
@@ -5643,6 +5649,82 @@ def test_admin_email_events_no_reference_filter(test_app, monkeypatch) -> None:
     oid = asyncio.run(_seed())
     res = client.get(
         f"/api/v1/orders/admin/{oid}/email-events",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_guest_email_confirm_no_expiry_set(test_app) -> None:
+    # Cart has a token but expires_at is None -> the tzinfo-normalization is
+    # short-circuited (expires falsy) and "Invalid or expired token" is raised.
+    from app.models.cart import Cart, CartItem
+
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+
+    async def _seed():
+        async with sf() as session:
+            category = Category(slug="gnoexp", name="GNOEXP")
+            product = Product(
+                category=category,
+                slug="gnoexp-prod",
+                sku="GNOEXP",
+                name="GNOEXP",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=5,
+                status=ProductStatus.published,
+            )
+            cart = Cart(session_id="g-noexp")
+            cart.guest_email = "gnoexp@example.com"
+            cart.guest_email_verification_token = "999000"
+            cart.guest_email_verification_expires_at = None
+            cart.items = [
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("10.00")
+                )
+            ]
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(_seed())
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "gnoexp@example.com", "token": "999000"},
+        headers={"X-Session-Id": "g-noexp"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid or expired token"
+
+
+def test_admin_deliver_reward_not_issued(test_app, monkeypatch) -> None:
+    # Reward issuance returns None (not eligible) -> the send_coupon_assigned task
+    # is skipped (the "if coupon" False branch).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+
+    import app.api.v1.orders as om
+
+    async def _none(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(
+        om.coupons_service, "issue_first_order_reward_if_eligible", _none
+    )
+
+    _, uid = create_user_token(sf, email="noreward@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.shipped,
+        customer_email="noreward@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "delivered"},
         headers=auth_headers(_admin(test_app)),
     )
     assert res.status_code == 200, res.text
