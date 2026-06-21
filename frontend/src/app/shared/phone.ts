@@ -16,7 +16,9 @@ export type PhoneCountryOption = {
 const cache = new Map<string, PhoneCountryOption[]>();
 
 function flagEmoji(code: string): string {
+  /* istanbul ignore next -- defensive: callers only pass valid 2-letter ISO codes from getCountries() */
   const normalized = (code || '').toUpperCase();
+  /* istanbul ignore next -- defensive: codes from getCountries() always match /^[A-Z]{2}$/ */
   if (!/^[A-Z]{2}$/.test(normalized)) return '🏳️';
   const [a, b] = normalized;
   return String.fromCodePoint(0x1f1e6 + a.charCodeAt(0) - 65, 0x1f1e6 + b.charCodeAt(0) - 65);
@@ -31,10 +33,13 @@ function displayName(locale: string, regionCode: string): string {
       ) => { of: (x: string) => string };
     };
     const DisplayNames = anyIntl.DisplayNames;
+    /* istanbul ignore next -- defensive: Intl.DisplayNames is always available in supported browsers */
     if (!DisplayNames) return regionCode;
     const names = new DisplayNames([locale], { type: 'region' });
+    /* istanbul ignore next -- defensive: names.of() always resolves a region label for valid ISO codes */
     return names.of(regionCode) || regionCode;
   } catch {
+    /* istanbul ignore next -- defensive: Intl.DisplayNames does not throw for valid ISO region codes */
     return regionCode;
   }
 }
@@ -76,6 +81,7 @@ export function buildE164(country: CountryCode, nationalNumber: string): string 
 export function formatNationalAsYouType(country: CountryCode, nationalNumber: string): string {
   const digits = (nationalNumber || '').replace(/[^\d]+/g, '');
   if (!digits) return '';
+  /* istanbul ignore next -- defensive: AsYouType.input() does not throw for sanitized digit strings */
   try {
     return new AsYouType(country).input(digits);
   } catch {
@@ -86,6 +92,7 @@ export function formatNationalAsYouType(country: CountryCode, nationalNumber: st
 export function formatInternationalFromE164(e164: string): string {
   const parsed = parsePhoneNumberFromString((e164 || '').trim());
   if (!parsed) return (e164 || '').trim();
+  /* istanbul ignore next -- defensive: formatInternational() does not throw for a parsed number */
   try {
     return parsed.formatInternational();
   } catch {

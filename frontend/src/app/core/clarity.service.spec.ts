@@ -392,13 +392,31 @@ describe('ClarityService (mocked DOCUMENT/Router for branch edges)', () => {
     expect(appendSpy).toHaveBeenCalled();
   });
 
-  it('falls back to window.location when router url is blank', () => {
+  it('falls back to window.location when the router url is whitespace', () => {
     const doc = makeDoc();
     const appendSpy = spyOn(doc.head, 'appendChild').and.callThrough();
     const service = configure(doc);
     routerStub.url = '   ';
     service.start();
     expect(appendSpy).toHaveBeenCalled();
+  });
+
+  it('falls back to window.location when the router url is an empty string', () => {
+    const doc = makeDoc();
+    const appendSpy = spyOn(doc.head, 'appendChild').and.callThrough();
+    const service = configure(doc);
+    routerStub.url = '';
+    service.start();
+    expect(appendSpy).toHaveBeenCalled();
+  });
+
+  it('skips initialization when the project id is null', () => {
+    (appConfig as { clarityProjectId?: string | null }).clarityProjectId = null;
+    const doc = makeDoc();
+    const appendSpy = spyOn(doc.head, 'appendChild').and.callThrough();
+    const service = configure(doc);
+    service.start();
+    expect(appendSpy).not.toHaveBeenCalled();
   });
 
   it('does not initialize on a private router path', () => {

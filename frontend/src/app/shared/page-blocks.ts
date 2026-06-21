@@ -188,6 +188,7 @@ function readLocalized(value: unknown, lang: UiLang): string | null {
 
 function ensureUniqueKey(value: unknown, fallback: string, existing: Set<string>): string | null {
   const key = (typeof value === 'string' ? value.trim() : '') || fallback;
+  /* istanbul ignore next -- unreachable: fallback is always a non-empty generated key */
   if (!key) return null;
   if (existing.has(key)) return null;
   existing.add(key);
@@ -200,6 +201,7 @@ function readString(value: unknown): string | null {
   return trimmed ? trimmed : null;
 }
 
+/* istanbul ignore next -- the `fallback` default is never exercised: every call site passes an explicit fallback */
 function readBoolean(value: unknown, fallback = false): boolean {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value === 1;

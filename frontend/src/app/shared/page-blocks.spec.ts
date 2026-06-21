@@ -442,6 +442,28 @@ describe('parsePageBlocks branch edges', () => {
     const out = parse([{ type: 'gallery', key: 'g', images: [null, 5, { url: '/ok.png' }] }]);
     expect(out[0].type === 'gallery' && out[0].images.length).toBe(1);
   });
+
+  it('defaults missing markdown to an empty string for text/cta/faq', () => {
+    const out = parse([
+      { type: 'text', key: 't' },
+      { type: 'cta', key: 'c', cta_label: 'Go' },
+      { type: 'faq', key: 'f', items: [{ question: 'Q' }] },
+    ]);
+    expect(out[0].type === 'text' && out[0].body_html).toBe(md(''));
+    expect(out[1].type === 'cta' && out[1].body_html).toBe(md(''));
+    expect(out[2].type === 'faq' && out[2].items[0].answer_html).toBe(md(''));
+  });
+
+  it('skips banner/image/gallery entries whose url is not a string', () => {
+    const out = parse([
+      { type: 'banner', key: 'b', slide: { image_url: 123, headline: 'H' } },
+      { type: 'image', key: 'i', url: 99 },
+      { type: 'gallery', key: 'g', images: [{ url: 7 }] },
+    ]);
+    // banner still parses (headline content), image+gallery skipped (no string url).
+    expect(out.map((b) => b.type)).toEqual(['banner']);
+    expect(out[0].type === 'banner' && out[0].slide.image_url).toBe('');
+  });
 });
 
 describe('pageBlocksToPlainText', () => {
@@ -500,6 +522,37 @@ describe('pageBlocksToPlainText', () => {
       { key: 't', type: 'text', enabled: true, body_html: '<p>Hello   <b>world</b></p>' },
     ];
     expect(pageBlocksToPlainText(blocks)).toBe('Hello world');
+  });
+
+  it('coerces undefined html fields to empty strings across block kinds', () => {
+    const blocks: PageBlock[] = [
+      { key: 't', type: 'text', enabled: true, body_html: undefined as unknown as string },
+      {
+        key: 'f',
+        type: 'faq',
+        enabled: true,
+        items: [{ question: 'Q', answer_html: undefined as unknown as string }],
+      },
+      {
+        key: 'ts',
+        type: 'testimonials',
+        enabled: true,
+        items: [{ quote_html: undefined as unknown as string }],
+      },
+      {
+        key: 'co',
+        type: 'columns',
+        enabled: true,
+        columns: [
+          { body_html: undefined as unknown as string },
+          { body_html: undefined as unknown as string },
+        ],
+        columns_count: 2,
+        breakpoint: 'md',
+      },
+    ];
+    // Only the faq question survives; all html fields collapse to ''.
+    expect(pageBlocksToPlainText(blocks)).toBe('Q');
   });
 
   it('handles cta/banner/carousel without optional fields', () => {

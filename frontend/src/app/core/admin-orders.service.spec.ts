@@ -119,7 +119,11 @@ describe('AdminOrdersService', () => {
     items: null,
   };
 
-  function expectDetailRequest(url: string, method: string, payload: unknown): void {
+  function expectDetailRequest(
+    url: string,
+    method: string,
+    payload: Record<string, unknown>,
+  ): void {
     const req = httpMock.expectOne((r) => r.url === url);
     expect(req.request.method).toBe(method);
     req.flush(payload);
@@ -136,6 +140,25 @@ describe('AdminOrdersService', () => {
       items: [{ id: 'o1', total_amount: '10.50', status: 'paid', tags: 'not-array' }],
       meta: { total_items: 1, total_pages: 1, page: 1, limit: 12 },
     });
+  });
+
+  it('search keeps an array of tags as-is', () => {
+    service.search({}).subscribe((res) => {
+      expect(res.items[0].tags).toEqual(['a', 'b']);
+    });
+    httpMock
+      .expectOne((r) => r.url === '/api/v1/orders/admin/search')
+      .flush({
+        items: [{ id: 'o1', total_amount: '1', status: 'paid', tags: ['a', 'b'] }],
+        meta: { total_items: 1, total_pages: 1, page: 1, limit: 12 },
+      });
+  });
+
+  it('search respects an explicit include_pii=false', () => {
+    service.search({ include_pii: false }).subscribe();
+    const req = httpMock.expectOne((r) => r.url === '/api/v1/orders/admin/search');
+    expect(req.request.params.get('include_pii')).toBe('false');
+    req.flush({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 12 } });
   });
 
   it('search tolerates a missing items array', () => {
@@ -177,24 +200,55 @@ describe('AdminOrdersService', () => {
     httpMock.expectOne((r) => r.url === '/api/v1/orders/admin/o1/email-events').flush('not-array');
   });
 
+  // Run a detail-returning call against BOTH the rich and minimal payloads so
+  // every normalize block hits the map-body (rich) and the `?? []`/Array.isArray
+  // fallback (minimal) sides.
+  function runDetailBoth(invoke: () => void, url: string, method: string): void {
+    invoke();
+    expectDetailRequest(url, method, richDetail);
+    invoke();
+    expectDetailRequest(url, method, minimalDetail);
+  }
+
+  it('updates an order against rich and minimal payloads', () => {
+    runDetailBoth(
+      () => service.update('o1', { status: 'paid' }).subscribe(),
+      '/api/v1/orders/admin/o1',
+      'PATCH',
+    );
+  });
+
   it('reviews fraud, updates addresses and manages shipments', () => {
-    service.reviewFraud('o1', { decision: 'approve' }).subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/fraud-review', 'POST', richDetail);
-
-    service.updateAddresses('o1', { rerate_shipping: true }).subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/addresses', 'PATCH', minimalDetail);
-
-    service.createShipment('o1', { tracking_number: 'T' }).subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/shipments', 'POST', richDetail);
-
-    service.updateShipment('o1', 's1', { tracking_number: 'T2' }).subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/shipments/s1', 'PATCH', minimalDetail);
-
-    service.deleteShipment('o1', 's1').subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/shipments/s1', 'DELETE', richDetail);
-
-    service.fulfillItem('o1', 'it1', 2).subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/items/it1/fulfill', 'POST', minimalDetail);
+    runDetailBoth(
+      () => service.reviewFraud('o1', { decision: 'approve' }).subscribe(),
+      '/api/v1/orders/admin/o1/fraud-review',
+      'POST',
+    );
+    runDetailBoth(
+      () => service.updateAddresses('o1', { rerate_shipping: true }).subscribe(),
+      '/api/v1/orders/admin/o1/addresses',
+      'PATCH',
+    );
+    runDetailBoth(
+      () => service.createShipment('o1', { tracking_number: 'T' }).subscribe(),
+      '/api/v1/orders/admin/o1/shipments',
+      'POST',
+    );
+    runDetailBoth(
+      () => service.updateShipment('o1', 's1', { tracking_number: 'T2' }).subscribe(),
+      '/api/v1/orders/admin/o1/shipments/s1',
+      'PATCH',
+    );
+    runDetailBoth(
+      () => service.deleteShipment('o1', 's1').subscribe(),
+      '/api/v1/orders/admin/o1/shipments/s1',
+      'DELETE',
+    );
+    runDetailBoth(
+      () => service.fulfillItem('o1', 'it1', 2).subscribe(),
+      '/api/v1/orders/admin/o1/items/it1/fulfill',
+      'POST',
+    );
   });
 
   it('uploads and downloads/deletes the shipping label', () => {
@@ -245,11 +299,17 @@ describe('AdminOrdersService', () => {
     httpMock.expectOne('/api/v1/orders/admin/o1/refund').flush(order);
   });
 
-  it('creates a partial refund and adds an admin note', () => {
-    service.createPartialRefund('o1', { amount: '5', note: 'n' }).subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/refunds', 'POST', richDetail);
-    service.addAdminNote('o1', 'note text').subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/notes', 'POST', minimalDetail);
+  it('creates a partial refund and adds an admin note against both payloads', () => {
+    runDetailBoth(
+      () => service.createPartialRefund('o1', { amount: '5', note: 'n' }).subscribe(),
+      '/api/v1/orders/admin/o1/refunds',
+      'POST',
+    );
+    runDetailBoth(
+      () => service.addAdminNote('o1', 'note text').subscribe(),
+      '/api/v1/orders/admin/o1/notes',
+      'POST',
+    );
   });
 
   it('lists/normalizes order tags and stats and renames tags', () => {
@@ -260,7 +320,11 @@ describe('AdminOrdersService', () => {
     httpMock.expectOne('/api/v1/orders/admin/tags').flush({ items: 'no' });
 
     service.listOrderTagStats().subscribe((stats) => {
-      expect(stats).toEqual([{ tag: 'x', count: 2 }]);
+      // '' is dropped (empty tag); 'y' kept with count clamped to 0.
+      expect(stats).toEqual([
+        { tag: 'x', count: 2 },
+        { tag: 'y', count: 0 },
+      ]);
     });
     httpMock.expectOne('/api/v1/orders/admin/tags/stats').flush({
       items: [
@@ -283,11 +347,39 @@ describe('AdminOrdersService', () => {
       .flush({ from_tag: 'a', to_tag: 'b', updated: 3, merged: 1 });
   });
 
-  it('adds and removes order tags', () => {
-    service.addOrderTag('o1', 'vip').subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/tags', 'POST', richDetail);
-    service.removeOrderTag('o1', 'vip').subscribe();
-    expectDetailRequest('/api/v1/orders/admin/o1/tags/vip', 'DELETE', minimalDetail);
+  it('clamps non-numeric and missing tag stat counts to zero', () => {
+    service.listOrderTagStats().subscribe((stats) => {
+      expect(stats).toEqual([
+        { tag: 'z', count: 0 },
+        { tag: 'w', count: 0 },
+      ]);
+    });
+    httpMock.expectOne('/api/v1/orders/admin/tags/stats').flush({
+      items: [
+        { tag: 'z', count: 'NaN' as unknown as number },
+        { tag: 'w' }, // count missing -> row.count || 0 falsy branch
+      ],
+    });
+  });
+
+  it('coerces a sparse rename response to safe defaults', () => {
+    service.renameOrderTag({ from_tag: 'a', to_tag: 'b' }).subscribe((res) => {
+      expect(res).toEqual({ from_tag: '', to_tag: '', updated: 0, merged: 0, total: 0 });
+    });
+    httpMock.expectOne('/api/v1/orders/admin/tags/rename').flush({});
+  });
+
+  it('adds and removes order tags against both payloads', () => {
+    runDetailBoth(
+      () => service.addOrderTag('o1', 'vip').subscribe(),
+      '/api/v1/orders/admin/o1/tags',
+      'POST',
+    );
+    runDetailBoth(
+      () => service.removeOrderTag('o1', 'vip').subscribe(),
+      '/api/v1/orders/admin/o1/tags/vip',
+      'DELETE',
+    );
   });
 
   it('sends emails and downloads batch documents', () => {
@@ -334,7 +426,7 @@ describe('AdminOrdersService', () => {
     service.downloadDocumentExport('exp1').subscribe();
     httpMock.expectOne('/api/v1/orders/admin/exports/exp1/download').flush(new Blob(['x']));
 
-    service.downloadExport(['col1', '  ', 'col2']).subscribe();
+    service.downloadExport(['col1', '  ', null as unknown as string, 'col2']).subscribe();
     const req = httpMock.expectOne((r) => r.url === '/api/v1/orders/admin/export');
     expect(req.request.params.getAll('columns')).toEqual(['col1', 'col2']);
     req.flush(new Blob(['x']));

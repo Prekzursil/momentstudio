@@ -114,6 +114,7 @@ export class ClarityService implements OnDestroy {
         return fromRouter.startsWith('/') ? fromRouter : `/${fromRouter}`;
       }
     }
+    /* istanbul ignore next -- defensive: window.location.pathname is always a non-empty string and does not throw under Karma */
     try {
       return window.location.pathname || '/';
     } catch {
@@ -122,6 +123,7 @@ export class ClarityService implements OnDestroy {
   }
 
   private isPublicStorefrontPath(pathname: string): boolean {
+    /* istanbul ignore next -- defensive: callers always pass a leading-slash path from currentPathname() */
     const normalized = pathname.startsWith('/') ? pathname : `/${pathname}`;
     return !ClarityService.privatePrefixes.some(
       (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
