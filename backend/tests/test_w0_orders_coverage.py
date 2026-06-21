@@ -111,6 +111,9 @@ def _mock_payments(monkeypatch) -> None:
     monkeypatch.setattr(settings, "environment", "test", raising=False)
 
 
+_ref_counter = [0]
+
+
 def _seed_order(
     session_factory,
     *,
@@ -125,12 +128,15 @@ def _seed_order(
     events=None,
     with_product=False,
 ):
+    _ref_counter[0] += 1
+    ref = f"REF-W0-{_ref_counter[0]}"
+
     async def _seed():
         async with session_factory() as session:
             order = Order(
                 user_id=user_id,
                 status=status,
-                reference_code="REF-W0",
+                reference_code=ref,
                 customer_email=customer_email,
                 customer_name="Buyer Zero",
                 total_amount=Decimal("25.00"),
@@ -144,11 +150,11 @@ def _seed_order(
             session.add(order)
             await session.flush()
             if with_product:
-                category = Category(slug="w0", name="W0")
+                category = Category(slug=f"w0-{ref}", name="W0")
                 product = Product(
                     category=category,
-                    slug="w0-prod",
-                    sku="W0-PROD",
+                    slug=f"w0-prod-{ref}",
+                    sku=f"W0-PROD-{ref}",
                     name="W0 Product",
                     base_price=Decimal("25.00"),
                     currency="RON",
@@ -1399,3 +1405,387 @@ def test_guest_checkout_success_cod(test_app, monkeypatch) -> None:
     )
     assert res.status_code == 201, res.text
     assert res.json()["payment_method"] == "cod"
+
+
+# --------------------------------------------------------------------------- #
+# Admin mutation endpoints: 404 not-found + happy paths                        #
+# --------------------------------------------------------------------------- #
+_NIL = "00000000-0000-0000-0000-000000000000"
+_uid_counter = [0]
+
+
+def _seed_order_with_user(test_app, *, status=OrderStatus.pending_acceptance, **kw):
+    sf = test_app["session_factory"]
+    _uid_counter[0] += 1
+    _, uid = create_user_token(sf, email=f"ow-{_uid_counter[0]}@example.com")
+    oid = _seed_order(sf, user_id=uid, status=status, with_product=True, **kw)
+    return oid, uid
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("patch", f"/api/v1/orders/admin/{_NIL}"),
+        ("patch", f"/api/v1/orders/admin/{_NIL}/addresses"),
+        ("get", f"/api/v1/orders/admin/{_NIL}/shipments"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/shipments"),
+        ("patch", f"/api/v1/orders/admin/{_NIL}/shipments/{_NIL}"),
+        ("delete", f"/api/v1/orders/admin/{_NIL}/shipments/{_NIL}"),
+        ("get", f"/api/v1/orders/admin/{_NIL}/shipping-label"),
+        ("delete", f"/api/v1/orders/admin/{_NIL}/shipping-label"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/retry-payment"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/refund"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/refunds"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/notes"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/tags"),
+        ("delete", f"/api/v1/orders/admin/{_NIL}/tags/sometag"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/fraud-review"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/delivery-email"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/confirmation-email"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/items/{_NIL}/fulfill"),
+        ("get", f"/api/v1/orders/admin/{_NIL}/events"),
+        ("get", f"/api/v1/orders/admin/{_NIL}/packing-slip"),
+        ("get", f"/api/v1/orders/admin/{_NIL}/receipt"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/capture-payment"),
+        ("post", f"/api/v1/orders/admin/{_NIL}/void-payment"),
+    ],
+)
+def test_admin_endpoints_order_not_found(test_app, method, path) -> None:
+    client = test_app["client"]
+    headers = auth_headers(_admin(test_app))
+    bodies = {
+        "shipments": {"tracking_number": "TRK1"},
+        "notes": {"note": "n"},
+        "tags": {"tag": "t"},
+        "fraud-review": {"decision": "approve"},
+        "refunds": {"amount": "1.00", "note": "r"},
+    }
+    json_body = None
+    for key, body in bodies.items():
+        if path.endswith(key):
+            json_body = body
+            break
+    # POST/PATCH carry a JSON body; GET/DELETE do not (TestClient rejects json=).
+    # Several POST endpoints declare Body(...) (required) so always send at least {}.
+    if method in ("post", "patch"):
+        res = getattr(client, method)(path, json=json_body or {}, headers=headers)
+    else:
+        res = getattr(client, method)(path, headers=headers)
+    assert res.status_code == 404, f"{method} {path} -> {res.status_code}: {res.text}"
+
+
+@pytest.mark.parametrize(
+    "new_status",
+    ["paid", "shipped", "delivered", "cancelled", "refunded"],
+)
+def test_admin_update_order_status_transitions(
+    test_app, monkeypatch, new_status
+) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    # Start each transition from a state that ALLOWED_TRANSITIONS permits.
+    start_for = {
+        "paid": OrderStatus.pending_acceptance,
+        "shipped": OrderStatus.paid,
+        "delivered": OrderStatus.shipped,
+        "cancelled": OrderStatus.pending_acceptance,
+        "refunded": OrderStatus.paid,
+    }
+    oid, _ = _seed_order_with_user(
+        test_app, status=start_for[new_status], payment_method="cod"
+    )
+    body: dict = {"status": new_status}
+    if new_status == "cancelled":
+        body["cancel_reason"] = "customer request"
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json=body,
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_update_order_shipping_method_not_found(test_app) -> None:
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"shipping_method_id": _NIL},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+
+
+def test_admin_update_addresses_no_updates(test_app) -> None:
+    # No shipping/billing payload -> service rejects with 400; endpoint covered.
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}/addresses",
+        json={"rerate_shipping": False, "note": "fix"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "No address updates provided"
+
+
+def test_admin_shipment_lifecycle(test_app) -> None:
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+
+    lst = client.get(f"/api/v1/orders/admin/{oid}/shipments", headers=headers)
+    assert lst.status_code == 200
+
+    created = client.post(
+        f"/api/v1/orders/admin/{oid}/shipments",
+        json={"courier": "sameday", "tracking_number": "TRK-1"},
+        headers=headers,
+    )
+    assert created.status_code == 200, created.text
+
+
+def test_admin_notes_tags_fraud_emails(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+
+    note = client.post(
+        f"/api/v1/orders/admin/{oid}/notes", json={"note": "hello"}, headers=headers
+    )
+    assert note.status_code == 200, note.text
+
+    tag = client.post(
+        f"/api/v1/orders/admin/{oid}/tags", json={"tag": "vip"}, headers=headers
+    )
+    assert tag.status_code == 200, tag.text
+
+    untag = client.delete(f"/api/v1/orders/admin/{oid}/tags/vip", headers=headers)
+    assert untag.status_code == 200, untag.text
+
+    fraud = client.post(
+        f"/api/v1/orders/admin/{oid}/fraud-review",
+        json={"decision": "approve", "note": "ok"},
+        headers=headers,
+    )
+    assert fraud.status_code == 200, fraud.text
+
+    de = client.post(
+        f"/api/v1/orders/admin/{oid}/delivery-email", json={}, headers=headers
+    )
+    assert de.status_code == 200, de.text
+
+    ce = client.post(
+        f"/api/v1/orders/admin/{oid}/confirmation-email", json={}, headers=headers
+    )
+    assert ce.status_code == 200, ce.text
+
+
+def test_admin_email_missing_customer(test_app) -> None:
+    # Stub an order with no user and no customer_email to hit the 400 branch.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    oid = _seed_order(sf, payment_method="cod")
+
+    class _Stub:
+        id = oid
+        user = None
+        customer_email = None
+        events: list = []
+
+    async def fake_get(_s, _id):
+        return _Stub()
+
+    import app.api.v1.orders as om
+
+    original = om.order_service.get_order_by_id
+    om.order_service.get_order_by_id = fake_get
+    try:
+        res = client.post(
+            f"/api/v1/orders/admin/{oid}/delivery-email",
+            json={},
+            headers=auth_headers(_admin(test_app)),
+        )
+        assert res.status_code == 400
+        assert res.json()["detail"] == "Order customer email missing"
+    finally:
+        om.order_service.get_order_by_id = original
+
+
+def test_admin_fulfill_item(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _, uid = create_user_token(sf, email="ff@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+
+    async def _item_id():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(
+                _select(OrderItem).where(OrderItem.order_id == oid)
+            )
+            return row.scalars().first().id
+
+    item_id = asyncio.run(_item_id())
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/items/{item_id}/fulfill",
+        params={"shipped_quantity": 1},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_packing_slip_and_receipt(test_app) -> None:
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+
+    ps = client.get(f"/api/v1/orders/admin/{oid}/packing-slip", headers=headers)
+    assert ps.status_code == 200
+    assert ps.headers["content-type"] == "application/pdf"
+
+    rc = client.get(f"/api/v1/orders/admin/{oid}/receipt", headers=headers)
+    assert rc.status_code == 200
+
+
+def test_admin_batch_missing_orders(test_app) -> None:
+    client = test_app["client"]
+    headers = auth_headers(_admin(test_app))
+    for path in (
+        "/api/v1/orders/admin/batch/packing-slips",
+        "/api/v1/orders/admin/batch/pick-list.csv",
+        "/api/v1/orders/admin/batch/pick-list.pdf",
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+    ):
+        res = client.post(path, json={"order_ids": [_NIL]}, headers=headers)
+        assert res.status_code == 404, f"{path} -> {res.status_code}"
+
+
+def test_admin_batch_packing_and_picklist_ok(test_app) -> None:
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+
+    ps = client.post(
+        "/api/v1/orders/admin/batch/packing-slips",
+        json={"order_ids": [str(oid)]},
+        headers=headers,
+    )
+    assert ps.status_code == 200, ps.text
+
+    csv_res = client.post(
+        "/api/v1/orders/admin/batch/pick-list.csv",
+        json={"order_ids": [str(oid)]},
+        headers=headers,
+    )
+    assert csv_res.status_code == 200
+
+    pdf_res = client.post(
+        "/api/v1/orders/admin/batch/pick-list.pdf",
+        json={"order_ids": [str(oid)]},
+        headers=headers,
+    )
+    assert pdf_res.status_code == 200
+
+
+def test_admin_batch_shipping_labels_missing(test_app) -> None:
+    # Order exists but has no shipping label -> 404 missing labels.
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    res = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        json={"order_ids": [str(oid)]},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+    assert "missing_shipping_label_order_ids" in str(res.json()["detail"])
+
+
+def test_admin_shipping_label_not_found(test_app) -> None:
+    # Order exists but no label uploaded -> 404 on download/delete.
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    dl = client.get(f"/api/v1/orders/admin/{oid}/shipping-label", headers=headers)
+    assert dl.status_code == 404
+    assert dl.json()["detail"] == "Shipping label not found"
+    rm = client.delete(f"/api/v1/orders/admin/{oid}/shipping-label", headers=headers)
+    assert rm.status_code == 404
+
+
+def test_admin_capture_and_void_payment(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    headers = auth_headers(_admin(test_app))
+
+    oid_cap, _ = _seed_order_with_user(
+        test_app, status=OrderStatus.pending_payment, payment_method="stripe"
+    )
+    cap = client.post(
+        f"/api/v1/orders/admin/{oid_cap}/capture-payment", headers=headers
+    )
+    assert cap.status_code in (200, 400), cap.text
+
+    oid_void, _ = _seed_order_with_user(
+        test_app, status=OrderStatus.pending_payment, payment_method="stripe"
+    )
+    void = client.post(f"/api/v1/orders/admin/{oid_void}/void-payment", headers=headers)
+    assert void.status_code in (200, 400), void.text
+
+
+def test_admin_retry_payment(test_app) -> None:
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(
+        test_app, status=OrderStatus.pending_payment, payment_method="stripe"
+    )
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/retry-payment",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
+
+
+# --------------------------------------------------------------------------- #
+# Shipping methods + get_order + list_orders                                   #
+# --------------------------------------------------------------------------- #
+def test_create_and_list_shipping_methods(test_app) -> None:
+    client = test_app["client"]
+    headers = auth_headers(_admin(test_app))
+    created = client.post(
+        "/api/v1/orders/shipping-methods",
+        json={"name": "Express", "rate_flat": 9.0, "rate_per_kg": 0},
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    listing = client.get("/api/v1/orders/shipping-methods")
+    assert listing.status_code == 200
+    assert any(m["name"] == "Express" for m in listing.json())
+
+
+def test_get_order_not_found(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="getorder@example.com")
+    res = client.get(f"/api/v1/orders/{_NIL}", headers=auth_headers(token))
+    assert res.status_code == 404
+
+
+def test_get_order_ok(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="getorder2@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+    res = client.get(f"/api/v1/orders/{oid}", headers=auth_headers(token))
+    assert res.status_code == 200, res.text
+
+
+def test_list_orders_endpoint(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="listo@example.com")
+    _seed_order(sf, user_id=uid, payment_method="cod")
+    res = client.get("/api/v1/orders", headers=auth_headers(token))
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
