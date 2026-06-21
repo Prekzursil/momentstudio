@@ -3042,3 +3042,170 @@ def test_guest_checkout_resume_netopia_reissue(test_app, monkeypatch) -> None:
     )
     assert res.status_code == 200, res.text
     assert res.json()["netopia_payment_url"] == "https://netopia.example/pay"
+
+
+# --------------------------------------------------------------------------- #
+# guest_checkout body validation branches                                      #
+# --------------------------------------------------------------------------- #
+def test_guest_checkout_legal_consents_required(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-legal", guest_email="glegal@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "glegal@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            accept_terms=False,
+        ),
+        headers={"X-Session-Id": "g-legal"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Legal consents required"
+
+
+def test_guest_checkout_promo_forbidden(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-promo", guest_email="gpromo@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gpromo@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            promo_code="SOMECODE",
+        ),
+        headers={"X-Session-Id": "g-promo"},
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Sign in to use coupons."
+
+
+def test_guest_checkout_billing_incomplete(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-bill", guest_email="gbill@example.com", guest_verified=True
+    )
+    # billing_line1 present but city/postal/country missing -> incomplete.
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gbill@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            billing_line1="9 Bill St",
+        ),
+        headers={"X-Session-Id": "g-bill"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Billing address is incomplete"
+
+
+def test_guest_checkout_with_full_billing(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-fbill", guest_email="gfbill@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gfbill@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            billing_line1="9 Bill St",
+            billing_city="Cluj",
+            billing_postal_code="400000",
+            billing_country="RO",
+        ),
+        headers={"X-Session-Id": "g-fbill"},
+    )
+    assert res.status_code == 201, res.text
+
+
+# --------------------------------------------------------------------------- #
+# checkout billing-incomplete branch                                           #
+# --------------------------------------------------------------------------- #
+def test_checkout_billing_incomplete(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ckbillinc@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-billinc")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod", phone="+40712345678", billing_line1="x"
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-billinc"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Billing address is incomplete"
+
+
+# --------------------------------------------------------------------------- #
+# netopia confirm: unparseable payment status -> treated as not-paid           #
+# --------------------------------------------------------------------------- #
+def test_netopia_confirm_unparseable_status(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    oid = _seed_order(sf, payment_method="netopia", netopia_ntp_id="NTP-BAD")
+
+    async def fake_status(**_kw):
+        return {"payment": {"status": "not-an-int"}}
+
+    monkeypatch.setattr(netopia_service, "get_status", fake_status)
+    res = client.post("/api/v1/orders/netopia/confirm", json={"order_id": str(oid)})
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Payment not completed"
+
+
+def test_netopia_confirm_non_dict_status(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    oid = _seed_order(sf, payment_method="netopia", netopia_ntp_id="NTP-NONDICT")
+
+    async def fake_status(**_kw):
+        return "unexpected-string"
+
+    monkeypatch.setattr(netopia_service, "get_status", fake_status)
+    res = client.post("/api/v1/orders/netopia/confirm", json={"order_id": str(oid)})
+    assert res.status_code == 400
+
+
+# --------------------------------------------------------------------------- #
+# admin_search: from/to datetime filters + include_test false                  #
+# --------------------------------------------------------------------------- #
+def test_admin_search_date_and_include_test(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={
+            "from": "2026-01-01T00:00:00Z",
+            "to": "2026-12-31T00:00:00Z",
+            "include_test": "false",
+            "q": "REF",
+        },
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
