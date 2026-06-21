@@ -168,6 +168,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
 
     const maybeInitSelection = (): void => {
       if (pendingCurrent) return;
+      /* istanbul ignore next -- guard against re-entry: the load orchestration only sets selectedVersion via this function once per reload */
       if (this.selectedVersion) return;
       const items = this.versions();
       if (!items?.length) return;
