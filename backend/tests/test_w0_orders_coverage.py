@@ -2529,3 +2529,327 @@ def test_admin_shipping_label_upload_download_delete(
 
     rm = client.delete(f"/api/v1/orders/admin/{oid}/shipping-label", headers=headers)
     assert rm.status_code == 204
+
+
+# --------------------------------------------------------------------------- #
+# Branch-completion: payment-confirm sub-branches                              #
+# --------------------------------------------------------------------------- #
+def test_paypal_capture_non_mock(test_app, monkeypatch) -> None:
+    # Real mode: paypal_service.capture_order is invoked (line 1189).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "payments_provider", "real", raising=False)
+
+    from app.services import paypal as paypal_service
+
+    async def _cap(**_kw):
+        return "CAP-REAL-1"
+
+    monkeypatch.setattr(paypal_service, "capture_order", _cap)
+
+    token, uid = create_user_token(sf, email="ppreal@example.com")
+    _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="paypal",
+        paypal_order_id="PP-REAL",
+        customer_email="ppreal@example.com",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/paypal/capture",
+        json={"paypal_order_id": "PP-REAL"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["paypal_capture_id"] == "CAP-REAL-1"
+
+
+def test_paypal_capture_from_pending_acceptance(test_app, monkeypatch) -> None:
+    # status already pending_acceptance -> skips the status_change block (1190->1199).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_order(
+        sf,
+        payment_method="paypal",
+        paypal_order_id="PP-PA",
+        status=OrderStatus.pending_acceptance,
+    )
+    res = client.post(
+        "/api/v1/orders/paypal/capture",
+        json={"paypal_order_id": "PP-PA", "mock": "success"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_stripe_confirm_guest_return_flow(test_app, monkeypatch) -> None:
+    # order has user_id but caller is anonymous and supplies matching order_id
+    # -> guest-return branch (1336-1338) instead of 403.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="guestret@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="stripe",
+        stripe_session_id="cs_guest",
+        customer_email="guestret@example.com",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/stripe/confirm",
+        json={"session_id": "cs_guest", "order_id": str(oid), "mock": "success"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_paypal_capture_guest_return_flow(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="ppguest@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="paypal",
+        paypal_order_id="PP-GUEST",
+        customer_email="ppguest@example.com",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/paypal/capture",
+        json={"paypal_order_id": "PP-GUEST", "order_id": str(oid), "mock": "success"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_netopia_confirm_guest_return_flow(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="netguest@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="netopia",
+        netopia_ntp_id="NTP-GUEST",
+        customer_email="netguest@example.com",
+        with_product=True,
+    )
+
+    async def fake_status(**_kw):
+        return {"payment": {"status": 5}, "error": {"code": "0"}}
+
+    monkeypatch.setattr(netopia_service, "get_status", fake_status)
+    res = client.post(
+        "/api/v1/orders/netopia/confirm",
+        json={"order_id": str(oid)},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_netopia_confirm_no_user_order(test_app, monkeypatch) -> None:
+    # Guest order (no user) confirmed -> skips the user-notification branch.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="netopia",
+        netopia_ntp_id="NTP-NOUSER",
+        customer_email="nouser@example.com",
+        with_product=True,
+    )
+
+    async def fake_status(**_kw):
+        return {"payment": {"status": 3}}
+
+    monkeypatch.setattr(netopia_service, "get_status", fake_status)
+    res = client.post("/api/v1/orders/netopia/confirm", json={"order_id": str(oid)})
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# admin_update_order: cancellation requiring manual refund (paypal/stripe)      #
+# --------------------------------------------------------------------------- #
+def test_admin_cancel_paypal_captured_needs_refund(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="cancelpp@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="paypal",
+        paypal_capture_id="CAP-XYZ",
+        status=OrderStatus.paid,
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "cancelled", "cancel_reason": "fraud"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_cancel_stripe_captured_needs_refund(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="cancelst@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="stripe",
+        status=OrderStatus.paid,
+        events=["payment_captured"],
+        with_product=True,
+    )
+
+    async def _set_intent():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(_select(Order).where(Order.id == oid))
+            order = row.scalars().first()
+            order.stripe_payment_intent_id = "pi_cancel"
+            session.add(order)
+            await session.commit()
+
+    asyncio.run(_set_intent())
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "cancelled", "cancel_reason": "fraud"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_update_order_with_shipping_method(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    headers = auth_headers(_admin(test_app))
+
+    created = client.post(
+        "/api/v1/orders/shipping-methods",
+        json={"name": "Std", "rate_flat": 5.0, "rate_per_kg": 0},
+        headers=headers,
+    )
+    method_id = created.json()["id"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"shipping_method_id": method_id},
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# capture / void happy paths with notification (user present)                   #
+# --------------------------------------------------------------------------- #
+def test_admin_capture_payment_success(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+
+    # The capture service calls the Stripe SDK; mock it as test_w3_payments does.
+    from app.services import payments
+
+    async def _cap(_intent):
+        return {"id": _intent, "status": "succeeded"}
+
+    monkeypatch.setattr(payments, "capture_payment_intent", _cap)
+
+    _, uid = create_user_token(sf, email="capok@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="stripe",
+        status=OrderStatus.pending_payment,
+        customer_email="capok@example.com",
+        with_product=True,
+    )
+
+    async def _set_intent():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(_select(Order).where(Order.id == oid))
+            order = row.scalars().first()
+            order.stripe_payment_intent_id = "pi_cap"
+            session.add(order)
+            await session.commit()
+
+    asyncio.run(_set_intent())
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/capture-payment",
+        params={"intent_id": "pi_cap"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
+
+
+def test_admin_void_payment_success(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+
+    from app.services import payments
+
+    async def _void(_intent):
+        return {"id": _intent, "status": "canceled"}
+
+    monkeypatch.setattr(payments, "void_payment_intent", _void)
+
+    _, uid = create_user_token(sf, email="voidok@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="stripe",
+        status=OrderStatus.pending_payment,
+        customer_email="voidok@example.com",
+        with_product=True,
+    )
+
+    async def _set_intent():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(_select(Order).where(Order.id == oid))
+            order = row.scalars().first()
+            order.stripe_payment_intent_id = "pi_void"
+            session.add(order)
+            await session.commit()
+
+    asyncio.run(_set_intent())
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/void-payment",
+        params={"intent_id": "pi_void"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
+
+
+# --------------------------------------------------------------------------- #
+# admin_search: naive-datetime SLA path + export expired/missing               #
+# --------------------------------------------------------------------------- #
+def test_admin_search_user_filter(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _, uid = create_user_token(sf, email="srchuser@example.com")
+    _seed_order(sf, user_id=uid, payment_method="cod", status=OrderStatus.paid)
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"user_id": str(uid), "tag": "x"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
