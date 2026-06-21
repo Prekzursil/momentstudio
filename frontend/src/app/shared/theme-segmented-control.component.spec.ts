@@ -101,4 +101,112 @@ describe('ThemeSegmentedControlComponent', () => {
     expect(emitted).toEqual(['system', 'dark']);
     expect(document.activeElement).toBe(buttons[2]);
   });
+
+  it('ArrowLeft wraps from the first option to the last', () => {
+    const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
+    const cmp = fixture.componentInstance;
+    cmp.preference = 'system';
+    fixture.detectChanges();
+    const emitted: string[] = [];
+    cmp.preferenceChange.subscribe((v) => emitted.push(v));
+
+    const buttons = getButtons(fixture);
+    buttons[0].dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }),
+    );
+    expect(emitted).toEqual(['dark']);
+  });
+
+  it('ArrowLeft from a middle option moves to the previous option', () => {
+    const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
+    const cmp = fixture.componentInstance;
+    cmp.preference = 'light';
+    fixture.detectChanges();
+    const emitted: string[] = [];
+    cmp.preferenceChange.subscribe((v) => emitted.push(v));
+
+    const buttons = getButtons(fixture);
+    buttons[1].dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }),
+    );
+    expect(emitted).toEqual(['system']);
+  });
+
+  it('uses the small stacked icon box', () => {
+    const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
+    const cmp = fixture.componentInstance;
+    cmp.layout = 'stacked';
+    cmp.size = 'sm';
+    expect(cmp.iconBoxClass()).toBe('h-7 w-7');
+  });
+
+  it('Enter and Space select the focused option without moving focus', () => {
+    const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
+    const cmp = fixture.componentInstance;
+    cmp.preference = 'system';
+    fixture.detectChanges();
+    const emitted: string[] = [];
+    cmp.preferenceChange.subscribe((v) => emitted.push(v));
+
+    cmp.onKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }), 1);
+    cmp.onKeyDown(new KeyboardEvent('keydown', { key: ' ' }), 2);
+    expect(emitted).toEqual(['light', 'dark']);
+  });
+
+  it('ignores keys outside the navigation set', () => {
+    const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
+    const cmp = fixture.componentInstance;
+    const emitted: string[] = [];
+    cmp.preferenceChange.subscribe((v) => emitted.push(v));
+    cmp.onKeyDown(new KeyboardEvent('keydown', { key: 'Tab' }), 0);
+    expect(emitted).toEqual([]);
+  });
+
+  it('focusOption is a no-op when there is no radiogroup container', () => {
+    const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
+    const cmp = fixture.componentInstance;
+    const orphan = document.createElement('button');
+    const event = new KeyboardEvent('keydown', { key: 'ArrowRight' });
+    Object.defineProperty(event, 'currentTarget', { value: orphan });
+    expect(() => cmp.onKeyDown(event, 0)).not.toThrow();
+  });
+
+  it('builds class variants across all input combinations', () => {
+    const fixture = TestBed.createComponent(ThemeSegmentedControlComponent);
+    const cmp = fixture.componentInstance;
+
+    cmp.stretch = true;
+    cmp.variant = 'embedded';
+    cmp.size = 'lg';
+    cmp.layout = 'stacked';
+    cmp.showLabels = true;
+    let root = cmp.rootClass();
+    expect(root).toContain('flex');
+    expect(root).toContain('w-full');
+    expect(root).toContain('gap-1');
+    expect(cmp.buttonNgClass('system')).toContain('flex-1');
+    expect(cmp.buttonNgClass('system')).toContain('flex-col');
+    expect(cmp.iconBoxClass()).toBe('h-8 w-8');
+    expect(cmp.labelClass()).toContain('pb-0.5');
+    expect(cmp.buttonClass('system')).toContain('min-h-10');
+
+    cmp.stretch = false;
+    cmp.variant = 'standalone';
+    cmp.size = 'sm';
+    cmp.layout = 'horizontal';
+    cmp.showLabels = true;
+    root = cmp.rootClass();
+    expect(root).toContain('inline-flex');
+    expect(root).toContain('border');
+    expect(root).toContain('gap-0.5');
+    expect(cmp.buttonNgClass('light')).toContain('gap-2');
+    expect(cmp.iconBoxClass()).toBe('h-8 w-8');
+    expect(cmp.labelClass()).toContain('pl-0');
+    cmp.size = 'lg';
+    expect(cmp.iconBoxClass()).toBe('h-9 w-9');
+    expect(cmp.labelClass()).toContain('pl-0.5');
+
+    cmp.showLabels = false;
+    expect(cmp.buttonNgClass('dark')).not.toContain('gap-2');
+  });
 });
