@@ -4391,3 +4391,212 @@ def test_admin_send_emails_with_note(test_app, monkeypatch) -> None:
         headers=headers,
     )
     assert ce.status_code == 200, ce.text
+
+
+# --------------------------------------------------------------------------- #
+# Final tail: admin-recipient confirms, export expiry/missing, resume-stale,    #
+# revoke guards, cancel-with-owner, label print, checkout stale pointer.        #
+# --------------------------------------------------------------------------- #
+def _with_admin_email(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "admin_alert_email", "ops@example.com", raising=False)
+
+
+def test_stripe_confirm_with_admin_recipient(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _with_admin_email(monkeypatch)
+    token, uid = create_user_token(sf, email="sadm@example.com")
+    _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="stripe",
+        stripe_session_id="cs_adm",
+        customer_email="sadm@example.com",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/stripe/confirm",
+        json={"session_id": "cs_adm", "mock": "success"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_netopia_confirm_with_admin_recipient(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _with_admin_email(monkeypatch)
+    token, uid = create_user_token(sf, email="nadm@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="netopia",
+        netopia_ntp_id="NTP-ADM",
+        customer_email="nadm@example.com",
+        with_product=True,
+    )
+
+    async def fake_status(**_kw):
+        return {"payment": {"status": 3}}
+
+    monkeypatch.setattr(netopia_service, "get_status", fake_status)
+    res = client.post(
+        "/api/v1/orders/netopia/confirm",
+        json={"order_id": str(oid)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_update_paid_with_admin_email(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _with_admin_email(monkeypatch)
+    _, uid = create_user_token(sf, email="updadm@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.pending_acceptance,
+        customer_email="updadm@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "paid"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_export_download_file_missing(test_app, monkeypatch, tmp_path) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    ps = client.get(f"/api/v1/orders/admin/{oid}/packing-slip", headers=headers)
+    assert ps.status_code == 200
+    listing = client.get("/api/v1/orders/admin/exports", headers=headers)
+    export_id = listing.json()["items"][0]["id"]
+
+    from uuid import UUID
+
+    async def _clear_and_break():
+        from sqlalchemy.future import select as _select
+
+        from app.models.order_document_export import OrderDocumentExport
+
+        async with sf() as session:
+            row = await session.execute(
+                _select(OrderDocumentExport).where(
+                    OrderDocumentExport.id == UUID(export_id)
+                )
+            )
+            exp = row.scalars().first()
+            exp.expires_at = None
+            exp.file_path = "exports/does-not-exist.pdf"
+            session.add(exp)
+            await session.commit()
+
+    asyncio.run(_clear_and_break())
+    dl = client.get(
+        f"/api/v1/orders/admin/exports/{export_id}/download", headers=headers
+    )
+    assert dl.status_code == 404
+
+
+def test_revoke_share_not_found_and_forbidden(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="rvnf@example.com")
+    nf = client.post(
+        f"/api/v1/orders/{_NIL}/receipt/revoke", headers=auth_headers(token)
+    )
+    assert nf.status_code == 404
+
+    _, other_uid = create_user_token(sf, email="rvowner@example.com")
+    oid = _seed_order(sf, user_id=other_uid, payment_method="cod")
+    forbidden = client.post(
+        f"/api/v1/orders/{oid}/receipt/revoke", headers=auth_headers(token)
+    )
+    assert forbidden.status_code == 403
+
+
+def test_cancel_request_with_owner(test_app, monkeypatch) -> None:
+    # Seed an owner user so the owner-notification branch (and admin email) runs.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+
+    async def _make_owner():
+        from sqlalchemy.future import select as _select
+
+        from app.models.user import User as _User, UserRole as _Role
+
+        async with sf() as session:
+            row = await session.execute(
+                _select(_User).where(_User.email == "ownerx@example.com")
+            )
+            owner = row.scalars().first()
+            owner.role = _Role.owner
+            session.add(owner)
+            await session.commit()
+
+    create_user_token(sf, email="ownerx@example.com")
+    asyncio.run(_make_owner())
+
+    token, uid = create_user_token(sf, email="crowner@example.com")
+    oid = _seed_order(
+        sf, user_id=uid, payment_method="cod", status=OrderStatus.pending_acceptance
+    )
+    res = client.post(
+        f"/api/v1/orders/{oid}/cancel-request",
+        json={"reason": "please cancel"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_shipping_label_print_action(test_app, monkeypatch, tmp_path) -> None:
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    up = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        files={"file": ("lab.pdf", b"%PDF-1.4 mini", "application/pdf")},
+        headers=headers,
+    )
+    assert up.status_code == 200, up.text
+    # action=print -> "shipping_label_printed" event branch.
+    pr = client.get(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        params={"action": "print"},
+        headers=headers,
+    )
+    assert pr.status_code == 200
+
+
+def test_shipping_label_upload_replaces_old(test_app, monkeypatch, tmp_path) -> None:
+    # Second upload triggers the old-file cleanup branch.
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    first = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        files={"file": ("a.pdf", b"%PDF-1.4 a", "application/pdf")},
+        headers=headers,
+    )
+    assert first.status_code == 200, first.text
+    second = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        files={"file": ("b.pdf", b"%PDF-1.4 b", "application/pdf")},
+        headers=headers,
+    )
+    assert second.status_code == 200, second.text
