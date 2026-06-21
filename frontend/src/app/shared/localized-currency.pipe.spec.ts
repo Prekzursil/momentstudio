@@ -5,9 +5,15 @@ import { FxRatesService } from '../core/fx-rates.service';
 import { LocalizedCurrencyPipe } from './localized-currency.pipe';
 
 class FxRatesServiceStub {
+  snap: { base: string; eurPerRon: number; usdPerRon: number; loaded: boolean } = {
+    base: 'RON',
+    eurPerRon: 0.2,
+    usdPerRon: 0.22,
+    loaded: true,
+  };
   ensureLoaded(): void {}
   get snapshot() {
-    return { base: 'RON', eurPerRon: 0.2, usdPerRon: 0.22, loaded: true };
+    return this.snap;
   }
 }
 
@@ -53,5 +59,109 @@ describe('LocalizedCurrencyPipe', () => {
     );
     expect(result).toContain('$');
     expect(result).not.toContain('≈');
+  });
+
+  it('derives the locale from the Romanian current language', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('ro');
+    const result = TestBed.runInInjectionContext(() =>
+      // No explicit locale -> falls back to fromLang ('ro-RO'), which renders
+      // EUR with the currency code rather than the € glyph.
+      new LocalizedCurrencyPipe().transform(100, 'EUR'),
+    );
+    expect(result).toMatch(/EUR|€/);
+  });
+
+  it('falls back to navigator.language when there is no language or locale', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('de'); // neither en nor ro -> fromLang undefined
+    const result = TestBed.runInInjectionContext(() =>
+      new LocalizedCurrencyPipe().transform(100, 'USD'),
+    );
+    expect(result).toContain('$');
+  });
+
+  it('uses the navigator fallback when navigator is unavailable', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('de');
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'navigator');
+    Object.defineProperty(window, 'navigator', { value: undefined, configurable: true });
+    try {
+      const result = TestBed.runInInjectionContext(() =>
+        new LocalizedCurrencyPipe().transform(100, 'USD'),
+      );
+      expect(result).toContain('$');
+    } finally {
+      if (descriptor) Object.defineProperty(window, 'navigator', descriptor);
+    }
+  });
+
+  it('skips approximation when rates are not loaded', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('en');
+    const fx = TestBed.inject(FxRatesService) as unknown as FxRatesServiceStub;
+    fx.snap = { base: 'RON', eurPerRon: 0.2, usdPerRon: 0.22, loaded: false };
+    const result = TestBed.runInInjectionContext(() =>
+      new LocalizedCurrencyPipe().transform(100, 'RON', 'en-US'),
+    );
+    expect(result).not.toContain('≈');
+  });
+
+  it('skips approximation when a rate is non-positive', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('en');
+    const fx = TestBed.inject(FxRatesService) as unknown as FxRatesServiceStub;
+    fx.snap = { base: 'RON', eurPerRon: 0, usdPerRon: 0.22, loaded: true };
+    const result = TestBed.runInInjectionContext(() =>
+      new LocalizedCurrencyPipe().transform(100, 'RON', 'en-US'),
+    );
+    expect(result).not.toContain('≈');
+  });
+
+  it('uppercases a lowercase RON currency code', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('ro');
+    const result = TestBed.runInInjectionContext(() =>
+      new LocalizedCurrencyPipe().transform(100, 'ron', 'ro-RO'),
+    );
+    expect(result).toContain('RON');
+  });
+
+  it('derives en-US locale from the English current language when no locale is passed', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('en');
+    const result = TestBed.runInInjectionContext(() =>
+      // No explicit locale -> fromLang resolves to 'en-US'.
+      new LocalizedCurrencyPipe().transform(100, 'USD'),
+    );
+    expect(result).toContain('$');
+  });
+
+  it('reuses a cached Intl formatter for repeat calls', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('de');
+    const pipe = TestBed.runInInjectionContext(() => new LocalizedCurrencyPipe());
+    const first = pipe.transform(100, 'USD', 'en-US');
+    const second = pipe.transform(200, 'USD', 'en-US');
+    expect(first).toContain('$');
+    expect(second).toContain('$');
+  });
+
+  describe('without a TranslateService', () => {
+    beforeEach(() => {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [{ provide: FxRatesService, useClass: FxRatesServiceStub }],
+      });
+    });
+
+    it('falls back to the default locale and skips approximation', () => {
+      const result = TestBed.runInInjectionContext(() =>
+        new LocalizedCurrencyPipe().transform(100, 'RON', 'en-US'),
+      );
+      // No translate service -> currentLang is undefined -> no EN approximation.
+      expect(result).toContain('RON');
+      expect(result).not.toContain('≈');
+    });
   });
 });

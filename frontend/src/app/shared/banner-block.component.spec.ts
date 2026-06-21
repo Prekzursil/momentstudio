@@ -98,6 +98,12 @@ describe('BannerBlockComponent', () => {
       expect(component.optimizedSrcset('avif')).toBe('');
     });
 
+    it('returns false when there is no image url (normalizeAssetUrl empty path)', () => {
+      // An empty image url exercises the `url || ''` fallback in normalizeAssetUrl.
+      component.slide = makeSlide({ image_url: '' });
+      expect(component.useOptimizedAsset()).toBe(false);
+    });
+
     it('builds srcsets including the jpeg fallback at 1280', () => {
       component.slide = makeSlide({ image_url: 'assets/home/banner_image.jpeg' });
       const jpg = component.optimizedSrcset('jpg');

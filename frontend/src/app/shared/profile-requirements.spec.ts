@@ -42,4 +42,22 @@ describe('profile requirements', () => {
       'phone',
     ]);
   });
+
+  it('reports a missing username and last name', () => {
+    const user = {
+      name: 'Ana',
+      username: '   ',
+      first_name: 'Ana',
+      last_name: '',
+      date_of_birth: '2000-01-01',
+      phone: '+40723204204',
+    };
+    expect(missingRequiredProfileFields(user)).toEqual(['username', 'last_name']);
+    expect(isProfileComplete(user)).toBeFalse();
+  });
+
+  it('handles a non-string value via the cleaned() fallback', () => {
+    const user = { name: 123 as never };
+    expect(missingRequiredProfileFields(user)).toContain('name');
+  });
 });
