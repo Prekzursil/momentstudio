@@ -185,6 +185,46 @@ def test_channel_attribution_full_path(
     assert out["coverage_pct"] is not None
 
 
+def test_channel_attribution_zero_total_orders(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """order_to_session non-empty but total_orders == 0 -> coverage_pct stays
+    None (1969->1972 false arc)."""
+    oid = uuid4()
+
+    async def _scenario(session) -> Any:
+        admin = await _admin(session)
+
+        async def _scalar(*args, **kwargs):
+            return 0  # total_orders falsy
+
+        state = {"n": 0}
+
+        async def _execute(*args, **kwargs):
+            state["n"] += 1
+            if state["n"] == 1:
+                return _RowsResult([("sess-a", oid)])
+            if state["n"] == 2:
+                return _RowsResult([(oid, Decimal("50.00"))])
+            return _RowsResult(
+                [("sess-a", {"utm_source": "g"}, datetime.now(timezone.utc))]
+            )
+
+        monkeypatch.setattr(session, "scalar", _scalar)
+        monkeypatch.setattr(session, "execute", _execute)
+        return await ad.admin_channel_attribution(
+            session=session,
+            _=admin,
+            range_days=30,
+            range_from=None,
+            range_to=None,
+            limit=12,
+        )
+
+    out = run(session_factory, _scenario)
+    assert out["coverage_pct"] is None
+
+
 def test_channel_attribution_range_validation(
     session_factory: async_sessionmaker,
 ) -> None:
@@ -205,6 +245,51 @@ def test_channel_attribution_range_validation(
             )
 
     run(session_factory, _scenario)
+
+
+# --------------------------------------------------------------------------- #
+# admin_summary: nonzero previous-window failed payments -> delta_pct (650)   #
+# --------------------------------------------------------------------------- #
+def test_admin_summary_failed_payments_delta(
+    session_factory: async_sessionmaker,
+) -> None:
+    from datetime import timedelta
+
+    from app.models.order import Order, OrderStatus
+
+    async def _scenario(session) -> Any:
+        admin = await _admin(session)
+        now = datetime.now(timezone.utc)
+        # pending_payment order in the previous 24h window (now-48h..now-24h)
+        # makes failed_payments_prev > 0 so _delta_pct computes (line 650).
+        session.add(
+            Order(
+                id=uuid4(),
+                customer_email="fp@x.com",
+                customer_name="FP",
+                total_amount=Decimal("10.00"),
+                status=OrderStatus.pending_payment,
+                created_at=now - timedelta(hours=36),
+            )
+        )
+        # A current-window pending_payment order too, so the delta is nonzero.
+        session.add(
+            Order(
+                id=uuid4(),
+                customer_email="fp2@x.com",
+                customer_name="FP2",
+                total_amount=Decimal("10.00"),
+                status=OrderStatus.pending_payment,
+                created_at=now - timedelta(hours=2),
+            )
+        )
+        await session.commit()
+        return await ad.admin_summary(
+            session=session, _=admin, range_days=30, range_from=None, range_to=None
+        )
+
+    out = run(session_factory, _scenario)
+    assert isinstance(out, dict)
 
 
 # --------------------------------------------------------------------------- #
