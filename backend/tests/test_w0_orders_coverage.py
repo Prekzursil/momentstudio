@@ -183,6 +183,102 @@ def _silence_email(monkeypatch) -> None:
     monkeypatch.setattr(email_service, "send_new_order_notification", _ok)
 
 
+def _seed_cart(
+    session_factory,
+    *,
+    user_id=None,
+    session_id=None,
+    guest_email=None,
+    guest_verified=False,
+):
+    from datetime import datetime, timezone
+
+    from app.models.cart import Cart, CartItem
+
+    async def _seed():
+        async with session_factory() as session:
+            category = Category(slug="ck", name="CK")
+            product = Product(
+                category=category,
+                slug="ck-prod",
+                sku="CK-PROD",
+                name="Checkout Product",
+                base_price=Decimal("20.00"),
+                currency="RON",
+                stock_quantity=10,
+                status=ProductStatus.published,
+            )
+            cart = Cart(user_id=user_id, session_id=session_id)
+            if guest_email:
+                cart.guest_email = guest_email
+                if guest_verified:
+                    cart.guest_email_verified_at = datetime.now(timezone.utc)
+            cart.items = [
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("20.00")
+                )
+            ]
+            session.add(cart)
+            await session.commit()
+            await session.refresh(cart)
+            return cart.id
+
+    return asyncio.run(_seed())
+
+
+def _seed_legal(session_factory) -> None:
+    from datetime import datetime, timezone
+
+    from app.models.content import ContentBlock, ContentStatus
+
+    async def _seed():
+        async with session_factory() as session:
+            session.add_all(
+                [
+                    ContentBlock(
+                        key="page.terms-and-conditions",
+                        title="Terms",
+                        body_markdown="Terms",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+                    ),
+                    ContentBlock(
+                        key="page.privacy-policy",
+                        title="Privacy",
+                        body_markdown="Privacy",
+                        status=ContentStatus.published,
+                        version=1,
+                        published_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+                    ),
+                ]
+            )
+            await session.commit()
+
+    asyncio.run(_seed())
+
+
+def _seed_address(session_factory, user_id):
+    from app.models.address import Address
+
+    async def _seed():
+        async with session_factory() as session:
+            addr = Address(
+                user_id=user_id,
+                label="Home",
+                line1="1 Main",
+                city="Bucharest",
+                country="RO",
+                postal_code="010101",
+            )
+            session.add(addr)
+            await session.commit()
+            await session.refresh(addr)
+            return addr.id
+
+    return asyncio.run(_seed())
+
+
 # --------------------------------------------------------------------------- #
 # Pure helpers (no HTTP)                                                       #
 # --------------------------------------------------------------------------- #
@@ -822,3 +918,484 @@ def test_netopia_confirm_success(test_app, monkeypatch) -> None:
     )
     assert res.status_code == 200, res.text
     assert res.json()["status"] == "pending_acceptance"
+
+
+# --------------------------------------------------------------------------- #
+# Admin: list / search / tags / export                                        #
+# --------------------------------------------------------------------------- #
+def _admin(test_app):
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="adm0@example.com", admin=True)
+    return token
+
+
+def test_admin_list_orders(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_order(sf, payment_method="stripe", status=OrderStatus.paid)
+    res = client.get("/api/v1/orders/admin", headers=auth_headers(_admin(test_app)))
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
+
+
+def test_admin_search_status_pending(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_order(sf, payment_method="stripe", status=OrderStatus.pending_payment)
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"status": "pending"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_search_status_sales(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"status": "sales"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_search_status_specific(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"status": "paid"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_search_status_invalid(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"status": "not-a-status"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid order status"
+
+
+@pytest.mark.parametrize(
+    "sla,parsed",
+    [
+        ("accept_overdue", True),
+        ("ship_overdue", True),
+        ("any_overdue", True),
+    ],
+)
+def test_admin_search_sla_valid(test_app, sla, parsed) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"sla": sla},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_search_sla_invalid(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"sla": "bogus"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid SLA filter"
+
+
+@pytest.mark.parametrize("fraud", ["queue", "flagged", "approved", "denied"])
+def test_admin_search_fraud_valid(test_app, fraud) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"fraud": fraud},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_search_fraud_invalid(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"fraud": "bogus"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid fraud filter"
+
+
+def test_admin_search_include_pii(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_order(sf, payment_method="stripe", status=OrderStatus.paid)
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"include_pii": "true"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_list_tags_and_stats(test_app) -> None:
+    client = test_app["client"]
+    token = _admin(test_app)
+    r1 = client.get("/api/v1/orders/admin/tags", headers=auth_headers(token))
+    r2 = client.get("/api/v1/orders/admin/tags/stats", headers=auth_headers(token))
+    assert r1.status_code == 200 and r2.status_code == 200
+
+
+def test_admin_rename_tag_not_found(test_app) -> None:
+    client = test_app["client"]
+    # No such tag -> service raises 404; the endpoint line is still exercised.
+    res = client.post(
+        "/api/v1/orders/admin/tags/rename",
+        json={"from_tag": "old", "to_tag": "new"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+
+
+def test_admin_export_default_columns(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_order(sf, payment_method="stripe", status=OrderStatus.paid)
+    res = client.get(
+        "/api/v1/orders/admin/export", headers=auth_headers(_admin(test_app))
+    )
+    assert res.status_code == 200
+    assert "id" in res.text
+
+
+def test_admin_export_with_pii_and_columns(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_order(sf, payment_method="stripe", status=OrderStatus.paid)
+    res = client.get(
+        "/api/v1/orders/admin/export",
+        params={"include_pii": "true", "columns": "id,customer_email,locker_address"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200
+
+
+def test_admin_export_masked_columns(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_order(sf, payment_method="stripe", status=OrderStatus.paid)
+    res = client.get(
+        "/api/v1/orders/admin/export",
+        params={
+            "columns": [
+                "customer_email",
+                "customer_name",
+                "invoice_company",
+                "invoice_vat_id",
+                "locker_address",
+            ]
+        },
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200
+
+
+def test_admin_export_invalid_columns(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/export",
+        params={"columns": "id,nope"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 400
+    assert "Invalid export columns" in res.json()["detail"]
+
+
+def test_admin_get_order_not_found(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/00000000-0000-0000-0000-000000000000",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+
+
+def test_admin_get_order_ok(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    oid = _seed_order(sf, payment_method="stripe", with_product=True)
+    res = client.get(
+        f"/api/v1/orders/admin/{oid}", headers=auth_headers(_admin(test_app))
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_order_events(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    oid = _seed_order(sf, payment_method="stripe", events=["created", "note"])
+    res = client.get(
+        f"/api/v1/orders/admin/{oid}/events", headers=auth_headers(_admin(test_app))
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_list_my_orders_invalid_date_range(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="me0@example.com")
+    res = client.get(
+        "/api/v1/orders/me",
+        params={"from": "2026-02-01", "to": "2026-01-01"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid date range"
+
+
+# --------------------------------------------------------------------------- #
+# create_order (POST "")                                                       #
+# --------------------------------------------------------------------------- #
+def test_create_order_empty_cart(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="co_empty@example.com")
+    res = client.post("/api/v1/orders", json={}, headers=auth_headers(token))
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Cart is empty"
+
+
+def test_create_order_invalid_address(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="co_addr@example.com")
+    _seed_cart(sf, user_id=uid)
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_address_id": "00000000-0000-0000-0000-000000000000"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid address"
+
+
+def test_create_order_shipping_method_not_found(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="co_sm@example.com")
+    _seed_cart(sf, user_id=uid)
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_method_id": "00000000-0000-0000-0000-000000000000"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Shipping method not found"
+
+
+def test_create_order_success_cod(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="co_ok@example.com")
+    _seed_cart(sf, user_id=uid)
+    addr_id = _seed_address(sf, uid)
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_address_id": str(addr_id)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_create_order_idempotent_existing(test_app, monkeypatch) -> None:
+    """Second call returns the existing order via cart.last_order_id (200)."""
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="co_idem@example.com")
+    _seed_cart(sf, user_id=uid)
+    addr_id = _seed_address(sf, uid)
+    first = client.post(
+        "/api/v1/orders",
+        json={"shipping_address_id": str(addr_id)},
+        headers=auth_headers(token),
+    )
+    assert first.status_code == 201, first.text
+    second = client.post(
+        "/api/v1/orders",
+        json={"shipping_address_id": str(addr_id)},
+        headers=auth_headers(token),
+    )
+    assert second.status_code == 200, second.text
+
+
+# --------------------------------------------------------------------------- #
+# checkout (POST /checkout) - authenticated                                    #
+# --------------------------------------------------------------------------- #
+def _checkout_payload(**over):
+    base = {
+        "line1": "1 Main",
+        "city": "Bucharest",
+        "postal_code": "010101",
+        "country": "RO",
+        "payment_method": "cod",
+        "accept_terms": True,
+        "accept_privacy": True,
+        "save_address": False,
+    }
+    base.update(over)
+    return base
+
+
+def test_checkout_empty_cart(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    token, _ = create_user_token(sf, email="ck_empty@example.com")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(),
+        headers={**auth_headers(token), "X-Session-Id": "ck-empty"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Cart is empty"
+
+
+def test_checkout_success_cod(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ck_ok@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-ok")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-ok"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["payment_method"] == "cod"
+
+
+def test_checkout_with_billing_address(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ck_bill@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-bill")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            phone="+40712345678",
+            billing_line1="9 Bill St",
+            billing_city="Cluj",
+            billing_postal_code="400000",
+            billing_country="RO",
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-bill"},
+    )
+    assert res.status_code == 201, res.text
+
+
+# --------------------------------------------------------------------------- #
+# guest_checkout (POST /guest-checkout)                                        #
+# --------------------------------------------------------------------------- #
+def _guest_payload(email, **over):
+    base = {
+        "name": "Guest Buyer",
+        "email": email,
+        "line1": "1 Main",
+        "city": "Bucharest",
+        "postal_code": "010101",
+        "country": "RO",
+        "payment_method": "cod",
+        "accept_terms": True,
+        "accept_privacy": True,
+    }
+    base.update(over)
+    return base
+
+
+def test_guest_checkout_missing_session(test_app) -> None:
+    client = test_app["client"]
+    res = client.post(
+        "/api/v1/orders/guest-checkout", json=_guest_payload("g@example.com")
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Missing guest session id"
+
+
+def test_guest_checkout_empty_cart(test_app) -> None:
+    client = test_app["client"]
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload("g2@example.com"),
+        headers={"X-Session-Id": "guest-empty"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Cart is empty"
+
+
+def test_guest_checkout_email_not_verified(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_cart(
+        sf, session_id="guest-unv", guest_email="g3@example.com", guest_verified=False
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload("g3@example.com"),
+        headers={"X-Session-Id": "guest-unv"},
+    )
+    assert res.status_code == 403
+    assert res.json()["detail"] == "Email verification required"
+
+
+def test_guest_checkout_email_taken(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    create_user_token(sf, email="taken@example.com")
+    _seed_cart(
+        sf,
+        session_id="guest-taken",
+        guest_email="taken@example.com",
+        guest_verified=True,
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload("taken@example.com"),
+        headers={"X-Session-Id": "guest-taken"},
+    )
+    assert res.status_code == 400
+    assert "already registered" in res.json()["detail"]
+
+
+def test_guest_checkout_success_cod(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf,
+        session_id="guest-ok",
+        guest_email="gok@example.com",
+        guest_verified=True,
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload("gok@example.com", phone="+40712345678"),
+        headers={"X-Session-Id": "guest-ok"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["payment_method"] == "cod"
