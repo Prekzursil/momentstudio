@@ -720,9 +720,7 @@ async def checkout(
             )
         # Stale pointer; clear it to allow checkout to proceed.
         cart_row = await session.get(Cart, user_cart.id)
-        if (
-            cart_row
-        ):  # pragma: no cover -- defensive; user_cart was just loaded so re-getting it by the same id within this transaction always returns the row
+        if cart_row:  # pragma: no cover -- defensive; user_cart was just loaded so re-getting it by the same id within this transaction always returns the row
             cart_row.last_order_id = None
             session.add(cart_row)
 
@@ -1562,9 +1560,7 @@ async def confirm_netopia_payment(
         session, order=order, note=f"Netopia {ntp_id}".strip()
     )
 
-    if (
-        captured_added
-    ):  # pragma: no cover -- always True here; captured_added is set unconditionally above (the already-captured case returns early), so the False branch is unreachable
+    if captured_added:  # pragma: no cover -- always True here; captured_added is set unconditionally above (the already-captured case returns early), so the False branch is unreachable
         checkout_settings = await checkout_settings_service.get_checkout_settings(
             session
         )
@@ -1780,9 +1776,7 @@ async def admin_search_orders(
     ship_hours = max(1, int(getattr(settings, "order_sla_ship_hours", 48) or 48))
 
     def _ensure_utc(dt: datetime | None) -> datetime | None:
-        if (
-            not dt
-        ):  # pragma: no cover -- sla_started_at comes from coalesce(MAX(event), Order.created_at) and created_at is NOT NULL, so dt is never falsy here
+        if not dt:  # pragma: no cover -- sla_started_at comes from coalesce(MAX(event), Order.created_at) and created_at is NOT NULL, so dt is never falsy here
             return None
         if dt.tzinfo is None:
             return dt.replace(tzinfo=timezone.utc)
@@ -2197,9 +2191,7 @@ async def admin_list_order_email_events(
         .order_by(EmailDeliveryEvent.created_at.desc())
         .limit(max(1, min(int(limit or 0), 200)))
     )
-    if (
-        ref_lower
-    ):  # pragma: no cover -- ref_lower is derived from `reference_code or str(order.id)`, and str(UUID) is never empty, so this is always truthy (the False side is unreachable)
+    if ref_lower:  # pragma: no cover -- ref_lower is derived from `reference_code or str(order.id)`, and str(UUID) is never empty, so this is always truthy (the False side is unreachable)
         stmt = stmt.where(func.lower(EmailDeliveryEvent.subject).like(f"%{ref_lower}%"))
 
     rows = (await session.execute(stmt)).scalars().all()
@@ -3026,9 +3018,7 @@ async def admin_update_order(
                 url=_account_orders_url(updated),
             )
     full = await order_service.get_order_by_id_admin(session, order_id)
-    if (
-        not full
-    ):  # pragma: no cover -- defensive; the order was just loaded + updated above, so the immediate re-fetch by the same id always returns it
+    if not full:  # pragma: no cover -- defensive; the order was just loaded + updated above, so the immediate re-fetch by the same id always returns it
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
         )
@@ -3248,9 +3238,7 @@ async def admin_upload_shipping_label(
         private_storage.delete_private_file(old_path)
 
     full = await order_service.get_order_by_id_admin(session, order_id)
-    if (
-        not full
-    ):  # pragma: no cover -- defensive; the order was just loaded + saved above, so the immediate re-fetch by the same id always returns it
+    if not full:  # pragma: no cover -- defensive; the order was just loaded + saved above, so the immediate re-fetch by the same id always returns it
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
         )
@@ -3706,9 +3694,7 @@ async def admin_fulfill_item(
         )
     await order_service.update_fulfillment(session, order, item_id, shipped_quantity)
     refreshed = await order_service.get_order_by_id_admin(session, order_id)
-    if (
-        not refreshed
-    ):  # pragma: no cover -- defensive; the order was just loaded + fulfilled above, so the immediate re-fetch by the same id always returns it
+    if not refreshed:  # pragma: no cover -- defensive; the order was just loaded + fulfilled above, so the immediate re-fetch by the same id always returns it
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
         )
@@ -3827,7 +3813,9 @@ async def admin_batch_pick_list_csv(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected"
         )
-    if len(ids) > 100:  # pragma: no cover -- unreachable; AdminOrderIdsRequest.order_ids has max_length=100 so >100 is rejected by schema validation (422) before this check
+    if (
+        len(ids) > 100
+    ):  # pragma: no cover -- unreachable; AdminOrderIdsRequest.order_ids has max_length=100 so >100 is rejected by schema validation (422) before this check
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected"
         )
@@ -3875,7 +3863,9 @@ async def admin_batch_pick_list_pdf(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="No orders selected"
         )
-    if len(ids) > 100:  # pragma: no cover -- unreachable; AdminOrderIdsRequest.order_ids has max_length=100 so >100 is rejected by schema validation (422) before this check
+    if (
+        len(ids) > 100
+    ):  # pragma: no cover -- unreachable; AdminOrderIdsRequest.order_ids has max_length=100 so >100 is rejected by schema validation (422) before this check
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Too many orders selected"
         )

@@ -333,7 +333,10 @@ def test_search_products_null_translation_row(
 
     async def _scenario(session) -> Any:
         admin = await _admin(session)
-        product = await _make_product(session, name="Widget", slug="widget")
+        # Side effect only: the product must exist so the first execute (the real
+        # product-list query) returns a non-empty product_ids set; the binding
+        # itself is unused (the second execute is monkeypatched below).
+        await _make_product(session, name="Widget", slug="widget")
 
         real_execute = session.execute
         state = {"n": 0}
