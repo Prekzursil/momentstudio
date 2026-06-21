@@ -203,11 +203,15 @@ def test_save_upload_mismatched_sniff(_media_root) -> None:
         storage.save_upload(up, allowed_content_types=("image/png",))
 
 
-def test_save_upload_bad_destination(_media_root) -> None:
+def test_save_upload_bad_destination(_media_root, tmp_path) -> None:
     up = _upload(_png_bytes(), filename="pic.png", content_type="image/png")
+    # A root that resolves OUTSIDE the media base is rejected. Use a creatable
+    # sibling dir (the media base is ``_media_root`` == tmp_path) so the guard is
+    # reached on every host; a non-creatable absolute like ``/totally`` raises an
+    # unrelated PermissionError at mkdir before the check (and fails as non-root).
+    outside = tmp_path.parent / "outside-media-root"
     with pytest.raises(HTTPException):
-        # A root outside the media base is rejected.
-        storage.save_upload(up, root="/totally/outside/root")
+        storage.save_upload(up, root=str(outside))
 
 
 def test_save_upload_with_explicit_filename(_media_root) -> None:
