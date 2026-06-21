@@ -145,6 +145,50 @@ def test_gdpr_export_jobs_aware_timestamps(
     assert out.items[0].finished_at is not None
 
 
+def test_gdpr_export_jobs_naive_timestamps(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Real seeded job with set started/finished/expires -> aiosqlite returns
+    naive datetimes, exercising the normalize branches (4003/4006/4009)."""
+    from app.models.user_export import UserDataExportJob
+
+    monkeypatch.setattr(ad.pii_service, "mask_email", lambda e: "m***@x.com")
+
+    async def _scenario(session) -> Any:
+        admin = await _admin(session)
+        target = await create_user(
+            session, UserCreate(email="jt@x.com", password="password123", name="JT")
+        )
+        await session.commit()
+        now = datetime.now(timezone.utc)
+        session.add(
+            UserDataExportJob(
+                id=uuid4(),
+                user_id=target.id,
+                status=UserDataExportStatus.succeeded,
+                progress=100,
+                started_at=now,
+                finished_at=now,
+                expires_at=now + timedelta(days=1),
+                file_path="e.json",
+            )
+        )
+        await session.commit()
+        return await ad.admin_gdpr_export_jobs(
+            request=_Req(),
+            q=None,
+            status_filter=None,
+            page=1,
+            limit=25,
+            include_pii=False,
+            session=session,
+            current_user=admin,
+        )
+
+    out = run(session_factory, _scenario)
+    assert out.items[0].started_at is not None
+
+
 # --------------------------------------------------------------------------- #
 # GDPR download: aware-expiry skip, file missing, user gone                   #
 # --------------------------------------------------------------------------- #
@@ -194,6 +238,40 @@ def test_gdpr_download_file_missing(
         assert "file not found" in exc.value.detail.lower()
 
     run(session_factory, _scenario)
+
+
+def test_gdpr_download_naive_expiry_success(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Naive future expiry -> exercises the 4157->4158 normalize branch."""
+    monkeypatch.setattr(ad.step_up_service, "require_step_up", lambda req, u: None)
+    _no_audit(monkeypatch)
+    f = tmp_path / "e.json"
+    f.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(ad.private_storage, "resolve_private_path", lambda p: f)
+
+    async def _scenario(session) -> Any:
+        admin = await _admin(session)
+        target = await create_user(
+            session, UserCreate(email="dl@x.com", password="password123", name="DL")
+        )
+        await session.commit()
+        # naive future expiry; aiosqlite returns it naive on reload
+        job = _seed_job(
+            session,
+            target.id,
+            finished_at=datetime.now(timezone.utc),
+            expires_at=(datetime.now(timezone.utc) + timedelta(days=1)).replace(
+                tzinfo=None
+            ),
+        )
+        await session.commit()
+        return await ad.admin_gdpr_download_export_job(
+            job_id=job.id, request=_Req(), session=session, current_user=admin
+        )
+
+    resp = run(session_factory, _scenario)
+    assert resp.media_type == "application/json"
 
 
 def test_gdpr_download_user_gone(
