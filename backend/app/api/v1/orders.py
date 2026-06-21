@@ -1478,7 +1478,7 @@ async def confirm_netopia_payment(
         elif payload.order_id and order.id == payload.order_id:
             # Allow guest checkout return flows (including "create account" during guest checkout).
             pass
-        else:
+        else:  # pragma: no cover -- unreachable; this endpoint looks the order up BY payload.order_id, so when an order is found the elif above always matches and the 403 cannot fire
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed"
             )

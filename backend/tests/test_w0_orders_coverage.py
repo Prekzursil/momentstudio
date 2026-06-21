@@ -4917,3 +4917,231 @@ def test_admin_create_refund_with_items(test_app, monkeypatch) -> None:
         headers=auth_headers(_admin(test_app)),
     )
     assert res.status_code in (200, 400), res.text
+
+
+# --------------------------------------------------------------------------- #
+# Coupon-applied checkout (covers the promo coupon-apply + reserve/redeem path) #
+# --------------------------------------------------------------------------- #
+def _seed_public_coupon(session_factory, code="SAVE10"):
+    from app.models.coupons_v2 import (
+        Coupon,
+        CouponVisibility,
+        Promotion,
+        PromotionDiscountType,
+    )
+
+    async def _seed():
+        async with session_factory() as session:
+            promo = Promotion(
+                name="Save 10",
+                description="Save 10",
+                discount_type=PromotionDiscountType.percent,
+                percentage_off=Decimal("10"),
+                allow_on_sale_items=True,
+                first_order_only=False,
+                is_active=True,
+                is_automatic=False,
+            )
+            session.add(promo)
+            await session.commit()
+            await session.refresh(promo)
+            coupon = Coupon(
+                promotion_id=promo.id,
+                code=code,
+                visibility=CouponVisibility.public,
+                is_active=True,
+            )
+            session.add(coupon)
+            await session.commit()
+
+    asyncio.run(_seed())
+
+
+def test_checkout_with_valid_coupon(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_public_coupon(sf, code="SAVE10")
+    token, uid = create_user_token(sf, email="ckcoupon@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-coupon")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod",
+            phone="+40712345678",
+            promo_code="SAVE10",
+            country="RO",
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-coupon"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_checkout_cod_with_admin_email(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "admin_alert_email", "ops@example.com", raising=False)
+    token, uid = create_user_token(sf, email="ckcodadm@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-codadm")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="cod", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-codadm"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_guest_checkout_paypal(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+
+    from app.services import paypal as paypal_service
+
+    async def _create(**_kw):
+        return "PP-G", "https://paypal.example/g"
+
+    monkeypatch.setattr(paypal_service, "create_order", _create)
+    _seed_cart(
+        sf, session_id="g-pp", guest_email="gpp@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gpp@example.com", payment_method="paypal", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-pp"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["paypal_order_id"] == "PP-G"
+
+
+def test_guest_checkout_name_whitespace(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf,
+        session_id="g-noname",
+        guest_email="gnoname@example.com",
+        guest_verified=True,
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gnoname@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            name="   ",
+        ),
+        headers={"X-Session-Id": "g-noname"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Name is required"
+
+
+def test_admin_shipping_label_upload_404(test_app) -> None:
+    client = test_app["client"]
+    res = client.post(
+        f"/api/v1/orders/admin/{_NIL}/shipping-label",
+        files={"file": ("x.pdf", b"%PDF-1.4", "application/pdf")},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+
+
+def test_admin_shipping_label_download_404(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        f"/api/v1/orders/admin/{_NIL}/shipping-label",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+
+
+def test_admin_shipping_label_upload_include_pii(
+    test_app, monkeypatch, tmp_path
+) -> None:
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        params={"include_pii": "true"},
+        files={"file": ("p.pdf", b"%PDF-1.4 mini", "application/pdf")},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_update_order_shipped_with_admin_email(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "admin_alert_email", "ops@example.com", raising=False)
+    _, uid = create_user_token(sf, email="shipadm@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.paid,
+        customer_email="shipadm@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "shipped"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_cancel_paypal_with_owner(test_app, monkeypatch) -> None:
+    # Cancel a paypal-captured order with an owner present -> refund-required
+    # notification to the owner (covers 2889 owner-notify branch).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+
+    async def _make_owner():
+        from sqlalchemy.future import select as _select
+
+        from app.models.user import User as _User, UserRole as _Role
+
+        async with sf() as session:
+            row = await session.execute(
+                _select(_User).where(_User.email == "ownerpp@example.com")
+            )
+            owner = row.scalars().first()
+            owner.role = _Role.owner
+            session.add(owner)
+            await session.commit()
+
+    create_user_token(sf, email="ownerpp@example.com")
+    asyncio.run(_make_owner())
+
+    _, uid = create_user_token(sf, email="cancelown@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="paypal",
+        paypal_capture_id="CAP-OWN",
+        status=OrderStatus.paid,
+        customer_email="cancelown@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "cancelled", "cancel_reason": "fraud"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
