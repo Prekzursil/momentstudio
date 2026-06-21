@@ -348,6 +348,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     const [y, m, d] = parts;
     const dt = new Date(Date.UTC(y, m - 1, d));
     const locale = this.translate.currentLang === 'ro' ? 'ro-RO' : 'en-US';
+    /* istanbul ignore next -- defensive: Intl.DateTimeFormat does not throw for a validated UTC date */
     try {
       return new Intl.DateTimeFormat(locale, {
         year: 'numeric',
@@ -415,6 +416,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         this.legalIndexDocs.set(rows);
         this.legalIndexLoading.set(false);
       },
+      /* istanbul ignore next -- unreachable: each forkJoin source has its own catchError(()=>of(null)) so the combined stream never errors */
       error: () => {
         this.legalIndexDocs.set([]);
         this.legalIndexLoading.set(false);
