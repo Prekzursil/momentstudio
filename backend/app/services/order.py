@@ -476,7 +476,7 @@ async def build_order_from_cart(
 
         for (product_id, variant_id), quantity in qty_by_key.items():
             product = products_by_id.get(product_id)
-            if not product:
+            if not product:  # pragma: no cover -- unreachable: product_ids and qty_by_key are built from the same cart-item loop, and the `missing` check above raises if any product is absent, so every qty_by_key product is present in products_by_id here
                 continue
             if bool(getattr(product, "allow_backorder", False)):
                 continue
@@ -2609,7 +2609,7 @@ async def create_order_refund(
     event_note = f"{amount_q} {order.currency} ({provider}{' ' + provider_refund_id if provider_refund_id else ''})"
     if prefix:
         event_note = f"{prefix}: {event_note}"
-    if note_clean:
+    if note_clean:  # pragma: no cover -- always truthy: an empty note raises at the `Refund note is required` guard above, so note_clean is never falsy here
         event_note = f"{event_note} - {note_clean}"
     session.add(
         OrderEvent(order_id=order.id, event="refund_partial", note=event_note[:2000])
