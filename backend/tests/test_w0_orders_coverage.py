@@ -2853,3 +2853,192 @@ def test_admin_search_user_filter(test_app) -> None:
         headers=auth_headers(_admin(test_app)),
     )
     assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# checkout / guest_checkout idempotent-resume blocks (existing last_order_id)   #
+# --------------------------------------------------------------------------- #
+def _seed_cart_with_existing_order(
+    session_factory,
+    *,
+    user_id=None,
+    session_id=None,
+    guest_email=None,
+    guest_verified=False,
+    payment_method="stripe",
+    netopia_ntp_id=None,
+    netopia_payment_url=None,
+    with_addresses=False,
+):
+    from datetime import datetime, timezone
+
+    from app.models.address import Address
+    from app.models.cart import Cart, CartItem
+
+    async def _seed():
+        async with session_factory() as session:
+            shipping_id = billing_id = None
+            if with_addresses:
+                ship = Address(
+                    user_id=user_id,
+                    label="Ship",
+                    line1="1 Main",
+                    city="Bucharest",
+                    country="RO",
+                    postal_code="010101",
+                    phone="+40712345678",
+                )
+                bill = Address(
+                    user_id=user_id,
+                    label="Bill",
+                    line1="2 Main",
+                    city="Bucharest",
+                    country="RO",
+                    postal_code="010102",
+                )
+                session.add_all([ship, bill])
+                await session.flush()
+                shipping_id, billing_id = ship.id, bill.id
+
+            order = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_payment,
+                reference_code=f"REF-EXIST-{_ref_counter[0]}",
+                customer_email=guest_email or "buyer0@example.com",
+                customer_name="Buyer Zero",
+                total_amount=Decimal("25.00"),
+                payment_method=payment_method,
+                currency="RON",
+                netopia_ntp_id=netopia_ntp_id,
+                netopia_payment_url=netopia_payment_url,
+                shipping_address_id=shipping_id,
+                billing_address_id=billing_id,
+            )
+            _ref_counter[0] += 1
+            session.add(order)
+            await session.flush()
+
+            category = Category(slug=f"ex-{order.id}", name="EX")
+            product = Product(
+                category=category,
+                slug=f"ex-prod-{order.id}",
+                sku=f"EX-{order.id}",
+                name="Ex Product",
+                base_price=Decimal("20.00"),
+                currency="RON",
+                stock_quantity=10,
+                status=ProductStatus.published,
+            )
+            cart = Cart(user_id=user_id, session_id=session_id, last_order_id=order.id)
+            if guest_email:
+                cart.guest_email = guest_email
+                if guest_verified:
+                    cart.guest_email_verified_at = datetime.now(timezone.utc)
+            cart.items = [
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("20.00")
+                )
+            ]
+            session.add(cart)
+            await session.commit()
+            return order.id
+
+    return asyncio.run(_seed())
+
+
+def test_checkout_resume_existing_order(test_app, monkeypatch) -> None:
+    # cart.last_order_id points to an existing stripe order -> returns it with 200.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="resume@example.com")
+    oid = _seed_cart_with_existing_order(
+        sf, user_id=uid, session_id="resume-1", payment_method="stripe"
+    )
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="stripe", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "resume-1"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["order_id"] == str(oid)
+
+
+def test_checkout_resume_netopia_reissue(test_app, monkeypatch) -> None:
+    # Existing netopia order with NO payment_url + netopia enabled -> re-issues
+    # the payment (covers the resume netopia block).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _enable_netopia(monkeypatch)
+    token, uid = create_user_token(sf, email="resume-net@example.com")
+    _seed_cart_with_existing_order(
+        sf,
+        user_id=uid,
+        session_id="resume-net",
+        payment_method="netopia",
+        netopia_payment_url=None,
+        with_addresses=True,
+    )
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="netopia", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "resume-net"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["netopia_payment_url"] == "https://netopia.example/pay"
+
+
+def test_guest_checkout_resume_existing_order(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    oid = _seed_cart_with_existing_order(
+        sf,
+        session_id="g-resume",
+        guest_email="gresume@example.com",
+        guest_verified=True,
+        payment_method="stripe",
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gresume@example.com", payment_method="stripe", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-resume"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["order_id"] == str(oid)
+
+
+def test_guest_checkout_resume_netopia_reissue(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _enable_netopia(monkeypatch)
+    _seed_cart_with_existing_order(
+        sf,
+        session_id="g-resume-net",
+        guest_email="gresumenet@example.com",
+        guest_verified=True,
+        payment_method="netopia",
+        netopia_payment_url=None,
+        with_addresses=True,
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gresumenet@example.com", payment_method="netopia", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-resume-net"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["netopia_payment_url"] == "https://netopia.example/pay"
