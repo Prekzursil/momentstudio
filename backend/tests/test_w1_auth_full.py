@@ -33,7 +33,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.models.content import ContentBlock, ContentStatus
-from app.models.user import RefreshSession
+from app.models.user import RefreshSession, User
 from app.api.v1 import auth as auth_api
 
 
@@ -726,6 +726,135 @@ def test_refresh_silent_probe_no_content(test_app):
     client = test_app["client"]
     resp = client.post("/api/v1/auth/refresh", json={}, headers={"X-Silent": "true"})
     assert resp.status_code == 204
+
+
+def _refresh_token_for(client: TestClient, email: str, username: str) -> str:
+    auth = _register(client, email, username)
+    return auth["tokens"]["refresh_token"]
+
+
+def _mutate_user(session_factory, email: str, **fields):
+    async def _run():
+        from sqlalchemy import select as _select
+
+        async with session_factory() as session:
+            user = (
+                await session.execute(_select(User).where(User.email == email))
+            ).scalar_one()
+            for key, value in fields.items():
+                setattr(user, key, value)
+            session.add(user)
+            await session.commit()
+
+    asyncio.run(_run())
+
+
+def test_refresh_success_rotates(test_app):
+    client = test_app["client"]
+    refresh = _refresh_token_for(client, "rf@example.com", "rfuser")
+    resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 200
+    assert resp.json()["access_token"]
+
+
+def test_refresh_silent_probe_invalid_returns_204(test_app):
+    client = test_app["client"]
+    resp = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": "garbage"},
+        headers={"X-Silent": "1"},
+    )
+    assert resp.status_code == 204
+
+
+def test_refresh_silent_probe_bad_subject(test_app):
+    client = test_app["client"]
+    # refresh-typed token with bad jti/sub triggers the silent 204 branch
+    tok = security.create_refresh_token(
+        "not-a-uuid", "jti", datetime.now(timezone.utc) + timedelta(days=1)
+    )
+    resp = client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": tok},
+        headers={"X-Silent": "yes"},
+    )
+    assert resp.status_code == 204
+
+
+def test_refresh_token_user_deleted(test_app):
+    client = test_app["client"]
+    refresh = _refresh_token_for(client, "rfd@example.com", "rfduser")
+    _mutate_user(
+        test_app["session_factory"],
+        "rfd@example.com",
+        deleted_at=datetime.now(timezone.utc),
+    )
+    resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 401
+
+
+def test_refresh_token_locked(test_app):
+    client = test_app["client"]
+    refresh = _refresh_token_for(client, "rfl@example.com", "rfluser")
+    _mutate_user(
+        test_app["session_factory"],
+        "rfl@example.com",
+        locked_until=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+    resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 403
+
+
+def test_refresh_token_password_reset_required(test_app):
+    client = test_app["client"]
+    refresh = _refresh_token_for(client, "rfp@example.com", "rfpuser")
+    _mutate_user(
+        test_app["session_factory"], "rfp@example.com", password_reset_required=True
+    )
+    resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 403
+
+
+def test_refresh_token_deletion_due(test_app):
+    client = test_app["client"]
+    refresh = _refresh_token_for(client, "rfdd@example.com", "rfdduser")
+    _mutate_user(
+        test_app["session_factory"],
+        "rfdd@example.com",
+        deletion_requested_at=datetime.now(timezone.utc) - timedelta(days=40),
+        deletion_scheduled_for=datetime.now(timezone.utc) - timedelta(days=1),
+    )
+    resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 401
+
+
+def test_refresh_revoked_token_rejected(test_app):
+    client = test_app["client"]
+    refresh = _refresh_token_for(client, "rfr@example.com", "rfruser")
+
+    async def _revoke():
+        from sqlalchemy import select as _select
+
+        async with test_app["session_factory"]() as session:
+            rows = (await session.execute(_select(RefreshSession))).scalars().all()
+            for row in rows:
+                row.revoked = True
+                row.revoked_reason = "manual"
+                session.add(row)
+            await session.commit()
+
+    asyncio.run(_revoke())
+    resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 401
+
+
+def test_refresh_no_rotation_reissues(test_app, monkeypatch):
+    monkeypatch.setattr(settings, "refresh_token_rotation", False)
+    client = test_app["client"]
+    refresh = _refresh_token_for(client, "rfnr@example.com", "rfnruser")
+    resp = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    assert resp.status_code == 200
+    assert resp.json()["access_token"]
 
 
 def test_change_password_wrong_current(test_app):
