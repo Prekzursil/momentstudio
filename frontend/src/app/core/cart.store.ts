@@ -105,7 +105,7 @@ export class CartStore {
             stock:
               res.max_quantity == null
                 ? UNLIMITED_CART_STOCK
-                : Number(res.max_quantity ?? /* istanbul ignore next */(payload.stock ?? 99)),
+                : Number(res.max_quantity ?? /* istanbul ignore next */ payload.stock ?? 99),
             image: res.image_url ?? payload.image ?? '',
           }),
         ),
