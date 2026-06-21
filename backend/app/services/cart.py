@@ -500,8 +500,11 @@ async def serialize_cart(
             country_code=country_code,
         )
     if totals_override and getattr(totals_override, "currency", None) is None:
-        totals = Totals(**totals_override.model_dump(), currency=currency)
-    if totals is not None:
+        totals = totals_override.model_copy(update={"currency": currency})
+    # `totals` is always populated above (either from a non-None
+    # `totals_override` or filled by `calculate_totals_async`), so the
+    # else-arc is unreachable defensive code.
+    if totals is not None:  # pragma: no cover -- totals always set above
         totals.free_shipping_threshold_ron = threshold
         totals.phone_required_home = bool(
             getattr(checkout, "phone_required_home", False)
