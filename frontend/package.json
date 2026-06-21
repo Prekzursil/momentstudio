@@ -9,6 +9,8 @@
     "build": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js build",
     "pretest": "node scripts/generate-config.mjs",
     "test": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js test",
+    "pretest:coverage": "node scripts/generate-config.mjs",
+    "test:coverage": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js test --code-coverage --watch=false --browsers=ChromeHeadlessNoSandbox",
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
     "e2e": "playwright test",

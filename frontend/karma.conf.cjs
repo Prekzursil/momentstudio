@@ -46,5 +46,28 @@ module.exports = function (config) {
     browsers: ['ChromeHeadlessNoSandbox'],
     singleRun: false,
     restartOnFileChange: true,
+    // Lean-charter coverage gate: the `test:coverage` script (ng test
+    // --code-coverage) makes the Angular karma builder emit istanbul coverage.
+    // We surface a machine-readable per-file summary for CI parsing and enforce
+    // the lean 100% threshold across all axes. A run below 100% exits non-zero
+    // (the gate is intentionally red until every source file is covered).
+    coverageReporter: {
+      dir: require('path').join(__dirname, 'coverage'),
+      subdir: '.',
+      reporters: [
+        { type: 'html' },
+        { type: 'lcovonly' },
+        { type: 'json-summary' },
+        { type: 'text-summary' },
+      ],
+      check: {
+        global: {
+          statements: 100,
+          branches: 100,
+          functions: 100,
+          lines: 100,
+        },
+      },
+    },
   });
 };
