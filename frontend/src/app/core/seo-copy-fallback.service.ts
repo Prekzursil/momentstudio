@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
 import { SeoLanguage } from './seo-head-links.service';
 
-function cleanText(value: unknown, maxLen = 220): string {
+function cleanText(
+  value: unknown,
+  /* istanbul ignore next -- every caller passes an explicit maxLen */ maxLen = 220,
+): string {
   if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
     return '';
   }

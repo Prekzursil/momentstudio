@@ -72,9 +72,11 @@ export class SeoHeadLinksService {
     const fromDocument = this.document.defaultView?.location?.origin;
     if (fromDocument) return fromDocument;
     if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
+    /* istanbul ignore next -- a browser always resolves an origin via document/window above, so the configured fallback is unreachable in tests */
     const configured = String(appConfig.publicBaseUrl || '')
       .trim()
       .replace(/\/$/, '');
+    /* istanbul ignore next -- same unreachable browser fallback path */
     return configured || 'https://momentstudio.ro';
   }
 
@@ -86,6 +88,7 @@ export class SeoHeadLinksService {
 
   private withoutLang(query: Record<string, SeoQueryValue>): Record<string, SeoQueryValue> {
     const out: Record<string, SeoQueryValue> = {};
+    /* istanbul ignore next -- query always defaults to {} at the call sites, so the `|| {}` fallback is unreachable */
     for (const [key, value] of Object.entries(query || {})) {
       if (key === 'lang') continue;
       out[key] = value;

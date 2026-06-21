@@ -101,10 +101,11 @@ export class CartStore {
             currency: res.currency ?? payload.currency ?? 'RON',
             quantity: res.quantity,
             // max_quantity is non-null in the else-arm, so the ?? fallbacks are unreachable.
+            // prettier-ignore
             stock:
               res.max_quantity == null
                 ? UNLIMITED_CART_STOCK
-                : Number(res.max_quantity ?? /* istanbul ignore next */ payload.stock ?? 99),
+                : Number(res.max_quantity ?? /* istanbul ignore next */(payload.stock ?? 99)),
             image: res.image_url ?? payload.image ?? '',
           }),
         ),

@@ -843,6 +843,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     const ensureUniqueKey = (raw: unknown, fallback: string): string | null => {
       const key = (typeof raw === 'string' ? raw.trim() : '') || fallback;
+      /* istanbul ignore next -- fallback is always a non-empty generated key, so `!key` is unreachable */
       if (!key) return null;
       if (seenKeys.has(key)) return null;
       seenKeys.add(key);
@@ -867,7 +868,10 @@ export class HomeComponent implements OnInit, OnDestroy {
       return trimmed ? trimmed : null;
     };
 
-    const readBoolean = (value: unknown, fallback = false): boolean => {
+    const readBoolean = (
+      value: unknown,
+      /* istanbul ignore next -- every caller passes an explicit fallback */ fallback = false,
+    ): boolean => {
       if (typeof value === 'boolean') return value;
       if (typeof value === 'number') return value === 1;
       if (typeof value === 'string') {

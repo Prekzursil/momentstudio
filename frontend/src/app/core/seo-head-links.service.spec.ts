@@ -74,6 +74,19 @@ describe('SeoHeadLinksService', () => {
     expect(href).not.toContain('?');
   });
 
+  it('removes duplicate canonical links, keeping a single one', () => {
+    const first = doc.createElement('link');
+    first.setAttribute('rel', 'canonical');
+    const second = doc.createElement('link');
+    second.setAttribute('rel', 'canonical');
+    doc.head.appendChild(first);
+    doc.head.appendChild(second);
+
+    service.setLocalizedCanonical('/shop', 'en');
+
+    expect(doc.querySelectorAll('link[rel="canonical"]').length).toBe(1);
+  });
+
   it('normalizes empty and slash-less paths', () => {
     expect(service.setLocalizedCanonical('', 'en')).toMatch(/\/$/);
     expect(service.setLocalizedCanonical('shop', 'en')).toContain('/shop');

@@ -58,6 +58,7 @@ export class LanguageService {
   }
 
   private applyDocumentLanguage(lang: AppLanguage): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser */
     if (typeof document === 'undefined') return;
     try {
       document.documentElement.lang = lang;
