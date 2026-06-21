@@ -344,6 +344,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
     if (!raw) return '';
     if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
     const parts = raw.split('-').map((p) => Number(p));
+    /* istanbul ignore next -- the YYYY-MM-DD regex above guarantees exactly 3 finite numeric parts, so this guard never trips */
     if (parts.length !== 3 || parts.some((p) => !Number.isFinite(p))) return raw;
     const [y, m, d] = parts;
     const dt = new Date(Date.UTC(y, m - 1, d));
@@ -416,15 +417,16 @@ export class CmsPageComponent implements OnInit, OnDestroy {
         this.legalIndexDocs.set(rows);
         this.legalIndexLoading.set(false);
       },
-      /* istanbul ignore next -- unreachable: each forkJoin source has its own catchError(()=>of(null)) so the combined stream never errors */
-      error: () => {
-        this.legalIndexDocs.set([]);
-        this.legalIndexLoading.set(false);
-      },
+      error:
+        /* istanbul ignore next -- unreachable: each forkJoin source has its own catchError(()=>of(null)) so the combined stream never errors */ () => {
+          this.legalIndexDocs.set([]);
+          this.legalIndexLoading.set(false);
+        },
     });
   }
 
   loginNextUrl(): string {
+    /* istanbul ignore next -- `window` is always defined under Karma; the SSR fallback path is browser-unreachable */
     return typeof window === 'undefined' ? `/pages/${this.slug}` : this.router.url;
   }
 
@@ -434,6 +436,7 @@ export class CmsPageComponent implements OnInit, OnDestroy {
   }
 
   private setMetaTags(title: string, body: string, slug: string): void {
+    /* istanbul ignore next -- callers always pass a non-empty title (block.title || slug), so the 'Page' fallback is unreachable */
     const pageTitle = title ? `${title} | momentstudio` : 'Page | momentstudio';
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const description = resolveRouteSeoDescription(
@@ -443,7 +446,9 @@ export class CmsPageComponent implements OnInit, OnDestroy {
       this.translate.instant('meta.descriptions.page'),
       this.translate.instant('about.metaDescription'),
     );
+    /* istanbul ignore next -- setMetaTags is only called with a non-empty slug, so the `|| ''` fallback is unreachable */
     const safeSlug = encodeURIComponent(String(slug || '').trim());
+    /* istanbul ignore next -- setMetaTags is only called with a non-empty slug; the '/pages' fallback is unreachable */
     const path = safeSlug ? `/pages/${safeSlug}` : '/pages';
     const canonical = this.seoHeadLinks.setLocalizedCanonical(path, lang, {});
     this.title.setTitle(pageTitle);

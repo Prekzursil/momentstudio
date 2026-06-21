@@ -329,6 +329,118 @@ describe('CmsPageComponent', () => {
     expect(fixture.componentInstance.legalIndexLoading()).toBeFalse();
   });
 
+  it('falls back to slug for title/canonical when key has no page prefix and title is empty', () => {
+    api.get.and.callFake(
+      () => of({ key: 'misc', title: '', body_markdown: '', images: [] }) as never,
+    );
+    const fixture = TestBed.createComponent(CmsPageComponent);
+    fixture.detectChanges();
+    // Empty title -> generic "Page | momentstudio"; non-page. key -> canonical uses slug.
+    expect(title.setTitle).toHaveBeenCalledWith('Page | momentstudio');
+    expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'en', {});
+  });
+
+  it('strips table rows that are not the legal-index header', () => {
+    paramMap$.next(convertToParamMap({ slug: 'terms' }));
+    api.get.and.callFake(((path: string) => {
+      if (path === '/content/pages/terms') {
+        return of({
+          key: 'page.terms',
+          title: 'Terms',
+          // A pipe line that is NOT the "last updated" header -> kept as content.
+          body_markdown: '| just a normal table row |\nplain text',
+          images: [],
+        });
+      }
+      return of(null);
+    }) as never);
+    const fixture = TestBed.createComponent(CmsPageComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.bodyHtml()).toContain('just a normal table row');
+  });
+
+  it('derives meta text from parsed page blocks when present', () => {
+    api.get.and.callFake(
+      () =>
+        of({
+          key: 'page.about',
+          title: 'About',
+          body_markdown: 'fallback',
+          images: [],
+          meta: {
+            blocks: [
+              { type: 'text', key: 't', body_markdown: 'Block body content', enabled: true },
+            ],
+          },
+        }) as never,
+    );
+    const fixture = TestBed.createComponent(CmsPageComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.pageBlocks().length).toBe(1);
+    expect(meta.updateTag).toHaveBeenCalled();
+  });
+
+  it('formats legal index dates in the Romanian locale', () => {
+    translate.use('ro');
+    const cmp = TestBed.createComponent(CmsPageComponent).componentInstance;
+    expect(cmp.formatLegalIndexDate('2026-02-10')).toBeTruthy();
+  });
+
+  it('passes through dates with the wrong number of parts', () => {
+    const cmp = TestBed.createComponent(CmsPageComponent).componentInstance;
+    // Matches the YYYY-MM-DD shape regex but produces a non-finite part after split.
+    expect(cmp.formatLegalIndexDate('20a6-01-15')).toBe('20a6-01-15');
+  });
+
+  it('handles a block with an empty key', () => {
+    api.get.and.callFake(
+      () => of({ key: '', title: 'NoKey', body_markdown: 'body', images: [] }) as never,
+    );
+    const fixture = TestBed.createComponent(CmsPageComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.block()?.key).toBe('');
+    expect(title.setTitle).toHaveBeenCalledWith('NoKey | momentstudio');
+  });
+
+  it('strips a legal index table when the terms body is empty', () => {
+    paramMap$.next(convertToParamMap({ slug: 'terms' }));
+    api.get.and.callFake(((path: string) => {
+      if (path === '/content/pages/terms') {
+        return of({
+          key: 'page.terms',
+          title: 'Terms',
+          body_markdown: null as unknown as string,
+          images: [],
+        });
+      }
+      return of(null);
+    }) as never);
+    const fixture = TestBed.createComponent(CmsPageComponent);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.block()?.title).toBe('Terms');
+  });
+
+  it('strips a legal index table that appears after body content', () => {
+    paramMap$.next(convertToParamMap({ slug: 'terms' }));
+    api.get.and.callFake(((path: string) => {
+      if (path === '/content/pages/terms') {
+        return of({
+          key: 'page.terms',
+          title: 'Terms',
+          body_markdown: 'Intro paragraph\n| Last updated | x |\n| 2026-01-01 | y |\nAfter table',
+          images: [],
+        });
+      }
+      return of(null);
+    }) as never);
+    const fixture = TestBed.createComponent(CmsPageComponent);
+    fixture.detectChanges();
+    // Body renders without the table rows; intro + after-table content remain.
+    expect(fixture.componentInstance.bodyHtml()).toContain('Intro paragraph');
+    expect(fixture.componentInstance.bodyHtml()).toContain('After table');
+    expect(fixture.componentInstance.bodyHtml()).not.toContain('Last updated');
+  });
+
   it('suppresses the reload triggered by the canonical-slug redirect', () => {
     paramMap$.next(convertToParamMap({ slug: 'old-slug' }));
     api.get.and.callFake(

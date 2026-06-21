@@ -243,6 +243,7 @@ export class ProductQuickViewModalComponent implements OnChanges {
     const variants = product.variants ?? [];
     if (!variants.length) return null;
     const desired = this.selectedVariantId;
+    /* istanbul ignore next -- variants[0] is defined here (variants.length checked above), so the final `?? null` is unreachable */
     return variants.find((v) => v.id === desired) ?? variants[0] ?? null;
   }
 

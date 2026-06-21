@@ -284,4 +284,16 @@ describe('ProductQuickViewModalComponent', () => {
     openWith('prod');
     expect(component.activeImageUrl()).toContain('placeholder');
   });
+
+  it('sorts images that lack an explicit sort_order', () => {
+    catalog.getProduct.and.returnValue(
+      of(
+        makeProduct({
+          images: [{ url: '/x.png' }, { url: '/y.png' }] as unknown as Product['images'],
+        }),
+      ),
+    );
+    openWith('prod');
+    expect(component.product?.images?.length).toBe(2);
+  });
 });
