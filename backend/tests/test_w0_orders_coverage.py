@@ -5145,3 +5145,173 @@ def test_admin_cancel_paypal_with_owner(test_app, monkeypatch) -> None:
         headers=auth_headers(_admin(test_app)),
     )
     assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Final-tail closure                                                           #
+# --------------------------------------------------------------------------- #
+def test_checkout_coupon_apply_non_404_raises(test_app, monkeypatch) -> None:
+    # A coupon-apply error that is NOT 404 must propagate (orders.py 824 else:raise).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ckcraise@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-craise")
+
+    import app.api.v1.orders as om
+    from fastapi import HTTPException as _HTTPException
+
+    async def _boom(*_a, **_k):
+        raise _HTTPException(status_code=400, detail="Coupon expired")
+
+    monkeypatch.setattr(om.coupons_service, "apply_discount_code_to_cart", _boom)
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod", phone="+40712345678", promo_code="EXPIRED"
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-craise"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Coupon expired"
+
+
+def test_guest_checkout_cod_with_admin_email(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "admin_alert_email", "ops@example.com", raising=False)
+    _seed_cart(
+        sf,
+        session_id="g-codadm",
+        guest_email="gcodadm@example.com",
+        guest_verified=True,
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gcodadm@example.com", payment_method="cod", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-codadm"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_admin_deliver_order_first_order_reward(test_app, monkeypatch) -> None:
+    # paid -> shipped -> delivered for a user's first order triggers the reward
+    # coupon issuance branch (2930-2946).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    headers = auth_headers(_admin(test_app))
+    _, uid = create_user_token(sf, email="reward@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.shipped,
+        customer_email="reward@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "delivered"},
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_shipping_label_download_file_missing(
+    test_app, monkeypatch, tmp_path
+) -> None:
+    # Label path is recorded but the file is removed from disk -> 404 (3271-3276).
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    up = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        files={"file": ("lab.pdf", b"%PDF-1.4 mini", "application/pdf")},
+        headers=headers,
+    )
+    assert up.status_code == 200, up.text
+
+    # Delete the underlying file but keep the DB pointer.
+    import shutil
+
+    shutil.rmtree(tmp_path / "shipping-labels", ignore_errors=True)
+
+    dl = client.get(f"/api/v1/orders/admin/{oid}/shipping-label", headers=headers)
+    assert dl.status_code == 404
+    assert dl.json()["detail"] == "Shipping label not found"
+
+
+def test_admin_batch_labels_file_missing(test_app, monkeypatch, tmp_path) -> None:
+    # Label path recorded but file removed -> batch lists it as missing (3941-3949).
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    up = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        files={"file": ("lab.pdf", b"%PDF-1.4 mini", "application/pdf")},
+        headers=headers,
+    )
+    assert up.status_code == 200, up.text
+
+    import shutil
+
+    shutil.rmtree(tmp_path / "shipping-labels", ignore_errors=True)
+
+    res = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        json={"order_ids": [str(oid)]},
+        headers=headers,
+    )
+    assert res.status_code == 404
+    assert str(oid) in str(res.json()["detail"])
+
+
+def test_admin_export_columns_empty_parts(test_app) -> None:
+    # Columns with empty segments exercise the "if cleaned" filter (1941-1943).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_order(sf, payment_method="cod", status=OrderStatus.paid)
+    res = client.get(
+        "/api/v1/orders/admin/export",
+        params={"columns": "id,,status,"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_email_events_order_no_reference(test_app, monkeypatch) -> None:
+    # Order with an email but no reference_code -> ref_lower empty, skips the
+    # subject filter (2190->2193 falsy side).
+    client = test_app["client"]
+
+    class _Stub:
+        id = __import__("uuid").UUID("00000000-0000-0000-0000-0000000000aa")
+        user = None
+        customer_email = "noref@example.com"
+        reference_code = ""
+
+    async def fake_get(_s, _id):
+        return _Stub()
+
+    import app.api.v1.orders as om
+
+    original = om.order_service.get_order_by_id_admin
+    om.order_service.get_order_by_id_admin = fake_get
+    try:
+        res = client.get(
+            f"/api/v1/orders/admin/{_Stub.id}/email-events",
+            headers=auth_headers(_admin(test_app)),
+        )
+        assert res.status_code == 200
+    finally:
+        om.order_service.get_order_by_id_admin = original
