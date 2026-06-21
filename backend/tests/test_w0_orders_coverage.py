@@ -1789,3 +1789,320 @@ def test_list_orders_endpoint(test_app) -> None:
     res = client.get("/api/v1/orders", headers=auth_headers(token))
     assert res.status_code == 200
     assert isinstance(res.json(), list)
+
+
+# --------------------------------------------------------------------------- #
+# Guest email verification (request / confirm / status)                        #
+# --------------------------------------------------------------------------- #
+def test_guest_email_request_missing_session(test_app) -> None:
+    client = test_app["client"]
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/request",
+        json={"email": "ge@example.com"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Missing guest session id"
+
+
+def test_guest_email_request_email_taken(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    create_user_token(sf, email="getaken@example.com")
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/request",
+        json={"email": "getaken@example.com"},
+        headers={"X-Session-Id": "ge-taken"},
+    )
+    assert res.status_code == 400
+    assert "already registered" in res.json()["detail"]
+
+
+def test_guest_email_request_and_confirm_flow(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_cart(sf, session_id="ge-flow")
+
+    from app.services import email as email_service
+
+    async def _ok(*_a, **_k):
+        return True
+
+    monkeypatch.setattr(email_service, "send_verification_email", _ok)
+
+    req = client.post(
+        "/api/v1/orders/guest-checkout/email/request",
+        json={"email": "geflow@example.com"},
+        headers={"X-Session-Id": "ge-flow"},
+    )
+    assert req.status_code == 200, req.text
+    assert req.json()["sent"] is True
+
+    # Read the generated token straight from the cart row.
+    from sqlalchemy.future import select as _select
+
+    from app.models.cart import Cart
+
+    async def _token():
+        async with sf() as session:
+            row = await session.execute(
+                _select(Cart).where(Cart.session_id == "ge-flow")
+            )
+            return row.scalars().first().guest_email_verification_token
+
+    token = asyncio.run(_token())
+
+    # Wrong token -> 400.
+    bad = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "geflow@example.com", "token": "000000"},
+        headers={"X-Session-Id": "ge-flow"},
+    )
+    assert bad.status_code == 400
+
+    # Correct token -> verified.
+    ok = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "geflow@example.com", "token": token},
+        headers={"X-Session-Id": "ge-flow"},
+    )
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["verified"] is True
+
+
+def test_guest_email_confirm_missing_session(test_app) -> None:
+    client = test_app["client"]
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "x@example.com", "token": "123456"},
+    )
+    assert res.status_code == 400
+
+
+def test_guest_email_confirm_email_mismatch(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_cart(sf, session_id="ge-mm", guest_email="real@example.com")
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "other@example.com", "token": "123456"},
+        headers={"X-Session-Id": "ge-mm"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Email mismatch"
+
+
+def test_guest_email_status(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_cart(sf, session_id="ge-st", guest_email="st@example.com")
+    no_sid = client.get("/api/v1/orders/guest-checkout/email/status")
+    assert no_sid.status_code == 400
+    res = client.get(
+        "/api/v1/orders/guest-checkout/email/status",
+        headers={"X-Session-Id": "ge-st"},
+    )
+    assert res.status_code == 200
+    assert res.json()["email"] == "st@example.com"
+
+
+# --------------------------------------------------------------------------- #
+# Admin document exports                                                        #
+# --------------------------------------------------------------------------- #
+def test_admin_list_document_exports(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        "/api/v1/orders/admin/exports", headers=auth_headers(_admin(test_app))
+    )
+    assert res.status_code == 200
+    assert "items" in res.json()
+
+
+def test_admin_download_export_not_found(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        f"/api/v1/orders/admin/exports/{_NIL}/download",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+
+
+def test_admin_email_events_not_found(test_app) -> None:
+    client = test_app["client"]
+    res = client.get(
+        f"/api/v1/orders/admin/{_NIL}/email-events",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 404
+
+
+def test_admin_email_events_ok(test_app) -> None:
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    res = client.get(
+        f"/api/v1/orders/admin/{oid}/email-events",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
+
+
+def test_admin_email_events_with_pii(test_app) -> None:
+    client = test_app["client"]
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    res = client.get(
+        f"/api/v1/orders/admin/{oid}/email-events",
+        params={"include_pii": "true"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# User-facing receipt + cancel-request + reorder                               #
+# --------------------------------------------------------------------------- #
+def test_download_receipt_not_found(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="rc@example.com")
+    res = client.get(f"/api/v1/orders/{_NIL}/receipt", headers=auth_headers(token))
+    assert res.status_code == 404
+
+
+def test_download_receipt_ok(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="rc2@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+    res = client.get(f"/api/v1/orders/{oid}/receipt", headers=auth_headers(token))
+    assert res.status_code == 200
+
+
+def test_read_receipt_by_token_invalid(test_app) -> None:
+    client = test_app["client"]
+    res = client.get("/api/v1/orders/receipt/not-a-token")
+    assert res.status_code == 403
+
+
+def test_receipt_share_and_token_roundtrip(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="share@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+
+    share = client.post(
+        f"/api/v1/orders/{oid}/receipt/share", headers=auth_headers(token)
+    )
+    assert share.status_code == 200, share.text
+    rcpt_token = share.json()["token"]
+
+    view = client.get(f"/api/v1/orders/receipt/{rcpt_token}")
+    assert view.status_code == 200, view.text
+
+    view_reveal = client.get(
+        f"/api/v1/orders/receipt/{rcpt_token}",
+        params={"reveal": "true"},
+        headers=auth_headers(token),
+    )
+    assert view_reveal.status_code == 200
+
+    pdf = client.get(f"/api/v1/orders/receipt/{rcpt_token}/pdf")
+    assert pdf.status_code == 200
+
+    pdf_reveal = client.get(
+        f"/api/v1/orders/receipt/{rcpt_token}/pdf",
+        params={"reveal": "true"},
+        headers=auth_headers(token),
+    )
+    assert pdf_reveal.status_code == 200
+
+    # Revoke bumps the token version -> old token now rejected.
+    revoke = client.post(
+        f"/api/v1/orders/{oid}/receipt/revoke", headers=auth_headers(token)
+    )
+    assert revoke.status_code == 200, revoke.text
+    stale = client.get(f"/api/v1/orders/receipt/{rcpt_token}")
+    assert stale.status_code == 403
+
+
+def test_receipt_share_not_found_and_forbidden(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="sharenf@example.com")
+    nf = client.post(
+        f"/api/v1/orders/{_NIL}/receipt/share", headers=auth_headers(token)
+    )
+    assert nf.status_code == 404
+
+    # Order belongs to a different user -> 403.
+    _, other_uid = create_user_token(sf, email="shareowner@example.com")
+    oid = _seed_order(sf, user_id=other_uid, payment_method="cod")
+    forbidden = client.post(
+        f"/api/v1/orders/{oid}/receipt/share", headers=auth_headers(token)
+    )
+    assert forbidden.status_code == 403
+
+
+def test_receipt_token_pdf_invalid(test_app) -> None:
+    client = test_app["client"]
+    res = client.get("/api/v1/orders/receipt/not-a-token/pdf")
+    assert res.status_code == 403
+
+
+def test_cancel_request_not_found(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, _ = create_user_token(sf, email="cr@example.com")
+    res = client.post(
+        f"/api/v1/orders/{_NIL}/cancel-request",
+        json={"reason": "changed mind"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 404
+
+
+def test_cancel_request_ineligible_status(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="cr2@example.com")
+    oid = _seed_order(
+        sf, user_id=uid, payment_method="cod", status=OrderStatus.delivered
+    )
+    res = client.post(
+        f"/api/v1/orders/{oid}/cancel-request",
+        json={"reason": "too late"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Cancel request not eligible"
+
+
+def test_cancel_request_ok_and_duplicate(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="cr3@example.com")
+    oid = _seed_order(
+        sf, user_id=uid, payment_method="cod", status=OrderStatus.pending_acceptance
+    )
+    ok = client.post(
+        f"/api/v1/orders/{oid}/cancel-request",
+        json={"reason": "changed mind"},
+        headers=auth_headers(token),
+    )
+    assert ok.status_code == 200, ok.text
+
+    dup = client.post(
+        f"/api/v1/orders/{oid}/cancel-request",
+        json={"reason": "again"},
+        headers=auth_headers(token),
+    )
+    assert dup.status_code == 409
+
+
+def test_reorder(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="re@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+    res = client.post(f"/api/v1/orders/{oid}/reorder", headers=auth_headers(token))
+    assert res.status_code in (200, 404), res.text
