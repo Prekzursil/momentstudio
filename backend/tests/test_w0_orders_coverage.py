@@ -3209,3 +3209,413 @@ def test_admin_search_date_and_include_test(test_app) -> None:
         headers=auth_headers(_admin(test_app)),
     )
     assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Final branch closure                                                         #
+# --------------------------------------------------------------------------- #
+def test_guest_checkout_netopia_disabled(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "netopia_enabled", False, raising=False)
+    _seed_cart(
+        sf, session_id="g-ndis", guest_email="gndis@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gndis@example.com", payment_method="netopia", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-ndis"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Netopia is disabled"
+
+
+def test_guest_checkout_netopia_not_configured(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "netopia_enabled", True, raising=False)
+    monkeypatch.setattr(
+        netopia_service, "netopia_configuration_status", lambda: (False, "no keys")
+    )
+    _seed_cart(
+        sf, session_id="g-nnc", guest_email="gnnc@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gnnc@example.com", payment_method="netopia", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-nnc"},
+    )
+    assert res.status_code == 500
+    assert res.json()["detail"] == "no keys"
+
+
+@pytest.mark.parametrize(
+    "drop,detail",
+    [
+        ("password", "Password is required"),
+        ("username", "Username is required"),
+        ("first_name", "First name is required"),
+        ("last_name", "Last name is required"),
+        ("date_of_birth", "Date of birth is required"),
+        ("phone", "Phone is required"),
+    ],
+)
+def test_guest_checkout_create_account_missing_fields(
+    test_app, monkeypatch, drop, detail
+) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    sid = f"g-acct-{drop}"
+    _seed_cart(
+        sf, session_id=sid, guest_email=f"{drop}@example.com", guest_verified=True
+    )
+    fields = {
+        "create_account": True,
+        "password": "secret123",
+        "username": "guname",
+        "first_name": "Gf",
+        "last_name": "Gl",
+        "date_of_birth": "1990-01-01",
+        "phone": "+40712345678",
+        "payment_method": "cod",
+    }
+    fields.pop(drop)
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(f"{drop}@example.com", **fields),
+        headers={"X-Session-Id": sid},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == detail
+
+
+def test_guest_checkout_shipping_method_not_found(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-sm", guest_email="gsm@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gsm@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            shipping_method_id="00000000-0000-0000-0000-000000000000",
+        ),
+        headers={"X-Session-Id": "g-sm"},
+    )
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Shipping method not found"
+
+
+def test_guest_checkout_courier_not_available(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-cour", guest_email="gcour@example.com", guest_verified=True
+    )
+
+    import app.api.v1.orders as om
+
+    monkeypatch.setattr(
+        om.cart_service, "delivery_constraints", lambda _cart: (True, {"fan_courier"})
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gcour@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            courier="sameday",
+        ),
+        headers={"X-Session-Id": "g-cour"},
+    )
+    assert res.status_code == 400
+    assert "courier is not available" in res.json()["detail"]
+
+
+def test_guest_checkout_no_couriers(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-noc", guest_email="gnoc@example.com", guest_verified=True
+    )
+
+    import app.api.v1.orders as om
+
+    monkeypatch.setattr(
+        om.cart_service, "delivery_constraints", lambda _cart: (False, set())
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gnoc@example.com", payment_method="cod", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-noc"},
+    )
+    assert res.status_code == 400
+    assert "No couriers available" in res.json()["detail"]
+
+
+def test_guest_checkout_locker_not_available(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-lock", guest_email="glock@example.com", guest_verified=True
+    )
+
+    import app.api.v1.orders as om
+
+    monkeypatch.setattr(
+        om.cart_service, "delivery_constraints", lambda _cart: (False, {"sameday"})
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "glock@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            delivery_type="locker",
+            locker_id="L1",
+            locker_name="Locker 1",
+            locker_lat=1.0,
+            locker_lng=2.0,
+        ),
+        headers={"X-Session-Id": "g-lock"},
+    )
+    assert res.status_code == 400
+    assert "Locker delivery is not available" in res.json()["detail"]
+
+
+def test_guest_checkout_phone_required(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-ph", guest_email="gph@example.com", guest_verified=True
+    )
+
+    import dataclasses
+
+    import app.api.v1.orders as om
+
+    settings_obj = om.checkout_settings_service
+    original = settings_obj.get_checkout_settings
+
+    async def _cs(session):
+        cs = await original(session)
+        # CheckoutSettings is a frozen dataclass; build a copy with the flag on.
+        return dataclasses.replace(cs, phone_required_home=True)
+
+    monkeypatch.setattr(settings_obj, "get_checkout_settings", _cs)
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload("gph@example.com", payment_method="cod"),
+        headers={"X-Session-Id": "g-ph"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Phone is required"
+
+
+# --------------------------------------------------------------------------- #
+# Stripe confirm: guest order (no user) -> customer_to falsy branch            #
+# --------------------------------------------------------------------------- #
+def test_stripe_confirm_real_mode_existing_intent(test_app, monkeypatch) -> None:
+    # order already has stripe_payment_intent_id -> 1356->1359 skips assignment.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    from app.services import payments
+
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "payments_provider", "real", raising=False)
+    monkeypatch.setattr(payments, "is_stripe_configured", lambda: True)
+    monkeypatch.setattr(payments, "init_stripe", lambda: None)
+
+    class _Session:
+        payment_status = "paid"
+        payment_intent = "pi_existing"
+
+    class _Sessions:
+        @staticmethod
+        def retrieve(_sid):
+            return _Session()
+
+    class _Checkout:
+        Session = _Sessions
+
+    class _Stripe:
+        checkout = _Checkout
+
+    monkeypatch.setattr(payments, "stripe", _Stripe, raising=False)
+    token, uid = create_user_token(sf, email="sintent@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="stripe",
+        stripe_session_id="cs_intent",
+        customer_email="sintent@example.com",
+        with_product=True,
+    )
+
+    async def _set_intent():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(_select(Order).where(Order.id == oid))
+            order = row.scalars().first()
+            order.stripe_payment_intent_id = "pi_existing"
+            session.add(order)
+            await session.commit()
+
+    asyncio.run(_set_intent())
+    res = client.post(
+        "/api/v1/orders/stripe/confirm",
+        json={"session_id": "cs_intent"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Admin update_order: status change for a guest order (no user)                #
+# --------------------------------------------------------------------------- #
+def test_admin_update_order_guest_no_user(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="cod",
+        status=OrderStatus.pending_acceptance,
+        customer_email="guestupd@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "paid"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_update_order_shipped_then_delivered(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    headers = auth_headers(_admin(test_app))
+    _, uid = create_user_token(sf, email="shipdel@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.paid,
+        customer_email="shipdel@example.com",
+        with_product=True,
+    )
+    shipped = client.patch(
+        f"/api/v1/orders/admin/{oid}", json={"status": "shipped"}, headers=headers
+    )
+    assert shipped.status_code == 200, shipped.text
+    delivered = client.patch(
+        f"/api/v1/orders/admin/{oid}", json={"status": "delivered"}, headers=headers
+    )
+    assert delivered.status_code == 200, delivered.text
+
+
+# --------------------------------------------------------------------------- #
+# Receipt-by-token: order not found + version mismatch                          #
+# --------------------------------------------------------------------------- #
+def test_receipt_token_version_mismatch_and_missing(test_app) -> None:
+    from app.core.security import create_receipt_token
+
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token_uid = create_user_token(sf, email="rtv@example.com")[0]  # noqa: F841
+
+    # Token for a non-existent order id -> 404.
+    from datetime import datetime, timedelta, timezone
+
+    exp = datetime.now(timezone.utc) + timedelta(days=1)
+    bad_tok = create_receipt_token(
+        order_id="11111111-1111-1111-1111-111111111111",
+        expires_at=exp,
+        token_version=0,
+    )
+    nf = client.get(f"/api/v1/orders/receipt/{bad_tok}")
+    assert nf.status_code == 404
+
+    # Real order but wrong token_version -> 403.
+    _, uid = create_user_token(sf, email="rtv2@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+    wrong = create_receipt_token(order_id=str(oid), expires_at=exp, token_version=99)
+    mm = client.get(f"/api/v1/orders/receipt/{wrong}")
+    assert mm.status_code == 403
+
+
+def test_receipt_token_pdf_not_found_and_mismatch(test_app) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.core.security import create_receipt_token
+
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    exp = datetime.now(timezone.utc) + timedelta(days=1)
+    bad = create_receipt_token(
+        order_id="22222222-2222-2222-2222-222222222222",
+        expires_at=exp,
+        token_version=0,
+    )
+    nf = client.get(f"/api/v1/orders/receipt/{bad}/pdf")
+    assert nf.status_code == 404
+
+    _, uid = create_user_token(sf, email="rtpdf@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+    wrong = create_receipt_token(order_id=str(oid), expires_at=exp, token_version=42)
+    mm = client.get(f"/api/v1/orders/receipt/{wrong}/pdf")
+    assert mm.status_code == 403
+
+
+def test_cancel_request_no_reason(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    token, uid = create_user_token(sf, email="crnr@example.com")
+    oid = _seed_order(
+        sf, user_id=uid, payment_method="cod", status=OrderStatus.pending_acceptance
+    )
+    # Whitespace reason strips to empty -> 400 (schema min_length=1 lets it through).
+    res = client.post(
+        f"/api/v1/orders/{oid}/cancel-request",
+        json={"reason": "   "},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Cancel reason is required"
