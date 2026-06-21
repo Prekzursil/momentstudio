@@ -636,7 +636,9 @@ def test_admin_order_search_and_detail(
     assert any(item["id"] == order_id for item in tag_test.json()["items"])
 
 
-def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
+def test_order_create_and_admin_updates(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
@@ -705,11 +707,19 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
         refund_meta["note"] = note
         return True
 
-    email_service.send_order_confirmation = fake_send_order_confirmation  # type: ignore[assignment]
-    email_service.send_shipping_update = fake_send_shipping_update  # type: ignore[assignment]
-    email_service.send_delivery_confirmation = fake_send_delivery_confirmation  # type: ignore[assignment]
-    email_service.send_refund_requested_notification = (
-        fake_send_refund_requested_notification  # type: ignore[assignment]
+    monkeypatch.setattr(
+        email_service, "send_order_confirmation", fake_send_order_confirmation
+    )
+    monkeypatch.setattr(
+        email_service, "send_shipping_update", fake_send_shipping_update
+    )
+    monkeypatch.setattr(
+        email_service, "send_delivery_confirmation", fake_send_delivery_confirmation
+    )
+    monkeypatch.setattr(
+        email_service,
+        "send_refund_requested_notification",
+        fake_send_refund_requested_notification,
     )
 
     res = client.post(
