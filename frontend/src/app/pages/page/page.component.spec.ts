@@ -335,8 +335,9 @@ describe('CmsPageComponent', () => {
     );
     const fixture = TestBed.createComponent(CmsPageComponent);
     fixture.detectChanges();
-    // Empty title -> generic "Page | momentstudio"; non-page. key -> canonical uses slug.
-    expect(title.setTitle).toHaveBeenCalledWith('Page | momentstudio');
+    // Empty title -> the slug is used as the title (block.title || slug); a non-`page.`
+    // key yields an empty canonical slug, so the canonical falls back to the route slug.
+    expect(title.setTitle).toHaveBeenCalledWith('about | momentstudio');
     expect(seoHeadLinks.setLocalizedCanonical).toHaveBeenCalledWith('/pages/about', 'en', {});
   });
 

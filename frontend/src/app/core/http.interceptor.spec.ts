@@ -306,7 +306,12 @@ describe('authAndErrorInterceptor', () => {
           status: 403,
           statusText: 'Forbidden',
         });
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      // The blob body is parsed asynchronously via Blob.text(); poll for the
+      // terminal error state instead of relying on a fixed timeout (which is
+      // flaky on a loaded CI runner).
+      for (let i = 0; i < 100 && !errored; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
       expect(auth.ensureStepUp).not.toHaveBeenCalled();
       expect(errored).toBeTrue();
     });

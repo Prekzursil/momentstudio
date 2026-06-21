@@ -110,7 +110,7 @@ describe('webauthn helpers', () => {
       const result = toPublicKeyCredentialCreationOptions({
         excludeCredentials: [{ type: 'public-key' }],
       });
-      expect((result.excludeCredentials?.[0].id as ArrayBuffer).byteLength).toBe(0);
+      expect((result.excludeCredentials![0].id as ArrayBuffer).byteLength).toBe(0);
     });
   });
 
@@ -134,7 +134,7 @@ describe('webauthn helpers', () => {
         allowCredentials: [{ type: 'public-key' }],
       });
       expect(result.challenge.byteLength).toBe(0);
-      expect((result.allowCredentials?.[0].id as ArrayBuffer).byteLength).toBe(0);
+      expect((result.allowCredentials![0].id as ArrayBuffer).byteLength).toBe(0);
     });
   });
 
