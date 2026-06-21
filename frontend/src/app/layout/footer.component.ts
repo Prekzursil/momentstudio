@@ -504,6 +504,7 @@ export class FooterComponent implements OnInit, OnDestroy {
     const cleaned = (label || '').trim();
     if (!cleaned) return 'MS';
     const parts = cleaned.split(/\s+/).filter(Boolean);
+    /* istanbul ignore next -- parts[0][0] is always defined (cleaned is non-empty and split+filter yields a non-empty first token), so the cleaned[0]/'M' fallbacks are unreachable */
     const first = parts[0]?.[0] ?? cleaned[0] ?? 'M';
     const second = parts[1]?.[0] ?? parts[0]?.[1] ?? 'S';
     return `${first}${second}`.toUpperCase();
