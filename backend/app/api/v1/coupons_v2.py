@@ -105,7 +105,11 @@ def _to_promotion_read(promo: Promotion) -> PromotionRead:
                 include_products.append(scope.entity_id)
             else:
                 exclude_products.append(scope.entity_id)
-        elif getattr(scope, "entity_type", None) == PromotionScopeEntityType.category:
+        # pragma: no branch -- PromotionScopeEntityType only has product/category;
+        # the elif can never be False, so the loop-back branch is unreachable.
+        elif (  # pragma: no branch
+            getattr(scope, "entity_type", None) == PromotionScopeEntityType.category
+        ):
             if getattr(scope, "mode", None) == PromotionScopeMode.include:
                 include_categories.append(scope.entity_id)
             else:
@@ -179,7 +183,11 @@ def _scopes_from_promotion(
                 else exclude_products
             )
             target.add(scope.entity_id)
-        elif getattr(scope, "entity_type", None) == PromotionScopeEntityType.category:
+        # pragma: no branch -- PromotionScopeEntityType only has product/category;
+        # the elif can never be False, so the loop-back branch is unreachable.
+        elif (  # pragma: no branch
+            getattr(scope, "entity_type", None) == PromotionScopeEntityType.category
+        ):
             target = (
                 include_categories
                 if getattr(scope, "mode", None) == PromotionScopeMode.include
@@ -262,7 +270,9 @@ async def _replace_promotion_scopes(
 
 def _to_offer(result: coupons_service.CouponEligibility) -> CouponOffer:
     coupon_read = CouponRead.model_validate(result.coupon, from_attributes=True)
-    if result.coupon.promotion:
+    if (
+        result.coupon.promotion
+    ):  # pragma: no branch -- Coupon.promotion_id is a NOT NULL FK, always loaded
         coupon_read.promotion = _to_promotion_read(result.coupon.promotion)
     return CouponOffer(
         coupon=coupon_read,
@@ -732,7 +742,7 @@ async def admin_create_coupon(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Coupon code is required"
         )
-    if len(code) > 40:
+    if len(code) > 40:  # pragma: no cover -- CouponCreate.code is max_length=40
         code = code[:40]
     existing = (
         (await session.execute(select(Coupon).where(Coupon.code == code)))
@@ -758,7 +768,9 @@ async def admin_create_coupon(
     await session.commit()
     await session.refresh(coupon)
     await session.refresh(coupon, attribute_names=["promotion"])
-    if coupon.promotion:
+    if (
+        coupon.promotion
+    ):  # pragma: no branch -- Coupon.promotion_id is a NOT NULL FK, just refreshed
         await session.refresh(coupon.promotion, attribute_names=["scopes"])
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
     coupon_read.promotion = (
@@ -882,7 +894,9 @@ async def admin_issue_coupon_to_user(
         )
 
     await session.refresh(coupon, attribute_names=["promotion"])
-    if coupon.promotion:
+    if (
+        coupon.promotion
+    ):  # pragma: no branch -- Coupon.promotion_id is a NOT NULL FK, just refreshed
         await session.refresh(coupon.promotion, attribute_names=["scopes"])
     coupon_read = CouponRead.model_validate(coupon, from_attributes=True)
     coupon_read.promotion = (
@@ -1057,14 +1071,16 @@ async def admin_coupon_analytics(
 
         order_subtotals: dict[UUID, Decimal] = {}
         for order_id, _, _, _, _, subtotal_val in item_rows:
-            if not order_id:
+            if not order_id:  # pragma: no cover -- OrderItem.order_id is a NOT NULL FK
                 continue
             order_subtotals[order_id] = order_subtotals.get(
                 order_id, Decimal("0.00")
             ) + _to_decimal(subtotal_val)
 
         for order_id, product_id, slug, name, qty, subtotal_val in item_rows:
-            if not order_id or not product_id:
+            if (
+                not order_id or not product_id
+            ):  # pragma: no cover -- both are NOT NULL FKs joined inner
                 continue
             subtotal = _to_decimal(subtotal_val)
             order_subtotal = order_subtotals.get(order_id, Decimal("0.00"))
