@@ -113,6 +113,23 @@ def _register(client: TestClient, email: str, username: str, **over) -> dict:
     return resp.json()
 
 
+def _totp_code(secret: str) -> str:
+    import base64
+    import hashlib
+    import hmac
+
+    period = int(getattr(settings, "two_factor_totp_period_seconds", 30) or 30)
+    digits = int(getattr(settings, "two_factor_totp_digits", 6) or 6)
+    counter = int(datetime.now(timezone.utc).timestamp()) // period
+    clean = (secret or "").strip().upper().replace(" ", "")
+    padding = "=" * ((8 - len(clean) % 8) % 8)
+    key = base64.b32decode(clean + padding, casefold=True)
+    digest = hmac.new(key, counter.to_bytes(8, "big"), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = int.from_bytes(digest[offset : offset + 4], "big") & 0x7FFFFFFF
+    return str(value % (10**digits)).zfill(digits)
+
+
 def _make_request(
     *, headers: dict[str, str] | None = None, cookies: dict[str, str] | None = None
 ) -> Request:
@@ -879,6 +896,63 @@ def test_two_factor_setup_wrong_password(test_app):
     assert resp.status_code == 400
 
 
+def test_two_factor_full_lifecycle(test_app):
+    """Setup -> enable -> status -> regenerate -> login/2fa -> disable.
+
+    Exercises the success arcs of setup/enable/disable/regenerate (1561-1643)
+    and the two-factor login completion path (793-852).
+    """
+    client = test_app["client"]
+    tokens = _register(client, "2fafull@example.com", "tfafulluser")["tokens"]
+    hdr = _headers(tokens["access_token"])
+
+    setup = client.post(
+        "/api/v1/auth/me/2fa/setup", headers=hdr, json={"password": "supersecret"}
+    )
+    assert setup.status_code == 200, setup.text
+    secret = setup.json()["secret"]
+
+    enable = client.post(
+        "/api/v1/auth/me/2fa/enable", headers=hdr, json={"code": _totp_code(secret)}
+    )
+    assert enable.status_code == 200, enable.text
+    assert enable.json()["recovery_codes"]
+
+    status_resp = client.get("/api/v1/auth/me/2fa", headers=hdr)
+    assert status_resp.status_code == 200
+    assert status_resp.json()["enabled"] is True
+    assert status_resp.json()["recovery_codes_remaining"] > 0
+
+    regen = client.post(
+        "/api/v1/auth/me/2fa/recovery-codes/regenerate",
+        headers=hdr,
+        json={"password": "supersecret", "code": _totp_code(secret)},
+    )
+    assert regen.status_code == 200, regen.text
+
+    # login now returns a two-factor challenge, then /login/2fa completes it
+    login = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "tfafulluser", "password": "supersecret"},
+    )
+    assert login.status_code == 200, login.text
+    two_factor_token = login.json()["two_factor_token"]
+    complete = client.post(
+        "/api/v1/auth/login/2fa",
+        json={"two_factor_token": two_factor_token, "code": _totp_code(secret)},
+    )
+    assert complete.status_code == 200, complete.text
+    assert complete.json()["tokens"]["access_token"]
+
+    disable = client.post(
+        "/api/v1/auth/me/2fa/disable",
+        headers=hdr,
+        json={"password": "supersecret", "code": _totp_code(secret)},
+    )
+    assert disable.status_code == 200, disable.text
+    assert disable.json()["enabled"] is False
+
+
 def test_two_factor_disable_not_enabled(test_app):
     client = test_app["client"]
     tokens = _register(client, "2fad@example.com", "tfaduser")["tokens"]
@@ -1194,3 +1268,255 @@ def test_password_reset_request_unknown_email(test_app):
         "/api/v1/auth/password-reset/request", json={"email": "nobody@example.com"}
     )
     assert resp.status_code == 202
+
+
+# --------------------------------------------------------------------------- #
+# Secondary email resend (1879-1892)
+# --------------------------------------------------------------------------- #
+def test_secondary_email_add_and_resend(test_app, monkeypatch):
+    sent: dict[str, str] = {}
+
+    async def fake_send(email, token, lang=None, kind="primary", next_path=None):
+        sent[email] = token
+        return True
+
+    monkeypatch.setattr("app.services.email.send_verification_email", fake_send)
+    client = test_app["client"]
+    tokens = _register(client, "sec@example.com", "secuser")["tokens"]
+    hdr = _headers(tokens["access_token"])
+    add = client.post(
+        "/api/v1/auth/me/emails", headers=hdr, json={"email": "alt-sec@example.com"}
+    )
+    assert add.status_code == 201, add.text
+    secondary_id = add.json()["id"]
+    resend = client.post(
+        f"/api/v1/auth/me/emails/{secondary_id}/verify/request",
+        headers=hdr,
+    )
+    assert resend.status_code == 202, resend.text
+    assert "alt-sec@example.com" in sent
+
+
+# --------------------------------------------------------------------------- #
+# Google OAuth flows (2608-2700, 2841-2889)
+# --------------------------------------------------------------------------- #
+def _google_profile(**over) -> dict:
+    profile = {
+        "sub": "google-sub-123",
+        "email": "gnew@example.com",
+        "name": "G New",
+        "given_name": "G",
+        "family_name": "New",
+        "picture": "http://pic",
+        "email_verified": True,
+    }
+    profile.update(over)
+    return profile
+
+
+def test_google_callback_new_user_requires_completion(test_app, monkeypatch):
+    client = test_app["client"]
+
+    async def fake_exchange(code):
+        return _google_profile()
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    state = auth_api._build_google_state("google_state")
+    resp = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["requires_completion"] is True
+
+
+def test_google_callback_invalid_profile(test_app, monkeypatch):
+    client = test_app["client"]
+
+    async def fake_exchange(code):
+        return {"sub": "", "email": ""}
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    state = auth_api._build_google_state("google_state")
+    resp = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
+    assert resp.status_code == 400
+
+
+def test_google_callback_domain_not_allowed(test_app, monkeypatch):
+    client = test_app["client"]
+
+    async def fake_exchange(code):
+        return _google_profile(email="user@blocked.com")
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    monkeypatch.setattr(settings, "google_allowed_domains", ["allowed.com"])
+    state = auth_api._build_google_state("google_state")
+    resp = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
+    assert resp.status_code == 403
+
+
+def test_google_callback_existing_password_email_conflict(test_app, monkeypatch):
+    client = test_app["client"]
+    _register(client, "conflict@example.com", "conflictuser")
+
+    async def fake_exchange(code):
+        return _google_profile(email="conflict@example.com", sub="other-sub")
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    state = auth_api._build_google_state("google_state")
+    resp = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
+    assert resp.status_code == 409
+
+
+def test_google_complete_registration_full(test_app, monkeypatch):
+    client = test_app["client"]
+
+    async def fake_exchange(code):
+        return _google_profile(email="gcomplete@example.com", sub="sub-complete")
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    state = auth_api._build_google_state("google_state")
+    cb = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
+    assert cb.status_code == 200, cb.text
+    completion_token = cb.json()["completion_token"]
+
+    # missing consents -> 400
+    no_consent = client.post(
+        "/api/v1/auth/google/complete",
+        headers=_headers(completion_token),
+        json={
+            "username": "gcompleteuser",
+            "name": "GC",
+            "first_name": "G",
+            "last_name": "C",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+            "password": "supersecret",
+            "accept_terms": False,
+            "accept_privacy": False,
+        },
+    )
+    assert no_consent.status_code == 400
+
+    done = client.post(
+        "/api/v1/auth/google/complete",
+        headers=_headers(completion_token),
+        json={
+            "username": "gcompleteuser",
+            "name": "GC",
+            "first_name": "G",
+            "last_name": "C",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+            "password": "supersecret",
+            "accept_terms": True,
+            "accept_privacy": True,
+        },
+    )
+    assert done.status_code == 200, done.text
+    assert done.json()["tokens"]["access_token"]
+
+
+def test_google_callback_existing_complete_user_logs_in(test_app, monkeypatch):
+    client = test_app["client"]
+
+    async def fake_exchange(code):
+        return _google_profile(email="grepeat@example.com", sub="sub-repeat")
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    state = auth_api._build_google_state("google_state")
+    cb = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state}
+    )
+    completion_token = cb.json()["completion_token"]
+    client.post(
+        "/api/v1/auth/google/complete",
+        headers=_headers(completion_token),
+        json={
+            "username": "grepeatuser",
+            "name": "GR",
+            "first_name": "G",
+            "last_name": "R",
+            "date_of_birth": "2000-01-01",
+            "phone": "+40723204204",
+            "password": "supersecret",
+            "accept_terms": True,
+            "accept_privacy": True,
+        },
+    )
+    # Second callback for the same sub -> logs in (profile complete).
+    state2 = auth_api._build_google_state("google_state")
+    again = client.post(
+        "/api/v1/auth/google/callback", json={"code": "abc", "state": state2}
+    )
+    assert again.status_code == 200, again.text
+    assert again.json()["tokens"]["access_token"]
+
+
+def test_google_link_and_unlink_success(test_app, monkeypatch):
+    client = test_app["client"]
+    tokens = _register(client, "glink@example.com", "glinkuser")["tokens"]
+    hdr = _headers(tokens["access_token"])
+
+    async def fake_exchange(code):
+        return _google_profile(email="glink-g@example.com", sub="sub-link")
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    me = client.get("/api/v1/auth/me", headers=hdr).json()
+    state = auth_api._build_google_state("google_link", me["id"])
+    link = client.post(
+        "/api/v1/auth/google/link",
+        headers=hdr,
+        json={"code": "abc", "state": state, "password": "supersecret"},
+    )
+    assert link.status_code == 200, link.text
+
+    unlink = client.post(
+        "/api/v1/auth/google/unlink", headers=hdr, json={"password": "supersecret"}
+    )
+    assert unlink.status_code == 200, unlink.text
+
+
+def test_google_link_conflict(test_app, monkeypatch):
+    client = test_app["client"]
+    tokens_a = _register(client, "gla@example.com", "glauser")["tokens"]
+    hdr_a = _headers(tokens_a["access_token"])
+
+    async def fake_exchange(code):
+        return _google_profile(email="shared-g@example.com", sub="sub-shared")
+
+    monkeypatch.setattr(auth_api.auth_service, "exchange_google_code", fake_exchange)
+    me_a = client.get("/api/v1/auth/me", headers=hdr_a).json()
+    state_a = auth_api._build_google_state("google_link", me_a["id"])
+    client.post(
+        "/api/v1/auth/google/link",
+        headers=hdr_a,
+        json={"code": "abc", "state": state_a, "password": "supersecret"},
+    )
+
+    tokens_b = _register(client, "glb@example.com", "glbuser")["tokens"]
+    hdr_b = _headers(tokens_b["access_token"])
+    me_b = client.get("/api/v1/auth/me", headers=hdr_b).json()
+    state_b = auth_api._build_google_state("google_link", me_b["id"])
+    resp = client.post(
+        "/api/v1/auth/google/link",
+        headers=hdr_b,
+        json={"code": "abc", "state": state_b, "password": "supersecret"},
+    )
+    assert resp.status_code == 409
+
+
+def test_google_start_success(test_app, monkeypatch):
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "google_client_id", "cid")
+    monkeypatch.setattr(settings, "google_redirect_uri", "http://localhost/cb")
+    resp = client.get("/api/v1/auth/google/start")
+    assert resp.status_code == 200
+    assert "auth_url" in resp.json()
