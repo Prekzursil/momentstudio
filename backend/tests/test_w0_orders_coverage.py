@@ -3619,3 +3619,495 @@ def test_cancel_request_no_reason(test_app) -> None:
     )
     assert res.status_code == 400
     assert res.json()["detail"] == "Cancel reason is required"
+
+
+# --------------------------------------------------------------------------- #
+# Last-mile branch closure                                                     #
+# --------------------------------------------------------------------------- #
+def test_checkout_no_couriers(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="cknoc@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-noc")
+
+    import app.api.v1.orders as om
+
+    monkeypatch.setattr(
+        om.cart_service, "delivery_constraints", lambda _c: (False, set())
+    )
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="cod", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-noc"},
+    )
+    assert res.status_code == 400
+    assert "No couriers available" in res.json()["detail"]
+
+
+def test_checkout_courier_not_available(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ckcour@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-cour")
+
+    import app.api.v1.orders as om
+
+    monkeypatch.setattr(
+        om.cart_service, "delivery_constraints", lambda _c: (True, {"fan_courier"})
+    )
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod", phone="+40712345678", courier="sameday"
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-cour"},
+    )
+    assert res.status_code == 400
+    assert "courier is not available" in res.json()["detail"]
+
+
+def test_checkout_locker_not_available(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="cklock@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-lock")
+
+    import app.api.v1.orders as om
+
+    monkeypatch.setattr(
+        om.cart_service, "delivery_constraints", lambda _c: (False, {"sameday"})
+    )
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod",
+            phone="+40712345678",
+            delivery_type="locker",
+            locker_id="L1",
+            locker_name="Locker 1",
+            locker_lat=1.0,
+            locker_lng=2.0,
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-lock"},
+    )
+    assert res.status_code == 400
+    assert "Locker delivery is not available" in res.json()["detail"]
+
+
+def test_checkout_phone_required_uses_user_phone(test_app, monkeypatch) -> None:
+    # No payload phone but phone_required and the user has none -> 400 (covers
+    # both the user-phone fallback and the required check).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ckphone@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-phone")
+
+    import dataclasses
+
+    import app.api.v1.orders as om
+
+    original = om.checkout_settings_service.get_checkout_settings
+
+    async def _cs(session):
+        return dataclasses.replace(await original(session), phone_required_home=True)
+
+    monkeypatch.setattr(om.checkout_settings_service, "get_checkout_settings", _cs)
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="cod"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-phone"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Phone is required"
+
+
+def test_checkout_shipping_method_not_found(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="cksmnf@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-smnf")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod",
+            phone="+40712345678",
+            shipping_method_id="00000000-0000-0000-0000-000000000000",
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-smnf"},
+    )
+    assert res.status_code == 404
+    assert res.json()["detail"] == "Shipping method not found"
+
+
+def test_checkout_ro_language(test_app, monkeypatch) -> None:
+    # Romanian user -> RO notification-title branches in checkout/cod path.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ckro@example.com")
+
+    async def _ro():
+        from sqlalchemy.future import select as _select
+
+        from app.models.user import User as _User
+
+        async with sf() as session:
+            row = await session.execute(_select(_User).where(_User.id == uid))
+            u = row.scalars().first()
+            u.preferred_language = "ro"
+            session.add(u)
+            await session.commit()
+
+    asyncio.run(_ro())
+    _seed_cart(sf, user_id=uid, session_id="ck-ro")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="cod", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-ro"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_create_order_ro_language(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="coro@example.com")
+
+    async def _ro():
+        from sqlalchemy.future import select as _select
+
+        from app.models.user import User as _User
+
+        async with sf() as session:
+            row = await session.execute(_select(_User).where(_User.id == uid))
+            u = row.scalars().first()
+            u.preferred_language = "ro"
+            session.add(u)
+            await session.commit()
+
+    asyncio.run(_ro())
+    _seed_cart(sf, user_id=uid)
+    addr_id = _seed_address(sf, uid)
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_address_id": str(addr_id)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_create_order_no_admin_email(test_app, monkeypatch) -> None:
+    # No owner user + empty admin_alert_email -> admin_to falsy branch skipped.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "admin_alert_email", "", raising=False)
+    token, uid = create_user_token(sf, email="conoadm@example.com")
+    _seed_cart(sf, user_id=uid)
+    addr_id = _seed_address(sf, uid)
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_address_id": str(addr_id)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 201, res.text
+
+
+# --------------------------------------------------------------------------- #
+# admin shipment / fulfill / note / tag with include_pii=true                  #
+# --------------------------------------------------------------------------- #
+def test_admin_shipment_endpoints_include_pii(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    params = {"include_pii": "true"}
+
+    created = client.post(
+        f"/api/v1/orders/admin/{oid}/shipments",
+        params=params,
+        json={"courier": "sameday", "tracking_number": "TRKPII"},
+        headers=headers,
+    )
+    assert created.status_code == 200, created.text
+
+    addr = client.patch(
+        f"/api/v1/orders/admin/{oid}/addresses",
+        params=params,
+        json={"rerate_shipping": False},
+        headers=headers,
+    )
+    assert addr.status_code == 400  # no updates, but include_pii line covered
+
+
+def test_admin_fulfill_item_include_pii(test_app) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _, uid = create_user_token(sf, email="ffpii@example.com")
+    oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
+
+    async def _item_id():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(
+                _select(OrderItem).where(OrderItem.order_id == oid)
+            )
+            return row.scalars().first().id
+
+    item_id = asyncio.run(_item_id())
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/items/{item_id}/fulfill",
+        params={"shipped_quantity": 1, "include_pii": "true"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# email-events: order with no customer email -> returns []                     #
+# --------------------------------------------------------------------------- #
+def test_admin_email_events_no_email(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    oid = _seed_order(sf, payment_method="cod")
+
+    class _Stub:
+        id = oid
+        user = None
+        customer_email = ""
+
+    async def fake_get(_s, _id):
+        return _Stub()
+
+    import app.api.v1.orders as om
+
+    original = om.order_service.get_order_by_id_admin
+    om.order_service.get_order_by_id_admin = fake_get
+    try:
+        res = client.get(
+            f"/api/v1/orders/admin/{oid}/email-events",
+            headers=auth_headers(_admin(test_app)),
+        )
+        assert res.status_code == 200
+        assert res.json() == []
+    finally:
+        om.order_service.get_order_by_id_admin = original
+
+
+# --------------------------------------------------------------------------- #
+# batch endpoints: "Too many orders selected" (>50 / >100)                      #
+# --------------------------------------------------------------------------- #
+def test_admin_batch_too_many_orders(test_app) -> None:
+    # packing-slips and shipping-labels.zip cap at 50 (schema allows up to 100,
+    # so >50 reaches the handler check). pick-list.csv/.pdf cap at 100 which the
+    # schema's max_length=100 already enforces, so their >100 check is unreachable.
+    client = test_app["client"]
+    headers = auth_headers(_admin(test_app))
+    from uuid import uuid4
+
+    ids_51 = [str(uuid4()) for _ in range(51)]
+
+    ps = client.post(
+        "/api/v1/orders/admin/batch/packing-slips",
+        json={"order_ids": ids_51},
+        headers=headers,
+    )
+    assert ps.status_code == 400 and "Too many" in ps.json()["detail"]
+
+    zipr = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        json={"order_ids": ids_51},
+        headers=headers,
+    )
+    assert zipr.status_code == 400 and "Too many" in zipr.json()["detail"]
+
+
+# --------------------------------------------------------------------------- #
+# receipt-by-token: token decodes but order_id is not a valid UUID             #
+# --------------------------------------------------------------------------- #
+def test_receipt_token_bad_uuid(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    import app.api.v1.orders as om
+
+    # Force decode to return a non-UUID order id -> UUID() raises -> 403.
+    monkeypatch.setattr(om, "decode_receipt_token", lambda _t: ("not-a-uuid", 0))
+    res = client.get("/api/v1/orders/receipt/anytoken")
+    assert res.status_code == 403
+    pdf = client.get("/api/v1/orders/receipt/anytoken/pdf")
+    assert pdf.status_code == 403
+
+
+# --------------------------------------------------------------------------- #
+# admin update_order: status update to a paid order for a user (RO)            #
+# --------------------------------------------------------------------------- #
+def test_admin_update_order_ro_user(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="updro@example.com")
+
+    async def _ro():
+        from sqlalchemy.future import select as _select
+
+        from app.models.user import User as _User
+
+        async with sf() as session:
+            row = await session.execute(_select(_User).where(_User.id == uid))
+            u = row.scalars().first()
+            u.preferred_language = "ro"
+            session.add(u)
+            await session.commit()
+
+    asyncio.run(_ro())
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.pending_acceptance,
+        customer_email="updro@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "paid"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Document export download (happy path with a real generated file)            #
+# --------------------------------------------------------------------------- #
+def test_admin_export_download_roundtrip(test_app, monkeypatch, tmp_path) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+
+    # Generate a packing-slip export so a downloadable export row exists on disk.
+    ps = client.get(f"/api/v1/orders/admin/{oid}/packing-slip", headers=headers)
+    assert ps.status_code == 200
+
+    listing = client.get("/api/v1/orders/admin/exports", headers=headers)
+    assert listing.status_code == 200
+    items = listing.json()["items"]
+    assert items, listing.text
+    export_id = items[0]["id"]
+
+    # Clear expires_at so the (aware/naive) expiry comparison is skipped under the
+    # in-memory SQLite harness, exercising the file-resolution + FileResponse path.
+    from uuid import UUID
+
+    async def _clear_expiry():
+        from sqlalchemy.future import select as _select
+
+        from app.models.order_document_export import OrderDocumentExport
+
+        async with sf() as session:
+            row = await session.execute(
+                _select(OrderDocumentExport).where(
+                    OrderDocumentExport.id == UUID(export_id)
+                )
+            )
+            exp = row.scalars().first()
+            exp.expires_at = None
+            session.add(exp)
+            await session.commit()
+
+    asyncio.run(_clear_expiry())
+
+    dl = client.get(
+        f"/api/v1/orders/admin/exports/{export_id}/download", headers=headers
+    )
+    assert dl.status_code == 200
+
+
+def test_admin_batch_shipping_labels_partial_missing(
+    test_app, monkeypatch, tmp_path
+) -> None:
+    # One order has a real label, another has none -> 404 lists the missing one.
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    headers = auth_headers(_admin(test_app))
+    oid_with, _ = _seed_order_with_user(test_app, payment_method="cod")
+    oid_without, _ = _seed_order_with_user(test_app, payment_method="cod")
+
+    up = client.post(
+        f"/api/v1/orders/admin/{oid_with}/shipping-label",
+        files={"file": ("label.pdf", b"%PDF-1.4 mini", "application/pdf")},
+        headers=headers,
+    )
+    assert up.status_code == 200, up.text
+
+    res = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        json={"order_ids": [str(oid_with), str(oid_without)]},
+        headers=headers,
+    )
+    assert res.status_code == 404
+    assert str(oid_without) in str(res.json()["detail"])
+
+
+def test_admin_batch_shipping_labels_all_present(
+    test_app, monkeypatch, tmp_path
+) -> None:
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    headers = auth_headers(_admin(test_app))
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    up = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        files={"file": ("label.pdf", b"%PDF-1.4 mini", "application/pdf")},
+        headers=headers,
+    )
+    assert up.status_code == 200, up.text
+    res = client.post(
+        "/api/v1/orders/admin/batch/shipping-labels.zip",
+        json={"order_ids": [str(oid)]},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    assert res.headers["content-type"] == "application/zip"
+
+
+def test_admin_update_order_to_pending_acceptance(test_app, monkeypatch) -> None:
+    # pending_payment -> pending_acceptance is allowed but is NOT one of the five
+    # elif statuses, so it exercises the generic "Order update" title branch.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="updpa@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.pending_payment,
+        customer_email="updpa@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "pending_acceptance"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
