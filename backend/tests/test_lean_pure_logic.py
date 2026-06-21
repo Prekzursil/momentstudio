@@ -11,7 +11,7 @@ import pytest
 from app.core import metrics
 from app.schemas.promo import PromoCodeCreate
 from app.schemas.user import UserBase
-from app.services import og_images
+from app.services import font_utils, og_images
 
 
 # --------------------------------------------------------------------------- #
@@ -134,3 +134,44 @@ def test_og_image_unbreakable_word_hits_fits_false_branch(monkeypatch) -> None:
     monkeypatch.setattr(og_images, "_load_font", _scalable_font)
     blob = og_images.render_blog_post_og(title="X" * 80, subtitle=None)
     assert _is_png(blob)
+
+
+# --------------------------------------------------------------------------- #
+# services.font_utils                                                          #
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("bold", [False, True])
+def test_load_font_falls_back_when_no_truetype(monkeypatch, bold: bool) -> None:
+    # On CI the DejaVu TTFs exist so ``ImageFont.truetype`` succeeds on the first
+    # candidate and the OSError-continue + ``load_default`` fallback never run; on
+    # bare hosts the opposite happens. Force every ``truetype`` lookup to raise so
+    # the loop exhausts and the default-font fallback runs deterministically on
+    # every platform (covering the except-continue and the final return).
+    real_truetype = font_utils.ImageFont.truetype
+
+    def _truetype(font=None, *args, **kwargs):
+        # The candidate lookups pass a filesystem path string -> force OSError so
+        # the loop exhausts. ``load_default`` calls ``truetype`` with a non-path
+        # (a bundled font buffer) -> delegate so the fallback can still build one.
+        if isinstance(font, str):
+            raise OSError("no font")
+        return real_truetype(font, *args, **kwargs)
+
+    monkeypatch.setattr(font_utils.ImageFont, "truetype", _truetype)
+    font = font_utils.load_font(24, bold=bold)
+    assert font is not None
+
+
+@pytest.mark.parametrize("bold", [False, True])
+def test_load_font_uses_truetype_when_available(monkeypatch, bold: bool) -> None:
+    # The happy path: the first candidate loads, so the function returns inside
+    # the try (covering the successful ``return`` branch on hosts where the system
+    # fonts are absent, e.g. Windows dev machines).
+    from PIL import ImageFont
+
+    sentinel = ImageFont.load_default()
+
+    def _ok(*args, **kwargs):
+        return sentinel
+
+    monkeypatch.setattr(font_utils.ImageFont, "truetype", _ok)
+    assert font_utils.load_font(18, bold=bold) is sentinel
