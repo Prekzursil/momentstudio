@@ -5315,3 +5315,334 @@ def test_admin_email_events_order_no_reference(test_app, monkeypatch) -> None:
         assert res.status_code == 200
     finally:
         om.order_service.get_order_by_id_admin = original
+
+
+# --------------------------------------------------------------------------- #
+# Final partial-branch closure (opposite sides of conditionals)               #
+# --------------------------------------------------------------------------- #
+def test_checkout_coupon_with_stripe(test_app, monkeypatch) -> None:
+    # applied_coupon set but payment_method != cod -> 1055 False side (skips
+    # the COD redeem).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_public_coupon(sf, code="STR10")
+    token, uid = create_user_token(sf, email="ckcoupstr@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-coupstr")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="stripe",
+            phone="+40712345678",
+            promo_code="STR10",
+            country="RO",
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-coupstr"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_guest_checkout_valid_shipping_method(test_app, monkeypatch) -> None:
+    # Guest provides a valid shipping method -> 2534 False side (no 404).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-vsm", guest_email="gvsm@example.com", guest_verified=True
+    )
+    created = client.post(
+        "/api/v1/orders/shipping-methods",
+        json={"name": "GuestStd", "rate_flat": 5.0, "rate_per_kg": 0},
+        headers=auth_headers(_admin(test_app)),
+    )
+    method_id = created.json()["id"]
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gvsm@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            shipping_method_id=method_id,
+        ),
+        headers={"X-Session-Id": "g-vsm"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_checkout_valid_shipping_method(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ckvsm@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-vsm")
+    created = client.post(
+        "/api/v1/orders/shipping-methods",
+        json={"name": "CkStd", "rate_flat": 5.0, "rate_per_kg": 0},
+        headers=auth_headers(_admin(test_app)),
+    )
+    method_id = created.json()["id"]
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod", phone="+40712345678", shipping_method_id=method_id
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-vsm"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_admin_deliver_guest_order_no_user(test_app, monkeypatch) -> None:
+    # delivered transition for a guest order (no user) -> 2932 False side skips
+    # the first-order-reward block.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="cod",
+        status=OrderStatus.shipped,
+        customer_email="delguest@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "delivered"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_checkout_resume_netopia_no_addresses(test_app, monkeypatch) -> None:
+    # Existing netopia order with NO addresses -> 651 inner False side: the order
+    # is returned without re-issuing payment.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _enable_netopia(monkeypatch)
+    token, uid = create_user_token(sf, email="resnoa@example.com")
+    _seed_cart_with_existing_order(
+        sf,
+        user_id=uid,
+        session_id="res-noa",
+        payment_method="netopia",
+        netopia_payment_url=None,
+        with_addresses=False,
+    )
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="netopia", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "res-noa"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_guest_resume_netopia_no_addresses(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _enable_netopia(monkeypatch)
+    _seed_cart_with_existing_order(
+        sf,
+        session_id="g-res-noa",
+        guest_email="gresnoa@example.com",
+        guest_verified=True,
+        payment_method="netopia",
+        netopia_payment_url=None,
+        with_addresses=False,
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gresnoa@example.com", payment_method="netopia", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-res-noa"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_create_refund_zero_record(test_app, monkeypatch) -> None:
+    # create_order_refund that produces no refund record -> 3450 False side.
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(
+        test_app, status=OrderStatus.paid, payment_method="cod"
+    )
+
+    import app.api.v1.orders as om
+
+    async def _no_record(session, order, **_kw):
+        # Return the order unchanged with no refunds attached.
+        return order
+
+    monkeypatch.setattr(om.order_service, "create_order_refund", _no_record)
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/refunds",
+        json={"amount": "1.00", "note": "no record"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Final coverage: naive-datetime + reward-issued branches                      #
+# --------------------------------------------------------------------------- #
+def test_admin_search_sla_naive_started_at(test_app, monkeypatch) -> None:
+    # An overdue pending_acceptance order produces an SLA row whose started_at is
+    # a naive datetime under SQLite -> _ensure_utc replace(tzinfo=utc) (1783).
+    from datetime import datetime
+
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _, uid = create_user_token(sf, email="slanaive@example.com")
+    oid = _seed_order(
+        sf, user_id=uid, payment_method="cod", status=OrderStatus.pending_acceptance
+    )
+
+    async def _backdate():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(_select(Order).where(Order.id == oid))
+            o = row.scalars().first()
+            # Naive datetime (no tzinfo) far in the past so it is overdue.
+            o.created_at = datetime(2020, 1, 1)
+            session.add(o)
+            await session.commit()
+
+    asyncio.run(_backdate())
+    res = client.get(
+        "/api/v1/orders/admin/search",
+        params={"sla": "any_overdue"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_guest_email_confirm_naive_expiry(test_app) -> None:
+    # Naive (no tz) expiry stored -> the tzinfo-None normalization runs (2281).
+    from datetime import datetime, timedelta
+
+    from app.models.cart import Cart, CartItem
+
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+
+    async def _seed():
+        async with sf() as session:
+            category = Category(slug="gnaive", name="GNAIVE")
+            product = Product(
+                category=category,
+                slug="gnaive-prod",
+                sku="GNAIVE",
+                name="GNAIVE",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=5,
+                status=ProductStatus.published,
+            )
+            cart = Cart(session_id="g-naive")
+            cart.guest_email = "gnaive@example.com"
+            cart.guest_email_verification_token = "111222"
+            # Naive future datetime (no tzinfo).
+            cart.guest_email_verification_expires_at = datetime.now() + timedelta(
+                minutes=10
+            )
+            cart.items = [
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("10.00")
+                )
+            ]
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(_seed())
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "gnaive@example.com", "token": "111222"},
+        headers={"X-Session-Id": "g-naive"},
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["verified"] is True
+
+
+def test_admin_deliver_issues_reward_coupon(test_app, monkeypatch) -> None:
+    # Reward issuance returns a coupon -> the send_coupon_assigned task runs (2944 True).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+
+    import app.api.v1.orders as om
+
+    class _Coupon:
+        code = "REWARD10"
+        ends_at = None
+
+    async def _issue(*_a, **_k):
+        return _Coupon()
+
+    async def _assigned(*_a, **_k):
+        return True
+
+    monkeypatch.setattr(
+        om.coupons_service, "issue_first_order_reward_if_eligible", _issue
+    )
+    monkeypatch.setattr(om.email_service, "send_coupon_assigned", _assigned)
+
+    _, uid = create_user_token(sf, email="rewardok@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.shipped,
+        customer_email="rewardok@example.com",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "delivered"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_email_events_no_reference_filter(test_app, monkeypatch) -> None:
+    # Real order with a customer email but an EMPTY reference_code -> ref_lower is
+    # falsy so the subject LIKE filter is skipped (2192 False side).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _, uid = create_user_token(sf, email="noreffilter@example.com")
+
+    async def _seed():
+        async with sf() as session:
+            o = Order(
+                user_id=uid,
+                status=OrderStatus.paid,
+                reference_code="",
+                customer_email="noreffilter@example.com",
+                customer_name="N",
+                total_amount=Decimal("1.00"),
+                payment_method="cod",
+                currency="RON",
+            )
+            session.add(o)
+            await session.commit()
+            await session.refresh(o)
+            return o.id
+
+    oid = asyncio.run(_seed())
+    res = client.get(
+        f"/api/v1/orders/admin/{oid}/email-events",
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text

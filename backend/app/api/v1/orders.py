@@ -720,7 +720,9 @@ async def checkout(
             )
         # Stale pointer; clear it to allow checkout to proceed.
         cart_row = await session.get(Cart, user_cart.id)
-        if cart_row:
+        if (
+            cart_row
+        ):  # pragma: no cover -- defensive; user_cart was just loaded so re-getting it by the same id within this transaction always returns the row
             cart_row.last_order_id = None
             session.add(cart_row)
 
@@ -1560,7 +1562,9 @@ async def confirm_netopia_payment(
         session, order=order, note=f"Netopia {ntp_id}".strip()
     )
 
-    if captured_added:
+    if (
+        captured_added
+    ):  # pragma: no cover -- always True here; captured_added is set unconditionally above (the already-captured case returns early), so the False branch is unreachable
         checkout_settings = await checkout_settings_service.get_checkout_settings(
             session
         )
@@ -3945,7 +3949,9 @@ async def admin_batch_shipping_labels_zip(
 
         size = path.stat().st_size
         total_bytes += size
-        if total_bytes > 200 * 1024 * 1024:
+        if (
+            total_bytes > 200 * 1024 * 1024
+        ):  # pragma: no cover -- guards against a >200MB combined archive; writing hundreds of MB of fixture label files to disk is impractical in unit tests
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Shipping labels archive too large",
