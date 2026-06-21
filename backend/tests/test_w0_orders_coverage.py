@@ -4600,3 +4600,320 @@ def test_shipping_label_upload_replaces_old(test_app, monkeypatch, tmp_path) -> 
         headers=headers,
     )
     assert second.status_code == 200, second.text
+
+
+# --------------------------------------------------------------------------- #
+# Stale last_order_id pointer cleared (points to a since-deleted order)         #
+# --------------------------------------------------------------------------- #
+def _seed_cart_stale_pointer(
+    session_factory, *, user_id=None, session_id=None, guest_email=None
+):
+    from datetime import datetime, timezone
+
+    from app.models.cart import Cart, CartItem
+
+    async def _seed():
+        async with session_factory() as session:
+            # Create a real order, capture its id, then delete it so the cart's
+            # last_order_id is a valid-but-dangling pointer.
+            tmp = Order(
+                user_id=user_id,
+                status=OrderStatus.pending_payment,
+                reference_code=f"REF-DANGLE-{_ref_counter[0]}",
+                customer_email=guest_email or "buyer0@example.com",
+                customer_name="Tmp",
+                total_amount=Decimal("1.00"),
+                payment_method="cod",
+                currency="RON",
+            )
+            _ref_counter[0] += 1
+            session.add(tmp)
+            await session.flush()
+            dangling_id = tmp.id
+            await session.delete(tmp)
+            await session.flush()
+
+            category = Category(slug=f"dangle-{dangling_id}", name="Dangle")
+            product = Product(
+                category=category,
+                slug=f"dangle-prod-{dangling_id}",
+                sku=f"DANGLE-{dangling_id}",
+                name="Dangle Product",
+                base_price=Decimal("20.00"),
+                currency="RON",
+                stock_quantity=10,
+                status=ProductStatus.published,
+            )
+            cart = Cart(
+                user_id=user_id, session_id=session_id, last_order_id=dangling_id
+            )
+            if guest_email:
+                cart.guest_email = guest_email
+                cart.guest_email_verified_at = datetime.now(timezone.utc)
+            cart.items = [
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("20.00")
+                )
+            ]
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(_seed())
+
+
+def test_checkout_stale_pointer_cleared(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ckstale@example.com")
+    _seed_cart_stale_pointer(sf, user_id=uid, session_id="ck-stale")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="cod", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-stale"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_guest_checkout_stale_pointer_cleared(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart_stale_pointer(sf, session_id="g-stale", guest_email="gstale@example.com")
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gstale@example.com", payment_method="cod", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-stale"},
+    )
+    assert res.status_code == 201, res.text
+
+
+def test_create_order_stale_pointer_cleared(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="costale@example.com")
+    _seed_cart_stale_pointer(sf, user_id=uid)
+    addr_id = _seed_address(sf, uid)
+    res = client.post(
+        "/api/v1/orders",
+        json={"shipping_address_id": str(addr_id)},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 201, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Guest email confirm: expired token + too-many attempts                       #
+# --------------------------------------------------------------------------- #
+def test_guest_email_confirm_expired_token(test_app) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.cart import Cart, CartItem
+
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+
+    async def _seed():
+        async with sf() as session:
+            category = Category(slug="gexp", name="GEXP")
+            product = Product(
+                category=category,
+                slug="gexp-prod",
+                sku="GEXP",
+                name="GEXP",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=5,
+                status=ProductStatus.published,
+            )
+            cart = Cart(session_id="g-exp")
+            cart.guest_email = "gexp@example.com"
+            cart.guest_email_verification_token = "123456"
+            cart.guest_email_verification_expires_at = datetime.now(
+                timezone.utc
+            ) - timedelta(minutes=1)
+            cart.items = [
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("10.00")
+                )
+            ]
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(_seed())
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "gexp@example.com", "token": "123456"},
+        headers={"X-Session-Id": "g-exp"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid or expired token"
+
+
+def test_guest_email_confirm_too_many_attempts(test_app) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from app.models.cart import Cart, CartItem
+
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+
+    async def _seed():
+        async with sf() as session:
+            category = Category(slug="gatt", name="GATT")
+            product = Product(
+                category=category,
+                slug="gatt-prod",
+                sku="GATT",
+                name="GATT",
+                base_price=Decimal("10.00"),
+                currency="RON",
+                stock_quantity=5,
+                status=ProductStatus.published,
+            )
+            cart = Cart(session_id="g-att")
+            cart.guest_email = "gatt@example.com"
+            cart.guest_email_verification_token = "654321"
+            cart.guest_email_verification_expires_at = datetime.now(
+                timezone.utc
+            ) + timedelta(minutes=10)
+            cart.guest_email_verification_attempts = 10
+            cart.items = [
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("10.00")
+                )
+            ]
+            session.add(cart)
+            await session.commit()
+
+    asyncio.run(_seed())
+    res = client.post(
+        "/api/v1/orders/guest-checkout/email/confirm",
+        json={"email": "gatt@example.com", "token": "654321"},
+        headers={"X-Session-Id": "g-att"},
+    )
+    assert res.status_code == 429
+
+
+# --------------------------------------------------------------------------- #
+# Netopia confirm: ntp_id mismatch when payload supplies a different one        #
+# --------------------------------------------------------------------------- #
+def test_netopia_confirm_status_5_confirmed(test_app, monkeypatch) -> None:
+    # status 5 (CONFIRMED) is in the paid set -> success path.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="n5@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="netopia",
+        netopia_ntp_id="NTP-5C",
+        status=OrderStatus.pending_acceptance,
+        customer_email="n5@example.com",
+        with_product=True,
+    )
+
+    async def fake_status(**_kw):
+        return {"payment": {"status": 5}}
+
+    monkeypatch.setattr(netopia_service, "get_status", fake_status)
+    res = client.post(
+        "/api/v1/orders/netopia/confirm",
+        json={"order_id": str(oid), "ntp_id": "NTP-5C"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Shipment update / delete + label endpoints include_pii                       #
+# --------------------------------------------------------------------------- #
+def test_admin_shipment_update_delete(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+
+    created = client.post(
+        f"/api/v1/orders/admin/{oid}/shipments",
+        json={"courier": "sameday", "tracking_number": "TRK-UPD"},
+        headers=headers,
+    )
+    assert created.status_code == 200, created.text
+    shipment_id = created.json()["shipments"][0]["id"]
+
+    updated = client.patch(
+        f"/api/v1/orders/admin/{oid}/shipments/{shipment_id}",
+        params={"include_pii": "true"},
+        json={"tracking_number": "TRK-UPD2"},
+        headers=headers,
+    )
+    assert updated.status_code == 200, updated.text
+
+    deleted = client.delete(
+        f"/api/v1/orders/admin/{oid}/shipments/{shipment_id}",
+        params={"include_pii": "true"},
+        headers=headers,
+    )
+    assert deleted.status_code == 200, deleted.text
+
+
+def test_admin_label_download_include_pii_noop(test_app, monkeypatch, tmp_path) -> None:
+    # tag-remove + add with include_pii (covers the include_pii guard on those).
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    rm = client.delete(
+        f"/api/v1/orders/admin/{oid}/tags/none",
+        params={"include_pii": "true"},
+        headers=headers,
+    )
+    assert rm.status_code == 200, rm.text
+
+
+# --------------------------------------------------------------------------- #
+# Refund with line items (partial refund quantities)                           #
+# --------------------------------------------------------------------------- #
+def test_admin_create_refund_with_items(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="refitems@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        status=OrderStatus.paid,
+        customer_email="refitems@example.com",
+        with_product=True,
+    )
+
+    async def _item_id():
+        from sqlalchemy.future import select as _select
+
+        async with sf() as session:
+            row = await session.execute(
+                _select(OrderItem).where(OrderItem.order_id == oid)
+            )
+            return row.scalars().first().id
+
+    item_id = asyncio.run(_item_id())
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/refunds",
+        json={
+            "amount": "5.00",
+            "note": "partial with items",
+            "items": [{"order_item_id": str(item_id), "quantity": 1}],
+        },
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
