@@ -134,4 +134,43 @@ describe('RichEditorComponent', () => {
     // No assertion needed beyond no-throw: blank label hits the early return.
     expect(true).toBeTrue();
   }));
+
+  it('applies a falsy external value as an empty string', fakeAsync(() => {
+    const fixture = make('seed');
+    fixture.detectChanges();
+    tick();
+    tick();
+    const cmp = fixture.componentInstance;
+    cmp.value = '';
+    cmp.ngOnChanges({ value: { currentValue: '', previousValue: 'seed' } as never });
+    const editor = (cmp as unknown as { editor: { getMarkdown: () => string } }).editor;
+    expect(editor.getMarkdown().trim()).toBe('');
+    fixture.destroy();
+  }));
+
+  it('syncThemeClass falls back to the host element when no defaultUI exists', fakeAsync(() => {
+    const fixture = make('');
+    const cmp = fixture.componentInstance as unknown as {
+      host: { nativeElement: HTMLElement };
+      syncThemeClass: () => void;
+    };
+    document.documentElement.classList.add('dark');
+    cmp.syncThemeClass(); // editor not built yet -> no .toastui-editor-defaultUI
+    expect(cmp.host.nativeElement.classList.contains('toastui-editor-dark')).toBeTrue();
+    document.documentElement.classList.remove('dark');
+  }));
+
+  it('theme/aria helpers bail out once the component is destroyed', fakeAsync(() => {
+    const fixture = make('');
+    fixture.detectChanges();
+    tick();
+    tick();
+    fixture.destroy();
+    const cmp = fixture.componentInstance as unknown as {
+      syncThemeClass: () => void;
+      applyAriaLabel: () => void;
+    };
+    expect(() => cmp.syncThemeClass()).not.toThrow();
+    expect(() => cmp.applyAriaLabel()).not.toThrow();
+  }));
 });
