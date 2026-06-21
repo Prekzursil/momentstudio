@@ -72,4 +72,44 @@ describe('FxAdminService', () => {
     expect(delReq.request.method).toBe('DELETE');
     delReq.flush(null);
   });
+
+  it('lists the override audit with the default limit', () => {
+    service.listOverrideAudit().subscribe((entries) => {
+      expect(entries.length).toBe(1);
+    });
+
+    const req = httpMock.expectOne('/api/v1/fx/admin/override/audit?limit=50');
+    expect(req.request.method).toBe('GET');
+    req.flush([{ id: 'a1', action: 'set', created_at: '2026-01-01T00:00:00+00:00' }]);
+  });
+
+  it('lists the override audit with an explicit limit', () => {
+    service.listOverrideAudit(5).subscribe();
+
+    const req = httpMock.expectOne('/api/v1/fx/admin/override/audit?limit=5');
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('restores an override from an audit entry', () => {
+    service.restoreOverrideFromAudit('a1').subscribe((status) => {
+      expect(status.effective.base).toBe('RON');
+    });
+
+    const req = httpMock.expectOne('/api/v1/fx/admin/override/audit/a1/revert');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({});
+    req.flush({
+      effective: {
+        base: 'RON',
+        eur_per_ron: 0.2,
+        usd_per_ron: 0.22,
+        as_of: '2026-01-01',
+        source: 'override',
+        fetched_at: '2026-01-01T00:00:00+00:00',
+      },
+      override: null,
+      last_known: null,
+    });
+  });
 });
