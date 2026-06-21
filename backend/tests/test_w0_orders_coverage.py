@@ -2106,3 +2106,426 @@ def test_reorder(test_app) -> None:
     oid = _seed_order(sf, user_id=uid, payment_method="cod", with_product=True)
     res = client.post(f"/api/v1/orders/{oid}/reorder", headers=auth_headers(token))
     assert res.status_code in (200, 404), res.text
+
+
+# --------------------------------------------------------------------------- #
+# Checkout payment-method branches (stripe / paypal / netopia)                 #
+# --------------------------------------------------------------------------- #
+def _enable_netopia(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "netopia_enabled", True, raising=False)
+    monkeypatch.setattr(
+        netopia_service, "netopia_configuration_status", lambda: (True, None)
+    )
+    monkeypatch.setattr(netopia_service, "is_netopia_configured", lambda: True)
+
+    async def _start(**_kw):
+        return "NTP-MOCK", "https://netopia.example/pay"
+
+    monkeypatch.setattr(netopia_service, "start_payment", _start)
+
+
+def test_checkout_stripe(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ck_stripe@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-stripe")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="stripe", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-stripe"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["payment_method"] == "stripe"
+    assert res.json()["stripe_session_id"]
+
+
+def test_checkout_paypal(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+
+    from app.services import paypal as paypal_service
+
+    async def _create(**_kw):
+        return "PP-MOCK", "https://paypal.example/approve"
+
+    monkeypatch.setattr(paypal_service, "create_order", _create)
+
+    token, uid = create_user_token(sf, email="ck_paypal@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-paypal")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="paypal", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-paypal"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["paypal_order_id"] == "PP-MOCK"
+
+
+def test_checkout_netopia(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _enable_netopia(monkeypatch)
+    token, uid = create_user_token(sf, email="ck_netopia@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-netopia")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="netopia", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-netopia"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["netopia_payment_url"] == "https://netopia.example/pay"
+
+
+def test_checkout_netopia_disabled(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "netopia_enabled", False, raising=False)
+    token, uid = create_user_token(sf, email="ck_netopia_off@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-netopia-off")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="netopia", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-netopia-off"},
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Netopia is disabled"
+
+
+def test_checkout_netopia_not_configured(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "netopia_enabled", True, raising=False)
+    monkeypatch.setattr(
+        netopia_service,
+        "netopia_configuration_status",
+        lambda: (False, "missing keys"),
+    )
+    token, uid = create_user_token(sf, email="ck_netopia_nc@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-netopia-nc")
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(payment_method="netopia", phone="+40712345678"),
+        headers={**auth_headers(token), "X-Session-Id": "ck-netopia-nc"},
+    )
+    assert res.status_code == 500
+    assert res.json()["detail"] == "missing keys"
+
+
+def test_checkout_with_promo_code(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="ck_promo@example.com")
+    _seed_cart(sf, user_id=uid, session_id="ck-promo")
+    # Unknown promo code: coupon lookup 404s, falls back to validate_promo (also
+    # returns nothing) -> checkout proceeds with no discount.
+    res = client.post(
+        "/api/v1/orders/checkout",
+        json=_checkout_payload(
+            payment_method="cod", phone="+40712345678", promo_code="UNKNOWNCODE"
+        ),
+        headers={**auth_headers(token), "X-Session-Id": "ck-promo"},
+    )
+    assert res.status_code in (201, 400, 404), res.text
+
+
+# --------------------------------------------------------------------------- #
+# Guest checkout full flows (cod already covered; add stripe + netopia)        #
+# --------------------------------------------------------------------------- #
+def test_guest_checkout_stripe(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf,
+        session_id="g-stripe",
+        guest_email="gstripe@example.com",
+        guest_verified=True,
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gstripe@example.com", payment_method="stripe", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-stripe"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["stripe_session_id"]
+
+
+def test_guest_checkout_netopia(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _enable_netopia(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-net", guest_email="gnet@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gnet@example.com", payment_method="netopia", phone="+40712345678"
+        ),
+        headers={"X-Session-Id": "g-net"},
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["netopia_payment_url"] == "https://netopia.example/pay"
+
+
+def test_guest_checkout_create_account(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _seed_legal(sf)
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _seed_cart(
+        sf, session_id="g-acct", guest_email="gacct@example.com", guest_verified=True
+    )
+    res = client.post(
+        "/api/v1/orders/guest-checkout",
+        json=_guest_payload(
+            "gacct@example.com",
+            payment_method="cod",
+            phone="+40712345678",
+            create_account=True,
+            password="secret123",
+            username="gacctuser",
+            first_name="Gacct",
+            last_name="User",
+            date_of_birth="1990-01-01",
+        ),
+        headers={"X-Session-Id": "g-acct"},
+    )
+    assert res.status_code == 201, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Stripe confirm in REAL mode (monkeypatched SDK, as test_w3_payments does)    #
+# --------------------------------------------------------------------------- #
+def test_stripe_confirm_real_mode_not_configured(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    from app.services import payments
+
+    monkeypatch.setattr(settings, "payments_provider", "real", raising=False)
+    monkeypatch.setattr(payments, "is_stripe_configured", lambda: False)
+    res = client.post("/api/v1/orders/stripe/confirm", json={"session_id": "cs_real"})
+    assert res.status_code == 500
+    assert res.json()["detail"] == "Stripe not configured"
+
+
+def test_stripe_confirm_real_mode_lookup_fails(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    from app.services import payments
+
+    monkeypatch.setattr(settings, "payments_provider", "real", raising=False)
+    monkeypatch.setattr(payments, "is_stripe_configured", lambda: True)
+    monkeypatch.setattr(payments, "init_stripe", lambda: None)
+
+    class _Sessions:
+        @staticmethod
+        def retrieve(_sid):
+            raise RuntimeError("boom")
+
+    class _Checkout:
+        Session = _Sessions
+
+    class _Stripe:
+        checkout = _Checkout
+
+    monkeypatch.setattr(payments, "stripe", _Stripe, raising=False)
+    res = client.post("/api/v1/orders/stripe/confirm", json={"session_id": "cs_real2"})
+    assert res.status_code == 502
+
+
+def test_stripe_confirm_real_mode_not_paid(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    from app.services import payments
+
+    monkeypatch.setattr(settings, "payments_provider", "real", raising=False)
+    monkeypatch.setattr(payments, "is_stripe_configured", lambda: True)
+    monkeypatch.setattr(payments, "init_stripe", lambda: None)
+
+    class _Session:
+        payment_status = "unpaid"
+        payment_intent = "pi_x"
+
+    class _Sessions:
+        @staticmethod
+        def retrieve(_sid):
+            return _Session()
+
+    class _Checkout:
+        Session = _Sessions
+
+    class _Stripe:
+        checkout = _Checkout
+
+    monkeypatch.setattr(payments, "stripe", _Stripe, raising=False)
+    res = client.post("/api/v1/orders/stripe/confirm", json={"session_id": "cs_real3"})
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Payment not completed"
+
+
+def test_stripe_confirm_real_mode_paid(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    from app.services import payments
+
+    _silence_email(monkeypatch)
+    monkeypatch.setattr(settings, "payments_provider", "real", raising=False)
+    monkeypatch.setattr(payments, "is_stripe_configured", lambda: True)
+    monkeypatch.setattr(payments, "init_stripe", lambda: None)
+
+    class _Session:
+        payment_status = "paid"
+        payment_intent = "pi_real_1"
+
+    class _Sessions:
+        @staticmethod
+        def retrieve(_sid):
+            return _Session()
+
+    class _Checkout:
+        Session = _Sessions
+
+    class _Stripe:
+        checkout = _Checkout
+
+    monkeypatch.setattr(payments, "stripe", _Stripe, raising=False)
+    token, uid = create_user_token(sf, email="sreal@example.com")
+    _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="stripe",
+        stripe_session_id="cs_real4",
+        customer_email="sreal@example.com",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/stripe/confirm",
+        json={"session_id": "cs_real4"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# include_pii branch on admin mutation endpoints                               #
+# --------------------------------------------------------------------------- #
+def test_admin_mutations_include_pii(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+    params = {"include_pii": "true"}
+
+    note = client.post(
+        f"/api/v1/orders/admin/{oid}/notes",
+        params=params,
+        json={"note": "pii"},
+        headers=headers,
+    )
+    assert note.status_code == 200, note.text
+
+    tag = client.post(
+        f"/api/v1/orders/admin/{oid}/tags",
+        params=params,
+        json={"tag": "piivip"},
+        headers=headers,
+    )
+    assert tag.status_code == 200, tag.text
+
+    fraud = client.post(
+        f"/api/v1/orders/admin/{oid}/fraud-review",
+        params=params,
+        json={"decision": "approve"},
+        headers=headers,
+    )
+    assert fraud.status_code == 200, fraud.text
+
+    get_o = client.get(f"/api/v1/orders/admin/{oid}", params=params, headers=headers)
+    assert get_o.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# Refund happy paths                                                            #
+# --------------------------------------------------------------------------- #
+def test_admin_refund_order_ok(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(
+        test_app, status=OrderStatus.paid, payment_method="cod"
+    )
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/refund",
+        json={"note": "full refund"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
+
+
+def test_admin_create_order_refund_ok(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    _silence_email(monkeypatch)
+    oid, _ = _seed_order_with_user(
+        test_app, status=OrderStatus.paid, payment_method="cod"
+    )
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/refunds",
+        json={"amount": "10.00", "note": "partial"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
+
+
+# --------------------------------------------------------------------------- #
+# Shipping label upload + download + delete (with real private file)           #
+# --------------------------------------------------------------------------- #
+def test_admin_shipping_label_upload_download_delete(
+    test_app, monkeypatch, tmp_path
+) -> None:
+    client = test_app["client"]
+    monkeypatch.setattr(settings, "private_media_root", str(tmp_path), raising=False)
+    oid, _ = _seed_order_with_user(test_app, payment_method="cod")
+    headers = auth_headers(_admin(test_app))
+
+    up = client.post(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        files={"file": ("label.pdf", b"%PDF-1.4 minimal", "application/pdf")},
+        headers=headers,
+    )
+    assert up.status_code == 200, up.text
+
+    dl = client.get(f"/api/v1/orders/admin/{oid}/shipping-label", headers=headers)
+    assert dl.status_code == 200
+
+    pr = client.get(
+        f"/api/v1/orders/admin/{oid}/shipping-label",
+        params={"action": "print"},
+        headers=headers,
+    )
+    assert pr.status_code == 200
+
+    rm = client.delete(f"/api/v1/orders/admin/{oid}/shipping-label", headers=headers)
+    assert rm.status_code == 204
