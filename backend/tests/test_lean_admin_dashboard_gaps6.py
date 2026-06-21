@@ -97,34 +97,57 @@ def test_alert_thresholds_integrity_race_recovers(
     session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def _scenario(session) -> Any:
-        # Pre-seed the default row so the post-rollback select finds it.
         from app.models.admin_dashboard_settings import AdminDashboardAlertThresholds
 
-        session.add(AdminDashboardAlertThresholds(key="default"))
-        await session.commit()
+        existing = AdminDashboardAlertThresholds(key="default")
 
-        # Force the first commit (the insert) to raise IntegrityError once so
-        # the except branch runs and recovers via the select.
-        real_commit = session.commit
-        state = {"raised": False}
+        # First scalar (initial lookup) misses; the insert commit then raises
+        # IntegrityError (a concurrent insert won the race); the recovery scalar
+        # returns the row another worker created -> exercises 186-194.
+        calls = {"scalar": 0}
+
+        async def _scalar(*args, **kwargs):
+            calls["scalar"] += 1
+            return None if calls["scalar"] == 1 else existing
 
         async def _commit():
-            if not state["raised"]:
-                state["raised"] = True
-                raise IntegrityError("dup", None, Exception("dup"))
-            return await real_commit()
+            raise IntegrityError("dup", None, Exception("dup"))
 
-        # Detach the pre-seeded row from the identity map so the helper's
-        # ``scalar(... key == default)`` first lookup misses and it attempts an
-        # insert (which our patched commit fails), then recovers.
-        session.expunge_all()
+        async def _rollback():
+            return None
+
+        monkeypatch.setattr(session, "scalar", _scalar)
         monkeypatch.setattr(session, "commit", _commit)
-        record = await ad._get_dashboard_alert_thresholds(session)
-        return record
+        monkeypatch.setattr(session, "rollback", _rollback)
+        return await ad._get_dashboard_alert_thresholds(session)
 
     rec = run(session_factory, _scenario)
     assert rec is not None
     assert rec.key == "default"
+
+
+def test_alert_thresholds_integrity_race_reraises(
+    session_factory: async_sessionmaker, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """IntegrityError but the recovery lookup also misses -> re-raise (194)."""
+
+    async def _scenario(session) -> Any:
+        async def _scalar(*args, **kwargs):
+            return None
+
+        async def _commit():
+            raise IntegrityError("dup", None, Exception("dup"))
+
+        async def _rollback():
+            return None
+
+        monkeypatch.setattr(session, "scalar", _scalar)
+        monkeypatch.setattr(session, "commit", _commit)
+        monkeypatch.setattr(session, "rollback", _rollback)
+        with pytest.raises(IntegrityError):
+            await ad._get_dashboard_alert_thresholds(session)
+
+    run(session_factory, _scenario)
 
 
 # --------------------------------------------------------------------------- #
