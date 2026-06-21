@@ -42,4 +42,36 @@ describe('RouteRobotsService', () => {
     tick();
     expect(meta.getTag("name='robots'")?.content).toBe('index,follow,max-image-preview:large');
   }));
+
+  it('only starts once and unsubscribes on destroy', fakeAsync(() => {
+    TestBed.configureTestingModule({
+      imports: [RouterTestingModule.withRoutes([{ path: '', component: PublicComponent }])],
+      providers: [RouteRobotsService],
+    });
+    const router = TestBed.inject(Router);
+    const service = TestBed.inject(RouteRobotsService);
+
+    service.start();
+    router.initialNavigation();
+    tick();
+    const sub = (service as unknown as { navSub?: { unsubscribe: () => void } }).navSub;
+    expect(sub).toBeDefined();
+
+    // Second start() is a no-op: navSub reference stays the same.
+    service.start();
+    expect((service as unknown as { navSub?: unknown }).navSub).toBe(sub);
+
+    spyOn(sub!, 'unsubscribe').and.callThrough();
+    service.ngOnDestroy();
+    expect(sub!.unsubscribe).toHaveBeenCalled();
+  }));
+
+  it('handles destroy when start was never called', () => {
+    TestBed.configureTestingModule({
+      imports: [RouterTestingModule.withRoutes([])],
+      providers: [RouteRobotsService],
+    });
+    const service = TestBed.inject(RouteRobotsService);
+    expect(() => service.ngOnDestroy()).not.toThrow();
+  });
 });

@@ -83,6 +83,7 @@ export class SiteCompanyService {
     }
     if (typeof value === 'number') {
       const cleaned = String(value).trim();
+      /* istanbul ignore next -- unreachable: no finite number stringifies to an empty/whitespace-only value */
       return cleaned ? cleaned : null;
     }
     return null;
