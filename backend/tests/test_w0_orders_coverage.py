@@ -4111,3 +4111,283 @@ def test_admin_update_order_to_pending_acceptance(test_app, monkeypatch) -> None
         headers=auth_headers(_admin(test_app)),
     )
     assert res.status_code == 200, res.text
+
+
+# --------------------------------------------------------------------------- #
+# Notification falsy-side branches: no-customer-email + no-admin orders         #
+# --------------------------------------------------------------------------- #
+def _no_recipients(monkeypatch) -> None:
+    # No owner user is seeded and admin_alert_email is blank -> admin_to falsy.
+    monkeypatch.setattr(settings, "admin_alert_email", "", raising=False)
+
+
+def test_netopia_confirm_no_recipients(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _no_recipients(monkeypatch)
+    # Guest order with blank customer_email -> customer_to falsy branch.
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="netopia",
+        netopia_ntp_id="NTP-NOREC",
+        customer_email="",
+        with_product=True,
+    )
+
+    async def fake_status(**_kw):
+        return {"payment": {"status": 3}}
+
+    monkeypatch.setattr(netopia_service, "get_status", fake_status)
+    res = client.post("/api/v1/orders/netopia/confirm", json={"order_id": str(oid)})
+    assert res.status_code == 200, res.text
+
+
+def test_stripe_confirm_no_recipients(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _no_recipients(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="stripe",
+        stripe_session_id="cs_norec",
+        customer_email="",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/stripe/confirm",
+        json={"session_id": "cs_norec", "order_id": str(oid), "mock": "success"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_paypal_capture_no_recipients(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    _no_recipients(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="paypal",
+        paypal_order_id="PP-NOREC",
+        customer_email="",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/paypal/capture",
+        json={"paypal_order_id": "PP-NOREC", "order_id": str(oid), "mock": "success"},
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_update_order_no_recipients(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="cod",
+        status=OrderStatus.pending_acceptance,
+        customer_email="",
+        with_product=True,
+    )
+    res = client.patch(
+        f"/api/v1/orders/admin/{oid}",
+        json={"status": "paid"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_capture_void_no_recipients(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    from app.services import payments
+
+    _silence_email(monkeypatch)
+
+    async def _cap(_i):
+        return {"id": _i}
+
+    async def _void(_i):
+        return {"id": _i}
+
+    monkeypatch.setattr(payments, "capture_payment_intent", _cap)
+    monkeypatch.setattr(payments, "void_payment_intent", _void)
+
+    headers = auth_headers(_admin(test_app))
+
+    def _mk():
+        oid = _seed_order(
+            sf,
+            user_id=None,
+            payment_method="stripe",
+            status=OrderStatus.pending_payment,
+            customer_email="",
+            with_product=True,
+        )
+
+        async def _intent():
+            from sqlalchemy.future import select as _select
+
+            async with sf() as session:
+                row = await session.execute(_select(Order).where(Order.id == oid))
+                o = row.scalars().first()
+                o.stripe_payment_intent_id = f"pi_{oid}"
+                session.add(o)
+                await session.commit()
+
+        asyncio.run(_intent())
+        return oid
+
+    cap_oid = _mk()
+    cap = client.post(
+        f"/api/v1/orders/admin/{cap_oid}/capture-payment",
+        params={"intent_id": f"pi_{cap_oid}"},
+        headers=headers,
+    )
+    assert cap.status_code in (200, 400), cap.text
+
+    void_oid = _mk()
+    void = client.post(
+        f"/api/v1/orders/admin/{void_oid}/void-payment",
+        params={"intent_id": f"pi_{void_oid}"},
+        headers=headers,
+    )
+    assert void.status_code in (200, 400), void.text
+
+
+def test_admin_refund_order_no_user(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _no_recipients(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="cod",
+        status=OrderStatus.paid,
+        customer_email="",
+        with_product=True,
+    )
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/refund",
+        json={"note": "refund"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
+
+
+def test_admin_create_refund_no_user(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    oid = _seed_order(
+        sf,
+        user_id=None,
+        payment_method="cod",
+        status=OrderStatus.paid,
+        customer_email="",
+        with_product=True,
+    )
+    res = client.post(
+        f"/api/v1/orders/admin/{oid}/refunds",
+        json={"amount": "5.00", "note": "partial"},
+        headers=auth_headers(_admin(test_app)),
+    )
+    assert res.status_code in (200, 400), res.text
+
+
+def test_cancel_request_no_owner(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _no_recipients(monkeypatch)
+    token, uid = create_user_token(sf, email="crno@example.com")
+    oid = _seed_order(
+        sf, user_id=uid, payment_method="cod", status=OrderStatus.pending_acceptance
+    )
+    res = client.post(
+        f"/api/v1/orders/{oid}/cancel-request",
+        json={"reason": "changed mind"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_paypal_capture_pending_acceptance_no_status_change(
+    test_app, monkeypatch
+) -> None:
+    # capture from pending_acceptance with a user -> notification branch + no
+    # status-change block (covers 1190->1199 with user notification).
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _mock_payments(monkeypatch)
+    _silence_email(monkeypatch)
+    token, uid = create_user_token(sf, email="pppa2@example.com")
+    _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="paypal",
+        paypal_order_id="PP-PA2",
+        status=OrderStatus.pending_acceptance,
+        customer_email="pppa2@example.com",
+        with_product=True,
+    )
+    res = client.post(
+        "/api/v1/orders/paypal/capture",
+        json={"paypal_order_id": "PP-PA2", "mock": "success"},
+        headers=auth_headers(token),
+    )
+    assert res.status_code == 200, res.text
+
+
+def test_admin_send_emails_no_customer_email(test_app, monkeypatch) -> None:
+    # delivery/confirmation email endpoints with an order lacking any email -> 400.
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    oid = _seed_order(sf, user_id=None, payment_method="cod", customer_email="")
+    headers = auth_headers(_admin(test_app))
+    de = client.post(
+        f"/api/v1/orders/admin/{oid}/delivery-email", json={}, headers=headers
+    )
+    assert de.status_code == 400
+    ce = client.post(
+        f"/api/v1/orders/admin/{oid}/confirmation-email", json={}, headers=headers
+    )
+    assert ce.status_code == 400
+
+
+def test_admin_send_emails_with_note(test_app, monkeypatch) -> None:
+    client = test_app["client"]
+    sf = test_app["session_factory"]
+    _silence_email(monkeypatch)
+    _, uid = create_user_token(sf, email="emnote@example.com")
+    oid = _seed_order(
+        sf,
+        user_id=uid,
+        payment_method="cod",
+        customer_email="emnote@example.com",
+        with_product=True,
+    )
+    headers = auth_headers(_admin(test_app))
+    de = client.post(
+        f"/api/v1/orders/admin/{oid}/delivery-email",
+        json={"note": "please redeliver"},
+        headers=headers,
+    )
+    assert de.status_code == 200, de.text
+    ce = client.post(
+        f"/api/v1/orders/admin/{oid}/confirmation-email",
+        json={"note": "resend pls"},
+        headers=headers,
+    )
+    assert ce.status_code == 200, ce.text
