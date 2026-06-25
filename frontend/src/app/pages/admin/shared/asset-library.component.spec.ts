@@ -170,6 +170,19 @@ describe('AssetLibraryComponent', () => {
   });
 
   describe('copy', () => {
+    let originalClipboard: unknown;
+
+    beforeEach(() => {
+      originalClipboard = (navigator as unknown as { clipboard: unknown }).clipboard;
+    });
+
+    afterEach(() => {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: originalClipboard,
+        configurable: true,
+      });
+    });
+
     it('does nothing for a blank url', () => {
       const component = create();
       component.copy('   ');
@@ -178,11 +191,9 @@ describe('AssetLibraryComponent', () => {
 
     it('errors when the clipboard API is unavailable', () => {
       const component = create();
-      const desc = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
       Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
       component.copy('/media/a.jpg');
       expect(toast.error).toHaveBeenCalled();
-      if (desc) Object.defineProperty(navigator, 'clipboard', desc);
     });
 
     it('copies and toasts success', async () => {
