@@ -1391,6 +1391,7 @@ export class AssetLibraryComponent implements OnInit, OnChanges {
         .slice()
         .sort((a, b) => this.createdAtMs(b.created_at) - this.createdAtMs(a.created_at));
       const primary = entry.original || editsSorted[0];
+      /* istanbul ignore next -- every grouped entry holds at least one image, so primary is always defined */
       if (!primary) continue;
       groups.push({
         primary,
