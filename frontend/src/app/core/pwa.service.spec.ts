@@ -15,6 +15,17 @@ describe('PwaService', () => {
     expect(service.isOnline()).toBeFalse();
   });
 
+  it('defaults to online when navigator is unavailable', () => {
+    const descriptor = Object.getOwnPropertyDescriptor(window, 'navigator');
+    Object.defineProperty(window, 'navigator', { value: undefined, configurable: true });
+    try {
+      const service = makeService();
+      expect(service.isOnline()).toBeTrue();
+    } finally {
+      if (descriptor) Object.defineProperty(window, 'navigator', descriptor);
+    }
+  });
+
   it('updates the signal when online/offline events fire', () => {
     spyOnProperty(navigator, 'onLine', 'get').and.returnValue(true);
     const service = makeService();

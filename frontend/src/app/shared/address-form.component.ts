@@ -496,6 +496,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   }
 
   private async fetchAutocomplete(query: string): Promise<void> {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     this.autocompleteAbort?.abort();
     const controller = new AbortController();

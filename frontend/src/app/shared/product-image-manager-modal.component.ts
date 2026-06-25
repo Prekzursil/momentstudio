@@ -385,7 +385,17 @@ export class ProductImageManagerModalComponent implements OnChanges {
             : 0,
       }))
       .filter((img) => Boolean(img.url));
-    normalized.sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0));
+    normalized.sort(
+      (a, b) =>
+        Number(
+          a.sort_order ??
+            /* istanbul ignore next -- normalization above always assigns a numeric sort_order */ 0,
+        ) -
+        Number(
+          b.sort_order ??
+            /* istanbul ignore next -- normalization above always assigns a numeric sort_order */ 0,
+        ),
+    );
     this.draftImages = normalized;
   }
 
@@ -419,7 +429,10 @@ export class ProductImageManagerModalComponent implements OnChanges {
     if (withIds.length !== this.draftImages.length) return;
 
     const updates = this.draftImages.map((img, idx) => ({
-      id: String(img.id || '').trim(),
+      // The guard above guarantees every draft image has an id here.
+      id: String(
+        img.id || /* istanbul ignore next -- guarded above: all images have ids */ '',
+      ).trim(),
       sort_order: idx + 1,
     }));
     this.orderSaving = true;
@@ -434,12 +447,21 @@ export class ProductImageManagerModalComponent implements OnChanges {
       next: () => {
         this.orderSaving = false;
         for (const row of updates) {
-          const match = this.draftImages.find((img) => String(img.id || '').trim() === row.id);
+          const match = this.draftImages.find(
+            (img) =>
+              String(
+                img.id || /* istanbul ignore next -- guarded above: all images have ids */ '',
+              ).trim() === row.id,
+          );
           if (match) match.sort_order = row.sort_order;
         }
         this.imagesChange.emit([...this.draftImages]);
         const currentIds = this.draftImages
-          .map((img) => String(img.id || '').trim())
+          .map((img) =>
+            String(
+              img.id || /* istanbul ignore next -- guarded above: all images have ids */ '',
+            ).trim(),
+          )
           .filter(Boolean);
         this.toast.action(
           this.translate.instant('adminUi.storefront.products.images.reorderSuccess'),

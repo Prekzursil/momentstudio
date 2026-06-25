@@ -147,6 +147,26 @@ describe('LocalizedCurrencyPipe', () => {
     expect(second).toContain('$');
   });
 
+  it('formats a non-finite RON amount as a zero fallback', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('ro');
+    const pipe = TestBed.runInInjectionContext(() => new LocalizedCurrencyPipe());
+    const formatted = (pipe as unknown as { formatRon(value: number): string }).formatRon(
+      Number.NaN,
+    );
+    expect(formatted).toBe('0.00 RON');
+  });
+
+  it('throws for a nullish currency code (off-contract input)', () => {
+    const translate = TestBed.inject(TranslateService);
+    translate.use('en');
+    expect(() =>
+      TestBed.runInInjectionContext(() =>
+        new LocalizedCurrencyPipe().transform(100, undefined as unknown as string, 'en-US'),
+      ),
+    ).toThrow();
+  });
+
   describe('without a TranslateService', () => {
     beforeEach(() => {
       TestBed.resetTestingModule();
