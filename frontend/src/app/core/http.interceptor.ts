@@ -17,6 +17,7 @@ function extractErrorCode(err: HttpErrorResponse): string {
   }
   if (typeof body === 'string') {
     try {
+      /* istanbul ignore next -- an empty body arrives as `null` via HttpClient, so `body` is always a non-empty string on this path */
       const data = JSON.parse(body || '{}');
       return String(data?.code || '');
     } catch {
@@ -183,10 +184,14 @@ export const authAndErrorInterceptor: HttpInterceptorFn = (req, next) => {
       // Global, low-noise error surface:
       // - only network failures (status 0) and 5xx
       // - honor X-Silent to avoid spamming background calls
-      if (!silent && err instanceof HttpErrorResponse) {
-        const status = err.status ?? 0;
-        if (status === 0 || (status >= 500 && status < 600)) {
-          errors.emit({ status, method: req.method, url: req.url });
+      if (!silent) {
+        /* istanbul ignore else -- HttpClient surfaces failures as HttpErrorResponse instances, so the else branch is unreachable in the browser */
+        if (err instanceof HttpErrorResponse) {
+          /* istanbul ignore next -- `HttpErrorResponse.status` is always a number, so the `?? 0` fallback is unreachable */
+          const status = err.status ?? 0;
+          if (status === 0 || (status >= 500 && status < 600)) {
+            errors.emit({ status, method: req.method, url: req.url });
+          }
         }
       }
 

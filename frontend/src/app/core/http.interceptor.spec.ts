@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 
 import { authAndErrorInterceptor } from './http.interceptor';
 import { AuthService } from './auth.service';
+import { appConfig } from './app-config';
 import { HttpErrorBusService, HttpErrorEvent } from './http-error-bus.service';
 
 interface AuthMock {
@@ -402,6 +403,14 @@ describe('authAndErrorInterceptor', () => {
       expect(seen[0].status).toBe(0);
     });
 
+    it('does not emit statuses at or above 600 to the bus', () => {
+      const seen: HttpErrorEvent[] = [];
+      bus.events$.subscribe((e) => seen.push(e));
+      http.get('/api/v1/ping').subscribe({ error: () => undefined });
+      httpMock.expectOne('/api/v1/ping').flush(null, { status: 600, statusText: 'Weird' });
+      expect(seen).toEqual([]);
+    });
+
     it('does not emit 4xx errors to the bus', () => {
       const seen: HttpErrorEvent[] = [];
       bus.events$.subscribe((e) => seen.push(e));
@@ -418,6 +427,140 @@ describe('authAndErrorInterceptor', () => {
         .subscribe({ error: () => undefined });
       httpMock.expectOne('/api/v1/ping').flush(null, { status: 503, statusText: 'Unavailable' });
       expect(seen).toEqual([]);
+    });
+  });
+
+  describe('edge-case error-code extraction and config', () => {
+    it('treats an empty string body as no step-up code', fakeAsync(() => {
+      auth.user.and.returnValue({ id: 'u1' });
+      let errored = false;
+      http
+        .get('/api/v1/admin/secure', { responseType: 'text' as 'json' })
+        .subscribe({ error: () => (errored = true) });
+      httpMock
+        .expectOne('/api/v1/admin/secure')
+        .flush('', { status: 403, statusText: 'Forbidden' });
+      tick(0);
+      expect(auth.ensureStepUp).not.toHaveBeenCalled();
+      expect(errored).toBeTrue();
+    }));
+
+    it('treats a parseable string body without a code as no step-up', fakeAsync(() => {
+      auth.user.and.returnValue({ id: 'u1' });
+      let errored = false;
+      http
+        .get('/api/v1/admin/secure', { responseType: 'text' as 'json' })
+        .subscribe({ error: () => (errored = true) });
+      httpMock
+        .expectOne('/api/v1/admin/secure')
+        .flush('{"detail":"nope"}', { status: 403, statusText: 'Forbidden' });
+      tick(0);
+      expect(auth.ensureStepUp).not.toHaveBeenCalled();
+      expect(errored).toBeTrue();
+    }));
+
+    it('treats a Blob body of valid JSON without a code as no step-up', async () => {
+      auth.user.and.returnValue({ id: 'u1' });
+      let errored = false;
+      http
+        .get('/api/v1/newsletter/admin/export', { responseType: 'blob' as 'json' })
+        .subscribe({ error: () => (errored = true) });
+      httpMock
+        .expectOne('/api/v1/newsletter/admin/export')
+        .flush(new Blob(['{}'], { type: 'application/json' }), {
+          status: 403,
+          statusText: 'Forbidden',
+        });
+      for (let i = 0; i < 100 && !errored; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      expect(auth.ensureStepUp).not.toHaveBeenCalled();
+      expect(errored).toBeTrue();
+    });
+
+    it('treats an empty Blob body as no step-up code', async () => {
+      auth.user.and.returnValue({ id: 'u1' });
+      let errored = false;
+      http
+        .get('/api/v1/newsletter/admin/export', { responseType: 'blob' as 'json' })
+        .subscribe({ error: () => (errored = true) });
+      httpMock
+        .expectOne('/api/v1/newsletter/admin/export')
+        .flush(new Blob([''], { type: 'application/json' }), {
+          status: 403,
+          statusText: 'Forbidden',
+        });
+      for (let i = 0; i < 100 && !errored; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      expect(auth.ensureStepUp).not.toHaveBeenCalled();
+      expect(errored).toBeTrue();
+    });
+
+    it('recovers as no code when reading the Blob body rejects', async () => {
+      auth.user.and.returnValue({ id: 'u1' });
+      let errored = false;
+      const blob = new Blob(['{}'], { type: 'application/json' });
+      spyOn(blob, 'text').and.returnValue(Promise.reject(new Error('read failed')));
+      http
+        .get('/api/v1/newsletter/admin/export', { responseType: 'blob' as 'json' })
+        .subscribe({ error: () => (errored = true) });
+      httpMock
+        .expectOne('/api/v1/newsletter/admin/export')
+        .flush(blob, { status: 403, statusText: 'Forbidden' });
+      for (let i = 0; i < 100 && !errored; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      }
+      expect(auth.ensureStepUp).not.toHaveBeenCalled();
+      expect(errored).toBeTrue();
+    });
+
+    it('reads an empty ArrayBuffer body without a TextDecoder available', fakeAsync(() => {
+      auth.user.and.returnValue({ id: 'u1' });
+      const original = (window as { TextDecoder?: unknown }).TextDecoder;
+      (window as { TextDecoder?: unknown }).TextDecoder = undefined;
+      try {
+        let errored = false;
+        http
+          .get('/api/v1/admin/secure', { responseType: 'arraybuffer' as 'json' })
+          .subscribe({ error: () => (errored = true) });
+        httpMock
+          .expectOne('/api/v1/admin/secure')
+          .flush(new ArrayBuffer(0), { status: 403, statusText: 'Forbidden' });
+        tick(0);
+        expect(auth.ensureStepUp).not.toHaveBeenCalled();
+        expect(errored).toBeTrue();
+      } finally {
+        (window as { TextDecoder?: unknown }).TextDecoder = original;
+      }
+    }));
+
+    it('does not attempt step-up on a 403 when there is no session', fakeAsync(() => {
+      auth.getAccessToken.and.returnValue(null);
+      auth.getRefreshToken.and.returnValue(null);
+      auth.user.and.returnValue(null);
+      let errored = false;
+      http.get('/api/v1/admin/secure').subscribe({ error: () => (errored = true) });
+      httpMock
+        .expectOne('/api/v1/admin/secure')
+        .flush({ code: 'step_up_required' }, { status: 403, statusText: 'Forbidden' });
+      tick(0);
+      expect(auth.ensureStepUp).not.toHaveBeenCalled();
+      expect(errored).toBeTrue();
+    }));
+
+    it('matches API requests when the configured base URL is absolute', () => {
+      const original = appConfig.apiBaseUrl;
+      appConfig.apiBaseUrl = 'http://api.example.com/api/v1';
+      try {
+        auth.getAccessToken.and.returnValue('access123');
+        http.get('http://api.example.com/api/v1/ping').subscribe();
+        const req = httpMock.expectOne('http://api.example.com/api/v1/ping');
+        expect(req.request.headers.get('Authorization')).toBe('Bearer access123');
+        req.flush({});
+      } finally {
+        appConfig.apiBaseUrl = original;
+      }
     });
   });
 });

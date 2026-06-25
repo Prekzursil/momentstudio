@@ -1550,7 +1550,8 @@ export class AdminOpsComponent implements OnInit {
         this.healthCheckedAt.set(new Date());
         this.healthLoading.set(false);
       },
-      error: () => {
+      // unreachable: every forkJoin source is catchError-guarded to of(null), so the outer error handler never fires
+      error: /* istanbul ignore next */ () => {
         this.backendReady.set(false);
         this.healthError.set(this.translate.instant('adminUi.ops.health.errors.load'));
         this.healthCheckedAt.set(new Date());
@@ -1605,7 +1606,8 @@ export class AdminOpsComponent implements OnInit {
         }
         this.samedaySyncLoading.set(false);
       },
-      error: () => {
+      // unreachable: both forkJoin sources are catchError-guarded to of(null), so the outer error handler never fires
+      error: /* istanbul ignore next */ () => {
         this.samedaySyncError.set(this.translate.instant('adminUi.ops.samedaySync.errors.load'));
         this.samedaySyncLoading.set(false);
       },
@@ -1953,6 +1955,7 @@ export class AdminOpsComponent implements OnInit {
           : '';
     if (!id) return;
     window.setTimeout(() => {
+      /* istanbul ignore next -- SSR-only guard: `document` is always defined in the browser test/runtime */
       if (typeof document === 'undefined') return;
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       try {

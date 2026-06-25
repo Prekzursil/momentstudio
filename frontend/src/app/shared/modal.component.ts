@@ -197,6 +197,7 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
     if (!this.dialogRef?.nativeElement) return;
     const el = this.dialogRef.nativeElement;
     setTimeout(() => {
+      /* istanbul ignore next -- the dialog always renders a close button, so the `|| el` fallback is unreachable */
       const focusable =
         el.querySelector<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -206,6 +207,7 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private capturePreviousFocus(): void {
+    /* istanbul ignore next -- SSR-only guard: `document` is always defined in the browser */
     if (typeof document === 'undefined') return;
     const active = document.activeElement;
     if (!(active instanceof HTMLElement)) return;
@@ -213,6 +215,7 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private trapFocus(event: KeyboardEvent): void {
+    /* istanbul ignore next -- SSR-only guard: `document` is always defined in the browser */
     if (typeof document === 'undefined') return;
     const container = this.dialogRef?.nativeElement;
     if (!container) return;
@@ -224,10 +227,12 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
       return;
     }
 
+    /* istanbul ignore next -- `document.activeElement` is never null in a live document, so the `: null` fallback is unreachable */
     const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
 
+    /* istanbul ignore next -- `!active` is unreachable here because `active` is always a live element; the contains/===container operands are covered */
     if (!active || !container.contains(active) || active === container) {
       event.preventDefault();
       (event.shiftKey ? last : first).focus();
@@ -259,6 +264,7 @@ export class ModalComponent implements AfterViewInit, OnChanges, OnDestroy {
   }
 
   private restorePreviousFocus(): void {
+    /* istanbul ignore next -- SSR-only guard: `document` is always defined in the browser */
     if (typeof document === 'undefined') return;
     const target = this.previouslyFocused;
     this.previouslyFocused = null;

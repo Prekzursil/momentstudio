@@ -115,4 +115,29 @@ describe('ThemeService', () => {
     media.emit(true);
     expect(service.mode()()).toBe('dark');
   });
+
+  it('defaults to system when localStorage is unavailable (SSR-style guard)', () => {
+    mockMatchMedia(false);
+    const original = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', { value: undefined, configurable: true });
+    try {
+      const service = new ThemeService();
+      expect(service.preference()()).toBe('system');
+      expect(service.mode()()).toBe('light');
+      // setPreference must also no-op its persistence branch when storage is gone.
+      service.setPreference('dark');
+      expect(service.mode()()).toBe('dark');
+    } finally {
+      if (original) {
+        Object.defineProperty(window, 'localStorage', original);
+      }
+    }
+  });
+
+  it('ignores an unrecognized saved preference value', () => {
+    localStorage.setItem('theme', 'not-a-real-theme');
+    mockMatchMedia(false);
+    const service = new ThemeService();
+    expect(service.preference()()).toBe('system');
+  });
 });
