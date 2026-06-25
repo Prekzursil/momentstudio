@@ -82,6 +82,7 @@ export class ErrorStateComponent {
   }
 
   private fallbackCopy(value: string): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser */
     if (typeof document === 'undefined') throw new Error('No document available');
     const el = document.createElement('textarea');
     el.value = value;

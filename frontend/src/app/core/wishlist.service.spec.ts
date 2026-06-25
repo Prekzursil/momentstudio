@@ -271,4 +271,39 @@ describe('WishlistService', () => {
     spyOn(localStorage, 'setItem').and.throwError('quota');
     expect(() => service.addLocal(product({ id: 'h' }))).not.toThrow();
   });
+
+  it('removeLocal skips baseline deletion for an anonymous user', () => {
+    const service = setup();
+    TestBed.tick();
+    expect(() => service.removeLocal('anon-item')).not.toThrow();
+    expect(service.getBaseline('anon-item')).toBeNull();
+  });
+
+  it('persistSnapshots is a no-op without an active user', () => {
+    const service = setup();
+    TestBed.tick();
+    expect(() =>
+      (
+        service as unknown as { persistSnapshots: (n: Record<string, unknown>) => void }
+      ).persistSnapshots({}),
+    ).not.toThrow();
+  });
+
+  it('snapshot persistence is skipped when localStorage is unavailable (SSR)', () => {
+    const service = setup();
+    const desc = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    try {
+      Object.defineProperty(globalThis, 'localStorage', { value: undefined, configurable: true });
+      const internals = service as unknown as {
+        loadSnapshots: (userId: string) => Record<string, unknown>;
+        persistSnapshots: (next: Record<string, unknown>) => void;
+        activeUserId: string | null;
+      };
+      expect(internals.loadSnapshots('u1')).toEqual({});
+      internals.activeUserId = 'u1';
+      expect(() => internals.persistSnapshots({})).not.toThrow();
+    } finally {
+      if (desc) Object.defineProperty(globalThis, 'localStorage', desc);
+    }
+  });
 });
