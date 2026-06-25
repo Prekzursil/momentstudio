@@ -153,4 +153,18 @@ describe('RecentlyViewedService', () => {
       if (original) Object.defineProperty(window, 'localStorage', original);
     }
   });
+
+  it('returns an empty list when the document has no cookies at all', () => {
+    // Deterministically exercise the `document.cookie ? ... : []` empty branch,
+    // which otherwise only triggers incidentally based on spec execution order.
+    const originalLs = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', { value: undefined, configurable: true });
+    Object.defineProperty(document, 'cookie', { configurable: true, get: () => '', set: () => {} });
+    try {
+      expect(service.list()).toEqual([]);
+    } finally {
+      delete (document as unknown as { cookie?: unknown }).cookie;
+      if (originalLs) Object.defineProperty(window, 'localStorage', originalLs);
+    }
+  });
 });

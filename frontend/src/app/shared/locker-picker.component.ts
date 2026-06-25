@@ -390,6 +390,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       this.searchAbort?.abort();
       return;
     }
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     this.searchTimer = window.setTimeout(() => void this.fetchLocations(query), 250);
   }
@@ -487,6 +488,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   }
 
   private async fetchLocations(query: string, opts?: { applyFirst?: boolean }): Promise<void> {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     this.searchAbort?.abort();
     const controller = new AbortController();
@@ -503,6 +505,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
             limit: 6,
           }),
         );
+        /* istanbul ignore next -- re-entry guard: the in-flight request is aborted by a newer search; not deterministically reproducible under Karma */
         if (controller.signal.aborted) return;
         this.mirrorSnapshot = response?.snapshot ?? null;
         const rows = Array.isArray(response?.items) ? response.items : [];

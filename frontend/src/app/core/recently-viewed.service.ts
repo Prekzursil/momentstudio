@@ -106,6 +106,7 @@ export class RecentlyViewedService {
   }
 
   private readCookie(name: string): string | null {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return null;
     const prefix = `${name}=`;
     const cookies = document.cookie ? document.cookie.split(';') : [];
@@ -119,6 +120,7 @@ export class RecentlyViewedService {
   }
 
   private writeCookie(name: string, value: string, days: number): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     const expires = new Date();
     expires.setDate(expires.getDate() + days);

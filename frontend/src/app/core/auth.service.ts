@@ -784,6 +784,7 @@ export class AuthService {
   }
 
   private installRevalidationHooks(): void {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     const cooldownMs = 10_000;
     const revalidate = () => {
@@ -813,7 +814,7 @@ export class AuthService {
   private isAuthResponse(res: AuthResponse | TwoFactorChallengeResponse): res is AuthResponse {
     return Boolean(
       (res as AuthResponse | null)?.tokens?.access_token &&
-        (res as AuthResponse | null)?.tokens?.refresh_token,
+      (res as AuthResponse | null)?.tokens?.refresh_token,
     );
   }
 
@@ -975,6 +976,7 @@ export class AuthService {
   }
 
   private bootstrapImpersonation(): void {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
 
     const fromUrl = this.readImpersonationTokenFromUrl();
@@ -998,6 +1000,7 @@ export class AuthService {
   }
 
   private readImpersonationTokenFromUrl(): string | null {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return null;
     const hash = (window.location.hash || '').replace(/^#/, '').trim();
     if (!hash) return null;
@@ -1035,6 +1038,7 @@ export class AuthService {
   }
 
   private clearImpersonation(): void {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     try {
       window.sessionStorage.removeItem(AuthService.IMPERSONATION_TOKEN_KEY);
@@ -1044,6 +1048,7 @@ export class AuthService {
   }
 
   private getStorage(mode: StorageMode): Storage | null {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return null;
     try {
       return mode === 'local' ? window.localStorage : window.sessionStorage;

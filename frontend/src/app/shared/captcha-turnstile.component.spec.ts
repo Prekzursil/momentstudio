@@ -5,11 +5,18 @@ import { CaptchaTurnstileComponent } from './captcha-turnstile.component';
 
 type TurnstileApi = NonNullable<Window['turnstile']>;
 
+function resetScriptCache(): void {
+  (CaptchaTurnstileComponent as unknown as { scriptPromise: Promise<void> | null }).scriptPromise =
+    null;
+}
+
 describe('CaptchaTurnstileComponent', () => {
   let originalTurnstile: Window['turnstile'];
 
   beforeEach(() => {
     originalTurnstile = window.turnstile;
+    resetScriptCache();
+    document.querySelectorAll('script[data-turnstile="true"]').forEach((el) => el.remove());
     TestBed.configureTestingModule({
       imports: [TranslateModule.forRoot(), CaptchaTurnstileComponent],
     });
@@ -18,6 +25,7 @@ describe('CaptchaTurnstileComponent', () => {
   afterEach(() => {
     window.turnstile = originalTurnstile;
     document.querySelectorAll('script[data-turnstile="true"]').forEach((el) => el.remove());
+    resetScriptCache();
   });
 
   function create(siteKey = 'site-key'): ComponentFixture<CaptchaTurnstileComponent> {
@@ -36,21 +44,56 @@ describe('CaptchaTurnstileComponent', () => {
     expect(fixture.componentInstance.errorKey).toBeNull();
   }));
 
-  it('reports captcha unavailable when the API never appears', fakeAsync(() => {
+  it('injects the script and reports unavailable when the API never appears', fakeAsync(() => {
     const fixture = create();
-    // The Turnstile loader promise may be process-cached from an earlier test;
-    // either path resolves with no window.turnstile present.
     const script = document.querySelector(
       'script[data-turnstile="true"]',
     ) as HTMLScriptElement | null;
-    script?.dispatchEvent(new Event('load'));
+    expect(script).not.toBeNull();
+    script!.dispatchEvent(new Event('load'));
     tick();
     flushMicrotasks();
     expect(fixture.componentInstance.errorKey).toBe('auth.captchaUnavailable');
   }));
 
-  it('renders the widget and wires the callbacks once the API is ready', fakeAsync(() => {
-    // First detectChanges below uses the now-cached resolved promise.
+  it('reports a load failure when the injected script errors', fakeAsync(() => {
+    const fixture = create();
+    const script = document.querySelector(
+      'script[data-turnstile="true"]',
+    ) as HTMLScriptElement | null;
+    script!.dispatchEvent(new Event('error'));
+    tick();
+    flushMicrotasks();
+    expect(fixture.componentInstance.errorKey).toBe('auth.captchaFailedLoad');
+  }));
+
+  it('reuses an already present script element (load path)', fakeAsync(() => {
+    const existing = document.createElement('script');
+    existing.dataset['turnstile'] = 'true';
+    document.head.appendChild(existing);
+
+    const fixture = create();
+    // Only the pre-existing script should be present (no second injection).
+    expect(document.querySelectorAll('script[data-turnstile="true"]').length).toBe(1);
+    existing.dispatchEvent(new Event('load'));
+    tick();
+    flushMicrotasks();
+    expect(fixture.componentInstance.errorKey).toBe('auth.captchaUnavailable');
+  }));
+
+  it('reuses an already present script element (error path)', fakeAsync(() => {
+    const existing = document.createElement('script');
+    existing.dataset['turnstile'] = 'true';
+    document.head.appendChild(existing);
+
+    const fixture = create();
+    existing.dispatchEvent(new Event('error'));
+    tick();
+    flushMicrotasks();
+    expect(fixture.componentInstance.errorKey).toBe('auth.captchaFailedLoad');
+  }));
+
+  it('resolves immediately when the API is already loaded', fakeAsync(() => {
     let opts: Record<string, unknown> = {};
     const api: TurnstileApi = {
       render: (_el, options) => {
@@ -68,6 +111,11 @@ describe('CaptchaTurnstileComponent', () => {
     fixture.componentInstance.tokenChange.subscribe((t) => tokens.push(t));
     fixture.detectChanges();
     tick();
+    flushMicrotasks();
+    tick();
+
+    // No script injection should occur because window.turnstile already exists.
+    expect(document.querySelectorAll('script[data-turnstile="true"]').length).toBe(0);
 
     (opts['callback'] as (t: string) => void)('tok');
     (opts['expired-callback'] as () => void)();
@@ -96,7 +144,30 @@ describe('CaptchaTurnstileComponent', () => {
     fixture.componentInstance.siteKey = 'k';
     fixture.detectChanges();
     tick();
+    flushMicrotasks();
     expect(fixture.componentInstance.errorKey).toBe('auth.captchaFailedLoad');
+  }));
+
+  it('reuses the memoized script promise for a second widget', fakeAsync(() => {
+    const first = create();
+    const script = document.querySelector(
+      'script[data-turnstile="true"]',
+    ) as HTMLScriptElement | null;
+    script!.dispatchEvent(new Event('load'));
+    tick();
+    flushMicrotasks();
+
+    // A second component must reuse the cached promise (no second injection).
+    const second = TestBed.createComponent(CaptchaTurnstileComponent);
+    second.componentInstance.siteKey = 'second';
+    second.detectChanges();
+    tick();
+    flushMicrotasks();
+
+    expect(document.querySelectorAll('script[data-turnstile="true"]').length).toBe(1);
+    expect(second.componentInstance.errorKey).toBe('auth.captchaUnavailable');
+    first.destroy();
+    second.destroy();
   }));
 
   it('reset and destroy are no-ops without a widget id', () => {

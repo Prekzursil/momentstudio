@@ -173,4 +173,42 @@ describe('RichEditorComponent', () => {
     expect(() => cmp.syncThemeClass()).not.toThrow();
     expect(() => cmp.applyAriaLabel()).not.toThrow();
   }));
+
+  it('re-syncs the theme when the MutationObserver fires', fakeAsync(() => {
+    const original = window.MutationObserver;
+    let captured: MutationCallback | null = null;
+    class FakeMutationObserver {
+      constructor(cb: MutationCallback) {
+        captured = cb;
+      }
+      observe(): void {}
+      disconnect(): void {}
+      takeRecords(): MutationRecord[] {
+        return [];
+      }
+    }
+    (window as unknown as { MutationObserver: unknown }).MutationObserver =
+      FakeMutationObserver as unknown as typeof MutationObserver;
+
+    try {
+      const fixture = make('');
+      fixture.detectChanges();
+      tick();
+      tick();
+
+      document.documentElement.classList.add('dark');
+      expect(captured).not.toBeNull();
+      // Invoke the observer callback -> runs the arrow that calls syncThemeClass().
+      captured!([], {} as MutationObserver);
+
+      const defaultUi = fixture.nativeElement.querySelector('.toastui-editor-defaultUI');
+      expect(defaultUi?.classList.contains('toastui-editor-dark')).toBeTrue();
+
+      document.documentElement.classList.remove('dark');
+      fixture.destroy();
+    } finally {
+      (window as unknown as { MutationObserver: typeof MutationObserver }).MutationObserver =
+        original;
+    }
+  }));
 });
