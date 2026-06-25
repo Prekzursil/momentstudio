@@ -3,7 +3,15 @@ from datetime import datetime, timedelta, timezone
 from io import StringIO
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    status,
+)
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,12 +53,16 @@ async def subscribe_newsletter(
     _: None = Depends(newsletter_subscribe_rate_limit),
     session: AsyncSession = Depends(get_session),
 ) -> NewsletterSubscribeResponse:
-    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
+    await captcha_service.verify(
+        payload.captcha_token, remote_ip=request.client.host if request.client else None
+    )
 
     email = str(payload.email or "").strip().lower()
     source = (payload.source or "").strip()[:64] or None
 
-    existing = await session.scalar(sa.select(NewsletterSubscriber).where(NewsletterSubscriber.email == email))
+    existing = await session.scalar(
+        sa.select(NewsletterSubscriber).where(NewsletterSubscriber.email == email)
+    )
     now = datetime.now(timezone.utc)
     if existing:
         # Subscribed (either confirmed or pending confirmation).
@@ -58,7 +70,10 @@ async def subscribe_newsletter(
             should_send = False
             if existing.confirmed_at is None and settings.smtp_enabled:
                 should_send = True
-                if existing.confirmation_sent_at and now - existing.confirmation_sent_at < _CONFIRM_RESEND_COOLDOWN:
+                if (
+                    existing.confirmation_sent_at
+                    and now - existing.confirmation_sent_at < _CONFIRM_RESEND_COOLDOWN
+                ):
                     should_send = False
                 if should_send:
                     existing.confirmation_sent_at = now
@@ -74,7 +89,11 @@ async def subscribe_newsletter(
                     email=email, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM
                 )
                 confirm_url = newsletter_tokens.build_frontend_confirm_url(token=token)
-                background_tasks.add_task(email_service.send_newsletter_confirmation, email, confirm_url=confirm_url)
+                background_tasks.add_task(
+                    email_service.send_newsletter_confirmation,
+                    email,
+                    confirm_url=confirm_url,
+                )
 
             return NewsletterSubscribeResponse(subscribed=True, already_subscribed=True)
 
@@ -94,7 +113,11 @@ async def subscribe_newsletter(
                 email=email, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM
             )
             confirm_url = newsletter_tokens.build_frontend_confirm_url(token=token)
-            background_tasks.add_task(email_service.send_newsletter_confirmation, email, confirm_url=confirm_url)
+            background_tasks.add_task(
+                email_service.send_newsletter_confirmation,
+                email,
+                confirm_url=confirm_url,
+            )
 
         return NewsletterSubscribeResponse(subscribed=True, already_subscribed=False)
 
@@ -113,7 +136,9 @@ async def subscribe_newsletter(
             email=email, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM
         )
         confirm_url = newsletter_tokens.build_frontend_confirm_url(token=token)
-        background_tasks.add_task(email_service.send_newsletter_confirmation, email, confirm_url=confirm_url)
+        background_tasks.add_task(
+            email_service.send_newsletter_confirmation, email, confirm_url=confirm_url
+        )
 
     return NewsletterSubscribeResponse(subscribed=True, already_subscribed=False)
 
@@ -123,11 +148,18 @@ async def confirm_newsletter(
     payload: NewsletterTokenRequest,
     session: AsyncSession = Depends(get_session),
 ) -> NewsletterConfirmResponse:
-    email = newsletter_tokens.decode_newsletter_token(token=payload.token, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM)
+    email = newsletter_tokens.decode_newsletter_token(
+        token=payload.token, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_CONFIRM
+    )
     if not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid confirmation token.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid confirmation token.",
+        )
 
-    subscriber = await session.scalar(sa.select(NewsletterSubscriber).where(NewsletterSubscriber.email == email))
+    subscriber = await session.scalar(
+        sa.select(NewsletterSubscriber).where(NewsletterSubscriber.email == email)
+    )
     now = datetime.now(timezone.utc)
     if subscriber:
         subscriber.unsubscribed_at = None
@@ -153,7 +185,9 @@ async def confirm_newsletter(
     return NewsletterConfirmResponse(confirmed=True)
 
 
-@router.api_route("/unsubscribe", methods=["GET"], response_model=NewsletterUnsubscribeResponse)
+@router.api_route(
+    "/unsubscribe", methods=["GET"], response_model=NewsletterUnsubscribeResponse
+)
 async def unsubscribe_newsletter_get(
     request: Request,
     token: str = Query(default="", max_length=5000),
@@ -202,12 +236,20 @@ async def unsubscribe_newsletter_post(
     return await _unsubscribe_newsletter(token=resolved, session=session)
 
 
-async def _unsubscribe_newsletter(*, token: str, session: AsyncSession) -> NewsletterUnsubscribeResponse:
-    email = newsletter_tokens.decode_newsletter_token(token=token, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_UNSUBSCRIBE)
+async def _unsubscribe_newsletter(
+    *, token: str, session: AsyncSession
+) -> NewsletterUnsubscribeResponse:
+    email = newsletter_tokens.decode_newsletter_token(
+        token=token, purpose=newsletter_tokens.NEWSLETTER_PURPOSE_UNSUBSCRIBE
+    )
     if not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid unsubscribe token.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid unsubscribe token."
+        )
 
-    subscriber = await session.scalar(sa.select(NewsletterSubscriber).where(NewsletterSubscriber.email == email))
+    subscriber = await session.scalar(
+        sa.select(NewsletterSubscriber).where(NewsletterSubscriber.email == email)
+    )
     now = datetime.now(timezone.utc)
     if subscriber:
         subscriber.unsubscribed_at = now
@@ -258,5 +300,7 @@ async def export_confirmed_subscribers_csv(
         writer.writerow([email or "", confirmed_value, source or ""])
 
     content = buf.getvalue()
-    headers = {"Content-Disposition": 'attachment; filename="newsletter_confirmed_subscribers.csv"'}
+    headers = {
+        "Content-Disposition": 'attachment; filename="newsletter_confirmed_subscribers.csv"'
+    }
     return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)

@@ -32,7 +32,11 @@ def _netopia_env() -> str:
 
 def _netopia_api_key() -> str:
     env = _netopia_env()
-    preferred = settings.netopia_api_key_live if env == "live" else settings.netopia_api_key_sandbox
+    preferred = (
+        settings.netopia_api_key_live
+        if env == "live"
+        else settings.netopia_api_key_sandbox
+    )
     api_key = (preferred or "").strip()
     if api_key:
         return api_key
@@ -41,7 +45,11 @@ def _netopia_api_key() -> str:
 
 def _netopia_pos_signature() -> str:
     env = _netopia_env()
-    preferred = settings.netopia_pos_signature_live if env == "live" else settings.netopia_pos_signature_sandbox
+    preferred = (
+        settings.netopia_pos_signature_live
+        if env == "live"
+        else settings.netopia_pos_signature_sandbox
+    )
     pos_signature = (preferred or "").strip()
     if pos_signature:
         return pos_signature
@@ -71,7 +79,9 @@ def _read_netopia_key_bytes(path: str) -> bytes:
     preferred = Path(raw)
     candidates: list[Path] = [preferred]
     if not preferred.is_absolute():
-        private_root_value = (getattr(settings, "private_media_root", None) or "private_uploads").strip() or "private_uploads"
+        private_root_value = (
+            getattr(settings, "private_media_root", None) or "private_uploads"
+        ).strip() or "private_uploads"
         private_root = Path(private_root_value)
         candidates.append(private_root / raw)
 
@@ -101,12 +111,18 @@ def _read_netopia_key_bytes(path: str) -> bytes:
 
 def _public_key_pem() -> str:
     env = _netopia_env()
-    preferred_pem = settings.netopia_public_key_pem_live if env == "live" else settings.netopia_public_key_pem_sandbox
+    preferred_pem = (
+        settings.netopia_public_key_pem_live
+        if env == "live"
+        else settings.netopia_public_key_pem_sandbox
+    )
     pem = (preferred_pem or settings.netopia_public_key_pem or "").strip()
     if pem:
         return pem
     preferred_path = (
-        settings.netopia_public_key_path_live if env == "live" else settings.netopia_public_key_path_sandbox
+        settings.netopia_public_key_path_live
+        if env == "live"
+        else settings.netopia_public_key_path_sandbox
     )
     path = (preferred_path or settings.netopia_public_key_path or "").strip()
     if not path:
@@ -151,7 +167,9 @@ def _public_key_pem() -> str:
         if b"BEGIN PUBLIC KEY" in header:
             try:
                 loaded_key = serialization.load_pem_public_key(key_bytes)
-                return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
+                return _to_subject_public_key_pem(
+                    cast(asymmetric_types.PublicKeyTypes, loaded_key)
+                )
             except Exception as exc:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -178,7 +196,9 @@ def _public_key_pem() -> str:
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Netopia public key could not be parsed",
             ) from exc
-        return _to_subject_public_key_pem(cast(asymmetric_types.PublicKeyTypes, loaded_key))
+        return _to_subject_public_key_pem(
+            cast(asymmetric_types.PublicKeyTypes, loaded_key)
+        )
     else:
         return _to_subject_public_key_pem(cert.public_key())
 
@@ -198,12 +218,20 @@ def netopia_configuration_status() -> tuple[bool, str | None]:
 
     pos_signature = _netopia_pos_signature()
     if not pos_signature:
-        missing.append(f"NETOPIA_POS_SIGNATURE_{env.upper()} (or NETOPIA_POS_SIGNATURE)")
+        missing.append(
+            f"NETOPIA_POS_SIGNATURE_{env.upper()} (or NETOPIA_POS_SIGNATURE)"
+        )
 
-    preferred_pem = settings.netopia_public_key_pem_live if env == "live" else settings.netopia_public_key_pem_sandbox
+    preferred_pem = (
+        settings.netopia_public_key_pem_live
+        if env == "live"
+        else settings.netopia_public_key_pem_sandbox
+    )
     pem = (preferred_pem or settings.netopia_public_key_pem or "").strip()
     preferred_path = (
-        settings.netopia_public_key_path_live if env == "live" else settings.netopia_public_key_path_sandbox
+        settings.netopia_public_key_path_live
+        if env == "live"
+        else settings.netopia_public_key_path_sandbox
     )
     path = (preferred_path or settings.netopia_public_key_path or "").strip()
     if not (pem or path):
@@ -214,7 +242,9 @@ def netopia_configuration_status() -> tuple[bool, str | None]:
         try:
             _public_key_pem()
         except HTTPException as exc:
-            return False, str(getattr(exc, "detail", "") or "Netopia public key could not be loaded")
+            return False, str(
+                getattr(exc, "detail", "") or "Netopia public key could not be loaded"
+            )
 
     if missing:
         return False, "Missing Netopia configuration: " + ", ".join(missing)
@@ -223,13 +253,18 @@ def netopia_configuration_status() -> tuple[bool, str | None]:
 
 
 def _netopia_base_url() -> str:
-    return NETOPIA_BASE_URL_LIVE if _netopia_env() == "live" else NETOPIA_BASE_URL_SANDBOX
+    return (
+        NETOPIA_BASE_URL_LIVE if _netopia_env() == "live" else NETOPIA_BASE_URL_SANDBOX
+    )
 
 
 def _netopia_headers() -> dict[str, str]:
     api_key = _netopia_api_key()
     if not api_key:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia not configured",
+        )
     return {
         "Content-Type": "application/json",
         "Authorization": api_key,
@@ -255,7 +290,10 @@ async def start_payment(
 
     pos_signature = _netopia_pos_signature()
     if not pos_signature:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia not configured",
+        )
 
     url = f"{_netopia_base_url().rstrip('/')}/payment/card/start"
     amount_value = Decimal(str(amount_ron)).quantize(Decimal("0.01"))
@@ -294,7 +332,9 @@ async def start_payment(
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(url, headers=_netopia_headers(), content=body)
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Netopia request failed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Netopia request failed"
+        ) from exc
 
     if resp.status_code >= 400:
         detail = "Netopia start payment failed"
@@ -313,17 +353,24 @@ async def start_payment(
     try:
         data = resp.json()
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid Netopia response") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid Netopia response"
+        ) from exc
 
     payment = data.get("payment") if isinstance(data, dict) else None
     payment_url = None
     ntp_id = None
     if isinstance(payment, dict):
-        payment_url = (payment.get("paymentURL") or payment.get("paymentUrl") or "").strip() or None
+        payment_url = (
+            payment.get("paymentURL") or payment.get("paymentUrl") or ""
+        ).strip() or None
         ntp_id = (payment.get("ntpID") or payment.get("ntpId") or "").strip() or None
 
     if not payment_url:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Netopia start payment did not return a URL")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Netopia start payment did not return a URL",
+        )
 
     return ntp_id, payment_url
 
@@ -334,7 +381,10 @@ async def get_status(*, ntp_id: str, order_id: str) -> dict[str, Any]:
 
     pos_signature = _netopia_pos_signature()
     if not pos_signature:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia not configured",
+        )
 
     url = f"{_netopia_base_url().rstrip('/')}/operation/status"
     payload = {
@@ -347,18 +397,27 @@ async def get_status(*, ntp_id: str, order_id: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(url, headers=_netopia_headers(), json=payload)
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Netopia request failed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Netopia request failed"
+        ) from exc
 
     if resp.status_code >= 400:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Netopia status lookup failed")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Netopia status lookup failed",
+        )
 
     try:
         data = resp.json()
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid Netopia response") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid Netopia response"
+        ) from exc
 
     if not isinstance(data, dict):
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid Netopia response")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid Netopia response"
+        )
     return data
 
 
@@ -368,12 +427,18 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
 
     pos_signature = _netopia_pos_signature()
     if not pos_signature:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia not configured",
+        )
 
     try:
         public_key = _public_key_pem()
     except HTTPException as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Netopia not configured") from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Netopia not configured",
+        ) from exc
 
     alg = (settings.netopia_jwt_alg or "RS512").strip().upper() or "RS512"
     allowed_algs = {"RS256", "RS384", "RS512"}
@@ -388,7 +453,9 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
         # Ignore invalid tokens; decode() below will raise a proper error.
         logger.debug("netopia_ipn_header_parse_failed", exc_info=exc)
 
-    max_age_seconds = max(60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24)))
+    max_age_seconds = max(
+        60, int(getattr(settings, "netopia_ipn_max_age_seconds", 60 * 60 * 24))
+    )
     skew_seconds = 5 * 60
 
     try:
@@ -404,7 +471,9 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
             },
         )
     except PyJWTError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia signature") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia signature"
+        ) from exc
 
     now_ts = datetime.now(timezone.utc).timestamp()
     for key in ("iat", "nbf", "exp"):
@@ -415,17 +484,26 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
     iat = claims.get("iat")
     if isinstance(iat, (int, float)):
         if iat - skew_seconds > now_ts:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia token time")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Netopia token time",
+            )
         if now_ts - float(iat) > max_age_seconds:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stale Netopia token")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Stale Netopia token"
+            )
 
     exp = claims.get("exp")
     if isinstance(exp, (int, float)) and float(exp) + skew_seconds < now_ts:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired Netopia token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Expired Netopia token"
+        )
 
     issuer = str(claims.get("iss") or "").strip()
     if issuer != "NETOPIA Payments":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia issuer")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia issuer"
+        )
 
     aud = claims.get("aud")
     aud_values: list[str] = []
@@ -437,7 +515,9 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
         aud_values = [str(aud).strip()] if aud else []
 
     if pos_signature.strip() not in aud_values:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia audience")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Netopia audience"
+        )
 
     def _digest_variants(payload_bytes: bytes) -> set[str]:
         digest = hashlib.sha512(payload_bytes).digest()
@@ -447,18 +527,26 @@ def verify_ipn(*, verification_token: str, payload: bytes) -> dict[str, Any]:
 
     token_sub = str(claims.get("sub") or "").strip()
     if not token_sub:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia payload hash mismatch")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Netopia payload hash mismatch",
+        )
 
     if token_sub not in _digest_variants(payload):
         # Some gateways canonicalize JSON before hashing (key sorting/minified JSON) and/or use
         # URL-safe base64 without padding. Attempt a canonical JSON re-encode fallback.
         try:
             parsed = simplejson.loads(payload)
-            canonical = simplejson.dumps(parsed, use_decimal=True, separators=(",", ":"), sort_keys=True).encode("utf-8")
+            canonical = simplejson.dumps(
+                parsed, use_decimal=True, separators=(",", ":"), sort_keys=True
+            ).encode("utf-8")
         except Exception:
             canonical = b""
 
         if not canonical or token_sub not in _digest_variants(canonical):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Netopia payload hash mismatch")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Netopia payload hash mismatch",
+            )
 
     return claims

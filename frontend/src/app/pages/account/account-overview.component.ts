@@ -19,7 +19,9 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
         <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
           {{ 'account.overview.title' | translate }}
         </h2>
-        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.overview.quickLinks' | translate }}</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">{{
+          'account.overview.quickLinks' | translate
+        }}</span>
       </div>
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <ng-container *ngIf="!account.ordersLoaded(); else ordersCard">
@@ -39,9 +41,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             routerLink="/account/orders"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
           >
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'nav.myOrders' | translate }}</p>
-            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ account.lastOrderLabel() }}</p>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ account.lastOrderSubcopy() }}</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ 'nav.myOrders' | translate }}
+            </p>
+            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
+              {{ account.lastOrderLabel() }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ account.lastOrderSubcopy() }}
+            </p>
           </a>
         </ng-template>
 
@@ -62,9 +70,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             routerLink="/account/addresses"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
           >
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.sections.addresses' | translate }}</p>
-            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ account.defaultAddressLabel() }}</p>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ account.defaultAddressSubcopy() }}</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ 'account.sections.addresses' | translate }}
+            </p>
+            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
+              {{ account.defaultAddressLabel() }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ account.defaultAddressSubcopy() }}
+            </p>
           </a>
         </ng-template>
 
@@ -85,9 +99,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             routerLink="/account/wishlist"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
           >
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'nav.myWishlist' | translate }}</p>
-            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ account.wishlistCountLabel() }}</p>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ 'account.overview.wishlistHint' | translate }}</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ 'nav.myWishlist' | translate }}
+            </p>
+            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
+              {{ account.wishlistCountLabel() }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ 'account.overview.wishlistHint' | translate }}
+            </p>
           </a>
         </ng-template>
 
@@ -108,9 +128,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             routerLink="/account/notifications"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
           >
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.sections.notifications' | translate }}</p>
-            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ account.notificationsLabel() }}</p>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ 'account.overview.notificationsHint' | translate }}</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ 'account.sections.notifications' | translate }}
+            </p>
+            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
+              {{ account.notificationsLabel() }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ 'account.overview.notificationsHint' | translate }}
+            </p>
           </a>
         </ng-template>
 
@@ -131,9 +157,15 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             routerLink="/account/security"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
           >
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.sections.security' | translate }}</p>
-            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ account.securityLabel() }}</p>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ 'account.overview.securityHint' | translate }}</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ 'account.sections.security' | translate }}
+            </p>
+            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
+              {{ account.securityLabel() }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ 'account.overview.securityHint' | translate }}
+            </p>
           </a>
         </ng-template>
 
@@ -154,14 +186,20 @@ import { SkeletonComponent } from '../../shared/skeleton.component';
             routerLink="/tickets"
             class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition dark:border-slate-800 dark:bg-slate-950/40 dark:hover:border-slate-700"
           >
-            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{{ 'account.overview.support.title' | translate }}</p>
-            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">{{ account.supportTicketsLabel() }}</p>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ account.supportTicketsSubcopy() }}</p>
+            <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ 'account.overview.support.title' | translate }}
+            </p>
+            <p class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
+              {{ account.supportTicketsLabel() }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ account.supportTicketsSubcopy() }}
+            </p>
           </a>
         </ng-template>
       </div>
     </section>
-  `
+  `,
 })
 export class AccountOverviewComponent {
   protected readonly account = inject(AccountComponent);

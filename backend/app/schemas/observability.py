@@ -13,4 +13,3 @@ class AdminClientErrorIn(BaseModel):
     user_agent: str | None = Field(default=None, max_length=1024)
     context: dict[str, Any] | None = None
     occurred_at: datetime | None = None
-

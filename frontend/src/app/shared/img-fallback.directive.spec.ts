@@ -7,7 +7,7 @@ import { ImgFallbackDirective } from './img-fallback.directive';
   template:
     '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" srcset="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw== 2x" [appImgFallback]="fallback" />',
   standalone: true,
-  imports: [ImgFallbackDirective]
+  imports: [ImgFallbackDirective],
 })
 class HostComponent {
   fallback?: string = 'assets/placeholder/product-placeholder.svg';
@@ -16,7 +16,7 @@ class HostComponent {
 describe('ImgFallbackDirective', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HostComponent]
+      imports: [HostComponent],
     });
   });
 

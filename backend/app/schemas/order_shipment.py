@@ -26,4 +26,3 @@ class OrderShipmentRead(OrderShipmentBase):
     id: UUID
     order_id: UUID
     created_at: datetime
-

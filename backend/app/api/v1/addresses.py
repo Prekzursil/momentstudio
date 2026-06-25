@@ -12,7 +12,10 @@ router = APIRouter(prefix="/me/addresses", tags=["addresses"])
 
 
 @router.get("", response_model=list[AddressRead])
-async def list_addresses(current_user=Depends(require_complete_profile), session: AsyncSession = Depends(get_session)):
+async def list_addresses(
+    current_user=Depends(require_complete_profile),
+    session: AsyncSession = Depends(get_session),
+):
     return await address_service.list_addresses(session, current_user.id)
 
 
@@ -34,7 +37,9 @@ async def update_address(
 ):
     address = await address_service.get_address(session, current_user.id, address_id)
     if not address:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Address not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Address not found"
+        )
     return await address_service.update_address(session, address, payload)
 
 
@@ -46,6 +51,8 @@ async def delete_address(
 ):
     address = await address_service.get_address(session, current_user.id, address_id)
     if not address:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Address not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Address not found"
+        )
     await address_service.delete_address(session, address)
     return None

@@ -15,7 +15,9 @@ class Settings(BaseSettings):
     _default_sqlite_path = _backend_root / "adrianaart.db"
     _default_sqlite_url = f"sqlite+aiosqlite:///{_default_sqlite_path.as_posix()}"
 
-    model_config = SettingsConfigDict(env_file=str(_backend_env_file), env_file_encoding="utf-8", case_sensitive=False)
+    model_config = SettingsConfigDict(
+        env_file=str(_backend_env_file), env_file_encoding="utf-8", case_sensitive=False
+    )
 
     app_name: str = "momentstudio API"
     app_version: str = "0.1.0"

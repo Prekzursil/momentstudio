@@ -36,8 +36,12 @@ export function computePasswordStrength(password: string): PasswordStrength {
   template: `
     <div *ngIf="(password || '').trim()" class="grid gap-2">
       <div class="flex items-center justify-between">
-        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.passwordStrength' | translate }}</span>
-        <span class="text-xs font-semibold" [ngClass]="labelClass()">{{ labelKey() | translate }}</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">{{
+          'auth.passwordStrength' | translate
+        }}</span>
+        <span class="text-xs font-semibold" [ngClass]="labelClass()">{{
+          labelKey() | translate
+        }}</span>
       </div>
       <input
         type="range"
@@ -56,7 +60,7 @@ export function computePasswordStrength(password: string): PasswordStrength {
         <span class="text-right">{{ 'auth.strengthStrong' | translate }}</span>
       </div>
     </div>
-  `
+  `,
 })
 export class PasswordStrengthComponent {
   @Input() password = '';
@@ -93,4 +97,3 @@ export class PasswordStrengthComponent {
     return 'accent-rose-500';
   }
 }
-

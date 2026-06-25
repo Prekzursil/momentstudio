@@ -23,7 +23,9 @@ def _account_orders_url(order: Order) -> str:
     return f"/account/orders?q={quote_plus(token)}"
 
 
-async def process_stripe_event(session: AsyncSession, background_tasks: BackgroundTasks, event: dict) -> None:
+async def process_stripe_event(
+    session: AsyncSession, background_tasks: BackgroundTasks, event: dict
+) -> None:
     event_type = str(event.get("type") or "")
 
     if event_type.startswith("charge.dispute."):
@@ -38,7 +40,9 @@ async def process_stripe_event(session: AsyncSession, background_tasks: Backgrou
         dispute_status = get("status") if callable(get) else None
 
         owner = await auth_service.get_owner_user(session)
-        admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        admin_to = (
+            owner.email if owner and owner.email else None
+        ) or settings.admin_alert_email
         if admin_to:
             background_tasks.add_task(
                 email_service.send_stripe_dispute_notification,
@@ -78,7 +82,11 @@ async def process_stripe_event(session: AsyncSession, background_tasks: Backgrou
                 .scalars()
                 .first()
             )
-            if order and order.status in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+            if order and order.status in {
+                OrderStatus.pending_payment,
+                OrderStatus.pending_acceptance,
+                OrderStatus.paid,
+            }:
                 captured_added = False
                 changed = False
                 if payment_intent_id and not order.stripe_payment_intent_id:
@@ -87,36 +95,69 @@ async def process_stripe_event(session: AsyncSession, background_tasks: Backgrou
 
                 if order.status == OrderStatus.pending_payment:
                     order.status = OrderStatus.pending_acceptance
-                    session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+                    session.add(
+                        OrderEvent(
+                            order_id=order.id,
+                            event="status_change",
+                            note="pending_payment -> pending_acceptance",
+                        )
+                    )
                     changed = True
 
-                already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+                already_captured = any(
+                    getattr(evt, "event", None) == "payment_captured"
+                    for evt in (order.events or [])
+                )
                 if not already_captured:
-                    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Stripe checkout {session_id}"))
+                    session.add(
+                        OrderEvent(
+                            order_id=order.id,
+                            event="payment_captured",
+                            note=f"Stripe checkout {session_id}",
+                        )
+                    )
                     captured_added = True
                     changed = True
-                    await promo_usage.record_promo_usage(session, order=order, note=f"Stripe checkout {session_id}")
+                    await promo_usage.record_promo_usage(
+                        session, order=order, note=f"Stripe checkout {session_id}"
+                    )
 
                 if changed:
                     session.add(order)
                     await session.commit()
                     await session.refresh(order)
-                await coupons_service.redeem_coupon_for_order(session, order=order, note=f"Stripe checkout {session_id}")
+                await coupons_service.redeem_coupon_for_order(
+                    session, order=order, note=f"Stripe checkout {session_id}"
+                )
 
                 if order.user and order.user.id:
                     await notification_service.create_notification(
                         session,
                         user_id=order.user.id,
                         type="order",
-                        title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
-                        body=f"Reference {order.reference_code}" if order.reference_code else None,
+                        title=(
+                            "Payment received"
+                            if (order.user.preferred_language or "en") != "ro"
+                            else "Plată confirmată"
+                        ),
+                        body=(
+                            f"Reference {order.reference_code}"
+                            if order.reference_code
+                            else None
+                        ),
                         url=_account_orders_url(order),
                     )
 
                 if captured_added:
-                    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-                    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
-                    customer_lang = order.user.preferred_language if order.user else None
+                    checkout_settings = (
+                        await checkout_settings_service.get_checkout_settings(session)
+                    )
+                    customer_to = (
+                        order.user.email if order.user and order.user.email else None
+                    ) or getattr(order, "customer_email", None)
+                    customer_lang = (
+                        order.user.preferred_language if order.user else None
+                    )
                     if customer_to:
                         background_tasks.add_task(
                             email_service.send_order_confirmation,
@@ -127,7 +168,9 @@ async def process_stripe_event(session: AsyncSession, background_tasks: Backgrou
                             receipt_share_days=checkout_settings.receipt_share_days,
                         )
                     owner = await auth_service.get_owner_user(session)
-                    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                    admin_to = (
+                        owner.email if owner and owner.email else None
+                    ) or settings.admin_alert_email
                     if admin_to:
                         background_tasks.add_task(
                             email_service.send_new_order_notification,
@@ -160,41 +203,78 @@ async def process_stripe_event(session: AsyncSession, background_tasks: Backgrou
                 .scalars()
                 .first()
             )
-            if order and order.status in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+            if order and order.status in {
+                OrderStatus.pending_payment,
+                OrderStatus.pending_acceptance,
+                OrderStatus.paid,
+            }:
                 captured_added = False
                 changed = False
-                already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+                already_captured = any(
+                    getattr(evt, "event", None) == "payment_captured"
+                    for evt in (order.events or [])
+                )
                 if not already_captured:
-                    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Stripe {intent_id}"))
+                    session.add(
+                        OrderEvent(
+                            order_id=order.id,
+                            event="payment_captured",
+                            note=f"Stripe {intent_id}",
+                        )
+                    )
                     captured_added = True
                     changed = True
-                    await promo_usage.record_promo_usage(session, order=order, note=f"Stripe {intent_id}".strip())
+                    await promo_usage.record_promo_usage(
+                        session, order=order, note=f"Stripe {intent_id}".strip()
+                    )
 
                 if order.status == OrderStatus.pending_payment:
                     order.status = OrderStatus.pending_acceptance
-                    session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+                    session.add(
+                        OrderEvent(
+                            order_id=order.id,
+                            event="status_change",
+                            note="pending_payment -> pending_acceptance",
+                        )
+                    )
                     changed = True
 
                 if changed:
                     session.add(order)
                     await session.commit()
                     await session.refresh(order)
-                await coupons_service.redeem_coupon_for_order(session, order=order, note=f"Stripe {intent_id}".strip())
+                await coupons_service.redeem_coupon_for_order(
+                    session, order=order, note=f"Stripe {intent_id}".strip()
+                )
 
                 if order.user and order.user.id:
                     await notification_service.create_notification(
                         session,
                         user_id=order.user.id,
                         type="order",
-                        title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
-                        body=f"Reference {order.reference_code}" if order.reference_code else None,
+                        title=(
+                            "Payment received"
+                            if (order.user.preferred_language or "en") != "ro"
+                            else "Plată confirmată"
+                        ),
+                        body=(
+                            f"Reference {order.reference_code}"
+                            if order.reference_code
+                            else None
+                        ),
                         url=_account_orders_url(order),
                     )
 
                 if captured_added:
-                    checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-                    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
-                    customer_lang = order.user.preferred_language if order.user else None
+                    checkout_settings = (
+                        await checkout_settings_service.get_checkout_settings(session)
+                    )
+                    customer_to = (
+                        order.user.email if order.user and order.user.email else None
+                    ) or getattr(order, "customer_email", None)
+                    customer_lang = (
+                        order.user.preferred_language if order.user else None
+                    )
                     if customer_to:
                         background_tasks.add_task(
                             email_service.send_order_confirmation,
@@ -205,7 +285,9 @@ async def process_stripe_event(session: AsyncSession, background_tasks: Backgrou
                             receipt_share_days=checkout_settings.receipt_share_days,
                         )
                     owner = await auth_service.get_owner_user(session)
-                    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                    admin_to = (
+                        owner.email if owner and owner.email else None
+                    ) or settings.admin_alert_email
                     if admin_to:
                         background_tasks.add_task(
                             email_service.send_new_order_notification,
@@ -216,7 +298,9 @@ async def process_stripe_event(session: AsyncSession, background_tasks: Backgrou
                         )
 
 
-async def process_paypal_event(session: AsyncSession, background_tasks: BackgroundTasks, event: dict) -> None:
+async def process_paypal_event(
+    session: AsyncSession, background_tasks: BackgroundTasks, event: dict
+) -> None:
     event_type = str(event.get("event_type") or "")
     if event_type != "CHECKOUT.ORDER.APPROVED":
         return
@@ -247,39 +331,68 @@ async def process_paypal_event(session: AsyncSession, background_tasks: Backgrou
         return
 
     already_captured = bool((order.paypal_capture_id or "").strip()) or any(
-        getattr(evt, "event", None) == "payment_captured" for evt in (order.events or [])
+        getattr(evt, "event", None) == "payment_captured"
+        for evt in (order.events or [])
     )
-    if already_captured or order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+    if already_captured or order.status not in {
+        OrderStatus.pending_payment,
+        OrderStatus.pending_acceptance,
+        OrderStatus.paid,
+    }:
         return
 
-    capture_id = await paypal_service.capture_order(paypal_order_id=str(paypal_order_id))
+    capture_id = await paypal_service.capture_order(
+        paypal_order_id=str(paypal_order_id)
+    )
 
     if order.status == OrderStatus.pending_payment:
         order.status = OrderStatus.pending_acceptance
-        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="status_change",
+                note="pending_payment -> pending_acceptance",
+            )
+        )
     if capture_id and not (order.paypal_capture_id or "").strip():
         order.paypal_capture_id = capture_id
 
-    session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"PayPal {capture_id}".strip()))
-    await promo_usage.record_promo_usage(session, order=order, note=f"PayPal {capture_id}".strip())
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="payment_captured",
+            note=f"PayPal {capture_id}".strip(),
+        )
+    )
+    await promo_usage.record_promo_usage(
+        session, order=order, note=f"PayPal {capture_id}".strip()
+    )
     session.add(order)
     await session.commit()
     await session.refresh(order)
 
-    await coupons_service.redeem_coupon_for_order(session, order=order, note=f"PayPal {capture_id}".strip())
+    await coupons_service.redeem_coupon_for_order(
+        session, order=order, note=f"PayPal {capture_id}".strip()
+    )
 
     if order.user and order.user.id:
         await notification_service.create_notification(
             session,
             user_id=order.user.id,
             type="order",
-            title="Payment received" if (order.user.preferred_language or "en") != "ro" else "Plată confirmată",
+            title=(
+                "Payment received"
+                if (order.user.preferred_language or "en") != "ro"
+                else "Plată confirmată"
+            ),
             body=f"Reference {order.reference_code}" if order.reference_code else None,
             url=_account_orders_url(order),
         )
 
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    customer_to = (order.user.email if order.user and order.user.email else None) or getattr(order, "customer_email", None)
+    customer_to = (
+        order.user.email if order.user and order.user.email else None
+    ) or getattr(order, "customer_email", None)
     customer_lang = order.user.preferred_language if order.user else None
     if customer_to:
         background_tasks.add_task(
@@ -291,7 +404,9 @@ async def process_paypal_event(session: AsyncSession, background_tasks: Backgrou
             receipt_share_days=checkout_settings.receipt_share_days,
         )
     owner = await auth_service.get_owner_user(session)
-    admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+    admin_to = (
+        owner.email if owner and owner.email else None
+    ) or settings.admin_alert_email
     if admin_to:
         background_tasks.add_task(
             email_service.send_new_order_notification,

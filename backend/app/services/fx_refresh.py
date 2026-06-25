@@ -40,7 +40,9 @@ def start(app: FastAPI) -> None:
         return
 
     stop = asyncio.Event()
-    task = asyncio.create_task(leader_lock.run_as_leader(name="fx_refresh", stop=stop, work=_refresh_loop))
+    task = asyncio.create_task(
+        leader_lock.run_as_leader(name="fx_refresh", stop=stop, work=_refresh_loop)
+    )
     app.state.fx_refresh_stop = stop
     app.state.fx_refresh_task = task
 

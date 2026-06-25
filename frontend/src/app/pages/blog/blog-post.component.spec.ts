@@ -39,7 +39,7 @@ describe('BlogPostComponent', () => {
     created_at: '2000-01-01T00:00:00+00:00',
     updated_at: '2000-01-01T00:00:00+00:00',
     images: [],
-    summary: 'Summary'
+    summary: 'Summary',
   };
 
   beforeEach(() => {
@@ -51,7 +51,7 @@ describe('BlogPostComponent', () => {
       'getNeighbors',
       'listPosts',
       'listCommentThreads',
-      'getCommentSubscription'
+      'getCommentSubscription',
     ]);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['error', 'success']);
     markdown = jasmine.createSpyObj<MarkdownService>('MarkdownService', ['render']);
@@ -61,9 +61,15 @@ describe('BlogPostComponent', () => {
     blog.getPost.and.returnValue(of(post));
     blog.getPreviewPost.and.returnValue(of(post));
     blog.getNeighbors.and.returnValue(of({ previous: null, next: null }));
-    blog.listPosts.and.returnValue(of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 } }));
+    blog.listPosts.and.returnValue(
+      of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 } }),
+    );
     blog.listCommentThreads.and.returnValue(
-      of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 }, total_comments: 0 })
+      of({
+        items: [],
+        meta: { total_items: 0, total_pages: 1, page: 1, limit: 10 },
+        total_comments: 0,
+      }),
     );
     blog.getCommentSubscription.and.returnValue(of({ enabled: false }));
     markdown.render.and.returnValue('<p>Body</p>');
@@ -74,7 +80,7 @@ describe('BlogPostComponent', () => {
     routeStub = {
       snapshot: { params: {}, queryParams: {} },
       params: routeParams$.asObservable(),
-      queryParams: routeQueryParams$.asObservable()
+      queryParams: routeQueryParams$.asObservable(),
     };
   });
 
@@ -85,20 +91,40 @@ describe('BlogPostComponent', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: BlogService, useValue: blog },
-        { provide: AdminService, useValue: jasmine.createSpyObj<AdminService>('AdminService', ['getContent', 'updateContentBlock']) },
-        { provide: CatalogService, useValue: jasmine.createSpyObj<CatalogService>('CatalogService', ['getProduct', 'listCategories', 'listFeaturedCollections']) },
-        { provide: NewsletterService, useValue: jasmine.createSpyObj<NewsletterService>('NewsletterService', ['subscribe']) },
+        {
+          provide: AdminService,
+          useValue: jasmine.createSpyObj<AdminService>('AdminService', [
+            'getContent',
+            'updateContentBlock',
+          ]),
+        },
+        {
+          provide: CatalogService,
+          useValue: jasmine.createSpyObj<CatalogService>('CatalogService', [
+            'getProduct',
+            'listCategories',
+            'listFeaturedCollections',
+          ]),
+        },
+        {
+          provide: NewsletterService,
+          useValue: jasmine.createSpyObj<NewsletterService>('NewsletterService', ['subscribe']),
+        },
         { provide: ToastService, useValue: toast },
         { provide: MarkdownService, useValue: markdown },
         { provide: StorefrontAdminModeService, useValue: { enabled: () => false } },
         { provide: AuthService, useValue: auth },
         { provide: ActivatedRoute, useValue: routeStub },
-        { provide: DOCUMENT, useValue: doc }
-      ]
+        { provide: DOCUMENT, useValue: doc },
+      ],
     });
 
     const translate = TestBed.inject(TranslateService);
-    translate.setTranslation('en', { blog: { post: { metaTitle: 'Blog post', metaDescription: 'Desc' } } }, true);
+    translate.setTranslation(
+      'en',
+      { blog: { post: { metaTitle: 'Blog post', metaDescription: 'Desc' } } },
+      true,
+    );
     translate.use('en');
   }
 
@@ -113,7 +139,9 @@ describe('BlogPostComponent', () => {
     expect(blog.getPost).toHaveBeenCalledWith('first-post', 'en');
     expect(title.setTitle).toHaveBeenCalledWith('Hello | momentstudio');
 
-    const ogImageCall = meta.updateTag.calls.allArgs().find((args) => args[0]?.property === 'og:image');
+    const ogImageCall = meta.updateTag.calls
+      .allArgs()
+      .find((args) => args[0]?.property === 'og:image');
     expect(ogImageCall).toBeTruthy();
     expect(ogImageCall?.[0]?.content).toContain('/api/v1/blog/posts/first-post/og.png?lang=en');
 
@@ -122,7 +150,9 @@ describe('BlogPostComponent', () => {
     expect(canonical?.getAttribute('href')).toContain('/blog/first-post');
     expect(canonical?.getAttribute('href')).not.toContain('lang=en');
 
-    const alternates = Array.from(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'));
+    const alternates = Array.from(
+      doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]'),
+    );
     expect(alternates.length).toBe(3);
 
     const routeSchema = doc.querySelector('script#seo-route-schema-1');

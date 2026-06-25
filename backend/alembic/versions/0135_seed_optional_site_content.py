@@ -26,7 +26,9 @@ def upgrade() -> None:
     now = datetime.now(timezone.utc)
     is_postgres = conn.dialect.name == "postgresql"
 
-    content_status = postgresql.ENUM("draft", "review", "published", name="contentstatus", create_type=False)
+    content_status = postgresql.ENUM(
+        "draft", "review", "published", name="contentstatus", create_type=False
+    )
 
     def status_value(value: str) -> sa.ColumnElement:
         if is_postgres:
@@ -68,8 +70,17 @@ def upgrade() -> None:
         sa.column("created_at", sa.DateTime(timezone=True)),
     )
 
-    def seed_block(*, key: str, title: str, body_markdown: str, status: str, meta: dict | None = None) -> None:
-        exists = conn.execute(sa.select(content_blocks.c.id).where(content_blocks.c.key == key)).first()
+    def seed_block(
+        *,
+        key: str,
+        title: str,
+        body_markdown: str,
+        status: str,
+        meta: dict | None = None,
+    ) -> None:
+        exists = conn.execute(
+            sa.select(content_blocks.c.id).where(content_blocks.c.key == key)
+        ).first()
         if exists:
             return
         block_id = uuid.uuid4()
@@ -116,7 +127,12 @@ def upgrade() -> None:
         title="Site navigation",
         body_markdown="Navigation links for header/footer.",
         status="published",
-        meta={"version": 1, "header_links": [], "footer_handcrafted_links": [], "footer_legal_links": []},
+        meta={
+            "version": 1,
+            "header_links": [],
+            "footer_handcrafted_links": [],
+            "footer_legal_links": [],
+        },
     )
     seed_block(
         key="site.header-banners",
@@ -171,7 +187,9 @@ def downgrade() -> None:
         "seo.category",
         "seo.about",
     ):
-        row = conn.execute(sa.text("SELECT id FROM content_blocks WHERE key = :key"), {"key": key}).first()
+        row = conn.execute(
+            sa.text("SELECT id FROM content_blocks WHERE key = :key"), {"key": key}
+        ).first()
         if not row:
             continue
         block_id = row[0]
@@ -181,11 +199,27 @@ def downgrade() -> None:
             ),
             {"block_id": block_id},
         )
-        conn.execute(sa.text("DELETE FROM content_images WHERE content_block_id = :block_id"), {"block_id": block_id})
         conn.execute(
-            sa.text("DELETE FROM content_block_translations WHERE content_block_id = :block_id"),
+            sa.text("DELETE FROM content_images WHERE content_block_id = :block_id"),
             {"block_id": block_id},
         )
-        conn.execute(sa.text("DELETE FROM content_block_versions WHERE content_block_id = :block_id"), {"block_id": block_id})
-        conn.execute(sa.text("DELETE FROM content_audit_log WHERE content_block_id = :block_id"), {"block_id": block_id})
-        conn.execute(sa.text("DELETE FROM content_blocks WHERE id = :block_id"), {"block_id": block_id})
+        conn.execute(
+            sa.text(
+                "DELETE FROM content_block_translations WHERE content_block_id = :block_id"
+            ),
+            {"block_id": block_id},
+        )
+        conn.execute(
+            sa.text(
+                "DELETE FROM content_block_versions WHERE content_block_id = :block_id"
+            ),
+            {"block_id": block_id},
+        )
+        conn.execute(
+            sa.text("DELETE FROM content_audit_log WHERE content_block_id = :block_id"),
+            {"block_id": block_id},
+        )
+        conn.execute(
+            sa.text("DELETE FROM content_blocks WHERE id = :block_id"),
+            {"block_id": block_id},
+        )

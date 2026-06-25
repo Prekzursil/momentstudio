@@ -37,7 +37,9 @@ export class AnalyticsService {
     this.persistEnabled(this.enabledState());
     if (typeof window !== 'undefined') {
       try {
-        window.dispatchEvent(new CustomEvent('app:analytics-opt-in', { detail: { enabled: this.enabledState() } }));
+        window.dispatchEvent(
+          new CustomEvent('app:analytics-opt-in', { detail: { enabled: this.enabledState() } }),
+        );
       } catch {
         // ignore
       }
@@ -57,6 +59,7 @@ export class AnalyticsService {
   }
 
   track(event: string, payload?: Record<string, unknown>): void {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     if (!this.enabledState()) return;
     if (event !== 'session_start') {
@@ -64,7 +67,7 @@ export class AnalyticsService {
     }
 
     const sessionId = this.getSessionId();
-    const record = { event, session_id: sessionId, ...(payload ?? {}) };
+    const record = { event, session_id: sessionId, ...payload };
 
     try {
       if (Array.isArray(window.dataLayer)) {
@@ -88,14 +91,17 @@ export class AnalyticsService {
         const headers: Record<string, string> = { 'X-Silent': '1' };
         if (token) headers['X-Analytics-Token'] = token;
         this.api
-          .post<{ received: boolean }>(
+          .post<{
+            received: boolean;
+          }>(
             '/analytics/events',
             { event, session_id: sessionId, path: this.getPath(), payload: payload ?? null },
-            headers
+            headers,
           )
           .subscribe({ error: () => void 0 });
       },
-      error: () => void 0
+      // ensureToken pipes through catchError, so the error callback is never invoked.
+      error: /* istanbul ignore next */ () => void 0,
     });
   }
 
@@ -106,7 +112,9 @@ export class AnalyticsService {
   private getAttributionPayload(): Record<string, unknown> | undefined {
     const cached = this.readAttribution();
     if (cached) return cached;
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return undefined;
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return undefined;
 
     const params = new URLSearchParams(window.location.search);
@@ -142,6 +150,7 @@ export class AnalyticsService {
   }
 
   private persistAttribution(value: Record<string, unknown>): void {
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return;
     try {
       sessionStorage.setItem(this.attributionStorageKey, JSON.stringify(value));
@@ -179,8 +188,10 @@ export class AnalyticsService {
   }
 
   private persistSessionStarted(value: boolean): void {
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return;
     try {
+      /* istanbul ignore else -- persistSessionStarted is only ever called with true */
       if (value) sessionStorage.setItem(this.sessionStartedKey, '1');
       else sessionStorage.removeItem(this.sessionStartedKey);
     } catch {
@@ -202,6 +213,7 @@ export class AnalyticsService {
   }
 
   private readToken(): string | null {
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return null;
     try {
       const token = sessionStorage.getItem(this.tokenStorageKey);
@@ -222,6 +234,7 @@ export class AnalyticsService {
   }
 
   private persistToken(token: string, expiresIn: number | undefined): void {
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return;
     try {
       sessionStorage.setItem(this.tokenStorageKey, token);
@@ -240,27 +253,31 @@ export class AnalyticsService {
     if (existing) return of(existing);
     if (this.tokenRequest$) return this.tokenRequest$;
 
-    this.tokenRequest$ = this.api.post<AnalyticsTokenResponse>(
-      '/analytics/token',
-      { session_id: sessionId },
-      { 'X-Silent': '1' }
-    ).pipe(
-      tap((res) => {
-        if (res?.token) this.persistToken(res.token, res.expires_in);
-      }),
-      map((res) => (res?.token ? res.token : null)),
-      catchError(() => of(null)),
-      finalize(() => {
-        this.tokenRequest$ = undefined;
-      }),
-      shareReplay({ bufferSize: 1, refCount: false })
-    );
+    this.tokenRequest$ = this.api
+      .post<AnalyticsTokenResponse>(
+        '/analytics/token',
+        { session_id: sessionId },
+        { 'X-Silent': '1' },
+      )
+      .pipe(
+        tap((res) => {
+          if (res?.token) this.persistToken(res.token, res.expires_in);
+        }),
+        map((res) => (res?.token ? res.token : null)),
+        catchError(() => of(null)),
+        finalize(() => {
+          this.tokenRequest$ = undefined;
+        }),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
 
     return this.tokenRequest$;
   }
 
   private getPath(): string | null {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return null;
+    /* istanbul ignore next -- defensive: window.location access does not throw in the browser */
     try {
       return window.location?.pathname + window.location?.search;
     } catch {
@@ -268,4 +285,3 @@ export class AnalyticsService {
     }
   }
 }
-

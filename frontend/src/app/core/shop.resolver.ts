@@ -10,5 +10,7 @@ export const shopCategoriesResolver: ResolveFn<Category[]> = (): Observable<Cate
   const catalog = inject(CatalogService);
   const lang = inject(LanguageService).language();
   const includeHidden = inject(StorefrontAdminModeService).enabled();
-  return catalog.listCategories(lang, { include_hidden: includeHidden }).pipe(catchError(() => of([])));
+  return catalog
+    .listCategories(lang, { include_hidden: includeHidden })
+    .pipe(catchError(() => of([])));
 };

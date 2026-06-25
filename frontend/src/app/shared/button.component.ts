@@ -59,7 +59,7 @@ type ButtonType = 'button' | 'submit' | 'reset';
         </button>
       </ng-template>
     </ng-template>
-  `
+  `,
 })
 export class ButtonComponent {
   @Input() label = '';
@@ -76,9 +76,10 @@ export class ButtonComponent {
   @Output() action = new EventEmitter<void>();
 
   get classes(): string {
-    const base = this.variant === 'primary'
-      ? 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white'
-      : 'bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600';
+    const base =
+      this.variant === 'primary'
+        ? 'bg-slate-900 text-white hover:bg-slate-800 focus-visible:outline-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white'
+        : 'bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600';
     const sizeCls = this.size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-2.5 text-sm';
     const state = this.disabled ? 'opacity-60 cursor-not-allowed pointer-events-none' : '';
     return `${base} ${sizeCls} ${state}`;

@@ -9,10 +9,17 @@ from app.models.user import User, UserRole
 from app.services import step_up as step_up_service
 
 
-_EMAIL_RE = re.compile(r"(?i)(?<![\w.+-])([\w.+-]{1,64})@([\w-]{1,255}(?:\.[\w-]{2,})+)")
+_EMAIL_RE = re.compile(
+    r"(?i)(?<![\w.+-])([\w.+-]{1,64})@([\w-]{1,255}(?:\.[\w-]{2,})+)"
+)
 _PHONE_RE = re.compile(r"^\+?[0-9]{6,20}$")
 
-PII_REVEAL_ROLES: set[UserRole] = {UserRole.owner, UserRole.admin, UserRole.support, UserRole.fulfillment}
+PII_REVEAL_ROLES: set[UserRole] = {
+    UserRole.owner,
+    UserRole.admin,
+    UserRole.support,
+    UserRole.fulfillment,
+}
 
 
 def can_reveal_pii(user: User | None) -> bool:
@@ -23,7 +30,9 @@ def can_reveal_pii(user: User | None) -> bool:
 
 def require_pii_reveal(user: User | None, *, request: Request) -> None:
     if not can_reveal_pii(user):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PII reveal not permitted")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="PII reveal not permitted"
+        )
     assert user is not None
     step_up_service.require_step_up(request, user)
 
@@ -50,7 +59,9 @@ def mask_phone(phone: str | None) -> str | None:
     if not _PHONE_RE.match(normalized):
         return "***"
     digits = normalized[1:]
-    if len(digits) <= 4:
+    if (
+        len(digits) <= 4
+    ):  # pragma: no cover - unreachable: _PHONE_RE requires >=6 digits
         return f"+{'*' * len(digits)}"
     keep_tail = digits[-2:]
     masked = "*" * (len(digits) - 2)

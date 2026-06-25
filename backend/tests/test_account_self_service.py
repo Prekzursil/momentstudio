@@ -42,10 +42,14 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_user_token(session_factory, *, email: str, role: UserRole = UserRole.customer) -> str:
+def create_user_token(
+    session_factory, *, email: str, role: UserRole = UserRole.customer
+) -> str:
     async def create_and_token() -> str:
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email=email, password="password123", name="User"))
+            user = await create_user(
+                session, UserCreate(email=email, password="password123", name="User")
+            )
             user.role = role
             if role in (UserRole.admin, UserRole.owner):
                 session.add(
@@ -69,7 +73,9 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+    token = create_user_token(
+        SessionLocal, email="user@example.com", role=UserRole.customer
+    )
 
     export = client.get("/api/v1/auth/me/export", headers=auth_headers(token))
     assert export.status_code == 200, export.text
@@ -80,7 +86,9 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
     assert exported["orders"] == []
     assert exported["wishlist"] == []
 
-    status_res = client.get("/api/v1/auth/me/delete/status", headers=auth_headers(token))
+    status_res = client.get(
+        "/api/v1/auth/me/delete/status", headers=auth_headers(token)
+    )
     assert status_res.status_code == 200, status_res.text
     assert status_res.json()["scheduled_for"] is None
     assert status_res.json()["cooldown_hours"] >= 1
@@ -108,7 +116,9 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
     )
     assert reschedule.status_code == 400, reschedule.text
 
-    canceled = client.post("/api/v1/auth/me/delete/cancel", json={}, headers=auth_headers(token))
+    canceled = client.post(
+        "/api/v1/auth/me/delete/cancel", json={}, headers=auth_headers(token)
+    )
     assert canceled.status_code == 200
     assert canceled.json()["scheduled_for"] is None
 
@@ -122,8 +132,14 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
 
     async def expire_schedule():
         async with SessionLocal() as session:
-            user = (await session.execute(select(User).where(User.email == "user@example.com"))).scalar_one()
-            user.deletion_scheduled_for = datetime.now(timezone.utc) - timedelta(hours=1)
+            user = (
+                await session.execute(
+                    select(User).where(User.email == "user@example.com")
+                )
+            ).scalar_one()
+            user.deletion_scheduled_for = datetime.now(timezone.utc) - timedelta(
+                hours=1
+            )
             user_id = user.id
             await session.commit()
             return user_id
@@ -139,20 +155,36 @@ def test_account_export_and_deletion_flow(test_app: Dict[str, object]) -> None:
             assert user is not None
             assert user.deleted_at is not None
             assert user.email.startswith("deleted+")
-            sessions = (await session.execute(select(RefreshSession).where(RefreshSession.user_id == user.id))).scalars().all()
+            sessions = (
+                (
+                    await session.execute(
+                        select(RefreshSession).where(RefreshSession.user_id == user.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
             assert sessions
             assert all(s.revoked for s in sessions)
 
     asyncio.run(assert_deleted())
 
 
-def test_my_comments_endpoint_includes_status_and_context(test_app: Dict[str, object]) -> None:
+def test_my_comments_endpoint_includes_status_and_context(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
-    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
-    other_token = create_user_token(SessionLocal, email="other@example.com", role=UserRole.customer)
+    admin_token = create_user_token(
+        SessionLocal, email="admin@example.com", role=UserRole.admin
+    )
+    user_token = create_user_token(
+        SessionLocal, email="user@example.com", role=UserRole.customer
+    )
+    other_token = create_user_token(
+        SessionLocal, email="other@example.com", role=UserRole.customer
+    )
 
     create_post = client.post(
         "/api/v1/content/admin/blog.first-post",
@@ -205,7 +237,11 @@ def test_my_comments_endpoint_includes_status_and_context(test_app: Dict[str, ob
     )
     assert other_reply.status_code == 201, other_reply.text
 
-    listing = client.get("/api/v1/blog/me/comments", params={"lang": "en"}, headers=auth_headers(user_token))
+    listing = client.get(
+        "/api/v1/blog/me/comments",
+        params={"lang": "en"},
+        headers=auth_headers(user_token),
+    )
     assert listing.status_code == 200, listing.text
     items = listing.json()["items"]
     by_id = {item["id"]: item for item in items}
@@ -225,16 +261,22 @@ def test_my_comments_endpoint_includes_status_and_context(test_app: Dict[str, ob
     )
     assert hide.status_code == 200, hide.text
 
-    after_hide = client.get("/api/v1/blog/me/comments", headers=auth_headers(user_token))
+    after_hide = client.get(
+        "/api/v1/blog/me/comments", headers=auth_headers(user_token)
+    )
     assert after_hide.status_code == 200
     hidden_item = next(i for i in after_hide.json()["items"] if i["id"] == root_id)
     assert hidden_item["status"] == "hidden"
     assert hidden_item["body"] == ""
 
-    deleted = client.delete(f"/api/v1/blog/comments/{reply_id}", headers=auth_headers(user_token))
+    deleted = client.delete(
+        f"/api/v1/blog/comments/{reply_id}", headers=auth_headers(user_token)
+    )
     assert deleted.status_code == 204, deleted.text
 
-    after_delete = client.get("/api/v1/blog/me/comments", headers=auth_headers(user_token))
+    after_delete = client.get(
+        "/api/v1/blog/me/comments", headers=auth_headers(user_token)
+    )
     assert after_delete.status_code == 200
     deleted_item = next(i for i in after_delete.json()["items"] if i["id"] == reply_id)
     assert deleted_item["status"] == "deleted"

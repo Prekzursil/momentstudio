@@ -29,15 +29,30 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("tag", sa.String(length=64), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.UniqueConstraint("content_image_id", "tag", name="uq_content_image_tags_image_tag"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.UniqueConstraint(
+            "content_image_id", "tag", name="uq_content_image_tags_image_tag"
+        ),
     )
-    op.create_index(op.f("ix_content_image_tags_content_image_id"), "content_image_tags", ["content_image_id"], unique=False)
-    op.create_index(op.f("ix_content_image_tags_tag"), "content_image_tags", ["tag"], unique=False)
+    op.create_index(
+        op.f("ix_content_image_tags_content_image_id"),
+        "content_image_tags",
+        ["content_image_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_content_image_tags_tag"), "content_image_tags", ["tag"], unique=False
+    )
 
 
 def downgrade() -> None:
     op.drop_index(op.f("ix_content_image_tags_tag"), table_name="content_image_tags")
-    op.drop_index(op.f("ix_content_image_tags_content_image_id"), table_name="content_image_tags")
+    op.drop_index(
+        op.f("ix_content_image_tags_content_image_id"), table_name="content_image_tags"
+    )
     op.drop_table("content_image_tags")
-

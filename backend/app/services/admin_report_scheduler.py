@@ -20,7 +20,9 @@ async def _run_once() -> None:
 
 
 async def _loop(stop: asyncio.Event) -> None:
-    interval = max(30, int(getattr(settings, "admin_reports_poll_interval_seconds", 60)))
+    interval = max(
+        30, int(getattr(settings, "admin_reports_poll_interval_seconds", 60))
+    )
     while not stop.is_set():
         try:
             await _run_once()
@@ -40,7 +42,9 @@ def start(app: FastAPI) -> None:
         return
 
     stop = asyncio.Event()
-    task = asyncio.create_task(leader_lock.run_as_leader(name="admin_report_scheduler", stop=stop, work=_loop))
+    task = asyncio.create_task(
+        leader_lock.run_as_leader(name="admin_report_scheduler", stop=stop, work=_loop)
+    )
     app.state.admin_report_scheduler_stop = stop
     app.state.admin_report_scheduler_task = task
 

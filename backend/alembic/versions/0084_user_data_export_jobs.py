@@ -21,7 +21,12 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "user_data_export_jobs",
-        sa.Column("id", sa.dialects.postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id",
+            sa.dialects.postgresql.UUID(as_uuid=True),
+            primary_key=True,
+            nullable=False,
+        ),
         sa.Column(
             "user_id",
             sa.dialects.postgresql.UUID(as_uuid=True),
@@ -30,7 +35,14 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            sa.Enum("pending", "running", "succeeded", "failed", name="userdataexportstatus", native_enum=False),
+            sa.Enum(
+                "pending",
+                "running",
+                "succeeded",
+                "failed",
+                name="userdataexportstatus",
+                native_enum=False,
+            ),
             nullable=False,
             server_default="pending",
         ),
@@ -40,7 +52,12 @@ def upgrade() -> None:
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
@@ -49,11 +66,14 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_index("ix_user_data_export_jobs_user_id", "user_data_export_jobs", ["user_id"])
+    op.create_index(
+        "ix_user_data_export_jobs_user_id", "user_data_export_jobs", ["user_id"]
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_user_data_export_jobs_user_id", table_name="user_data_export_jobs")
+    op.drop_index(
+        "ix_user_data_export_jobs_user_id", table_name="user_data_export_jobs"
+    )
     op.drop_table("user_data_export_jobs")
     op.execute("DROP TYPE IF EXISTS userdataexportstatus")
-

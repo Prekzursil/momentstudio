@@ -75,13 +75,13 @@ export class ReceiptService {
         items: (r?.items ?? []).map((it: any) => ({
           ...it,
           unit_price: parseMoney(it?.unit_price),
-          subtotal: parseMoney(it?.subtotal)
+          subtotal: parseMoney(it?.subtotal),
         })),
         refunds: (r?.refunds ?? []).map((rf: any) => ({
           ...rf,
-          amount: parseMoney(rf?.amount)
-        }))
-      }))
+          amount: parseMoney(rf?.amount),
+        })),
+      })),
     );
   }
 
@@ -90,4 +90,3 @@ export class ReceiptService {
     return opts?.reveal ? `${base}?reveal=true` : base;
   }
 }
-

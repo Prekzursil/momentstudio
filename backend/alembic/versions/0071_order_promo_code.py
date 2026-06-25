@@ -18,9 +18,10 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("orders", sa.Column("promo_code", sa.String(length=40), nullable=True))
+    op.add_column(
+        "orders", sa.Column("promo_code", sa.String(length=40), nullable=True)
+    )
 
 
 def downgrade() -> None:
     op.drop_column("orders", "promo_code")
-

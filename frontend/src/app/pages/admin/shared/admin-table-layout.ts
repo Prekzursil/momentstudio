@@ -17,7 +17,10 @@ export function adminTableCellPaddingClass(density: AdminTableDensity): string {
   return density === 'compact' ? 'px-3 py-1.5' : 'px-3 py-2';
 }
 
-export function adminTableLayoutStorageKey(tableId: string, userId: string | null | undefined): string {
+export function adminTableLayoutStorageKey(
+  tableId: string,
+  userId: string | null | undefined,
+): string {
   const cleanedTable = (tableId || '')
     .trim()
     .toLowerCase()
@@ -39,7 +42,7 @@ export function defaultAdminTableLayout(columns: AdminTableColumn[]): AdminTable
 export function sanitizeAdminTableLayout(
   input: unknown,
   columns: AdminTableColumn[],
-  fallbackLayout?: AdminTableLayoutV1
+  fallbackLayout?: AdminTableLayoutV1,
 ): AdminTableLayoutV1 {
   const ids = columns.map((c) => c.id);
   const allowed = new Set(ids);
@@ -83,7 +86,11 @@ export function sanitizeAdminTableLayout(
   return { version: 1, order, hidden, density, updated_at };
 }
 
-export function loadAdminTableLayout(storageKey: string, columns: AdminTableColumn[], fallbackLayout?: AdminTableLayoutV1): AdminTableLayoutV1 {
+export function loadAdminTableLayout(
+  storageKey: string,
+  columns: AdminTableColumn[],
+  fallbackLayout?: AdminTableLayoutV1,
+): AdminTableLayoutV1 {
   const fallback = fallbackLayout ?? defaultAdminTableLayout(columns);
   try {
     const raw = localStorage.getItem(storageKey);
@@ -103,7 +110,10 @@ export function saveAdminTableLayout(storageKey: string, layout: AdminTableLayou
   }
 }
 
-export function visibleAdminTableColumnIds(layout: AdminTableLayoutV1, columns: AdminTableColumn[]): string[] {
+export function visibleAdminTableColumnIds(
+  layout: AdminTableLayoutV1,
+  columns: AdminTableColumn[],
+): string[] {
   const required = new Set(columns.filter((c) => c.required).map((c) => c.id));
   const hidden = new Set(layout.hidden || []);
   return (layout.order || []).filter((id) => required.has(id) || !hidden.has(id));

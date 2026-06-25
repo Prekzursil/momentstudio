@@ -16,15 +16,23 @@ async def verify(token: str | None, *, remote_ip: str | None = None) -> None:
 
     provider = (settings.captcha_provider or "").strip().lower()
     if provider != "turnstile":
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="CAPTCHA provider misconfigured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CAPTCHA provider misconfigured",
+        )
 
     secret = (settings.turnstile_secret_key or "").strip()
     if not secret:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="CAPTCHA secret key missing")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CAPTCHA secret key missing",
+        )
 
     token = (token or "").strip()
     if not token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CAPTCHA required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="CAPTCHA required"
+        )
 
     payload: dict[str, Any] = {"secret": secret, "response": token}
     if remote_ip:
@@ -34,13 +42,21 @@ async def verify(token: str | None, *, remote_ip: str | None = None) -> None:
         async with httpx.AsyncClient(timeout=5) as client:
             resp = await client.post(TURNSTILE_VERIFY_URL, data=payload)
     except httpx.HTTPError:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="CAPTCHA verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="CAPTCHA verification failed",
+        )
 
     if resp.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="CAPTCHA verification failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="CAPTCHA verification failed",
+        )
 
     data = resp.json() if resp.content else {}
     success = bool(isinstance(data, dict) and data.get("success"))
     if not success:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CAPTCHA verification failed")
-
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CAPTCHA verification failed",
+        )

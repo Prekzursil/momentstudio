@@ -33,7 +33,7 @@ import { TranslateModule } from '@ngx-translate/core';
         <ng-content></ng-content>
       </div>
     </details>
-  `
+  `,
 })
 export class HelpPanelComponent {
   @Input() titleKey = 'adminUi.help.title';

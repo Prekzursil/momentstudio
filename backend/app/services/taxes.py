@@ -22,7 +22,10 @@ def _normalize_country_code(value: str | None) -> str | None:
     if not code:
         return None
     if len(code) != 2 or not code.isalpha():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Country must be a 2-letter code")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Country must be a 2-letter code",
+        )
     return code
 
 
@@ -30,18 +33,28 @@ def _normalize_group_code(value: str) -> str:
     cleaned = (value or "").strip().lower().replace(" ", "-")
     cleaned = "-".join(part for part in cleaned.split("-") if part)
     if not cleaned:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group code is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group code is required"
+        )
     if len(cleaned) > 40:
         cleaned = cleaned[:40]
     return cleaned
 
 
 async def _get_default_group_id(session: AsyncSession) -> UUID | None:
-    result = await session.execute(select(TaxGroup.id).where(TaxGroup.is_default.is_(True)).order_by(TaxGroup.created_at))
+    result = await session.execute(
+        select(TaxGroup.id)
+        .where(TaxGroup.is_default.is_(True))
+        .order_by(TaxGroup.created_at)
+    )
     group_id = result.scalar_one_or_none()
     if group_id:
         return group_id
-    result = await session.execute(select(TaxGroup.id).where(TaxGroup.code == "standard").order_by(TaxGroup.created_at))
+    result = await session.execute(
+        select(TaxGroup.id)
+        .where(TaxGroup.code == "standard")
+        .order_by(TaxGroup.created_at)
+    )
     return result.scalar_one_or_none()
 
 
@@ -55,7 +68,9 @@ async def default_country_vat_rate_percent(
     if not default_group_id:
         return fallback_rate_percent
     result = await session.execute(
-        select(TaxRate.vat_rate_percent).where(TaxRate.group_id == default_group_id, TaxRate.country_code == country)
+        select(TaxRate.vat_rate_percent).where(
+            TaxRate.group_id == default_group_id, TaxRate.country_code == country
+        )
     )
     rate = result.scalar_one_or_none()
     if rate is None:
@@ -67,7 +82,11 @@ async def list_tax_groups(session: AsyncSession) -> list[TaxGroup]:
     result = await session.execute(
         select(TaxGroup)
         .options(selectinload(TaxGroup.rates))
-        .order_by(TaxGroup.is_default.desc(), func.lower(TaxGroup.name), func.lower(TaxGroup.code))
+        .order_by(
+            TaxGroup.is_default.desc(),
+            func.lower(TaxGroup.name),
+            func.lower(TaxGroup.code),
+        )
     )
     groups = list(result.scalars().unique())
     return groups
@@ -82,14 +101,24 @@ async def create_tax_group(
     is_default: bool,
 ) -> TaxGroup:
     code_clean = _normalize_group_code(code)
-    exists = await session.execute(select(TaxGroup.id).where(TaxGroup.code == code_clean))
+    exists = await session.execute(
+        select(TaxGroup.id).where(TaxGroup.code == code_clean)
+    )
     if exists.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group code already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tax group code already exists",
+        )
 
     if is_default:
         await session.execute(update(TaxGroup).values(is_default=False))
 
-    group = TaxGroup(code=code_clean, name=(name or "").strip()[:120], description=description, is_default=bool(is_default))
+    group = TaxGroup(
+        code=code_clean,
+        name=(name or "").strip()[:120],
+        description=description,
+        is_default=bool(is_default),
+    )
     session.add(group)
     await session.commit()
     await session.refresh(group)
@@ -105,7 +134,9 @@ async def update_tax_group(
     is_default: bool | None,
 ) -> TaxGroup:
     if is_default is True:
-        await session.execute(update(TaxGroup).where(TaxGroup.id != group.id).values(is_default=False))
+        await session.execute(
+            update(TaxGroup).where(TaxGroup.id != group.id).values(is_default=False)
+        )
         group.is_default = True
     elif is_default is False:
         group.is_default = False
@@ -123,11 +154,21 @@ async def update_tax_group(
 
 async def delete_tax_group(session: AsyncSession, *, group: TaxGroup) -> None:
     if group.is_default:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete default tax group")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete default tax group",
+        )
     # Prevent deleting a group still referenced by categories.
-    result = await session.execute(select(func.count()).select_from(Category).where(Category.tax_group_id == group.id))
+    result = await session.execute(
+        select(func.count())
+        .select_from(Category)
+        .where(Category.tax_group_id == group.id)
+    )
     if (result.scalar_one() or 0) > 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tax group is still assigned to categories")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tax group is still assigned to categories",
+        )
     await session.delete(group)
     await session.commit()
 
@@ -142,10 +183,15 @@ async def upsert_tax_rate(
     country = _normalize_country_code(country_code) or ""
     rate = Decimal(vat_rate_percent)
     if rate < 0 or rate > 100:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="VAT rate must be between 0 and 100")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="VAT rate must be between 0 and 100",
+        )
     rate = rate.quantize(Decimal("0.01"))
     existing = await session.execute(
-        select(TaxRate).where(TaxRate.group_id == group.id, TaxRate.country_code == country)
+        select(TaxRate).where(
+            TaxRate.group_id == group.id, TaxRate.country_code == country
+        )
     )
     row = existing.scalar_one_or_none()
     if row:
@@ -161,9 +207,15 @@ async def upsert_tax_rate(
     return row
 
 
-async def delete_tax_rate(session: AsyncSession, *, group_id: UUID, country_code: str) -> None:
+async def delete_tax_rate(
+    session: AsyncSession, *, group_id: UUID, country_code: str
+) -> None:
     country = _normalize_country_code(country_code) or ""
-    await session.execute(delete(TaxRate).where(TaxRate.group_id == group_id, TaxRate.country_code == country))
+    await session.execute(
+        delete(TaxRate).where(
+            TaxRate.group_id == group_id, TaxRate.country_code == country
+        )
+    )
     await session.commit()
 
 
@@ -184,15 +236,21 @@ async def vat_rates_for_products(
         .join(Category, Product.category_id == Category.id)
         .where(Product.id.in_(product_ids))
     )
-    group_by_product: dict[UUID, UUID | None] = {pid: (group_id or default_group_id) for pid, group_id in result.all()}
+    group_by_product: dict[UUID, UUID | None] = {
+        pid: (group_id or default_group_id) for pid, group_id in result.all()
+    }
     group_ids = {gid for gid in group_by_product.values() if gid is not None}
     if not group_ids:
         return {pid: Decimal(fallback_rate_percent) for pid in product_ids}
 
     rates = await session.execute(
-        select(TaxRate.group_id, TaxRate.vat_rate_percent).where(TaxRate.group_id.in_(group_ids), TaxRate.country_code == country)
+        select(TaxRate.group_id, TaxRate.vat_rate_percent).where(
+            TaxRate.group_id.in_(group_ids), TaxRate.country_code == country
+        )
     )
-    rate_by_group: dict[UUID, Decimal] = {gid: Decimal(rate) for gid, rate in rates.all()}
+    rate_by_group: dict[UUID, Decimal] = {
+        gid: Decimal(rate) for gid, rate in rates.all()
+    }
     default_rate = rate_by_group.get(default_group_id) if default_group_id else None
     fallback = Decimal(fallback_rate_percent)
 
@@ -211,7 +269,9 @@ class TaxableProductLine:
     subtotal: Decimal
 
 
-def _allocate_discount(lines: list[TaxableProductLine], discount: Decimal) -> list[Decimal]:
+def _allocate_discount(
+    lines: list[TaxableProductLine], discount: Decimal
+) -> list[Decimal]:
     if not lines:
         return []
     subtotal = sum((line.subtotal for line in lines), start=Decimal("0.00"))
@@ -224,7 +284,9 @@ def _allocate_discount(lines: list[TaxableProductLine], discount: Decimal) -> li
         discount_q = subtotal
 
     raw_shares = [(line.subtotal / subtotal) * discount_q for line in lines]
-    floored = [share.quantize(pricing.MONEY_QUANT, rounding=ROUND_DOWN) for share in raw_shares]
+    floored = [
+        share.quantize(pricing.MONEY_QUANT, rounding=ROUND_DOWN) for share in raw_shares
+    ]
     remainder = discount_q - sum(floored, start=Decimal("0.00"))
     pennies = int((remainder * 100).to_integral_value())
     if pennies <= 0:
@@ -251,14 +313,26 @@ async def compute_cart_vat_amount(
     if not checkout.vat_enabled:
         return Decimal("0.00")
 
-    subtotal = pricing.quantize_money(sum((line.subtotal for line in lines), start=Decimal("0.00")), rounding=rounding)
-    discount_q = pricing.quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
+    subtotal = pricing.quantize_money(
+        sum((line.subtotal for line in lines), start=Decimal("0.00")), rounding=rounding
+    )
+    discount_q = (
+        pricing.quantize_money(discount, rounding=rounding)
+        if discount > 0
+        else Decimal("0.00")
+    )
     taxable_subtotal = subtotal - discount_q
     if taxable_subtotal < 0:
         taxable_subtotal = Decimal("0.00")
     taxable_subtotal = pricing.quantize_money(taxable_subtotal, rounding=rounding)
-    shipping_q = pricing.quantize_money(shipping, rounding=rounding) if shipping > 0 else Decimal("0.00")
-    fee_q = pricing.quantize_money(fee, rounding=rounding) if fee > 0 else Decimal("0.00")
+    shipping_q = (
+        pricing.quantize_money(shipping, rounding=rounding)
+        if shipping > 0
+        else Decimal("0.00")
+    )
+    fee_q = (
+        pricing.quantize_money(fee, rounding=rounding) if fee > 0 else Decimal("0.00")
+    )
 
     country = _normalize_country_code(country_code)
     if not country:
@@ -275,9 +349,14 @@ async def compute_cart_vat_amount(
 
     product_ids = {line.product_id for line in lines}
     rates_by_product = await vat_rates_for_products(
-        session, product_ids=product_ids, country_code=country, fallback_rate_percent=checkout.vat_rate_percent
+        session,
+        product_ids=product_ids,
+        country_code=country,
+        fallback_rate_percent=checkout.vat_rate_percent,
     )
-    default_rate = await default_country_vat_rate_percent(session, country_code=country, fallback_rate_percent=checkout.vat_rate_percent)
+    default_rate = await default_country_vat_rate_percent(
+        session, country_code=country, fallback_rate_percent=checkout.vat_rate_percent
+    )
 
     allocations = _allocate_discount(lines, discount_q)
     base_by_rate: dict[Decimal, Decimal] = {}
@@ -285,7 +364,9 @@ async def compute_cart_vat_amount(
         rate = rates_by_product.get(line.product_id, Decimal(default_rate))
         if rate <= 0:
             continue
-        base = pricing.quantize_money(line.subtotal, rounding=rounding) - pricing.quantize_money(allocated, rounding=rounding)
+        base = pricing.quantize_money(
+            line.subtotal, rounding=rounding
+        ) - pricing.quantize_money(allocated, rounding=rounding)
         if base <= 0:
             continue
         base_by_rate[rate] = base_by_rate.get(rate, Decimal("0.00")) + base
@@ -296,11 +377,17 @@ async def compute_cart_vat_amount(
     if checkout.vat_apply_to_fee:
         extra_base += fee_q
     if extra_base > 0 and default_rate > 0:
-        base_by_rate[Decimal(default_rate)] = base_by_rate.get(Decimal(default_rate), Decimal("0.00")) + extra_base
+        base_by_rate[Decimal(default_rate)] = (
+            base_by_rate.get(Decimal(default_rate), Decimal("0.00")) + extra_base
+        )
 
     vat_total = Decimal("0.00")
     for rate, base in base_by_rate.items():
-        if base <= 0 or rate <= 0:
+        if (
+            base <= 0 or rate <= 0
+        ):  # pragma: no cover - defensive; only positive (base, rate) pairs are inserted above
             continue
-        vat_total += pricing.quantize_money(base * Decimal(rate) / Decimal("100"), rounding=rounding)
+        vat_total += pricing.quantize_money(
+            base * Decimal(rate) / Decimal("100"), rounding=rounding
+        )
     return pricing.quantize_money(vat_total, rounding=rounding)

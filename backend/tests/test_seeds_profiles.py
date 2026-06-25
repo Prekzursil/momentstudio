@@ -29,12 +29,16 @@ def test_load_profile_rejects_profile_path_traversal() -> None:
         seeds._load_profile("../default")
 
 
-def test_load_profile_rejects_markdown_path_traversal(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_profile_rejects_markdown_path_traversal(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     root = tmp_path / "seed_profiles"
     profile_dir = root / "safe"
     profile_dir.mkdir(parents=True)
 
-    (profile_dir / "catalog.json").write_text(json.dumps({"categories": [], "products": []}), encoding="utf-8")
+    (profile_dir / "catalog.json").write_text(
+        json.dumps({"categories": [], "products": []}), encoding="utf-8"
+    )
     (profile_dir / "content_blocks.json").write_text(
         json.dumps(
             {

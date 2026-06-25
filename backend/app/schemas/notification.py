@@ -23,4 +23,3 @@ class NotificationListResponse(BaseModel):
 
 class NotificationUnreadCountResponse(BaseModel):
     count: int = Field(ge=0)
-

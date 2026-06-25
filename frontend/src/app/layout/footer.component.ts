@@ -1,5 +1,13 @@
 import { NgClass, NgForOf, NgIf } from '@angular/common';
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, HostListener, OnDestroy, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  HostListener,
+  OnDestroy,
+  OnInit,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -34,19 +42,32 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
   imports: [NgIf, NgForOf, NgClass, RouterLink, TranslateModule, ImgFallbackDirective],
   template: `
     <footer class="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 lg:grid-cols-4 text-sm text-slate-600 dark:text-slate-300">
+      <div
+        class="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 lg:grid-cols-4 text-sm text-slate-600 dark:text-slate-300"
+      >
         <section class="grid gap-4" aria-labelledby="footer-brand-heading">
           <div class="grid gap-1">
-            <h2 id="footer-brand-heading" class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ 'app.name' | translate }}</h2>
+            <h2
+              id="footer-brand-heading"
+              class="text-lg font-semibold text-slate-900 dark:text-slate-100"
+            >
+              {{ 'app.name' | translate }}
+            </h2>
             <p class="text-slate-600 dark:text-slate-300">{{ 'app.tagline' | translate }}</p>
           </div>
 
           <div class="min-h-[2.5rem]">
             <ng-container *ngIf="socialLoading; else socialLinksReady">
               <div class="flex flex-wrap items-center gap-3" data-footer-social-loading="true">
-                <span class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-                <span class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-                <span class="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+                <span
+                  class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"
+                ></span>
+                <span
+                  class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"
+                ></span>
+                <span
+                  class="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"
+                ></span>
               </div>
             </ng-container>
             <ng-template #socialLinksReady>
@@ -86,7 +107,10 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                         />
                       </ng-container>
                       <ng-template #instagramAvatar>
-                        <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
+                        <span
+                          class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white"
+                          [ngClass]="page.avatarClass"
+                        >
                           {{ page.initials }}
                         </span>
                       </ng-template>
@@ -130,7 +154,10 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                         />
                       </ng-container>
                       <ng-template #facebookAvatar>
-                        <span class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white" [ngClass]="page.avatarClass">
+                        <span
+                          class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white"
+                          [ngClass]="page.avatarClass"
+                        >
                           {{ page.initials }}
                         </span>
                       </ng-template>
@@ -139,16 +166,32 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                   </div>
                 </div>
 
-                <a class="font-medium hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'footer.contact' | translate }}</a>
+                <a
+                  class="font-medium hover:text-slate-900 dark:hover:text-white"
+                  routerLink="/contact"
+                  >{{ 'footer.contact' | translate }}</a
+                >
               </nav>
             </ng-template>
           </div>
         </section>
 
-        <section class="grid gap-2 content-start min-h-[9rem]" data-footer-nav-shell="handcrafted" aria-labelledby="footer-handcrafted-heading">
-          <h2 id="footer-handcrafted-heading" class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.handcraftedArt' | translate }}</h2>
+        <section
+          class="grid gap-2 content-start min-h-[9rem]"
+          data-footer-nav-shell="handcrafted"
+          aria-labelledby="footer-handcrafted-heading"
+        >
+          <h2
+            id="footer-handcrafted-heading"
+            class="font-semibold text-slate-900 dark:text-slate-100"
+          >
+            {{ 'footer.handcraftedArt' | translate }}
+          </h2>
           <ng-container *ngIf="navLoading; else handcraftedLinksReady">
-            <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" data-footer-nav-loading="handcrafted"></span>
+            <span
+              class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"
+              data-footer-nav-loading="handcrafted"
+            ></span>
             <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
             <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
             <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
@@ -156,7 +199,9 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
           <ng-template #handcraftedLinksReady>
             <nav class="grid gap-2" aria-labelledby="footer-handcrafted-heading">
               <ng-container *ngIf="footerHandcraftedLinks?.length; else defaultHandcraftedLinks">
-                <ng-container *ngFor="let link of footerHandcraftedLinks; trackBy: trackSiteNavLink">
+                <ng-container
+                  *ngFor="let link of footerHandcraftedLinks; trackBy: trackSiteNavLink"
+                >
                   <a
                     *ngIf="!isExternalLink(link.url)"
                     class="hover:text-slate-900 dark:hover:text-white"
@@ -176,19 +221,36 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 </ng-container>
               </ng-container>
               <ng-template #defaultHandcraftedLinks>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/shop">{{ 'nav.shop' | translate }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/about">{{ 'nav.about' | translate }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{ 'nav.contact' | translate }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
+                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/shop">{{
+                  'nav.shop' | translate
+                }}</a>
+                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/about">{{
+                  'nav.about' | translate
+                }}</a>
+                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{
+                  'nav.contact' | translate
+                }}</a>
+                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{
+                  'nav.terms' | translate
+                }}</a>
               </ng-template>
             </nav>
           </ng-template>
         </section>
 
-        <section class="grid gap-2 content-start min-h-[9rem]" data-footer-nav-shell="legal" aria-labelledby="footer-legal-heading">
-          <h2 id="footer-legal-heading" class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.legal' | translate }}</h2>
+        <section
+          class="grid gap-2 content-start min-h-[9rem]"
+          data-footer-nav-shell="legal"
+          aria-labelledby="footer-legal-heading"
+        >
+          <h2 id="footer-legal-heading" class="font-semibold text-slate-900 dark:text-slate-100">
+            {{ 'footer.legal' | translate }}
+          </h2>
           <ng-container *ngIf="navLoading; else legalLinksReady">
-            <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" data-footer-nav-loading="legal"></span>
+            <span
+              class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"
+              data-footer-nav-loading="legal"
+            ></span>
             <span class="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
             <span class="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
           </ng-container>
@@ -215,18 +277,35 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 </ng-container>
               </ng-container>
               <ng-template #defaultLegalLinks>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{ 'nav.terms' | translate }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/privacy-policy">{{ 'footer.privacyPolicy' | translate }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/anpc">{{ 'footer.anpc' | translate }}</a>
+                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{
+                  'nav.terms' | translate
+                }}</a>
+                <a
+                  class="hover:text-slate-900 dark:hover:text-white"
+                  routerLink="/pages/privacy-policy"
+                  >{{ 'footer.privacyPolicy' | translate }}</a
+                >
+                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/anpc">{{
+                  'footer.anpc' | translate
+                }}</a>
               </ng-template>
             </nav>
           </ng-template>
         </section>
 
-        <section class="grid gap-2 content-start min-h-[10.5rem]" data-footer-company-shell aria-labelledby="footer-company-heading">
-          <h2 id="footer-company-heading" class="font-semibold text-slate-900 dark:text-slate-100">{{ 'footer.companyInfo' | translate }}</h2>
+        <section
+          class="grid gap-2 content-start min-h-[10.5rem]"
+          data-footer-company-shell
+          aria-labelledby="footer-company-heading"
+        >
+          <h2 id="footer-company-heading" class="font-semibold text-slate-900 dark:text-slate-100">
+            {{ 'footer.companyInfo' | translate }}
+          </h2>
           <ng-container *ngIf="companyLoading; else companyInfoReady">
-            <span class="h-4 w-48 rounded bg-slate-200 dark:bg-slate-800 animate-pulse" data-footer-company-loading="true"></span>
+            <span
+              class="h-4 w-48 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"
+              data-footer-company-loading="true"
+            ></span>
             <span class="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
             <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
             <span class="h-4 w-56 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
@@ -234,19 +313,39 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
             <span class="h-4 w-40 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
           </ng-container>
           <ng-template #companyInfoReady>
-            <p *ngIf="companyInfo.name" class="font-medium text-slate-800 dark:text-slate-100">{{ companyInfo.name }}</p>
-            <p *ngIf="companyInfo.registrationNumber">{{ 'footer.registrationNumber' | translate }}: {{ companyInfo.registrationNumber }}</p>
+            <p *ngIf="companyInfo.name" class="font-medium text-slate-800 dark:text-slate-100">
+              {{ companyInfo.name }}
+            </p>
+            <p *ngIf="companyInfo.registrationNumber">
+              {{ 'footer.registrationNumber' | translate }}: {{ companyInfo.registrationNumber }}
+            </p>
             <p *ngIf="companyInfo.cui">{{ 'footer.cui' | translate }}: {{ companyInfo.cui }}</p>
-            <p *ngIf="companyInfo.address">{{ 'footer.address' | translate }}: {{ companyInfo.address }}</p>
-            <p *ngIf="companyInfo.phone">{{ 'footer.phone' | translate }}: {{ companyInfo.phone }}</p>
-            <p *ngIf="companyInfo.email">{{ 'footer.email' | translate }}: {{ companyInfo.email }}</p>
+            <p *ngIf="companyInfo.address">
+              {{ 'footer.address' | translate }}: {{ companyInfo.address }}
+            </p>
+            <p *ngIf="companyInfo.phone">
+              {{ 'footer.phone' | translate }}: {{ companyInfo.phone }}
+            </p>
+            <p *ngIf="companyInfo.email">
+              {{ 'footer.email' | translate }}: {{ companyInfo.email }}
+            </p>
           </ng-template>
         </section>
 
-        <section class="lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-6 dark:border-slate-800" aria-labelledby="footer-payments-heading">
+        <section
+          class="lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-6 dark:border-slate-800"
+          aria-labelledby="footer-payments-heading"
+        >
           <div class="flex flex-col sm:flex-row items-center gap-4">
-            <h2 id="footer-payments-heading" class="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300">{{ 'footer.paymentsAccepted' | translate }}</h2>
-            <div class="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200">
+            <h2
+              id="footer-payments-heading"
+              class="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300"
+            >
+              {{ 'footer.paymentsAccepted' | translate }}
+            </h2>
+            <div
+              class="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200"
+            >
               <img
                 src="assets/payments/netopia-visa-mastercard.png"
                 [alt]="'footer.paymentsAcceptedAlt' | translate"
@@ -273,7 +372,7 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
         </section>
       </div>
     </footer>
-  `
+  `,
 })
 export class FooterComponent implements OnInit, OnDestroy {
   openMenu: 'instagram' | 'facebook' | null = null;
@@ -291,7 +390,7 @@ export class FooterComponent implements OnInit, OnDestroy {
     cui: null,
     address: null,
     phone: null,
-    email: null
+    email: null,
   };
 
   private socialSub?: Subscription;
@@ -304,13 +403,15 @@ export class FooterComponent implements OnInit, OnDestroy {
     private readonly company: SiteCompanyService,
     private readonly navigation: SiteNavigationService,
     private readonly translate: TranslateService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
     this.socialSub = this.social.get().subscribe({
       next: (data) => {
-        const instagram = data.instagramPages?.length ? data.instagramPages : DEFAULT_INSTAGRAM_PAGES;
+        const instagram = data.instagramPages?.length
+          ? data.instagramPages
+          : DEFAULT_INSTAGRAM_PAGES;
         const facebook = data.facebookPages?.length ? data.facebookPages : DEFAULT_FACEBOOK_PAGES;
         this.deferStateUpdate(() => {
           this.instagramPages = this.toFooterPages('instagram', instagram);
@@ -322,7 +423,7 @@ export class FooterComponent implements OnInit, OnDestroy {
         this.deferStateUpdate(() => {
           this.socialLoading = false;
         });
-      }
+      },
     });
     this.companySub = this.company.get().subscribe({
       next: (info) => {
@@ -335,12 +436,14 @@ export class FooterComponent implements OnInit, OnDestroy {
         this.deferStateUpdate(() => {
           this.companyLoading = false;
         });
-      }
+      },
     });
     this.navSub = this.navigation.get().subscribe({
       next: (data) => {
         this.deferStateUpdate(() => {
-          this.footerHandcraftedLinks = data?.footerHandcraftedLinks?.length ? data.footerHandcraftedLinks : null;
+          this.footerHandcraftedLinks = data?.footerHandcraftedLinks?.length
+            ? data.footerHandcraftedLinks
+            : null;
           this.footerLegalLinks = data?.footerLegalLinks?.length ? data.footerLegalLinks : null;
           this.navLoading = false;
         });
@@ -349,7 +452,7 @@ export class FooterComponent implements OnInit, OnDestroy {
         this.deferStateUpdate(() => {
           this.navLoading = false;
         });
-      }
+      },
     });
   }
 
@@ -376,18 +479,24 @@ export class FooterComponent implements OnInit, OnDestroy {
 
   private toFooterPages(
     platform: 'instagram' | 'facebook',
-    pages: SiteSocialLink[]
+    pages: SiteSocialLink[],
   ): FooterSocialPage[] {
     const palettes =
       platform === 'instagram'
-        ? ['bg-gradient-to-br from-fuchsia-500 to-rose-500', 'bg-gradient-to-br from-amber-500 to-rose-500']
-        : ['bg-gradient-to-br from-blue-600 to-sky-500', 'bg-gradient-to-br from-blue-600 to-fuchsia-500'];
+        ? [
+            'bg-gradient-to-br from-fuchsia-500 to-rose-500',
+            'bg-gradient-to-br from-amber-500 to-rose-500',
+          ]
+        : [
+            'bg-gradient-to-br from-blue-600 to-sky-500',
+            'bg-gradient-to-br from-blue-600 to-fuchsia-500',
+          ];
     return pages.map((page, index) => ({
       label: page.label,
       url: page.url,
       thumbnailUrl: page.thumbnail_url || null,
       initials: this.initialsForLabel(page.label),
-      avatarClass: palettes[index % palettes.length]
+      avatarClass: palettes[index % palettes.length],
     }));
   }
 
@@ -395,6 +504,7 @@ export class FooterComponent implements OnInit, OnDestroy {
     const cleaned = (label || '').trim();
     if (!cleaned) return 'MS';
     const parts = cleaned.split(/\s+/).filter(Boolean);
+    /* istanbul ignore next -- parts[0][0] is always defined (cleaned is non-empty and split+filter yields a non-empty first token), so the cleaned[0]/'M' fallbacks are unreachable */
     const first = parts[0]?.[0] ?? cleaned[0] ?? 'M';
     const second = parts[1]?.[0] ?? parts[0]?.[1] ?? 'S';
     return `${first}${second}`.toUpperCase();
@@ -436,4 +546,3 @@ export class FooterComponent implements OnInit, OnDestroy {
     }
   }
 }
-

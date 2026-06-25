@@ -35,7 +35,14 @@ def test_app():
     app.dependency_overrides.clear()
 
 
-def _create_user(session_factory, *, email: str, username: str, role: UserRole, password: str = "supersecret") -> User:
+def _create_user(
+    session_factory,
+    *,
+    email: str,
+    username: str,
+    role: UserRole,
+    password: str = "supersecret",
+) -> User:
     async def _inner() -> User:
         async with session_factory() as session:
             user = User(
@@ -59,27 +66,45 @@ def test_admin_login_alert_sent_once_per_device(test_app, monkeypatch) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]
 
-    owner = _create_user(session_factory, email="owner@example.com", username="owner", role=UserRole.owner)
-    _create_user(session_factory, email="admin@example.com", username="admin", role=UserRole.admin)
+    owner = _create_user(
+        session_factory,
+        email="owner@example.com",
+        username="owner",
+        role=UserRole.owner,
+    )
+    _create_user(
+        session_factory,
+        email="admin@example.com",
+        username="admin",
+        role=UserRole.admin,
+    )
 
     mock_send = AsyncMock(return_value=True)
     monkeypatch.setattr(email_service, "send_admin_login_alert", mock_send)
 
     headers = {"user-agent": "TestBrowser/1.0"}
-    res1 = client.post("/api/v1/auth/login", json={"identifier": "admin", "password": "supersecret"}, headers=headers)
+    res1 = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "admin", "password": "supersecret"},
+        headers=headers,
+    )
     assert res1.status_code == 200, res1.text
 
     assert mock_send.await_count == 1
     assert mock_send.await_args.args[0] == owner.email
 
     res2 = client.post(
-        "/api/v1/auth/login", json={"identifier": "admin", "password": "supersecret"}, headers={"user-agent": "TestBrowser/2.0"}
+        "/api/v1/auth/login",
+        json={"identifier": "admin", "password": "supersecret"},
+        headers={"user-agent": "TestBrowser/2.0"},
     )
     assert res2.status_code == 200, res2.text
     assert mock_send.await_count == 1
 
     res3 = client.post(
-        "/api/v1/auth/login", json={"identifier": "admin", "password": "supersecret"}, headers={"user-agent": "OtherBrowser/1.0"}
+        "/api/v1/auth/login",
+        json={"identifier": "admin", "password": "supersecret"},
+        headers={"user-agent": "OtherBrowser/1.0"},
     )
     assert res3.status_code == 200, res3.text
     assert mock_send.await_count == 2
@@ -89,13 +114,26 @@ def test_customer_login_does_not_trigger_admin_alert(test_app, monkeypatch) -> N
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]
 
-    _create_user(session_factory, email="owner@example.com", username="owner", role=UserRole.owner)
-    _create_user(session_factory, email="user@example.com", username="user", role=UserRole.customer)
+    _create_user(
+        session_factory,
+        email="owner@example.com",
+        username="owner",
+        role=UserRole.owner,
+    )
+    _create_user(
+        session_factory,
+        email="user@example.com",
+        username="user",
+        role=UserRole.customer,
+    )
 
     mock_send = AsyncMock(return_value=True)
     monkeypatch.setattr(email_service, "send_admin_login_alert", mock_send)
 
-    res = client.post("/api/v1/auth/login", json={"identifier": "user", "password": "supersecret"}, headers={"user-agent": "X/1.0"})
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "user", "password": "supersecret"},
+        headers={"user-agent": "X/1.0"},
+    )
     assert res.status_code == 200, res.text
     assert mock_send.await_count == 0
-

@@ -17,13 +17,18 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("orders", sa.Column("paypal_order_id", sa.String(length=255), nullable=True))
-    op.add_column("orders", sa.Column("paypal_capture_id", sa.String(length=255), nullable=True))
-    op.create_index("ix_orders_paypal_order_id", "orders", ["paypal_order_id"], unique=True)
+    op.add_column(
+        "orders", sa.Column("paypal_order_id", sa.String(length=255), nullable=True)
+    )
+    op.add_column(
+        "orders", sa.Column("paypal_capture_id", sa.String(length=255), nullable=True)
+    )
+    op.create_index(
+        "ix_orders_paypal_order_id", "orders", ["paypal_order_id"], unique=True
+    )
 
 
 def downgrade() -> None:
     op.drop_index("ix_orders_paypal_order_id", table_name="orders")
     op.drop_column("orders", "paypal_capture_id")
     op.drop_column("orders", "paypal_order_id")
-

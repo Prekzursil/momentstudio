@@ -20,12 +20,16 @@ def _prune(bucket: WindowBucket, now: float, window_seconds: int) -> None:
         bucket.popleft()
 
 
-def _enforce_limit(bucket: WindowBucket, limit: int, window_seconds: int, now: float) -> None:
+def _enforce_limit(
+    bucket: WindowBucket, limit: int, window_seconds: int, now: float
+) -> None:
     _prune(bucket, now, window_seconds)
     if len(bucket) >= limit:
         retry_after_seconds = 1
         if bucket:
-            retry_after_seconds = max(1, int(math.ceil(bucket[0] + window_seconds - now)))
+            retry_after_seconds = max(
+                1, int(math.ceil(bucket[0] + window_seconds - now))
+            )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many requests",
@@ -55,7 +59,9 @@ async def _enforce_limit_redis(
         if count == 1:
             await client.expire(redis_key, int(window_seconds))
         if int(count) > int(limit):
-            retry_after_seconds = max(1, int(window_seconds) - (now_int % int(window_seconds or 1)))
+            retry_after_seconds = max(
+                1, int(window_seconds) - (now_int % int(window_seconds or 1))
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many requests",
@@ -84,7 +90,13 @@ def limiter(
 
     async def dependency(_: Request) -> None:
         now = time.time()
-        enforced = await _enforce_limit_redis(key=key, identifier="global", limit=limit, window_seconds=window_seconds, now=now)
+        enforced = await _enforce_limit_redis(
+            key=key,
+            identifier="global",
+            limit=limit,
+            window_seconds=window_seconds,
+            now=now,
+        )
         if not enforced:
             _enforce_limit(buckets[key], limit, window_seconds, now)
 
@@ -111,7 +123,13 @@ def per_identifier_limiter(
     async def dependency(request: Request) -> None:
         ident = identifier_fn(request)
         now = time.time()
-        enforced = await _enforce_limit_redis(key=key, identifier=ident, limit=limit, window_seconds=window_seconds, now=now)
+        enforced = await _enforce_limit_redis(
+            key=key,
+            identifier=ident,
+            limit=limit,
+            window_seconds=window_seconds,
+            now=now,
+        )
         if not enforced:
             _enforce_limit(buckets[ident], limit, window_seconds, now)
 

@@ -11,7 +11,9 @@ from app.services import netopia as netopia_service
 
 
 @pytest.mark.anyio
-async def test_netopia_start_payment_serializes_decimal_amount(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_netopia_start_payment_serializes_decimal_amount(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(settings, "netopia_enabled", True)
     monkeypatch.setattr(settings, "netopia_env", "sandbox")
     monkeypatch.setattr(settings, "netopia_api_key_sandbox", "API-KEY")
@@ -34,7 +36,9 @@ async def test_netopia_start_payment_serializes_decimal_amount(monkeypatch: pyte
         assert decoded["order"]["posSignature"] == "SIG-TEST"
         return httpx.Response(
             200,
-            json={"payment": {"paymentURL": "https://example.com/pay", "ntpID": "NTP-1"}},
+            json={
+                "payment": {"paymentURL": "https://example.com/pay", "ntpID": "NTP-1"}
+            },
         )
 
     monkeypatch.setattr(httpx.AsyncClient, "post", fake_post, raising=True)
@@ -54,4 +58,3 @@ async def test_netopia_start_payment_serializes_decimal_amount(monkeypatch: pyte
 
     assert ntp_id == "NTP-1"
     assert payment_url == "https://example.com/pay"
-

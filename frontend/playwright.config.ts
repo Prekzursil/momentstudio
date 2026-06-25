@@ -9,17 +9,17 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL || 'http://localhost:4200',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure'
+    video: 'retain-on-failure',
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
+      use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] }
-    }
+      use: { ...devices['Desktop Firefox'] },
+    },
   ],
-  reporter: [['list'], ['html', { open: 'never' }]]
+  reporter: [['list'], ['html', { open: 'never' }]],
 });

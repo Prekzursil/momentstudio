@@ -12,7 +12,7 @@ if (!fs.existsSync(serverDir)) {
 }
 
 const payload = {
-  type: 'commonjs'
+  type: 'commonjs',
 };
 
 fs.writeFileSync(markerPath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');

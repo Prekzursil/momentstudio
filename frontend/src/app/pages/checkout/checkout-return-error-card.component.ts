@@ -18,7 +18,7 @@ import { InlineErrorCardComponent } from '../../shared/inline-error-card.compone
       [contactLabelKey]="contactLabelKey"
       (retry)="retry.emit()"
     ></app-inline-error-card>
-  `
+  `,
 })
 export class CheckoutReturnErrorCardComponent {
   @Input({ required: true }) titleKey = '';

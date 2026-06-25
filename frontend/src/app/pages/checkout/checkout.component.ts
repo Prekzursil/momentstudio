@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, ElementRef, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  ElementRef,
+  NgZone,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+} from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ContainerComponent } from '../../layout/container.component';
@@ -9,7 +17,11 @@ import { CartStore, CartItem } from '../../core/cart.store';
 import { CartApi, CartResponse } from '../../core/cart.api';
 import { ApiService } from '../../core/api.service';
 import { AccountService, Address, AddressCreateRequest } from '../../core/account.service';
-import { CouponsService, type CouponEligibilityResponse, type CouponOffer } from '../../core/coupons.service';
+import {
+  CouponsService,
+  type CouponEligibilityResponse,
+  type CouponOffer,
+} from '../../core/coupons.service';
 import { appConfig } from '../../core/app-config';
 import { AnalyticsService } from '../../core/analytics.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -52,7 +64,11 @@ type CheckoutBillingAddress = {
 };
 
 type CheckoutPaymentMethod = 'cod' | 'netopia' | 'paypal' | 'stripe';
-type PaymentMethodCapability = { enabled?: boolean; reason?: string | null; reason_code?: string | null };
+type PaymentMethodCapability = {
+  enabled?: boolean;
+  reason?: string | null;
+  reason_code?: string | null;
+};
 
 type CheckoutStartResponse = {
   order_id: string;
@@ -125,189 +141,239 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 @Component({
   selector: 'app-checkout',
   standalone: true,
-		  imports: [
-		    CommonModule,
-		    FormsModule,
-		    RouterLink,
-		    ContainerComponent,
-		    ButtonComponent,
-		    LocalizedCurrencyPipe,
-		    TranslateModule,
-		    ModalComponent,
-        LegalConsentModalComponent,
-		    AddressFormComponent,
-        CheckoutShippingStepComponent,
-        CheckoutPromoStepComponent,
-        CheckoutPaymentStepComponent,
-		    ImgFallbackDirective,
-        PageHeaderComponent,
-        InlineErrorCardComponent
-		  ],
-	  template: `
-	      <app-container classes="py-10 grid gap-6">
-	        <app-page-header [crumbs]="crumbs" [titleKey]="'checkout.title'">
-            <span pageHeaderActions *ngIf="cartSyncPending()" class="text-xs text-slate-500 dark:text-slate-400">
-              {{ 'checkout.syncing' | translate }}
-            </span>
-          </app-page-header>
-          <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ liveAssertive }}</div>
-		        <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
-		          <section class="grid gap-4">
-	            <div
-	              *ngIf="syncNotice"
-	              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-	            >
-	              {{ syncNotice }}
-	            </div>
-	            <div
-                *ngIf="errorMessage"
-                id="checkout-global-error"
-                tabindex="-1"
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ContainerComponent,
+    ButtonComponent,
+    LocalizedCurrencyPipe,
+    TranslateModule,
+    ModalComponent,
+    LegalConsentModalComponent,
+    AddressFormComponent,
+    CheckoutShippingStepComponent,
+    CheckoutPromoStepComponent,
+    CheckoutPaymentStepComponent,
+    ImgFallbackDirective,
+    PageHeaderComponent,
+    InlineErrorCardComponent,
+  ],
+  template: `
+    <app-container classes="py-10 grid gap-6">
+      <app-page-header [crumbs]="crumbs" [titleKey]="'checkout.title'">
+        <span
+          pageHeaderActions
+          *ngIf="cartSyncPending()"
+          class="text-xs text-slate-500 dark:text-slate-400"
+        >
+          {{ 'checkout.syncing' | translate }}
+        </span>
+      </app-page-header>
+      <div class="sr-only" aria-live="assertive" aria-atomic="true">{{ liveAssertive }}</div>
+      <div class="grid lg:grid-cols-[2fr_1fr] gap-6 items-start">
+        <section class="grid gap-4">
+          <div
+            *ngIf="syncNotice"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+          >
+            {{ syncNotice }}
+          </div>
+          <div *ngIf="errorMessage" id="checkout-global-error" tabindex="-1">
+            <app-inline-error-card
+              [titleKey]="'errors.unexpected.title'"
+              [message]="errorMessage"
+              [retryLabelKey]="'checkout.retry'"
+              [showContact]="false"
+              [backToUrl]="null"
+              (retry)="retryValidation()"
+            ></app-inline-error-card>
+          </div>
+          <div
+            *ngIf="!auth.isAuthenticated()"
+            class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+          >
+            <span class="font-medium">{{ 'checkout.guest' | translate }}</span>
+            <div class="flex flex-wrap gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'auth.login' | translate"
+                routerLink="/login"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'auth.register' | translate"
+                routerLink="/register"
+              ></app-button>
+            </div>
+          </div>
+          <div
+            *ngIf="auth.isAuthenticated() && !emailVerified()"
+            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+          >
+            <div class="grid gap-2 w-full">
+              <div class="flex items-start justify-between gap-3">
+                <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="
+                    primaryEmailVerificationResendRemainingSeconds() > 0
+                      ? ('account.verification.resendIn'
+                        | translate: { seconds: primaryEmailVerificationResendRemainingSeconds() })
+                      : ('auth.emailVerificationResend' | translate)
+                  "
+                  [disabled]="
+                    primaryEmailVerificationBusy ||
+                    primaryEmailVerificationResendRemainingSeconds() > 0
+                  "
+                  (action)="resendPrimaryEmailVerification()"
+                ></app-button>
+              </div>
+              <p class="text-xs text-amber-800 dark:text-amber-200">
+                {{ 'account.verification.linkInstructions' | translate }}
+              </p>
+              <p
+                *ngIf="primaryEmailVerificationStatus"
+                class="text-xs text-amber-800 dark:text-amber-200"
               >
-                <app-inline-error-card
-                  [titleKey]="'errors.unexpected.title'"
-                  [message]="errorMessage"
-                  [retryLabelKey]="'checkout.retry'"
-                  [showContact]="false"
-                  [backToUrl]="null"
-                  (retry)="retryValidation()"
-                ></app-inline-error-card>
-              </div>
-            <div
-              *ngIf="!auth.isAuthenticated()"
-              class="rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-            >
-              <span class="font-medium">{{ 'checkout.guest' | translate }}</span>
-              <div class="flex flex-wrap gap-2">
-                <app-button size="sm" variant="ghost" [label]="'auth.login' | translate" routerLink="/login"></app-button>
-                <app-button size="sm" variant="ghost" [label]="'auth.register' | translate" routerLink="/register"></app-button>
-              </div>
+                {{ primaryEmailVerificationStatus }}
+              </p>
             </div>
-            <div
-              *ngIf="auth.isAuthenticated() && !emailVerified()"
-              class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start justify-between gap-3 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-            >
-              <div class="grid gap-2 w-full">
-                <div class="flex items-start justify-between gap-3">
-                  <span>{{ 'auth.emailVerificationNeeded' | translate }}</span>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="
-                      primaryEmailVerificationResendRemainingSeconds() > 0
-                        ? ('account.verification.resendIn' | translate: { seconds: primaryEmailVerificationResendRemainingSeconds() })
-                        : ('auth.emailVerificationResend' | translate)
-                    "
-                    [disabled]="primaryEmailVerificationBusy || primaryEmailVerificationResendRemainingSeconds() > 0"
-                    (action)="resendPrimaryEmailVerification()"
-                  ></app-button>
-                </div>
-                <p class="text-xs text-amber-800 dark:text-amber-200">{{ 'account.verification.linkInstructions' | translate }}</p>
-                <p *ngIf="primaryEmailVerificationStatus" class="text-xs text-amber-800 dark:text-amber-200">{{ primaryEmailVerificationStatus }}</p>
-              </div>
-            </div>
-		            <form #checkoutForm="ngForm" #checkoutFormEl class="grid gap-4" (ngSubmit)="placeOrder(checkoutForm)">
-	              <app-checkout-shipping-step [vm]="vm" [checkoutForm]="checkoutForm"></app-checkout-shipping-step>
-	              <app-checkout-promo-step [vm]="vm"></app-checkout-promo-step>
-	              <app-checkout-payment-step [vm]="vm"></app-checkout-payment-step>
+          </div>
+          <form
+            #checkoutForm="ngForm"
+            #checkoutFormEl
+            class="grid gap-4"
+            (ngSubmit)="placeOrder(checkoutForm)"
+          >
+            <app-checkout-shipping-step
+              [vm]="vm"
+              [checkoutForm]="checkoutForm"
+            ></app-checkout-shipping-step>
+            <app-checkout-promo-step [vm]="vm"></app-checkout-promo-step>
+            <app-checkout-payment-step [vm]="vm"></app-checkout-payment-step>
           </form>
         </section>
 
-	        <aside class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-	          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'checkout.summary' | translate }}</h2>
-	          <div class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
-	            <div *ngFor="let item of items()" class="flex gap-3">
-	              <a class="shrink-0" [routerLink]="['/products', item.slug]">
-	                <img
-	                  class="h-12 w-12 rounded-xl object-cover border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
-	                  [src]="item.image || 'assets/placeholder/product-placeholder.svg'"
-	                  [alt]="item.name"
-	                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
-	                />
-	              </a>
-	              <div class="min-w-0 flex-1">
-	                <div class="flex items-start justify-between gap-3">
-	                  <div class="min-w-0">
-	                    <a class="font-medium text-slate-900 hover:underline dark:text-slate-50" [routerLink]="['/products', item.slug]">
-	                      {{ item.name }}
-	                    </a>
-	                    <p class="text-xs text-slate-500 dark:text-slate-400">
-	                      {{ item.quantity }} × {{ item.price | localizedCurrency : item.currency }}
-	                    </p>
-	                  </div>
-	                  <span class="font-medium text-slate-900 dark:text-slate-50">
-	                    {{ item.price * item.quantity | localizedCurrency : item.currency }}
-	                  </span>
-	                </div>
-	                <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'cart.inStock' | translate : { count: item.stock } }}</p>
-	              </div>
-	            </div>
-	          </div>
+        <aside
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'checkout.summary' | translate }}
+          </h2>
+          <div class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
+            <div *ngFor="let item of items()" class="flex gap-3">
+              <a class="shrink-0" [routerLink]="['/products', item.slug]">
+                <img
+                  class="h-12 w-12 rounded-xl object-cover border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950"
+                  [src]="item.image || 'assets/placeholder/product-placeholder.svg'"
+                  [alt]="item.name"
+                  [appImgFallback]="'assets/placeholder/product-placeholder.svg'"
+                />
+              </a>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <a
+                      class="font-medium text-slate-900 hover:underline dark:text-slate-50"
+                      [routerLink]="['/products', item.slug]"
+                    >
+                      {{ item.name }}
+                    </a>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ item.quantity }} × {{ item.price | localizedCurrency: item.currency }}
+                    </p>
+                  </div>
+                  <span class="font-medium text-slate-900 dark:text-slate-50">
+                    {{ item.price * item.quantity | localizedCurrency: item.currency }}
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'cart.inStock' | translate: { count: item.stock } }}
+                </p>
+              </div>
+            </div>
+          </div>
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
             <span>{{ 'checkout.subtotal' | translate }}</span>
-            <span>{{ quoteSubtotal() | localizedCurrency : currency }}</span>
+            <span>{{ quoteSubtotal() | localizedCurrency: currency }}</span>
           </div>
           <div
             class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200"
             *ngIf="quoteFee() > 0"
           >
             <span>{{ 'checkout.additionalCost' | translate }}</span>
-            <span>{{ quoteFee() | localizedCurrency : currency }}</span>
+            <span>{{ quoteFee() | localizedCurrency: currency }}</span>
           </div>
-          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quoteTax() > 0">
+          <div
+            class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200"
+            *ngIf="quoteTax() > 0"
+          >
             <span>{{ 'checkout.tax' | translate }}</span>
-            <span>{{ quoteTax() | localizedCurrency : currency }}</span>
+            <span>{{ quoteTax() | localizedCurrency: currency }}</span>
           </div>
           <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200">
             <span>{{ 'checkout.shipping' | translate }}</span>
-            <span>{{ quoteShipping() | localizedCurrency : currency }}</span>
+            <span>{{ quoteShipping() | localizedCurrency: currency }}</span>
           </div>
-	          <div class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200" *ngIf="quotePromoSavings() > 0">
-	            <span>{{ 'checkout.discount' | translate }}</span>
-	            <span class="text-emerald-700 dark:text-emerald-300">{{ -quotePromoSavings() | localizedCurrency : currency }}</span>
-	          </div>
-          <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50">
+          <div
+            class="flex items-center justify-between text-sm text-slate-700 dark:text-slate-200"
+            *ngIf="quotePromoSavings() > 0"
+          >
+            <span>{{ 'checkout.discount' | translate }}</span>
+            <span class="text-emerald-700 dark:text-emerald-300">{{
+              -quotePromoSavings() | localizedCurrency: currency
+            }}</span>
+          </div>
+          <div
+            class="border-t border-slate-200 pt-3 flex items-center justify-between text-base font-semibold text-slate-900 dark:border-slate-800 dark:text-slate-50"
+          >
             <span>{{ 'checkout.estimatedTotal' | translate }}</span>
-            <span>{{ quoteTotal() | localizedCurrency : currency }}</span>
+            <span>{{ quoteTotal() | localizedCurrency: currency }}</span>
           </div>
-          </aside>
-        </div>
+        </aside>
+      </div>
 
-        <app-legal-consent-modal
-          [open]="consentModalOpen"
-          [slug]="consentModalSlug"
-          (accepted)="confirmConsentModal()"
-          (closed)="closeConsentModal()"
-        ></app-legal-consent-modal>
+      <app-legal-consent-modal
+        [open]="consentModalOpen"
+        [slug]="consentModalSlug"
+        (accepted)="confirmConsentModal()"
+        (closed)="closeConsentModal()"
+      ></app-legal-consent-modal>
 
-        <app-modal
-          [open]="editSavedAddressOpen"
-          [title]="editSavedAddressTitle()"
-          [showActions]="false"
-          [closeLabel]="'addressForm.cancel' | translate"
-          (closed)="closeEditSavedAddress()"
-        >
-          <p *ngIf="editSavedAddressError" class="text-sm text-rose-700 dark:text-rose-300">{{ editSavedAddressError }}</p>
-          <app-address-form
-            *ngIf="editSavedAddressModel"
-            [model]="editSavedAddressModel"
-            [stickyActions]="true"
-            (cancel)="closeEditSavedAddress()"
-            (save)="saveEditedSavedAddress($event)"
-          ></app-address-form>
-        </app-modal>
-      </app-container>
-    `
+      <app-modal
+        [open]="editSavedAddressOpen"
+        [title]="editSavedAddressTitle()"
+        [showActions]="false"
+        [closeLabel]="'addressForm.cancel' | translate"
+        (closed)="closeEditSavedAddress()"
+      >
+        <p *ngIf="editSavedAddressError" class="text-sm text-rose-700 dark:text-rose-300">
+          {{ editSavedAddressError }}
+        </p>
+        <app-address-form
+          *ngIf="editSavedAddressModel"
+          [model]="editSavedAddressModel"
+          [stickyActions]="true"
+          (cancel)="closeEditSavedAddress()"
+          (save)="saveEditedSavedAddress($event)"
+        ></app-address-form>
+      </app-modal>
+    </app-container>
+  `,
 })
-		export class CheckoutComponent implements OnInit, OnDestroy {
-	    @ViewChild('checkoutFormEl') checkoutFormEl?: ElementRef<HTMLFormElement>;
-      readonly vm = this;
+export class CheckoutComponent implements OnInit, OnDestroy {
+  @ViewChild('checkoutFormEl') checkoutFormEl?: ElementRef<HTMLFormElement>;
+  readonly vm = this;
 
-		  crumbs = [
-		    { label: 'nav.home', url: '/' },
-		    { label: 'nav.cart', url: '/cart' },
-	    { label: 'checkout.title' }
-	  ];
+  crumbs = [
+    { label: 'nav.home', url: '/' },
+    { label: 'nav.cart', url: '/cart' },
+    { label: 'checkout.title' },
+  ];
   promo = '';
   promoMessage = '';
   promoStatus: 'success' | 'warn' | 'info' = 'info';
@@ -338,14 +404,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   editSavedAddressModel: AddressCreateRequest | null = null;
   editSavedAddressError = '';
   private editSavedAddressSaving = false;
-	  addressError = '';
-	  errorMessage = '';
-    liveAssertive = '';
-	  syncNotice = '';
-	  pricesRefreshed = false;
-	  syncQueued = false;
-	  saveAddress = true;
-	  saveDefaultShipping = true;
+  addressError = '';
+  errorMessage = '';
+  liveAssertive = '';
+  syncNotice = '';
+  pricesRefreshed = false;
+  syncQueued = false;
+  saveAddress = true;
+  saveDefaultShipping = true;
   saveDefaultBilling = true;
   guestCreateAccount = false;
   guestUsername = '';
@@ -394,7 +460,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     region: '',
     postal: '',
     country: '',
-    password: ''
+    password: '',
   };
   billingSameAsShipping = true;
   billing: CheckoutBillingAddress = {
@@ -403,30 +469,30 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     city: '',
     region: '',
     postal: '',
-    country: ''
+    country: '',
   };
-	  invoiceEnabled = false;
-	  invoiceCompany = '';
-	  invoiceVatId = '';
-    acceptTerms = false;
-    acceptPrivacy = false;
-    consentLocked = false;
-    consentError = '';
-    legalConsentsLoading = false;
-    consentModalOpen = false;
-    consentModalSlug = '';
-    private consentModalTarget: 'terms' | 'privacy' | null = null;
+  invoiceEnabled = false;
+  invoiceCompany = '';
+  invoiceVatId = '';
+  acceptTerms = false;
+  acceptPrivacy = false;
+  consentLocked = false;
+  consentError = '';
+  legalConsentsLoading = false;
+  consentModalOpen = false;
+  consentModalSlug = '';
+  private consentModalTarget: 'terms' | 'privacy' | null = null;
 
-		  syncing = false;
-		  placing = false;
-		  paymentNotReady = false;
-	  private paymentNotReadyTimer: ReturnType<typeof setTimeout> | null = null;
-	  paymentMethod: CheckoutPaymentMethod = 'cod';
-	  stripeEnabled = Boolean(appConfig.stripeEnabled);
-	  paypalEnabled = Boolean(appConfig.paypalEnabled);
-	  netopiaEnabled = Boolean(appConfig.netopiaEnabled);
-    netopiaDisabledReason = '';
-	  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
+  syncing = false;
+  placing = false;
+  paymentNotReady = false;
+  private paymentNotReadyTimer: ReturnType<typeof setTimeout> | null = null;
+  paymentMethod: CheckoutPaymentMethod = 'cod';
+  stripeEnabled = Boolean(appConfig.stripeEnabled);
+  paypalEnabled = Boolean(appConfig.paypalEnabled);
+  netopiaEnabled = Boolean(appConfig.netopiaEnabled);
+  netopiaDisabledReason = '';
+  private syncDebounceHandle: ReturnType<typeof setTimeout> | null = null;
   private queuedSyncItems: CartItem[] | null = null;
   private checkoutRedirectedToCart = false;
   private checkoutStartTracked = false;
@@ -445,7 +511,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     private readonly analytics: AnalyticsService,
     public auth: AuthService,
     private readonly zone: NgZone,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
   ) {
     const prefs = this.checkoutPrefs.tryLoadDeliveryPrefs();
     if (prefs) {
@@ -470,120 +536,120 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     return this.syncing || this.syncQueued;
   }
 
-	  scrollToStep(id: string): void {
-      if (typeof document === 'undefined') return;
-      try {
-        const step = document.getElementById(id) as HTMLElement | null;
-        if (!step) return;
-        step.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setTimeout(() => {
-          const focusable = this.findFirstFocusableElement(step);
-          if (focusable) {
-            this.focusOnly(focusable);
-            return;
-          }
-          step.setAttribute('tabindex', step.getAttribute('tabindex') || '-1');
-          this.focusOnly(step);
-        });
-      } catch {
-        // ignore
-      }
-	  }
-
-    private findFirstFocusableElement(container: HTMLElement): HTMLElement | null {
-      const selector = 'button, [href], input, select, textarea, [tabindex]';
-      const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
-      for (const candidate of candidates) {
-        if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
-        if (!this.isElementVisible(candidate)) continue;
-        return candidate;
-      }
-      return null;
-    }
-
-    private focusOnly(el: HTMLElement): void {
-      try {
-        el.focus();
-      } catch {
-        // ignore
-      }
-    }
-
-    private announceAssertive(message: string): void {
-      const text = (message || '').trim();
-      if (!text) return;
-      this.liveAssertive = '';
+  scrollToStep(id: string): void {
+    if (typeof document === 'undefined') return;
+    try {
+      const step = document.getElementById(id) as HTMLElement | null;
+      if (!step) return;
+      step.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setTimeout(() => {
-        this.liveAssertive = text;
+        const focusable = this.findFirstFocusableElement(step);
+        if (focusable) {
+          this.focusOnly(focusable);
+          return;
+        }
+        step.setAttribute('tabindex', step.getAttribute('tabindex') || '-1');
+        this.focusOnly(step);
       });
+    } catch {
+      // ignore
     }
+  }
 
-    private focusGlobalError(): void {
-      this.focusElementById('checkout-global-error');
+  private findFirstFocusableElement(container: HTMLElement): HTMLElement | null {
+    const selector = 'button, [href], input, select, textarea, [tabindex]';
+    const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
+    for (const candidate of candidates) {
+      if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
+      if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+      if (!this.isElementVisible(candidate)) continue;
+      return candidate;
     }
+    return null;
+  }
 
-    private focusLockerPicker(): void {
-      this.focusElementById('checkout-locker-picker');
+  private focusOnly(el: HTMLElement): void {
+    try {
+      el.focus();
+    } catch {
+      // ignore
     }
+  }
 
-    private focusFirstInvalidField(): void {
-      if (typeof document === 'undefined') return;
-      setTimeout(() => {
-        const formEl = this.checkoutFormEl?.nativeElement;
-        if (!formEl) return;
-        const firstInvalid = this.findFirstInvalidField(formEl);
-        if (!firstInvalid) return;
-        this.scrollAndFocus(firstInvalid);
-      });
-    }
+  private announceAssertive(message: string): void {
+    const text = (message || '').trim();
+    if (!text) return;
+    this.liveAssertive = '';
+    setTimeout(() => {
+      this.liveAssertive = text;
+    });
+  }
 
-    private focusElementById(id: string): void {
-      if (typeof document === 'undefined') return;
-      setTimeout(() => {
-        const el = document.getElementById(id) as HTMLElement | null;
-        if (!el) return;
-        this.scrollAndFocus(el);
-      });
-    }
+  private focusGlobalError(): void {
+    this.focusElementById('checkout-global-error');
+  }
 
-    private detectChangesSafe(): void {
-      try {
-        this.cdr.detectChanges();
-      } catch {
-        // ignore - view might already be destroyed or in the middle of change detection
-      }
-    }
+  private focusLockerPicker(): void {
+    this.focusElementById('checkout-locker-picker');
+  }
 
-    private findFirstInvalidField(container: HTMLElement): HTMLElement | null {
-      const selector =
-        'input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"], input.ng-invalid, select.ng-invalid, textarea.ng-invalid';
-      const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
-      for (const candidate of candidates) {
-        if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
-        if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
-        if (!this.isElementVisible(candidate)) continue;
-        return candidate;
-      }
-      return null;
-    }
+  private focusFirstInvalidField(): void {
+    if (typeof document === 'undefined') return;
+    setTimeout(() => {
+      const formEl = this.checkoutFormEl?.nativeElement;
+      if (!formEl) return;
+      const firstInvalid = this.findFirstInvalidField(formEl);
+      if (!firstInvalid) return;
+      this.scrollAndFocus(firstInvalid);
+    });
+  }
 
-    private isElementVisible(el: HTMLElement): boolean {
-      return el.getClientRects().length > 0;
-    }
+  private focusElementById(id: string): void {
+    if (typeof document === 'undefined') return;
+    setTimeout(() => {
+      const el = document.getElementById(id) as HTMLElement | null;
+      if (!el) return;
+      this.scrollAndFocus(el);
+    });
+  }
 
-    private scrollAndFocus(el: HTMLElement): void {
-      try {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } catch {
-        // ignore
-      }
-      try {
-        el.focus();
-      } catch {
-        // ignore
-      }
+  private detectChangesSafe(): void {
+    try {
+      this.cdr.detectChanges();
+    } catch {
+      // ignore - view might already be destroyed or in the middle of change detection
     }
+  }
+
+  private findFirstInvalidField(container: HTMLElement): HTMLElement | null {
+    const selector =
+      'input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"], input.ng-invalid, select.ng-invalid, textarea.ng-invalid';
+    const candidates = Array.from(container.querySelectorAll<HTMLElement>(selector));
+    for (const candidate of candidates) {
+      if (candidate instanceof HTMLInputElement && candidate.type === 'hidden') continue;
+      if ('disabled' in candidate && Boolean((candidate as any).disabled)) continue;
+      if (!this.isElementVisible(candidate)) continue;
+      return candidate;
+    }
+    return null;
+  }
+
+  private isElementVisible(el: HTMLElement): boolean {
+    return el.getClientRects().length > 0;
+  }
+
+  private scrollAndFocus(el: HTMLElement): void {
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch {
+      // ignore
+    }
+    try {
+      el.focus();
+    } catch {
+      // ignore
+    }
+  }
 
   step1Complete(): boolean {
     if (this.auth.isAuthenticated()) return true;
@@ -678,16 +744,20 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
     this.auth.requestEmailVerification('/checkout').subscribe({
       next: () => {
-        this.primaryEmailVerificationStatus = this.translate.instant('account.verification.sentStatus');
+        this.primaryEmailVerificationStatus = this.translate.instant(
+          'account.verification.sentStatus',
+        );
         this.primaryEmailVerificationResendUntil = Date.now() + 60_000;
       },
       error: () => {
-        this.primaryEmailVerificationStatus = this.translate.instant('account.verification.sendError');
+        this.primaryEmailVerificationStatus = this.translate.instant(
+          'account.verification.sendError',
+        );
         this.primaryEmailVerificationBusy = false;
       },
       complete: () => {
         this.primaryEmailVerificationBusy = false;
-      }
+      },
     });
   }
 
@@ -698,12 +768,16 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       this.address.email = user.email || '';
     }
     if (!this.address.name) {
-      const parts = [user.first_name, user.middle_name, user.last_name].filter((p) => (p || '').trim());
+      const parts = [user.first_name, user.middle_name, user.last_name].filter((p) =>
+        (p || '').trim(),
+      );
       const fullName = parts.join(' ').trim();
       this.address.name = fullName || user.name || '';
     }
     if (!this.shippingPhoneNational.trim()) {
-      const userPhone = (typeof (user as any)?.phone === 'string' ? ((user as any).phone as string) : '').trim();
+      const userPhone = (
+        typeof (user as any)?.phone === 'string' ? ((user as any).phone as string) : ''
+      ).trim();
       if (userPhone) {
         const split = splitE164(userPhone);
         if (split.country) this.shippingPhoneCountry = split.country;
@@ -772,13 +846,18 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   }
 
   editSavedAddressTitle(): string {
-    const key = this.editSavedAddressTarget === 'billing' ? 'checkout.editBillingAddressTitle' : 'checkout.editShippingAddressTitle';
+    const key =
+      this.editSavedAddressTarget === 'billing'
+        ? 'checkout.editBillingAddressTitle'
+        : 'checkout.editShippingAddressTitle';
     return this.translate.instant(key);
   }
 
   openEditSavedAddress(target: 'shipping' | 'billing'): void {
     if (!this.auth.isAuthenticated()) return;
-    const id = (target === 'billing' ? this.selectedBillingAddressId : this.selectedShippingAddressId).trim();
+    const id = (
+      target === 'billing' ? this.selectedBillingAddressId : this.selectedShippingAddressId
+    ).trim();
     if (!id) return;
     const addr = this.savedAddresses.find((a) => a.id === id);
     if (!addr) return;
@@ -795,7 +874,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       postal_code: addr.postal_code || '',
       country: (addr.country || 'RO').trim().toUpperCase(),
       is_default_shipping: Boolean(addr.is_default_shipping),
-      is_default_billing: Boolean(addr.is_default_billing)
+      is_default_billing: Boolean(addr.is_default_billing),
     };
     this.editSavedAddressError = '';
     this.editSavedAddressOpen = true;
@@ -834,7 +913,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       error: () => {
         this.editSavedAddressSaving = false;
         this.editSavedAddressError = this.translate.instant('account.addresses.errors.update');
-      }
+      },
     });
   }
 
@@ -983,18 +1062,30 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       next: (addresses) => {
         this.savedAddresses = Array.isArray(addresses) ? addresses : [];
         if (this.savedAddresses.length) {
-          const defaultShipping = this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
-          const defaultBilling = this.savedAddresses.find((a) => a.is_default_billing) ?? defaultShipping;
+          const defaultShipping =
+            this.savedAddresses.find((a) => a.is_default_shipping) ?? this.savedAddresses[0];
+          const defaultBilling =
+            this.savedAddresses.find((a) => a.is_default_billing) ?? defaultShipping;
           if (!this.selectedBillingAddressId && defaultBilling) {
             this.selectedBillingAddressId = defaultBilling.id;
           }
-          if (!this.billingSameAsShipping && !this.billing.line1.trim() && !this.billing.city.trim() && !this.billing.postal.trim() && defaultBilling) {
+          if (
+            !this.billingSameAsShipping &&
+            !this.billing.line1.trim() &&
+            !this.billing.city.trim() &&
+            !this.billing.postal.trim() &&
+            defaultBilling
+          ) {
             this.applySavedAddressToBilling(defaultBilling);
           }
 
-          if (!this.address.line1.trim() && !this.address.city.trim() && !this.address.postal.trim()) {
-          this.selectedShippingAddressId = defaultShipping.id;
-          this.applySavedAddressToShipping(defaultShipping);
+          if (
+            !this.address.line1.trim() &&
+            !this.address.city.trim() &&
+            !this.address.postal.trim()
+          ) {
+            this.selectedShippingAddressId = defaultShipping.id;
+            this.applySavedAddressToShipping(defaultShipping);
           }
         }
         this.savedAddressesLoading = false;
@@ -1003,7 +1094,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         this.savedAddresses = [];
         this.savedAddressesError = this.translate.instant('checkout.savedAddressesLoadError');
         this.savedAddressesLoading = false;
-      }
+      },
     });
   }
 
@@ -1062,7 +1153,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     const shipping = this.shippingPhoneE164();
     if (shipping) return shipping;
     const user = this.auth.user();
-    const userPhone = (typeof (user as any)?.phone === 'string' ? ((user as any).phone as string) : '').trim();
+    const userPhone = (
+      typeof (user as any)?.phone === 'string' ? ((user as any).phone as string) : ''
+    ).trim();
     if (userPhone) return userPhone;
     if (this.guestCreateAccount) return this.guestPhoneE164();
     return null;
@@ -1158,9 +1251,13 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (promo.discount_type === 'free_shipping') {
       label = this.translate.instant('account.coupons.freeShipping');
     } else if (promo.discount_type === 'amount') {
-      label = this.translate.instant('account.coupons.amountOff', { value: promo.amount_off ?? '0' });
+      label = this.translate.instant('account.coupons.amountOff', {
+        value: promo.amount_off ?? '0',
+      });
     } else {
-      label = this.translate.instant('account.coupons.percentOff', { value: promo.percentage_off ?? '0' });
+      label = this.translate.instant('account.coupons.percentOff', {
+        value: promo.percentage_off ?? '0',
+      });
     }
 
     const savings = this.couponOfferSavings(offer);
@@ -1180,7 +1277,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     return labels.join(' • ');
   }
 
-  minSubtotalShortfall(offer: CouponOffer | null): { min: number; remaining: number; progress: number } | null {
+  minSubtotalShortfall(
+    offer: CouponOffer | null,
+  ): { min: number; remaining: number; progress: number } | null {
     if (!offer?.reasons?.includes('min_subtotal_not_met')) return null;
     const promo = offer.coupon?.promotion;
     if (!promo?.min_subtotal) return null;
@@ -1221,18 +1320,34 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
   }
 
   private couponOfferSavings(offer: CouponOffer): number {
-    return parseMoney(offer.estimated_discount_ron) + parseMoney(offer.estimated_shipping_discount_ron);
+    return (
+      parseMoney(offer.estimated_discount_ron) + parseMoney(offer.estimated_shipping_discount_ron)
+    );
   }
 
-  private buildSuccessSummary(orderId: string, referenceCode: string | null, paymentMethod: CheckoutPaymentMethod): CheckoutSuccessSummary {
-    const quote = this.quote ?? { subtotal: this.subtotal(), fee: 0, tax: 0, shipping: 0, total: this.subtotal(), currency: this.currency };
-    const discount = Math.max(0, quote.subtotal + quote.fee + quote.tax + quote.shipping - quote.total);
+  private buildSuccessSummary(
+    orderId: string,
+    referenceCode: string | null,
+    paymentMethod: CheckoutPaymentMethod,
+  ): CheckoutSuccessSummary {
+    const quote = this.quote ?? {
+      subtotal: this.subtotal(),
+      fee: 0,
+      tax: 0,
+      shipping: 0,
+      total: this.subtotal(),
+      currency: this.currency,
+    };
+    const discount = Math.max(
+      0,
+      quote.subtotal + quote.fee + quote.tax + quote.shipping - quote.total,
+    );
     const items = this.items().map((i) => ({
       name: i.name,
       slug: i.slug,
       quantity: i.quantity,
       unit_price: i.price,
-      currency: i.currency || this.currency
+      currency: i.currency || this.currency,
     }));
     return {
       order_id: orderId,
@@ -1244,13 +1359,16 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       locker_address: this.locker?.address ?? null,
       totals: { ...quote, discount },
       items,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
   }
 
   private persistAddressIfRequested(): void {
     if (this.saveAddress) {
-      this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
+      this.checkoutPrefs.saveDeliveryPrefs({
+        courier: this.courier,
+        deliveryType: this.deliveryType,
+      });
     }
   }
 
@@ -1275,12 +1393,18 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       const parsed = new URL(url, currentOrigin);
       const protocol = parsed.protocol.toLowerCase();
       const sameOrigin = Boolean(currentOrigin && parsed.origin === currentOrigin);
-      if (sameOrigin && parsed.pathname.startsWith('/checkout/mock/') && (protocol === 'http:' || protocol === 'https:')) {
+      if (
+        sameOrigin &&
+        parsed.pathname.startsWith('/checkout/mock/') &&
+        (protocol === 'http:' || protocol === 'https:')
+      ) {
         return parsed.toString();
       }
       if (protocol !== 'https:') return null;
       const host = parsed.hostname.toLowerCase();
-      const allowed = allowedHosts.some((allowedHost) => host === allowedHost || host.endsWith(`.${allowedHost}`));
+      const allowed = allowedHosts.some(
+        (allowedHost) => host === allowedHost || host.endsWith(`.${allowedHost}`),
+      );
       return allowed ? parsed.toString() : null;
     } catch {
       return null;
@@ -1345,7 +1469,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
 
   private handleCheckoutRequestError(err: any): void {
     this.placing = false;
-    const isTimeout = String(err?.name || '').toLowerCase().includes('timeout');
+    const isTimeout = String(err?.name || '')
+      .toLowerCase()
+      .includes('timeout');
     this.errorMessage = isTimeout
       ? this.translate.instant('checkout.checkoutFailed')
       : err?.error?.detail || this.translate.instant('checkout.checkoutFailed');
@@ -1366,7 +1492,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           this.zone.run(() => {
             this.handleCheckoutFinalize(settled);
           });
-        })
+        }),
       )
       .subscribe({
         next: (res) => {
@@ -1407,7 +1533,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       units,
       subtotal: this.subtotal(),
       total: this.quoteTotal(),
-      currency
+      currency,
     });
   }
 
@@ -1429,7 +1555,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       delivery_type: this.deliveryType,
       courier: this.courier,
       promo_applied: Boolean((this.promo || '').trim()),
-      signed_in: this.auth.isAuthenticated()
+      signed_in: this.auth.isAuthenticated(),
     });
   }
 
@@ -1440,39 +1566,41 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     void this.router.navigate(['/cart'], { queryParams: { from: 'checkout' }, replaceUrl: true });
   }
 
-	  private setQuote(res: CartResponse): void {
-	    const totals = res?.totals ?? ({} as any);
-	    const subtotal = parseMoney(totals.subtotal);
-	    const fee = parseMoney(totals.fee);
-	    const tax = parseMoney(totals.tax);
-	    const shipping = parseMoney(totals.shipping);
-	    const total = parseMoney(totals.total);
-	    const currency = (totals.currency ?? 'RON');
-	    this.quote = { subtotal, fee, tax, shipping, total, currency };
-      this.phoneRequiredHome = parseBool((totals as any).phone_required_home, true);
-      this.phoneRequiredLocker = parseBool((totals as any).phone_required_locker, true);
-      this.deliveryLockerAllowed = parseBool((totals as any).delivery_locker_allowed, true);
-      const allowedCouriersRaw = (totals as any).delivery_allowed_couriers;
-      const allowedCouriers = Array.isArray(allowedCouriersRaw)
-        ? allowedCouriersRaw
-            .map((item: any) => (item ?? '').toString().trim().toLowerCase())
-            .filter((item: string) => item === 'sameday' || item === 'fan_courier')
-        : [];
-      this.deliveryAllowedCouriers = (allowedCouriers.length ? allowedCouriers : ['sameday', 'fan_courier']) as LockerProvider[];
-	    this.currency = currency || 'RON';
-	    this.ensurePaymentMethodAvailable();
-      this.ensureDeliveryOptionsAvailable();
-	    this.loadCouponsEligibility();
-	    this.applyPendingPromoCode();
-	  }
+  private setQuote(res: CartResponse): void {
+    const totals = res?.totals ?? ({} as any);
+    const subtotal = parseMoney(totals.subtotal);
+    const fee = parseMoney(totals.fee);
+    const tax = parseMoney(totals.tax);
+    const shipping = parseMoney(totals.shipping);
+    const total = parseMoney(totals.total);
+    const currency = totals.currency ?? 'RON';
+    this.quote = { subtotal, fee, tax, shipping, total, currency };
+    this.phoneRequiredHome = parseBool((totals as any).phone_required_home, true);
+    this.phoneRequiredLocker = parseBool((totals as any).phone_required_locker, true);
+    this.deliveryLockerAllowed = parseBool((totals as any).delivery_locker_allowed, true);
+    const allowedCouriersRaw = (totals as any).delivery_allowed_couriers;
+    const allowedCouriers = Array.isArray(allowedCouriersRaw)
+      ? allowedCouriersRaw
+          .map((item: any) => (item ?? '').toString().trim().toLowerCase())
+          .filter((item: string) => item === 'sameday' || item === 'fan_courier')
+      : [];
+    this.deliveryAllowedCouriers = (
+      allowedCouriers.length ? allowedCouriers : ['sameday', 'fan_courier']
+    ) as LockerProvider[];
+    this.currency = currency || 'RON';
+    this.ensurePaymentMethodAvailable();
+    this.ensureDeliveryOptionsAvailable();
+    this.loadCouponsEligibility();
+    this.applyPendingPromoCode();
+  }
 
-    private applyPrefetchedPricingSettings(): void {
-      const meta = this.route.snapshot.data?.['checkoutPricingSettings'];
-      if (!meta || typeof meta !== 'object') return;
-      const obj = meta as Record<string, unknown>;
-      this.phoneRequiredHome = parseBool(obj['phone_required_home'], this.phoneRequiredHome);
-      this.phoneRequiredLocker = parseBool(obj['phone_required_locker'], this.phoneRequiredLocker);
-    }
+  private applyPrefetchedPricingSettings(): void {
+    const meta = this.route.snapshot.data?.['checkoutPricingSettings'];
+    if (!meta || typeof meta !== 'object') return;
+    const obj = meta as Record<string, unknown>;
+    this.phoneRequiredHome = parseBool(obj['phone_required_home'], this.phoneRequiredHome);
+    this.phoneRequiredLocker = parseBool(obj['phone_required_locker'], this.phoneRequiredLocker);
+  }
 
   private loadCouponsEligibility(): void {
     if (!this.auth.isAuthenticated()) {
@@ -1495,8 +1623,12 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         if (!current) {
           this.appliedCouponOffer = null;
         } else {
-          const offers = [...(this.couponEligibility.eligible ?? []), ...(this.couponEligibility.ineligible ?? [])];
-          const match = offers.find((offer) => offer.coupon?.code?.toUpperCase() === current) ?? null;
+          const offers = [
+            ...(this.couponEligibility.eligible ?? []),
+            ...(this.couponEligibility.ineligible ?? []),
+          ];
+          const match =
+            offers.find((offer) => offer.coupon?.code?.toUpperCase() === current) ?? null;
           this.appliedCouponOffer = match;
         }
 
@@ -1506,7 +1638,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         this.couponEligibilityLoading = false;
         this.couponEligibilityError =
           err?.error?.detail || this.translate.instant('checkout.couponsLoadError');
-      }
+      },
     });
   }
 
@@ -1551,7 +1683,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
             if (minInfo) {
               const extra = this.translate.instant('checkout.couponMinSubtotalRemaining', {
                 amount: minInfo.remaining.toFixed(2),
-                min: minInfo.min.toFixed(2)
+                min: minInfo.min.toFixed(2),
               });
               this.promoMessage = `${this.translate.instant('checkout.couponNotEligible')}: ${reasons}. ${extra}`;
             } else {
@@ -1575,9 +1707,10 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           this.promoStatus = 'warn';
           this.promoValid = false;
           this.promoMessage =
-            err?.error?.detail || this.translate.instant('checkout.promoPending', { code: normalized });
+            err?.error?.detail ||
+            this.translate.instant('checkout.promoPending', { code: normalized });
           this.refreshQuote(null);
-        }
+        },
       });
       return;
     }
@@ -1590,124 +1723,131 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     this.refreshQuote(null);
   }
 
-	  placeOrder(form: NgForm): void {
-	    if (this.placing) return;
-	    if (!this.normalizeCheckoutCountries()) {
-	      this.addressError = this.translate.instant('checkout.countryInvalid');
-        this.announceAssertive(this.addressError);
-        this.focusFirstInvalidField();
-	      return;
-	    }
-	    form.control.updateValueAndValidity();
-	    if (!form.valid) {
-	      this.addressError = this.translate.instant('checkout.addressRequired');
-        this.announceAssertive(this.addressError);
-        this.focusFirstInvalidField();
-	      return;
-	    }
-	    this.addressError = '';
-	    this.deliveryError = '';
-	    if (this.deliveryType === 'locker' && !this.locker) {
-	      this.deliveryError = this.translate.instant('checkout.deliveryLockerRequired');
-        this.announceAssertive(this.deliveryError);
-        this.focusLockerPicker();
-	      return;
-	    }
-	    if (this.auth.isAuthenticated() && !this.emailVerified()) {
-	      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
+  placeOrder(form: NgForm): void {
+    if (this.placing) return;
+    if (!this.normalizeCheckoutCountries()) {
+      this.addressError = this.translate.instant('checkout.countryInvalid');
+      this.announceAssertive(this.addressError);
+      this.focusFirstInvalidField();
+      return;
+    }
+    form.control.updateValueAndValidity();
+    if (!form.valid) {
+      this.addressError = this.translate.instant('checkout.addressRequired');
+      this.announceAssertive(this.addressError);
+      this.focusFirstInvalidField();
+      return;
+    }
+    this.addressError = '';
+    this.deliveryError = '';
+    if (this.deliveryType === 'locker' && !this.locker) {
+      this.deliveryError = this.translate.instant('checkout.deliveryLockerRequired');
+      this.announceAssertive(this.deliveryError);
+      this.focusLockerPicker();
+      return;
+    }
+    if (this.auth.isAuthenticated() && !this.emailVerified()) {
+      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
+      this.announceAssertive(this.errorMessage);
+      this.focusGlobalError();
+      return;
+    }
+    if (!this.auth.isAuthenticated() && !this.guestEmailVerified) {
+      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
+      this.announceAssertive(this.errorMessage);
+      this.focusGlobalError();
+      return;
+    }
+    if (!this.auth.isAuthenticated() && this.guestCreateAccount) {
+      if (this.guestPassword.length < 6) {
+        this.errorMessage = this.translate.instant('validation.passwordMin');
         this.announceAssertive(this.errorMessage);
         this.focusGlobalError();
-	      return;
-	    }
-	    if (!this.auth.isAuthenticated() && !this.guestEmailVerified) {
-	      this.errorMessage = this.translate.instant('auth.emailVerificationNeeded');
-        this.announceAssertive(this.errorMessage);
-        this.focusGlobalError();
-	      return;
-	    }
-	    if (!this.auth.isAuthenticated() && this.guestCreateAccount) {
-	      if (this.guestPassword.length < 6) {
-	        this.errorMessage = this.translate.instant('validation.passwordMin');
-          this.announceAssertive(this.errorMessage);
-          this.focusGlobalError();
-	        return;
-	      }
-	      if (this.guestPassword !== this.guestPasswordConfirm) {
-	        this.errorMessage = this.translate.instant('validation.passwordMismatch');
-          this.announceAssertive(this.errorMessage);
-          this.focusGlobalError();
-	        return;
-	      }
-	      if (!this.guestPhoneE164()) {
-	        this.errorMessage = this.translate.instant('validation.phoneInvalid');
-          this.announceAssertive(this.errorMessage);
-          this.focusFirstInvalidField();
-	        return;
-	      }
-	    }
-	    if (this.shippingPhoneRequired() && this.shippingPhoneNational.trim() && !this.shippingPhoneE164()) {
-	      this.errorMessage = this.translate.instant('validation.phoneInvalid');
-        this.announceAssertive(this.errorMessage);
-        this.focusGlobalError();
-	      return;
-	    }
-		    const validation = this.validateCart();
-		    if (validation) {
-		      this.errorMessage = validation;
-          this.announceAssertive(this.errorMessage);
-          this.focusGlobalError();
-		      return;
-		    }
-		    if (!this.pricesRefreshed || this.cartSyncPending()) {
-		      this.errorMessage = '';
-		      this.syncNotice = this.translate.instant('checkout.cartSyncing');
-	      this.queueCartSync(this.items(), { immediate: true });
-	      return;
-	    }
-    this.errorMessage = '';
-    this.syncNotice = '';
-	    if (!this.isPaymentMethodAvailable(this.paymentMethod)) {
-	      this.showPaymentNotReady();
-	      this.scrollToStep('checkout-step-4');
-	      return;
-	    }
-      if (!this.validateLegalConsents()) {
-        this.scrollToStep('checkout-step-4');
-        this.announceAssertive(this.consentError);
         return;
       }
-	    this.checkoutPrefs.savePaymentMethod(this.paymentMethod);
-	    this.placing = true;
-	    if (this.auth.isAuthenticated()) {
-	      this.submitCheckout();
-	    } else {
+      if (this.guestPassword !== this.guestPasswordConfirm) {
+        this.errorMessage = this.translate.instant('validation.passwordMismatch');
+        this.announceAssertive(this.errorMessage);
+        this.focusGlobalError();
+        return;
+      }
+      if (!this.guestPhoneE164()) {
+        this.errorMessage = this.translate.instant('validation.phoneInvalid');
+        this.announceAssertive(this.errorMessage);
+        this.focusFirstInvalidField();
+        return;
+      }
+    }
+    if (
+      this.shippingPhoneRequired() &&
+      this.shippingPhoneNational.trim() &&
+      !this.shippingPhoneE164()
+    ) {
+      this.errorMessage = this.translate.instant('validation.phoneInvalid');
+      this.announceAssertive(this.errorMessage);
+      this.focusGlobalError();
+      return;
+    }
+    const validation = this.validateCart();
+    if (validation) {
+      this.errorMessage = validation;
+      this.announceAssertive(this.errorMessage);
+      this.focusGlobalError();
+      return;
+    }
+    if (!this.pricesRefreshed || this.cartSyncPending()) {
+      this.errorMessage = '';
+      this.syncNotice = this.translate.instant('checkout.cartSyncing');
+      this.queueCartSync(this.items(), { immediate: true });
+      return;
+    }
+    this.errorMessage = '';
+    this.syncNotice = '';
+    if (!this.isPaymentMethodAvailable(this.paymentMethod)) {
+      this.showPaymentNotReady();
+      this.scrollToStep('checkout-step-4');
+      return;
+    }
+    if (!this.validateLegalConsents()) {
+      this.scrollToStep('checkout-step-4');
+      this.announceAssertive(this.consentError);
+      return;
+    }
+    this.checkoutPrefs.savePaymentMethod(this.paymentMethod);
+    this.placing = true;
+    if (this.auth.isAuthenticated()) {
+      this.submitCheckout();
+    } else {
       this.submitGuestCheckout();
     }
   }
 
-	  retryValidation(): void {
-	    this.errorMessage = '';
-	    this.queueCartSync(this.items(), { immediate: true });
-	  }
+  retryValidation(): void {
+    this.errorMessage = '';
+    this.queueCartSync(this.items(), { immediate: true });
+  }
 
-    private validateLegalConsents(): boolean {
-      this.consentError = '';
-      if (this.auth.isAuthenticated() && this.legalConsentsLoading) {
-        this.consentError = this.translate.instant('legal.consent.loading');
-        return false;
-      }
-      if (!this.acceptTerms || !this.acceptPrivacy) {
-        this.consentError = this.translate.instant('legal.consent.required');
-        return false;
-      }
-      return true;
+  private validateLegalConsents(): boolean {
+    this.consentError = '';
+    if (this.auth.isAuthenticated() && this.legalConsentsLoading) {
+      this.consentError = this.translate.instant('legal.consent.loading');
+      return false;
     }
+    if (!this.acceptTerms || !this.acceptPrivacy) {
+      this.consentError = this.translate.instant('legal.consent.required');
+      return false;
+    }
+    return true;
+  }
 
-	  private validateCart(forceRefresh = false): string | null {
-	    const items = this.items();
-	    const stockIssue = items.find((i) => i.quantity > i.stock);
-	    if (stockIssue) {
-	      return this.translate.instant('checkout.stockOnlyLeft', { count: stockIssue.stock, name: stockIssue.name });
+  private validateCart(forceRefresh = false): string | null {
+    const items = this.items();
+    const stockIssue = items.find((i) => i.quantity > i.stock);
+    if (stockIssue) {
+      return this.translate.instant('checkout.stockOnlyLeft', {
+        count: stockIssue.stock,
+        name: stockIssue.name,
+      });
     }
     if (!items.length) return null;
     if (!this.pricesRefreshed || forceRefresh) {
@@ -1728,67 +1868,75 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     if (value === 'home') {
       this.locker = null;
     }
-    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
+    this.checkoutPrefs.saveDeliveryPrefs({
+      courier: this.courier,
+      deliveryType: this.deliveryType,
+    });
   }
 
-	  onCourierChanged(): void {
-	    this.deliveryError = '';
-	    if (this.deliveryType === 'locker') {
-	      this.locker = null;
-	    }
-	    this.checkoutPrefs.saveDeliveryPrefs({ courier: this.courier, deliveryType: this.deliveryType });
-	  }
-
-	  setCourier(value: LockerProvider): void {
-      if (!this.courierAllowed(value)) {
-        this.deliveryError = this.translate.instant('checkout.courierUnavailable');
-        return;
-      }
-	    this.courier = value;
-	    this.onCourierChanged();
-	  }
-
-    courierAllowed(provider: LockerProvider): boolean {
-      return (this.deliveryAllowedCouriers || []).includes(provider);
+  onCourierChanged(): void {
+    this.deliveryError = '';
+    if (this.deliveryType === 'locker') {
+      this.locker = null;
     }
+    this.checkoutPrefs.saveDeliveryPrefs({
+      courier: this.courier,
+      deliveryType: this.deliveryType,
+    });
+  }
 
-    private ensureDeliveryOptionsAvailable(): void {
-      if (!this.deliveryLockerAllowed && this.deliveryType === 'locker') {
-        this.deliveryType = 'home';
-        this.locker = null;
-      }
-      if (!this.courierAllowed(this.courier)) {
-        const fallback = this.deliveryAllowedCouriers?.[0];
-        if (fallback) {
-          this.courier = fallback;
-          this.deliveryError = '';
-          if (this.deliveryType === 'locker') {
-            this.locker = null;
-          }
+  setCourier(value: LockerProvider): void {
+    if (!this.courierAllowed(value)) {
+      this.deliveryError = this.translate.instant('checkout.courierUnavailable');
+      return;
+    }
+    this.courier = value;
+    this.onCourierChanged();
+  }
+
+  courierAllowed(provider: LockerProvider): boolean {
+    return (this.deliveryAllowedCouriers || []).includes(provider);
+  }
+
+  private ensureDeliveryOptionsAvailable(): void {
+    if (!this.deliveryLockerAllowed && this.deliveryType === 'locker') {
+      this.deliveryType = 'home';
+      this.locker = null;
+    }
+    if (!this.courierAllowed(this.courier)) {
+      const fallback = this.deliveryAllowedCouriers?.[0];
+      if (fallback) {
+        this.courier = fallback;
+        this.deliveryError = '';
+        if (this.deliveryType === 'locker') {
+          this.locker = null;
         }
       }
     }
+  }
 
-	  courierEstimate(provider: LockerProvider): { min: number; max: number } | null {
-	    const est: Record<LockerProvider, Record<'home' | 'locker', { min: number; max: number }>> = {
-	      sameday: { home: { min: 1, max: 2 }, locker: { min: 1, max: 3 } },
-	      fan_courier: { home: { min: 1, max: 3 }, locker: { min: 2, max: 4 } }
-	    };
-	    return est[provider]?.[this.deliveryType] ?? null;
-	  }
+  courierEstimate(provider: LockerProvider): { min: number; max: number } | null {
+    const est: Record<LockerProvider, Record<'home' | 'locker', { min: number; max: number }>> = {
+      sameday: { home: { min: 1, max: 2 }, locker: { min: 1, max: 3 } },
+      fan_courier: { home: { min: 1, max: 3 }, locker: { min: 2, max: 4 } },
+    };
+    return est[provider]?.[this.deliveryType] ?? null;
+  }
 
-	  courierEstimateKey(provider: LockerProvider): string | null {
-	    const est = this.courierEstimate(provider);
-	    if (!est) return null;
-	    return est.min === est.max ? 'checkout.deliveryEstimateSingle' : 'checkout.deliveryEstimateRange';
-	  }
+  courierEstimateKey(provider: LockerProvider): string | null {
+    const est = this.courierEstimate(provider);
+    if (!est) return null;
+    return est.min === est.max
+      ? 'checkout.deliveryEstimateSingle'
+      : 'checkout.deliveryEstimateRange';
+  }
 
-	  courierEstimateParams(provider: LockerProvider): Record<string, number> {
-	    const est = this.courierEstimate(provider);
-	    if (!est) return {};
-	    if (est.min === est.max) return { days: est.min };
-	    return { min: est.min, max: est.max };
-	  }
+  courierEstimateParams(provider: LockerProvider): Record<string, number> {
+    const est = this.courierEstimate(provider);
+    if (!est) return {};
+    if (est.min === est.max) return { days: est.min };
+    return { min: est.min, max: est.max };
+  }
 
   ngOnInit(): void {
     this.autoApplyBestCoupon = this.loadAutoApplyBestCouponPreference();
@@ -1810,15 +1958,16 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       this.queueCartSync(items, { immediate: true });
     } else if (!this.auth.isAuthenticated()) {
       this.redirectToCartIfEmpty();
-	    } else {
-	      this.loadCartFromServer();
-	    }
-	    this.loadGuestEmailVerificationStatus();
-      this.loadLegalConsentStatus();
-	  }
+    } else {
+      this.loadCartFromServer();
+    }
+    this.loadGuestEmailVerificationStatus();
+    this.loadLegalConsentStatus();
+  }
 
-    private loadPaymentCapabilities(): void {
-      this.api.get<{
+  private loadPaymentCapabilities(): void {
+    this.api
+      .get<{
         stripe?: PaymentMethodCapability;
         paypal?: PaymentMethodCapability;
         netopia?: PaymentMethodCapability;
@@ -1835,7 +1984,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
             const reasonKey = reasonCode ? `checkout.paymentDisabledReasons.${reasonCode}` : '';
             const translated = reasonKey ? this.translate.instant(reasonKey) : '';
             const fallback = String(cap?.netopia?.reason || '').trim();
-            this.netopiaDisabledReason = translated && translated !== reasonKey ? translated : fallback;
+            this.netopiaDisabledReason =
+              translated && translated !== reasonKey ? translated : fallback;
           } else {
             this.netopiaDisabledReason = '';
           }
@@ -1843,100 +1993,100 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         },
         error: () => {
           // Keep app-config defaults when the backend cannot be reached.
-        }
+        },
       });
+  }
+
+  ngOnDestroy(): void {
+    if (this.syncDebounceHandle) {
+      clearTimeout(this.syncDebounceHandle);
+      this.syncDebounceHandle = null;
     }
-
-	  ngOnDestroy(): void {
-	    if (this.syncDebounceHandle) {
-	      clearTimeout(this.syncDebounceHandle);
-	      this.syncDebounceHandle = null;
-	    }
-	    if (this.guestResendTimer) {
-	      clearInterval(this.guestResendTimer);
-	      this.guestResendTimer = null;
-	    }
-	    if (this.paymentNotReadyTimer) {
-	      clearTimeout(this.paymentNotReadyTimer);
-	      this.paymentNotReadyTimer = null;
-	    }
-      this.trackCheckoutAbandon();
-	  }
-
-	  setPaymentMethod(method: CheckoutPaymentMethod): void {
-	    if (!this.isPaymentMethodAvailable(method)) {
-	      this.showPaymentNotReady();
-	      return;
-	    }
-	    this.paymentMethod = method;
-      this.checkoutPrefs.savePaymentMethod(method);
-	    this.errorMessage = '';
-	    this.paymentNotReady = false;
-	  }
-
-    get analyticsOptIn(): boolean {
-      return this.analytics.enabled();
+    if (this.guestResendTimer) {
+      clearInterval(this.guestResendTimer);
+      this.guestResendTimer = null;
     }
-
-    setAnalyticsOptIn(value: boolean): void {
-      const next = Boolean(value);
-      this.analytics.setEnabled(next);
-      if (next) {
-        this.trackCheckoutStart();
-      }
+    if (this.paymentNotReadyTimer) {
+      clearTimeout(this.paymentNotReadyTimer);
+      this.paymentNotReadyTimer = null;
     }
+    this.trackCheckoutAbandon();
+  }
 
-    private currentShippingCountryCode(): string {
-      return (
-        this.resolveCountryCode(this.shippingCountryInput) ||
-        (this.address.country || '').trim().toUpperCase() ||
-        'RO'
-      );
+  setPaymentMethod(method: CheckoutPaymentMethod): void {
+    if (!this.isPaymentMethodAvailable(method)) {
+      this.showPaymentNotReady();
+      return;
     }
+    this.paymentMethod = method;
+    this.checkoutPrefs.savePaymentMethod(method);
+    this.errorMessage = '';
+    this.paymentNotReady = false;
+  }
 
-    isPaymentMethodAvailable(method: CheckoutPaymentMethod): boolean {
-      const currency = (this.currency || 'RON').toUpperCase();
-      const country = this.currentShippingCountryCode();
-      if (method === 'cod') return currency === 'RON' && country === 'RO';
-      if (method === 'netopia') return this.netopiaEnabled && currency === 'RON' && country === 'RO';
-      if (method === 'paypal') return this.paypalEnabled && currency === 'RON';
-      if (method === 'stripe') return this.stripeEnabled;
-      return true;
+  get analyticsOptIn(): boolean {
+    return this.analytics.enabled();
+  }
+
+  setAnalyticsOptIn(value: boolean): void {
+    const next = Boolean(value);
+    this.analytics.setEnabled(next);
+    if (next) {
+      this.trackCheckoutStart();
     }
+  }
 
-    private ensurePaymentMethodAvailable(): void {
-      if (this.isPaymentMethodAvailable(this.paymentMethod)) return;
-      const next = this.defaultPaymentMethod();
-      this.paymentMethod = next;
-      this.checkoutPrefs.savePaymentMethod(next);
+  private currentShippingCountryCode(): string {
+    return (
+      this.resolveCountryCode(this.shippingCountryInput) ||
+      (this.address.country || '').trim().toUpperCase() ||
+      'RO'
+    );
+  }
+
+  isPaymentMethodAvailable(method: CheckoutPaymentMethod): boolean {
+    const currency = (this.currency || 'RON').toUpperCase();
+    const country = this.currentShippingCountryCode();
+    if (method === 'cod') return currency === 'RON' && country === 'RO';
+    if (method === 'netopia') return this.netopiaEnabled && currency === 'RON' && country === 'RO';
+    if (method === 'paypal') return this.paypalEnabled && currency === 'RON';
+    if (method === 'stripe') return this.stripeEnabled;
+    return true;
+  }
+
+  private ensurePaymentMethodAvailable(): void {
+    if (this.isPaymentMethodAvailable(this.paymentMethod)) return;
+    const next = this.defaultPaymentMethod();
+    this.paymentMethod = next;
+    this.checkoutPrefs.savePaymentMethod(next);
+  }
+
+  private defaultPaymentMethod(): CheckoutPaymentMethod {
+    const saved = this.checkoutPrefs.tryLoadPaymentMethod();
+    if (saved && this.isPaymentMethodAvailable(saved)) return saved;
+
+    const candidates: CheckoutPaymentMethod[] = ['cod', 'netopia', 'paypal', 'stripe'];
+    for (const candidate of candidates) {
+      if (this.isPaymentMethodAvailable(candidate)) return candidate;
     }
+    return 'cod';
+  }
 
-	  private defaultPaymentMethod(): CheckoutPaymentMethod {
-      const saved = this.checkoutPrefs.tryLoadPaymentMethod();
-      if (saved && this.isPaymentMethodAvailable(saved)) return saved;
+  private showPaymentNotReady(): void {
+    this.errorMessage = '';
+    this.paymentNotReady = true;
+    if (this.paymentNotReadyTimer) {
+      clearTimeout(this.paymentNotReadyTimer);
+    }
+    this.paymentNotReadyTimer = setTimeout(() => {
+      this.paymentNotReady = false;
+      this.paymentNotReadyTimer = null;
+    }, 6_000);
+  }
 
-	      const candidates: CheckoutPaymentMethod[] = ['cod', 'netopia', 'paypal', 'stripe'];
-      for (const candidate of candidates) {
-        if (this.isPaymentMethodAvailable(candidate)) return candidate;
-      }
-      return 'cod';
-	  }
-
-	  private showPaymentNotReady(): void {
-	    this.errorMessage = '';
-	    this.paymentNotReady = true;
-	    if (this.paymentNotReadyTimer) {
-	      clearTimeout(this.paymentNotReadyTimer);
-	    }
-	    this.paymentNotReadyTimer = setTimeout(() => {
-	      this.paymentNotReady = false;
-	      this.paymentNotReadyTimer = null;
-	    }, 6_000);
-	  }
-
-	  private syncBackendCart(items: CartItem[]): void {
-	    this.syncing = true;
-	    this.pricesRefreshed = false;
+  private syncBackendCart(items: CartItem[]): void {
+    this.syncing = true;
+    this.pricesRefreshed = false;
     this.cartApi
       .sync(
         items.map((i) => ({
@@ -1944,8 +2094,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           variant_id: i.variant_id,
           quantity: i.quantity,
           note: undefined,
-          max_quantity: undefined
-        }))
+          max_quantity: undefined,
+        })),
       )
       .subscribe({
         next: (res) => {
@@ -1961,7 +2111,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           this.syncing = false;
           this.pricesRefreshed = false;
           this.errorMessage = this.translate.instant('checkout.cartSyncError');
-        }
+        },
       });
   }
 
@@ -2002,14 +2152,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
             this.syncing = false;
             this.pricesRefreshed = false;
             this.errorMessage = this.translate.instant('checkout.cartLoadError');
-          }
+          },
         });
       },
       error: () => {
         this.syncing = false;
         this.pricesRefreshed = false;
         this.errorMessage = this.translate.instant('checkout.cartLoadError');
-      }
+      },
     });
   }
 
@@ -2033,13 +2183,14 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         if (code) {
           this.promoStatus = 'warn';
           this.promoValid = false;
-          this.promoMessage = err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
+          this.promoMessage =
+            err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
           this.cartApi.get(this.cartQuoteParams(null)).subscribe({
             next: (res) => this.hydrateCartAndQuote(res),
-            error: () => {}
+            error: () => {},
           });
         }
-      }
+      },
     });
   }
 
@@ -2061,12 +2212,13 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       error: (err) => {
         this.promoStatus = 'warn';
         this.promoValid = false;
-        this.promoMessage = err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
+        this.promoMessage =
+          err?.error?.detail || this.translate.instant('checkout.promoPending', { code });
         this.cartApi.get(this.cartQuoteParams(null)).subscribe({
           next: (res) => this.hydrateCartAndQuote(res),
-          error: () => {}
+          error: () => {},
         });
-      }
+      },
     });
   }
 
@@ -2089,11 +2241,11 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       accept_privacy: this.acceptPrivacy,
       courier: this.courier,
       delivery_type: this.deliveryType,
-      locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
-      locker_name: this.deliveryType === 'locker' ? this.locker?.name ?? null : null,
-      locker_address: this.deliveryType === 'locker' ? this.locker?.address ?? null : null,
-      locker_lat: this.deliveryType === 'locker' ? this.locker?.lat ?? null : null,
-      locker_lng: this.deliveryType === 'locker' ? this.locker?.lng ?? null : null,
+      locker_id: this.deliveryType === 'locker' ? (this.locker?.id ?? null) : null,
+      locker_name: this.deliveryType === 'locker' ? (this.locker?.name ?? null) : null,
+      locker_address: this.deliveryType === 'locker' ? (this.locker?.address ?? null) : null,
+      locker_lat: this.deliveryType === 'locker' ? (this.locker?.lat ?? null) : null,
+      locker_lng: this.deliveryType === 'locker' ? (this.locker?.lng ?? null) : null,
     };
     if (this.saveAddress) {
       body['default_shipping'] = this.saveDefaultShipping;
@@ -2130,7 +2282,9 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       billing_city: this.billingSameAsShipping ? null : this.billing.city,
       billing_region: this.billingSameAsShipping ? null : this.billing.region || null,
       billing_postal_code: this.billingSameAsShipping ? null : this.billing.postal,
-      billing_country: this.billingSameAsShipping ? null : this.billing.country || this.address.country || 'RO',
+      billing_country: this.billingSameAsShipping
+        ? null
+        : this.billing.country || this.address.country || 'RO',
       shipping_method_id: null,
       save_address: this.saveAddress,
       payment_method: this.paymentMethod,
@@ -2139,11 +2293,11 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       create_account: this.guestCreateAccount,
       courier: this.courier,
       delivery_type: this.deliveryType,
-      locker_id: this.deliveryType === 'locker' ? this.locker?.id ?? null : null,
-      locker_name: this.deliveryType === 'locker' ? this.locker?.name ?? null : null,
-      locker_address: this.deliveryType === 'locker' ? this.locker?.address ?? null : null,
-      locker_lat: this.deliveryType === 'locker' ? this.locker?.lat ?? null : null,
-      locker_lng: this.deliveryType === 'locker' ? this.locker?.lng ?? null : null,
+      locker_id: this.deliveryType === 'locker' ? (this.locker?.id ?? null) : null,
+      locker_name: this.deliveryType === 'locker' ? (this.locker?.name ?? null) : null,
+      locker_address: this.deliveryType === 'locker' ? (this.locker?.address ?? null) : null,
+      locker_lat: this.deliveryType === 'locker' ? (this.locker?.lat ?? null) : null,
+      locker_lng: this.deliveryType === 'locker' ? (this.locker?.lng ?? null) : null,
     };
 
     if (this.guestCreateAccount) {
@@ -2211,7 +2365,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     const timeoutId = setTimeout(() => {
       if (!this.guestSendingCode) return;
       this.guestSendingCode = false;
-      this.guestEmailError = this.guestEmailError || this.translate.instant('checkout.emailVerifySendFailed');
+      this.guestEmailError =
+        this.guestEmailError || this.translate.instant('checkout.emailVerifySendFailed');
     }, 15_000);
 
     const lang = (this.translate.currentLang || 'en') === 'ro' ? 'ro' : 'en';
@@ -2225,7 +2380,8 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
       error: (err) => {
         clearTimeout(timeoutId);
         this.guestSendingCode = false;
-        this.guestEmailError = err?.error?.detail || this.translate.instant('checkout.emailVerifySendFailed');
+        this.guestEmailError =
+          err?.error?.detail || this.translate.instant('checkout.emailVerifySendFailed');
         this.startGuestResendCooldown(10);
       },
       complete: () => {
@@ -2233,7 +2389,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         clearTimeout(timeoutId);
         this.guestSendingCode = false;
         this.startGuestResendCooldown(30);
-      }
+      },
     });
   }
 
@@ -2248,11 +2404,10 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
     }
     this.guestConfirmingCode = true;
     this.api
-      .post<{ email: string | null; verified: boolean }>(
-        '/orders/guest-checkout/email/confirm',
-        { email, token },
-        this.cartApi.headers()
-      )
+      .post<{
+        email: string | null;
+        verified: boolean;
+      }>('/orders/guest-checkout/email/confirm', { email, token }, this.cartApi.headers())
       .subscribe({
         next: (res) => {
           this.guestConfirmingCode = false;
@@ -2262,19 +2417,19 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         },
         error: (err) => {
           this.guestConfirmingCode = false;
-          this.guestEmailError = err?.error?.detail || this.translate.instant('checkout.emailVerifyInvalidCode');
-        }
+          this.guestEmailError =
+            err?.error?.detail || this.translate.instant('checkout.emailVerifyInvalidCode');
+        },
       });
   }
 
   private loadGuestEmailVerificationStatus(): void {
     if (this.auth.isAuthenticated()) return;
     this.api
-      .get<{ email: string | null; verified: boolean }>(
-        '/orders/guest-checkout/email/status',
-        undefined,
-        this.cartApi.headers()
-      )
+      .get<{
+        email: string | null;
+        verified: boolean;
+      }>('/orders/guest-checkout/email/status', undefined, this.cartApi.headers())
       .subscribe({
         next: (res) => {
           if (!res) return;
@@ -2293,7 +2448,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
         },
         error: () => {
           // Best-effort; allow checkout UI to function even if status lookup fails.
-        }
+        },
       });
   }
 
@@ -2326,7 +2481,7 @@ const parseBool = (value: unknown, fallback: boolean): boolean => {
           this.acceptTerms = false;
           this.acceptPrivacy = false;
           this.consentLocked = false;
-        }
+        },
       });
   }
 

@@ -20,7 +20,7 @@ type ThemeSegmentedLayout = 'horizontal' | 'stacked';
       :host {
         display: block;
       }
-    `
+    `,
   ],
   template: `
     <div
@@ -98,16 +98,12 @@ type ThemeSegmentedLayout = 'horizontal' | 'stacked';
             </svg>
           </ng-container>
         </span>
-        <span
-          *ngIf="showLabels"
-          class="font-medium min-w-0 text-center"
-          [ngClass]="labelClass()"
-        >
+        <span *ngIf="showLabels" class="font-medium min-w-0 text-center" [ngClass]="labelClass()">
           {{ opt.labelKey | translate }}
         </span>
       </button>
     </div>
-  `
+  `,
 })
 export class ThemeSegmentedControlComponent {
   @Input() preference: ThemePreference = 'system';
@@ -122,7 +118,7 @@ export class ThemeSegmentedControlComponent {
   readonly options: ThemeOption[] = [
     { value: 'system', labelKey: 'theme.system', icon: 'system' },
     { value: 'light', labelKey: 'theme.light', icon: 'light' },
-    { value: 'dark', labelKey: 'theme.dark', icon: 'dark' }
+    { value: 'dark', labelKey: 'theme.dark', icon: 'dark' },
   ];
 
   rootClass(): string {
@@ -141,8 +137,11 @@ export class ThemeSegmentedControlComponent {
   }
 
   buttonNgClass(value: ThemePreference): string {
-    const layoutClass = this.layout === 'stacked' ? 'flex-col gap-0.5 py-1' : this.showLabels ? 'gap-2' : '';
-    return [this.buttonClass(value), this.stretch ? 'flex-1' : '', layoutClass].filter(Boolean).join(' ');
+    const layoutClass =
+      this.layout === 'stacked' ? 'flex-col gap-0.5 py-1' : this.showLabels ? 'gap-2' : '';
+    return [this.buttonClass(value), this.stretch ? 'flex-1' : '', layoutClass]
+      .filter(Boolean)
+      .join(' ');
   }
 
   iconBoxClass(): string {
@@ -189,10 +188,13 @@ export class ThemeSegmentedControlComponent {
   }
 
   private focusOption(index: number, target: EventTarget | null): void {
-    const container = (target as HTMLElement | null)?.closest('[role="radiogroup"]') as HTMLElement | null;
+    const container = (target as HTMLElement | null)?.closest(
+      '[role="radiogroup"]',
+    ) as HTMLElement | null;
     if (!container) return;
-    const buttons = Array.from(container.querySelectorAll('button[role="radio"]')) as HTMLButtonElement[];
+    const buttons = Array.from(
+      container.querySelectorAll('button[role="radio"]'),
+    ) as HTMLButtonElement[];
     buttons[index]?.focus();
   }
 }
-

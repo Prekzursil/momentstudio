@@ -39,7 +39,7 @@ import { TranslateModule } from '@ngx-translate/core';
       </div>
       <span *ngIf="hint" class="text-xs text-slate-500 dark:text-slate-400">{{ hint }}</span>
     </label>
-  `
+  `,
 })
 export class InputComponent {
   @Input() name = '';

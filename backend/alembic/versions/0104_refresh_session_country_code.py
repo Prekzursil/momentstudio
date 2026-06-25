@@ -19,9 +19,11 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("refresh_sessions", sa.Column("country_code", sa.String(length=8), nullable=True))
+    op.add_column(
+        "refresh_sessions",
+        sa.Column("country_code", sa.String(length=8), nullable=True),
+    )
 
 
 def downgrade() -> None:
     op.drop_column("refresh_sessions", "country_code")
-

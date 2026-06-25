@@ -55,5 +55,3 @@ export class TicketsService {
     return this.api.post<TicketRead>(`/support/me/submissions/${id}/messages`, { message });
   }
 }
-
-

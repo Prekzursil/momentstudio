@@ -6,21 +6,24 @@ import { TranslateService } from '@ngx-translate/core';
 
 @Injectable({ providedIn: 'root' })
 export class ErrorHandlerService {
-  constructor(private readonly toast: ToastService, private translate: TranslateService) {}
+  constructor(
+    private readonly toast: ToastService,
+    private translate: TranslateService,
+  ) {}
 
   handle(error: unknown): void {
     if (error instanceof HttpErrorResponse) {
       if (error.status === 0) {
         this.toast.error(
           this.translate.instant('errors.network.title'),
-          this.translate.instant('errors.network.body')
+          this.translate.instant('errors.network.body'),
         );
         return;
       }
       if (error.status === 401 || error.status === 403) {
         this.toast.error(
           this.translate.instant('errors.unauthorized.title'),
-          this.translate.instant('errors.unauthorized.body')
+          this.translate.instant('errors.unauthorized.body'),
         );
         return;
       }
@@ -31,7 +34,7 @@ export class ErrorHandlerService {
         captureException(error);
         this.toast.error(
           this.translate.instant('errors.server.title'),
-          this.translate.instant('errors.server.body')
+          this.translate.instant('errors.server.body'),
         );
         return;
       }
@@ -42,9 +45,8 @@ export class ErrorHandlerService {
       captureException(error);
       this.toast.error(
         this.translate.instant('errors.unexpected.title'),
-        this.translate.instant('errors.unexpected.body')
+        this.translate.instant('errors.unexpected.body'),
       );
     }
   }
 }
-

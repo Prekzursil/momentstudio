@@ -8,13 +8,21 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 MediaAssetTypeLiteral = Literal["image", "video", "document"]
-MediaAssetStatusLiteral = Literal["draft", "approved", "rejected", "archived", "trashed"]
+MediaAssetStatusLiteral = Literal[
+    "draft", "approved", "rejected", "archived", "trashed"
+]
 MediaVisibilityLiteral = Literal["public", "private"]
-MediaJobStatusLiteral = Literal["queued", "processing", "completed", "failed", "dead_letter"]
-MediaJobTypeLiteral = Literal["ingest", "variant", "edit", "ai_tag", "duplicate_scan", "usage_reconcile"]
+MediaJobStatusLiteral = Literal[
+    "queued", "processing", "completed", "failed", "dead_letter"
+]
+MediaJobTypeLiteral = Literal[
+    "ingest", "variant", "edit", "ai_tag", "duplicate_scan", "usage_reconcile"
+]
 MediaJobTriageStateLiteral = Literal["open", "retrying", "ignored", "resolved"]
 MediaRetryPolicyJobTypeLiteral = MediaJobTypeLiteral
-MediaRetryPolicyPresetKeyLiteral = Literal["factory_default", "last_change", "known_good"]
+MediaRetryPolicyPresetKeyLiteral = Literal[
+    "factory_default", "last_change", "known_good"
+]
 
 
 class MediaAssetI18nRead(BaseModel):
@@ -207,7 +215,9 @@ class MediaRetryPolicyListResponse(BaseModel):
 
 class MediaRetryPolicyUpdateRequest(BaseModel):
     max_attempts: int | None = Field(default=None, ge=1, le=20)
-    backoff_schedule_seconds: list[int] | None = Field(default=None, min_length=1, max_length=20)
+    backoff_schedule_seconds: list[int] | None = Field(
+        default=None, min_length=1, max_length=20
+    )
     jitter_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
     enabled: bool | None = None
 

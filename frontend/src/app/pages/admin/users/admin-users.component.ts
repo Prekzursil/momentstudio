@@ -4,14 +4,18 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
-import { AdminUserAliasesResponse, AdminUserSession, AdminService } from '../../../core/admin.service';
+import {
+  AdminUserAliasesResponse,
+  AdminUserSession,
+  AdminService,
+} from '../../../core/admin.service';
 import { AdminCouponsV2Service } from '../../../core/admin-coupons-v2.service';
 import {
   AdminEmailVerificationHistoryResponse,
   AdminUserListItem,
   AdminUserListResponse,
   AdminUserProfileResponse,
-  AdminUsersService
+  AdminUsersService,
 } from '../../../core/admin-users.service';
 import { AuthService } from '../../../core/auth.service';
 import type { PromotionRead } from '../../../core/coupons.service';
@@ -34,9 +38,12 @@ import {
   defaultAdminTableLayout,
   loadAdminTableLayout,
   saveAdminTableLayout,
-  visibleAdminTableColumnIds
+  visibleAdminTableColumnIds,
 } from '../shared/admin-table-layout';
-import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import {
+  AdminTableLayoutColumnDef,
+  TableLayoutModalComponent,
+} from '../shared/table-layout-modal.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 import { CustomerTimelineComponent } from '../shared/customer-timeline.component';
@@ -49,56 +56,76 @@ const USERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'role', labelKey: 'adminUi.users.table.role' },
   { id: 'verified', labelKey: 'adminUi.users.table.verified' },
   { id: 'created', labelKey: 'adminUi.users.table.created' },
-  { id: 'actions', labelKey: 'adminUi.users.table.actions', required: true }
+  { id: 'actions', labelKey: 'adminUi.users.table.actions', required: true },
 ];
 
 const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
   ...defaultAdminTableLayout(USERS_TABLE_COLUMNS),
-  hidden: ['email']
+  hidden: ['email'],
 });
 
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-	  imports: [
-	    CommonModule,
-	    FormsModule,
-	    RouterLink,
-	    ScrollingModule,
-	    TranslateModule,
-	    BreadcrumbComponent,
-	    ButtonComponent,
-      CopyButtonComponent,
-	    ErrorStateComponent,
-	    InputComponent,
-	    HelpPanelComponent,
-	    SkeletonComponent,
-	    CustomerTimelineComponent,
-	    TableLayoutModalComponent,
-      AdminPageHeaderComponent
-	  ],
+  imports: [
+    CommonModule,
+    FormsModule,
+    RouterLink,
+    ScrollingModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    CopyButtonComponent,
+    ErrorStateComponent,
+    InputComponent,
+    HelpPanelComponent,
+    SkeletonComponent,
+    CustomerTimelineComponent,
+    TableLayoutModalComponent,
+    AdminPageHeaderComponent,
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-		      <app-admin-page-header [titleKey]="'adminUi.users.title'" [hintKey]="'adminUi.users.hint'">
-		        <ng-template #primaryActions>
-		          <app-button
-		            size="sm"
-		            variant="ghost"
-		            [label]="(piiReveal() ? 'adminUi.pii.hide' : 'adminUi.pii.reveal') | translate"
-		            [disabled]="loading() || !canRevealPii()"
-		            (action)="togglePiiReveal()"
-		          ></app-button>
-		          <app-button size="sm" variant="ghost" routerLink="/admin/users/segments" [label]="'adminUi.users.segments' | translate"></app-button>
-		          <app-button size="sm" variant="ghost" routerLink="/admin/users/gdpr" [label]="'adminUi.users.gdprQueue' | translate"></app-button>
-		        </ng-template>
+      <app-admin-page-header [titleKey]="'adminUi.users.title'" [hintKey]="'adminUi.users.hint'">
+        <ng-template #primaryActions>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="(piiReveal() ? 'adminUi.pii.hide' : 'adminUi.pii.reveal') | translate"
+            [disabled]="loading() || !canRevealPii()"
+            (action)="togglePiiReveal()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            routerLink="/admin/users/segments"
+            [label]="'adminUi.users.segments' | translate"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            routerLink="/admin/users/gdpr"
+            [label]="'adminUi.users.gdprQueue' | translate"
+          ></app-button>
+        </ng-template>
 
-		        <ng-template #secondaryActions>
-		          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
-		          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
-		        </ng-template>
-		      </app-admin-page-header>
+        <ng-template #secondaryActions>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="densityToggleLabelKey() | translate"
+            (action)="toggleDensity()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.tableLayout.title' | translate"
+            (action)="openLayoutModal()"
+          ></app-button>
+        </ng-template>
+      </app-admin-page-header>
 
       <app-table-layout-modal
         [open]="layoutModalOpen()"
@@ -110,7 +137,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
       ></app-table-layout-modal>
 
       <div class="grid gap-6 lg:grid-cols-[1.25fr_0.75fr] items-start">
-        <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+        <section
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
           <app-help-panel
             [titleKey]="'adminUi.help.title'"
             [subtitleKey]="'adminUi.users.help.subtitle'"
@@ -136,7 +165,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 <option value="all">{{ 'adminUi.users.all' | translate }}</option>
                 <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
                 <option value="support">{{ 'adminUi.users.roles.support' | translate }}</option>
-                <option value="fulfillment">{{ 'adminUi.users.roles.fulfillment' | translate }}</option>
+                <option value="fulfillment">
+                  {{ 'adminUi.users.roles.fulfillment' | translate }}
+                </option>
                 <option value="content">{{ 'adminUi.users.roles.content' | translate }}</option>
                 <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
                 <option value="owner">{{ 'adminUi.users.roles.owner' | translate }}</option>
@@ -144,13 +175,24 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
             </label>
 
             <div class="flex items-center gap-2">
-              <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.actions.refresh' | translate"
+                (action)="applyFilters()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.reset' | translate"
+                (action)="resetFilters()"
+              ></app-button>
             </div>
           </div>
 
           <div class="flex flex-wrap items-end justify-between gap-3">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+            <label
+              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto"
+            >
               {{ 'adminUi.favorites.savedViews.label' | translate }}
               <select
                 class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
@@ -158,7 +200,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 (ngModelChange)="applySavedView($event)"
               >
                 <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
-                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+                <option *ngFor="let view of savedViews()" [value]="view.key">
+                  {{ view.label }}
+                </option>
               </select>
             </label>
 
@@ -166,7 +210,12 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
               <app-button
                 size="sm"
                 variant="ghost"
-                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
+                [label]="
+                  (isCurrentViewPinned()
+                    ? 'adminUi.favorites.savedViews.unpinCurrent'
+                    : 'adminUi.favorites.savedViews.pinCurrent'
+                  ) | translate
+                "
                 [disabled]="favorites.loading()"
                 (action)="toggleCurrentViewPin()"
               ></app-button>
@@ -189,125 +238,211 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
               {{ 'adminUi.users.empty' | translate }}
             </div>
 
-	            <div *ngIf="users().length > 0" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                <ng-template #usersTableHeader>
-                  <tr>
-                    <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
-                      <th *ngSwitchCase="'identity'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                        {{ 'adminUi.users.table.identity' | translate }}
-                      </th>
-                      <th *ngSwitchCase="'email'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                        {{ 'adminUi.users.table.email' | translate }}
-                      </th>
-                      <th *ngSwitchCase="'role'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                        {{ 'adminUi.users.table.role' | translate }}
-                      </th>
-                      <th *ngSwitchCase="'verified'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                        {{ 'adminUi.users.table.verified' | translate }}
-                      </th>
-                      <th *ngSwitchCase="'created'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                        {{ 'adminUi.users.table.created' | translate }}
-                      </th>
-                      <th *ngSwitchCase="'actions'" class="text-right font-semibold" [ngClass]="cellPaddingClass()">
-                        {{ 'adminUi.users.table.actions' | translate }}
-                      </th>
-                    </ng-container>
-                  </tr>
-                </ng-template>
+            <div
+              *ngIf="users().length > 0"
+              class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            >
+              <ng-template #usersTableHeader>
+                <tr>
+                  <ng-container
+                    *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId"
+                    [ngSwitch]="colId"
+                  >
+                    <th
+                      *ngSwitchCase="'identity'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.users.table.identity' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'email'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.users.table.email' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'role'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.users.table.role' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'verified'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.users.table.verified' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'created'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.users.table.created' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'actions'"
+                      class="text-right font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.users.table.actions' | translate }}
+                    </th>
+                  </ng-container>
+                </tr>
+              </ng-template>
 
-                <ng-template #usersTableRow let-user>
-                  <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
-                    <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
-                      <td
-                        *ngSwitchCase="'identity'"
-                        class="font-medium text-slate-900 dark:text-slate-50"
-                        [ngClass]="cellPaddingClass()"
+              <ng-template #usersTableRow let-user>
+                <tr
+                  class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                >
+                  <ng-container
+                    *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId"
+                    [ngSwitch]="colId"
+                  >
+                    <td
+                      *ngSwitchCase="'identity'"
+                      class="font-medium text-slate-900 dark:text-slate-50"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ identityLabel(user) }}
+                    </td>
+                    <td
+                      *ngSwitchCase="'email'"
+                      class="text-slate-700 dark:text-slate-200"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ user.email }}
+                    </td>
+                    <td *ngSwitchCase="'role'" [ngClass]="cellPaddingClass()">
+                      <span
+                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                        [ngClass]="rolePillClass(user.role)"
                       >
-                        {{ identityLabel(user) }}
-                      </td>
-                      <td *ngSwitchCase="'email'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
-                        {{ user.email }}
-                      </td>
-                      <td *ngSwitchCase="'role'" [ngClass]="cellPaddingClass()">
-                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="rolePillClass(user.role)">
-                          {{ ('adminUi.users.roles.' + user.role) | translate }}
-                        </span>
-                      </td>
-                      <td *ngSwitchCase="'verified'" [ngClass]="cellPaddingClass()">
-                        <span
-                          class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                          [ngClass]="
-                            user.email_verified
-                              ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
-                              : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'
-                          "
-                        >
-                          {{ user.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
-                        </span>
-                      </td>
-                      <td *ngSwitchCase="'created'" class="text-slate-600 dark:text-slate-300" [ngClass]="cellPaddingClass()">
-                        {{ user.created_at | date: 'short' }}
-                      </td>
-                      <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
-                        <app-button size="sm" variant="ghost" [label]="'adminUi.users.manage' | translate" (action)="select(user)"></app-button>
-                      </td>
-                    </ng-container>
-                  </tr>
-                </ng-template>
+                        {{ 'adminUi.users.roles.' + user.role | translate }}
+                      </span>
+                    </td>
+                    <td *ngSwitchCase="'verified'" [ngClass]="cellPaddingClass()">
+                      <span
+                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                        [ngClass]="
+                          user.email_verified
+                            ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                            : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'
+                        "
+                      >
+                        {{
+                          user.email_verified
+                            ? ('adminUi.users.verified' | translate)
+                            : ('adminUi.users.unverified' | translate)
+                        }}
+                      </span>
+                    </td>
+                    <td
+                      *ngSwitchCase="'created'"
+                      class="text-slate-600 dark:text-slate-300"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ user.created_at | date: 'short' }}
+                    </td>
+                    <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.users.manage' | translate"
+                        (action)="select(user)"
+                      ></app-button>
+                    </td>
+                  </ng-container>
+                </tr>
+              </ng-template>
 
-	              <ng-container *ngIf="users().length > 100; else usersTableStandard">
-	                <cdk-virtual-scroll-viewport
-	                  class="block h-[min(70vh,720px)]"
+              <ng-container *ngIf="users().length > 100; else usersTableStandard">
+                <cdk-virtual-scroll-viewport
+                  class="block h-[min(70vh,720px)]"
                   [itemSize]="userRowHeight"
                   [minBufferPx]="userRowHeight * 10"
                   [maxBufferPx]="userRowHeight * 20"
-	                >
-	                  <table class="min-w-[880px] w-full text-sm">
-	                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-	                      <ng-container [ngTemplateOutlet]="usersTableHeader"></ng-container>
-	                    </thead>
-	                    <tbody>
-                        <ng-container *cdkVirtualFor="let user of users(); trackBy: trackUserId">
-                          <ng-container
-                            [ngTemplateOutlet]="usersTableRow"
-                            [ngTemplateOutletContext]="{ $implicit: user }"
-                          ></ng-container>
-                        </ng-container>
-	                    </tbody>
-	                  </table>
-	                </cdk-virtual-scroll-viewport>
-	              </ng-container>
-	              <ng-template #usersTableStandard>
-	                <table class="min-w-[880px] w-full text-sm">
-	                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-	                    <ng-container [ngTemplateOutlet]="usersTableHeader"></ng-container>
-	                  </thead>
-	                  <tbody>
-                      <ng-container *ngFor="let user of users(); trackBy: trackUserId">
+                >
+                  <table class="min-w-[880px] w-full text-sm">
+                    <thead
+                      class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200"
+                    >
+                      <ng-container [ngTemplateOutlet]="usersTableHeader"></ng-container>
+                    </thead>
+                    <tbody>
+                      <ng-container *cdkVirtualFor="let user of users(); trackBy: trackUserId">
                         <ng-container
                           [ngTemplateOutlet]="usersTableRow"
                           [ngTemplateOutletContext]="{ $implicit: user }"
                         ></ng-container>
                       </ng-container>
-	                  </tbody>
-	                </table>
-	              </ng-template>
-	            </div>
+                    </tbody>
+                  </table>
+                </cdk-virtual-scroll-viewport>
+              </ng-container>
+              <ng-template #usersTableStandard>
+                <table class="min-w-[880px] w-full text-sm">
+                  <thead
+                    class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200"
+                  >
+                    <ng-container [ngTemplateOutlet]="usersTableHeader"></ng-container>
+                  </thead>
+                  <tbody>
+                    <ng-container *ngFor="let user of users(); trackBy: trackUserId">
+                      <ng-container
+                        [ngTemplateOutlet]="usersTableRow"
+                        [ngTemplateOutletContext]="{ $implicit: user }"
+                      ></ng-container>
+                    </ng-container>
+                  </tbody>
+                </table>
+              </ng-template>
+            </div>
 
-            <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
+            <div
+              *ngIf="meta()"
+              class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200"
+            >
               <div>
-                {{ 'adminUi.users.pagination' | translate: { page: meta()!.page, total_pages: meta()!.total_pages, total_items: meta()!.total_items } }}
+                {{
+                  'adminUi.users.pagination'
+                    | translate
+                      : {
+                          page: meta()!.page,
+                          total_pages: meta()!.total_pages,
+                          total_items: meta()!.total_items,
+                        }
+                }}
               </div>
               <div class="flex items-center gap-2">
-                <app-button size="sm" variant="ghost" [label]="'adminUi.users.prev' | translate" [disabled]="meta()!.page <= 1" (action)="goToPage(meta()!.page - 1)"></app-button>
-                <app-button size="sm" variant="ghost" [label]="'adminUi.users.next' | translate" [disabled]="meta()!.page >= meta()!.total_pages" (action)="goToPage(meta()!.page + 1)"></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.prev' | translate"
+                  [disabled]="meta()!.page <= 1"
+                  (action)="goToPage(meta()!.page - 1)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.users.next' | translate"
+                  [disabled]="meta()!.page >= meta()!.total_pages"
+                  (action)="goToPage(meta()!.page + 1)"
+                ></app-button>
               </div>
             </div>
           </ng-template>
         </section>
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.detailTitle' | translate }}</h2>
+        <section
+          class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+        >
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'adminUi.users.detailTitle' | translate }}
+          </h2>
 
           <div *ngIf="!selectedUser()" class="text-sm text-slate-600 dark:text-slate-300">
             {{ 'adminUi.users.selectHint' | translate }}
@@ -315,17 +450,25 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 
           <div *ngIf="selectedUser()" class="grid gap-3">
             <div class="rounded-xl border border-slate-200 p-3 grid gap-1 dark:border-slate-800">
-              <div class="font-semibold text-slate-900 dark:text-slate-50">{{ identityLabel(selectedUser()!) }}</div>
-              <div class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <div class="font-semibold text-slate-900 dark:text-slate-50">
+                {{ identityLabel(selectedUser()!) }}
+              </div>
+              <div
+                class="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300"
+              >
                 <span class="truncate max-w-[320px]">{{ selectedUser()!.email }}</span>
                 <app-copy-button [value]="selectedUser()!.email"></app-copy-button>
               </div>
-              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <div
+                class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400"
+              >
                 <span class="font-mono break-all">{{ selectedUser()!.id }}</span>
                 <app-copy-button [value]="selectedUser()!.id"></app-copy-button>
               </div>
               <div *ngIf="vip" class="mt-2">
-                <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
+                <span
+                  class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100"
+                >
                   {{ 'adminUi.users.vip' | translate }}
                 </span>
               </div>
@@ -348,16 +491,26 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
               >
                 <option value="customer">{{ 'adminUi.users.roles.customer' | translate }}</option>
                 <option value="support">{{ 'adminUi.users.roles.support' | translate }}</option>
-                <option value="fulfillment">{{ 'adminUi.users.roles.fulfillment' | translate }}</option>
+                <option value="fulfillment">
+                  {{ 'adminUi.users.roles.fulfillment' | translate }}
+                </option>
                 <option value="content">{{ 'adminUi.users.roles.content' | translate }}</option>
                 <option value="admin">{{ 'adminUi.users.roles.admin' | translate }}</option>
-                <option value="owner" disabled>{{ 'adminUi.users.roles.owner' | translate }}</option>
+                <option value="owner" disabled>
+                  {{ 'adminUi.users.roles.owner' | translate }}
+                </option>
               </select>
-              <span *ngIf="selectedUser()!.role === 'owner'" class="text-xs font-normal text-slate-500 dark:text-slate-400">
+              <span
+                *ngIf="selectedUser()!.role === 'owner'"
+                class="text-xs font-normal text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.users.ownerLocked' | translate }}
               </span>
-              <span *ngIf="selectedRole" class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                {{ ('adminUi.users.roleHints.' + selectedRole) | translate }}
+              <span
+                *ngIf="selectedRole"
+                class="text-xs font-normal text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.users.roleHints.' + selectedRole | translate }}
               </span>
             </label>
 
@@ -366,7 +519,11 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 size="sm"
                 variant="ghost"
                 [label]="'adminUi.users.setRole' | translate"
-                [disabled]="!canManageRoles() || selectedUser()!.role === 'owner' || selectedRole === selectedUser()!.role"
+                [disabled]="
+                  !canManageRoles() ||
+                  selectedUser()!.role === 'owner' ||
+                  selectedRole === selectedUser()!.role
+                "
                 (action)="updateRole()"
               ></app-button>
               <app-button
@@ -397,7 +554,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                   [(ngModel)]="adminNote"
                   [maxLength]="2000"
                 ></textarea>
-                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'adminUi.users.adminNoteHint' | translate }}</span>
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{
+                  'adminUi.users.adminNoteHint' | translate
+                }}</span>
               </label>
 
               <div class="flex gap-2">
@@ -412,23 +571,40 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
             </div>
 
             <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
-              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <div
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.users.securityTitle' | translate }}
               </div>
 
               <div class="flex items-center justify-between gap-3 text-sm">
-                <div class="text-slate-700 dark:text-slate-200">{{ 'adminUi.users.lockStatus' | translate }}</div>
+                <div class="text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.users.lockStatus' | translate }}
+                </div>
                 <span
                   class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                  [ngClass]="isLocked() ? 'bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100' : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'"
+                  [ngClass]="
+                    isLocked()
+                      ? 'bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-100'
+                      : 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                  "
                 >
-                  {{ isLocked() ? ('adminUi.users.locked' | translate) : ('adminUi.users.unlocked' | translate) }}
+                  {{
+                    isLocked()
+                      ? ('adminUi.users.locked' | translate)
+                      : ('adminUi.users.unlocked' | translate)
+                  }}
                 </span>
               </div>
 
-              <div *ngIf="profile()?.user?.locked_until" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="profile()?.user?.locked_until"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'adminUi.users.lockedUntil' | translate }}:
-                <span class="font-medium text-slate-900 dark:text-slate-100">{{ profile()!.user.locked_until | date: 'short' }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-100">{{
+                  profile()!.user.locked_until | date: 'short'
+                }}</span>
               </div>
 
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -498,7 +674,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
               *ngIf="canManageRoles() && selectedUser()!.role !== 'owner'"
               class="rounded-xl border border-rose-200 p-3 grid gap-3 dark:border-rose-900/40"
             >
-              <div class="text-xs font-semibold tracking-wide uppercase text-rose-700 dark:text-rose-200">
+              <div
+                class="text-xs font-semibold tracking-wide uppercase text-rose-700 dark:text-rose-200"
+              >
                 {{ 'adminUi.users.deleteTitle' | translate }}
               </div>
               <p class="text-sm text-slate-700 dark:text-slate-200">
@@ -519,7 +697,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 
             <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
               <div class="flex items-center justify-between gap-3">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.users.sessionsTitle' | translate }}
                 </div>
                 <app-button
@@ -538,7 +718,10 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 {{ sessionsError() }}
               </div>
 
-              <div *ngIf="sessions() && sessions()!.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="sessions() && sessions()!.length === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'adminUi.users.sessionsEmpty' | translate }}
               </div>
 
@@ -555,11 +738,17 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                       <div class="text-xs text-slate-600 dark:text-slate-300">
                         {{ s.ip_address || '—' }}{{ s.country_code ? ' · ' + s.country_code : '' }}
                         ·
-                        {{ s.persistent ? ('adminUi.users.sessionPersistent' | translate) : ('adminUi.users.sessionNonPersistent' | translate) }}
+                        {{
+                          s.persistent
+                            ? ('adminUi.users.sessionPersistent' | translate)
+                            : ('adminUi.users.sessionNonPersistent' | translate)
+                        }}
                       </div>
                       <div class="text-xs text-slate-500 dark:text-slate-400">
-                        {{ 'adminUi.users.sessionCreated' | translate }}: {{ s.created_at | date: 'short' }} ·
-                        {{ 'adminUi.users.sessionExpires' | translate }}: {{ s.expires_at | date: 'short' }}
+                        {{ 'adminUi.users.sessionCreated' | translate }}:
+                        {{ s.created_at | date: 'short' }} ·
+                        {{ 'adminUi.users.sessionExpires' | translate }}:
+                        {{ s.expires_at | date: 'short' }}
                       </div>
                     </div>
                     <app-button
@@ -574,9 +763,14 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
               </div>
             </div>
 
-            <div *ngIf="canIssueCoupons()" class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
+            <div
+              *ngIf="canIssueCoupons()"
+              class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800"
+            >
               <div class="flex items-center justify-between gap-3">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.users.couponGrantTitle' | translate }}
                 </div>
                 <app-button
@@ -588,14 +782,24 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 ></app-button>
               </div>
 
-              <div *ngIf="couponPromotionsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="couponPromotionsLoading()"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'adminUi.users.couponPromotionsLoading' | translate }}
               </div>
               <div *ngIf="couponPromotionsError()" class="text-sm text-rose-700 dark:text-rose-200">
                 {{ couponPromotionsError() }}
               </div>
 
-              <div *ngIf="couponPromotions() && couponPromotions()!.length === 0 && !couponPromotionsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="
+                  couponPromotions() &&
+                  couponPromotions()!.length === 0 &&
+                  !couponPromotionsLoading()
+                "
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'adminUi.users.couponPromotionsEmpty' | translate }}
               </div>
 
@@ -606,12 +810,17 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                     class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     [(ngModel)]="couponPromotionId"
                   >
-                    <option *ngFor="let p of couponPromotions()!" [value]="p.id">{{ p.name }}</option>
+                    <option *ngFor="let p of couponPromotions()!" [value]="p.id">
+                      {{ p.name }}
+                    </option>
                   </select>
                 </label>
 
                 <div class="grid gap-3 lg:grid-cols-2">
-                  <app-input [label]="'adminUi.users.couponPrefix' | translate" [(value)]="couponPrefix"></app-input>
+                  <app-input
+                    [label]="'adminUi.users.couponPrefix' | translate"
+                    [(value)]="couponPrefix"
+                  ></app-input>
                   <app-input
                     [label]="'adminUi.users.couponValidityDays' | translate"
                     type="number"
@@ -621,7 +830,11 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 </div>
 
                 <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                  <input type="checkbox" class="h-5 w-5 accent-indigo-600" [(ngModel)]="couponSendEmail" />
+                  <input
+                    type="checkbox"
+                    class="h-5 w-5 accent-indigo-600"
+                    [(ngModel)]="couponSendEmail"
+                  />
                   {{ 'adminUi.users.couponSendEmail' | translate }}
                 </label>
 
@@ -657,7 +870,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
             </div>
 
             <div class="rounded-xl border border-slate-200 p-3 grid gap-3 dark:border-slate-800">
-              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <div
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.users.emailVerificationTitle' | translate }}
               </div>
 
@@ -665,9 +880,17 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 <div class="text-slate-700 dark:text-slate-200">{{ selectedUser()!.email }}</div>
                 <span
                   class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                  [ngClass]="selectedUser()!.email_verified ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'"
+                  [ngClass]="
+                    selectedUser()!.email_verified
+                      ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                      : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100'
+                  "
                 >
-                  {{ selectedUser()!.email_verified ? ('adminUi.users.verified' | translate) : ('adminUi.users.unverified' | translate) }}
+                  {{
+                    selectedUser()!.email_verified
+                      ? ('adminUi.users.verified' | translate)
+                      : ('adminUi.users.unverified' | translate)
+                  }}
                 </span>
               </div>
 
@@ -703,26 +926,43 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                 {{ emailHistoryError() }}
               </div>
 
-              <div *ngIf="emailHistory() && emailHistory()!.tokens.length" class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <div class="grid gap-1 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900" *ngFor="let tok of emailHistory()!.tokens">
+              <div
+                *ngIf="emailHistory() && emailHistory()!.tokens.length"
+                class="grid gap-2 text-sm text-slate-700 dark:text-slate-200"
+              >
+                <div
+                  class="grid gap-1 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  *ngFor="let tok of emailHistory()!.tokens"
+                >
                   <div class="flex items-center justify-between gap-3">
                     <div class="font-medium">{{ tok.created_at | date: 'short' }}</div>
                     <span
                       class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                      [ngClass]="tok.used ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100' : 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100'"
+                      [ngClass]="
+                        tok.used
+                          ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
+                          : 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100'
+                      "
                     >
-                      {{ tok.used ? ('adminUi.users.verificationUsed' | translate) : ('adminUi.users.verificationPending' | translate) }}
+                      {{
+                        tok.used
+                          ? ('adminUi.users.verificationUsed' | translate)
+                          : ('adminUi.users.verificationPending' | translate)
+                      }}
                     </span>
                   </div>
                   <div class="text-xs text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.users.verificationExpires' | translate }}: {{ tok.expires_at | date: 'short' }}
+                    {{ 'adminUi.users.verificationExpires' | translate }}:
+                    {{ tok.expires_at | date: 'short' }}
                   </div>
                 </div>
               </div>
             </div>
 
             <div class="grid gap-2">
-              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <div
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.users.aliasHistory' | translate }}
               </div>
 
@@ -735,28 +975,60 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 
               <ng-container *ngIf="aliases()">
                 <div class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
-                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.users.usernameHistory' | translate }}</p>
-                    <p *ngIf="aliases()!.usernames.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  <div
+                    class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <p
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
+                      {{ 'adminUi.users.usernameHistory' | translate }}
+                    </p>
+                    <p
+                      *ngIf="aliases()!.usernames.length === 0"
+                      class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.users.noHistory' | translate }}
                     </p>
                     <ul *ngIf="aliases()!.usernames.length > 0" class="mt-2 grid gap-2">
-                      <li *ngFor="let h of aliases()!.usernames" class="flex items-center justify-between gap-2">
-                        <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.username }}</span>
-                        <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
+                      <li
+                        *ngFor="let h of aliases()!.usernames"
+                        class="flex items-center justify-between gap-2"
+                      >
+                        <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{
+                          h.username
+                        }}</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{
+                          h.created_at | date: 'short'
+                        }}</span>
                       </li>
                     </ul>
                   </div>
 
-                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.users.displayNameHistory' | translate }}</p>
-                    <p *ngIf="aliases()!.display_names.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  <div
+                    class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <p
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
+                      {{ 'adminUi.users.displayNameHistory' | translate }}
+                    </p>
+                    <p
+                      *ngIf="aliases()!.display_names.length === 0"
+                      class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.users.noHistory' | translate }}
                     </p>
                     <ul *ngIf="aliases()!.display_names.length > 0" class="mt-2 grid gap-2">
-                      <li *ngFor="let h of aliases()!.display_names" class="flex items-center justify-between gap-2">
-                        <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.name }}#{{ h.name_tag }}</span>
-                        <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
+                      <li
+                        *ngFor="let h of aliases()!.display_names"
+                        class="flex items-center justify-between gap-2"
+                      >
+                        <span class="font-medium text-slate-900 dark:text-slate-50 truncate"
+                          >{{ h.name }}#{{ h.name_tag }}</span
+                        >
+                        <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{
+                          h.created_at | date: 'short'
+                        }}</span>
                       </li>
                     </ul>
                   </div>
@@ -765,7 +1037,9 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
             </div>
 
             <div class="grid gap-2">
-              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+              <div
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 {{ 'adminUi.users.customerProfile' | translate }}
               </div>
 
@@ -778,45 +1052,77 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
 
               <ng-container *ngIf="profile() as profile">
                 <div class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
-                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  <div
+                    class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <p
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.users.addressesTitle' | translate }}
                     </p>
-                    <p *ngIf="profile.addresses.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p
+                      *ngIf="profile.addresses.length === 0"
+                      class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.users.addressesEmpty' | translate }}
                     </p>
                     <ul *ngIf="profile.addresses.length > 0" class="mt-2 grid gap-2">
-                      <li *ngFor="let addr of profile.addresses | slice: 0:5" class="rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+                      <li
+                        *ngFor="let addr of profile.addresses | slice: 0 : 5"
+                        class="rounded-lg border border-slate-200 p-2 dark:border-slate-800"
+                      >
                         <div class="flex items-center justify-between gap-2">
                           <div class="font-medium text-slate-900 dark:text-slate-50 truncate">
                             {{ addr.label || addr.line1 }}
                           </div>
-                          <div class="flex items-center gap-1 text-[10px] font-semibold uppercase text-slate-600 dark:text-slate-300">
-                            <span *ngIf="addr.is_default_shipping" class="rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100">
+                          <div
+                            class="flex items-center gap-1 text-[10px] font-semibold uppercase text-slate-600 dark:text-slate-300"
+                          >
+                            <span
+                              *ngIf="addr.is_default_shipping"
+                              class="rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100"
+                            >
                               {{ 'adminUi.users.defaultShipping' | translate }}
                             </span>
-                            <span *ngIf="addr.is_default_billing" class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                            <span
+                              *ngIf="addr.is_default_billing"
+                              class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                            >
                               {{ 'adminUi.users.defaultBilling' | translate }}
                             </span>
                           </div>
                         </div>
                         <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                          {{ addr.city }}{{ addr.region ? ', ' + addr.region : '' }} · {{ addr.postal_code }} · {{ addr.country }}
+                          {{ addr.city }}{{ addr.region ? ', ' + addr.region : '' }} ·
+                          {{ addr.postal_code }} · {{ addr.country }}
                         </div>
                       </li>
                     </ul>
                   </div>
 
-                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  <div
+                    class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <p
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.users.ordersTitle' | translate }}
                     </p>
-                    <p *ngIf="profile.orders.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p
+                      *ngIf="profile.orders.length === 0"
+                      class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.users.ordersEmpty' | translate }}
                     </p>
                     <ul *ngIf="profile.orders.length > 0" class="mt-2 grid gap-2">
-                      <li *ngFor="let order of profile.orders | slice: 0:5" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800">
-                        <a [routerLink]="['/admin/orders', order.id]" class="font-medium text-indigo-700 hover:underline dark:text-indigo-200">
+                      <li
+                        *ngFor="let order of profile.orders | slice: 0 : 5"
+                        class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800"
+                      >
+                        <a
+                          [routerLink]="['/admin/orders', order.id]"
+                          class="font-medium text-indigo-700 hover:underline dark:text-indigo-200"
+                        >
                           {{ order.reference_code || order.id }}
                         </a>
                         <span class="text-xs text-slate-500 dark:text-slate-400">
@@ -826,37 +1132,62 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
                     </ul>
                   </div>
 
-                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  <div
+                    class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <p
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.users.ticketsTitle' | translate }}
                     </p>
-                    <p *ngIf="profile.tickets.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p
+                      *ngIf="profile.tickets.length === 0"
+                      class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.users.ticketsEmpty' | translate }}
                     </p>
                     <ul *ngIf="profile.tickets.length > 0" class="mt-2 grid gap-2">
-                      <li *ngFor="let ticket of profile.tickets | slice: 0:5" class="rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+                      <li
+                        *ngFor="let ticket of profile.tickets | slice: 0 : 5"
+                        class="rounded-lg border border-slate-200 p-2 dark:border-slate-800"
+                      >
                         <div class="flex items-center justify-between gap-2">
                           <span class="font-medium text-slate-900 dark:text-slate-50 truncate">
                             {{ ticket.topic }} · {{ ticket.status }}
                           </span>
-                          <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ ticket.created_at | date: 'short' }}</span>
+                          <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{
+                            ticket.created_at | date: 'short'
+                          }}</span>
                         </div>
-                        <div *ngIf="ticket.order_reference" class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                        <div
+                          *ngIf="ticket.order_reference"
+                          class="mt-1 text-xs text-slate-600 dark:text-slate-300"
+                        >
                           {{ ticket.order_reference }}
                         </div>
                       </li>
                     </ul>
                   </div>
 
-                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  <div
+                    class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <p
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.users.activityTitle' | translate }}
                     </p>
-                    <p *ngIf="profile.security_events.length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p
+                      *ngIf="profile.security_events.length === 0"
+                      class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.users.activityEmpty' | translate }}
                     </p>
                     <ul *ngIf="profile.security_events.length > 0" class="mt-2 grid gap-2">
-                      <li *ngFor="let ev of profile.security_events | slice: 0:5" class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+                      <li
+                        *ngFor="let ev of profile.security_events | slice: 0 : 5"
+                        class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 p-2 dark:border-slate-800"
+                      >
                         <span class="font-medium text-slate-900 dark:text-slate-50 truncate">
                           {{ ev.event_type }}
                         </span>
@@ -870,193 +1201,217 @@ const defaultUsersTableLayout = (): AdminTableLayoutV1 => ({
               </ng-container>
             </div>
           </div>
-	        </section>
-	      </div>
+        </section>
+      </div>
 
-	              <ng-container *ngIf="roleChangeOpen() && selectedUser() as u">
-		        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRoleChange()">
-		          <div
-		            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-	            (click)="$event.stopPropagation()"
-	          >
-	            <div class="flex items-start justify-between gap-3">
-	              <div class="grid gap-1">
-	                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.setRole' | translate }}</h3>
-	                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
-	              </div>
-	              <button
-	                type="button"
-	                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-	                (click)="closeRoleChange()"
-	                [attr.aria-label]="'adminUi.actions.cancel' | translate"
-	              >
-	                ✕
-	              </button>
-	            </div>
-
-		            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ roleChangeError() }}</div>
-
-                <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.users.rolePasswordPrompt' | translate }}
-                </p>
-                <div class="mt-3">
-                  <app-input
-                    type="password"
-                    [label]="'adminUi.users.rolePasswordLabel' | translate"
-                    [placeholder]="'adminUi.users.rolePasswordLabel' | translate"
-                    [disabled]="roleChangeBusy()"
-                    [(value)]="roleChangePassword"
-                    [ariaLabel]="'adminUi.users.rolePasswordLabel' | translate"
-                  ></app-input>
-                </div>
-
-	            <div class="mt-4 flex justify-end gap-2">
-	              <app-button
-	                size="sm"
-	                variant="ghost"
-	                [label]="'adminUi.actions.cancel' | translate"
-	                [disabled]="roleChangeBusy()"
-	                (action)="closeRoleChange()"
-	              ></app-button>
-	              <app-button
-	                size="sm"
-	                [label]="'adminUi.users.setRole' | translate"
-	                [disabled]="roleChangeBusy()"
-	                (action)="confirmRoleChange()"
-	              ></app-button>
-	            </div>
-	          </div>
-		        </div>
-		      </ng-container>
-
-		      <ng-container *ngIf="overrideVerificationOpen() && selectedUser() as u">
-		        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeOverrideVerification()">
-		          <div
-		            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-		            (click)="$event.stopPropagation()"
-		          >
-		            <div class="flex items-start justify-between gap-3">
-		              <div class="grid gap-1">
-		                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.overrideVerification' | translate }}</h3>
-		                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
-		              </div>
-		              <button
-		                type="button"
-		                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-		                (click)="closeOverrideVerification()"
-		                [attr.aria-label]="'adminUi.actions.cancel' | translate"
-		              >
-		                ✕
-		              </button>
-		            </div>
-
-		            <div *ngIf="overrideVerificationError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ overrideVerificationError() }}</div>
-
-                <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.users.overrideVerificationPasswordPrompt' | translate }}
-                </p>
-                <div class="mt-3">
-                  <app-input
-                    type="password"
-                    [label]="'adminUi.users.overrideVerificationPasswordLabel' | translate"
-                    [placeholder]="'adminUi.users.overrideVerificationPasswordPlaceholder' | translate"
-                    [disabled]="emailVerificationBusy()"
-                    [(value)]="overrideVerificationPassword"
-                    [ariaLabel]="'adminUi.users.overrideVerificationPasswordLabel' | translate"
-                  ></app-input>
-                </div>
-
-		            <div class="mt-4 flex justify-end gap-2">
-		              <app-button
-		                size="sm"
-		                variant="ghost"
-		                [label]="'adminUi.actions.cancel' | translate"
-		                [disabled]="emailVerificationBusy()"
-		                (action)="closeOverrideVerification()"
-		              ></app-button>
-		              <app-button
-		                size="sm"
-		                [label]="'adminUi.users.overrideVerification' | translate"
-		                [disabled]="emailVerificationBusy()"
-		                (action)="confirmOverrideVerification()"
-		              ></app-button>
-		            </div>
-		          </div>
-		        </div>
-		      </ng-container>
-
-		      <ng-container *ngIf="deleteUserOpen() && selectedUser() as u">
-		        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeDeleteUser()">
-		          <div
-		            class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-4 shadow-xl dark:border-rose-900/40 dark:bg-slate-900"
-	            (click)="$event.stopPropagation()"
-	          >
-	            <div class="flex items-start justify-between gap-3">
-	              <div class="grid gap-1">
-	                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.users.deleteTitle' | translate }}</h3>
-	                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
-	              </div>
-	              <button
-	                type="button"
-	                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-	                (click)="closeDeleteUser()"
-	                [attr.aria-label]="'adminUi.actions.cancel' | translate"
-	              >
-	                ✕
-	              </button>
-	            </div>
-
-              <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.users.deleteHint' | translate }}
-              </p>
-
-	            <div *ngIf="deleteUserError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ deleteUserError() }}</div>
-
-              <div class="mt-3 grid gap-3">
-                <app-input
-                  [label]="'adminUi.users.deleteConfirmLabel' | translate"
-                  [(value)]="deleteUserConfirm"
-                  [placeholder]="'adminUi.users.deleteConfirmPlaceholder' | translate"
-                  [hint]="'adminUi.users.deleteConfirmHint' | translate"
-                  [disabled]="deleteUserBusy()"
-                  [ariaLabel]="'adminUi.users.deleteConfirmLabel' | translate"
-                ></app-input>
-                <app-input
-                  type="password"
-                  [label]="'adminUi.users.deletePasswordLabel' | translate"
-                  [(value)]="deleteUserPassword"
-                  [placeholder]="'adminUi.users.deletePasswordPlaceholder' | translate"
-                  [disabled]="deleteUserBusy()"
-                  [ariaLabel]="'adminUi.users.deletePasswordLabel' | translate"
-                ></app-input>
+      <ng-container *ngIf="roleChangeOpen() && selectedUser() as u">
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          (click)="closeRoleChange()"
+        >
+          <div
+            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.users.setRole' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
               </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeRoleChange()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
 
-	            <div class="mt-4 flex justify-end gap-2">
-	              <app-button
-	                size="sm"
-	                variant="ghost"
-	                [label]="'adminUi.actions.cancel' | translate"
-	                [disabled]="deleteUserBusy()"
-	                (action)="closeDeleteUser()"
-	              ></app-button>
-	              <app-button
-	                size="sm"
-	                [label]="'adminUi.users.deleteAction' | translate"
-	                [disabled]="deleteUserBusy()"
-	                (action)="confirmDeleteUser()"
-	              ></app-button>
-	            </div>
-	          </div>
-	        </div>
-	      </ng-container>
-	    </div>
-	  `
+            <div *ngIf="roleChangeError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+              {{ roleChangeError() }}
+            </div>
+
+            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.users.rolePasswordPrompt' | translate }}
+            </p>
+            <div class="mt-3">
+              <app-input
+                type="password"
+                [label]="'adminUi.users.rolePasswordLabel' | translate"
+                [placeholder]="'adminUi.users.rolePasswordLabel' | translate"
+                [disabled]="roleChangeBusy()"
+                [(value)]="roleChangePassword"
+                [ariaLabel]="'adminUi.users.rolePasswordLabel' | translate"
+              ></app-input>
+            </div>
+
+            <div class="mt-4 flex justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.cancel' | translate"
+                [disabled]="roleChangeBusy()"
+                (action)="closeRoleChange()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.users.setRole' | translate"
+                [disabled]="roleChangeBusy()"
+                (action)="confirmRoleChange()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="overrideVerificationOpen() && selectedUser() as u">
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          (click)="closeOverrideVerification()"
+        >
+          <div
+            class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.users.overrideVerification' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeOverrideVerification()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div
+              *ngIf="overrideVerificationError()"
+              class="mt-2 text-sm text-rose-700 dark:text-rose-300"
+            >
+              {{ overrideVerificationError() }}
+            </div>
+
+            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.users.overrideVerificationPasswordPrompt' | translate }}
+            </p>
+            <div class="mt-3">
+              <app-input
+                type="password"
+                [label]="'adminUi.users.overrideVerificationPasswordLabel' | translate"
+                [placeholder]="'adminUi.users.overrideVerificationPasswordPlaceholder' | translate"
+                [disabled]="emailVerificationBusy()"
+                [(value)]="overrideVerificationPassword"
+                [ariaLabel]="'adminUi.users.overrideVerificationPasswordLabel' | translate"
+              ></app-input>
+            </div>
+
+            <div class="mt-4 flex justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.cancel' | translate"
+                [disabled]="emailVerificationBusy()"
+                (action)="closeOverrideVerification()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.users.overrideVerification' | translate"
+                [disabled]="emailVerificationBusy()"
+                (action)="confirmOverrideVerification()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="deleteUserOpen() && selectedUser() as u">
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          (click)="closeDeleteUser()"
+        >
+          <div
+            class="w-full max-w-md rounded-2xl border border-rose-200 bg-white p-4 shadow-xl dark:border-rose-900/40 dark:bg-slate-900"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.users.deleteTitle' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">{{ identityLabel(u) }}</div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeDeleteUser()"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.users.deleteHint' | translate }}
+            </p>
+
+            <div *ngIf="deleteUserError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+              {{ deleteUserError() }}
+            </div>
+
+            <div class="mt-3 grid gap-3">
+              <app-input
+                [label]="'adminUi.users.deleteConfirmLabel' | translate"
+                [(value)]="deleteUserConfirm"
+                [placeholder]="'adminUi.users.deleteConfirmPlaceholder' | translate"
+                [hint]="'adminUi.users.deleteConfirmHint' | translate"
+                [disabled]="deleteUserBusy()"
+                [ariaLabel]="'adminUi.users.deleteConfirmLabel' | translate"
+              ></app-input>
+              <app-input
+                type="password"
+                [label]="'adminUi.users.deletePasswordLabel' | translate"
+                [(value)]="deleteUserPassword"
+                [placeholder]="'adminUi.users.deletePasswordPlaceholder' | translate"
+                [disabled]="deleteUserBusy()"
+                [ariaLabel]="'adminUi.users.deletePasswordLabel' | translate"
+              ></app-input>
+            </div>
+
+            <div class="mt-4 flex justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.cancel' | translate"
+                [disabled]="deleteUserBusy()"
+                (action)="closeDeleteUser()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.users.deleteAction' | translate"
+                [disabled]="deleteUserBusy()"
+                (action)="confirmDeleteUser()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+    </div>
+  `,
 })
 export class AdminUsersComponent implements OnInit {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
-    { label: 'adminUi.users.title' }
+    { label: 'adminUi.users.title' },
   ];
 
   readonly userRowHeight = 44;
@@ -1108,13 +1463,13 @@ export class AdminUsersComponent implements OnInit {
   securityBusy = signal(false);
   passwordResetEmailBusy = signal(false);
 
-	  emailHistory = signal<AdminEmailVerificationHistoryResponse | null>(null);
-	  emailHistoryLoading = signal(false);
-	  emailHistoryError = signal<string | null>(null);
-	  emailVerificationBusy = signal(false);
-	  overrideVerificationOpen = signal(false);
-	  overrideVerificationError = signal<string | null>(null);
-	  overrideVerificationPassword = '';
+  emailHistory = signal<AdminEmailVerificationHistoryResponse | null>(null);
+  emailHistoryLoading = signal(false);
+  emailHistoryError = signal<string | null>(null);
+  emailVerificationBusy = signal(false);
+  overrideVerificationOpen = signal(false);
+  overrideVerificationError = signal<string | null>(null);
+  overrideVerificationPassword = '';
 
   sessions = signal<AdminUserSession[] | null>(null);
   sessionsLoading = signal(false);
@@ -1143,12 +1498,14 @@ export class AdminUsersComponent implements OnInit {
     private readonly recent: AdminRecentService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    public favorites: AdminFavoritesService
+    public favorites: AdminFavoritesService,
   ) {}
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
+    this.tableLayout.set(
+      loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults),
+    );
     const state = history.state;
     const appliedSavedView = this.maybeApplyFiltersFromState(state);
     if (!appliedSavedView) {
@@ -1224,19 +1581,23 @@ export class AdminUsersComponent implements OnInit {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state)?.['adminFilterScope'] === 'users');
+      .filter((item) => item?.type === 'filter' && item?.state?.['adminFilterScope'] === 'users');
   }
 
   applySavedView(key: string): void {
     this.selectedSavedViewKey = key;
     if (!key) return;
     const view = this.savedViews().find((item) => item.key === key);
-    const filters = view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
+    const filters =
+      view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
     if (!filters || typeof filters !== 'object') return;
 
     this.q = String(filters.q ?? '');
     this.role = (filters.role ?? 'all') as RoleFilter;
-    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    const nextLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit)
+        ? filters.limit
+        : this.limit;
     this.limit = nextLimit;
     this.page = 1;
     this.load();
@@ -1254,7 +1615,9 @@ export class AdminUsersComponent implements OnInit {
       return;
     }
 
-    const name = (window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? '').trim();
+    const name = (
+      window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? ''
+    ).trim();
     if (!name) {
       this.toast.error(this.translate.instant('adminUi.favorites.savedViews.errors.nameRequired'));
       return;
@@ -1267,7 +1630,7 @@ export class AdminUsersComponent implements OnInit {
       label: name,
       subtitle: '',
       url: '/admin/users',
-      state: { adminFilterScope: 'users', adminFilters: filters }
+      state: { adminFilterScope: 'users', adminFilters: filters },
     });
     this.selectedSavedViewKey = key;
   }
@@ -1280,7 +1643,10 @@ export class AdminUsersComponent implements OnInit {
 
     this.q = String(filters.q ?? '');
     this.role = (filters.role ?? 'all') as RoleFilter;
-    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    const nextLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit)
+        ? filters.limit
+        : this.limit;
     this.limit = nextLimit;
     this.page = 1;
     this.selectedSavedViewKey = this.currentViewFavoriteKey();
@@ -1293,7 +1659,7 @@ export class AdminUsersComponent implements OnInit {
     return {
       q: this.q,
       role: this.role,
-      limit: this.limit
+      limit: this.limit,
     };
   }
 
@@ -1318,7 +1684,7 @@ export class AdminUsersComponent implements OnInit {
       label: this.identityLabel(user),
       subtitle: email,
       url: '/admin/users',
-      state: email ? { prefillUserSearch: email, autoSelectFirst: true } : null
+      state: email ? { prefillUserSearch: email, autoSelectFirst: true } : null,
     });
     this.selectedUser.set(user);
     this.selectedRole = user.role;
@@ -1378,9 +1744,12 @@ export class AdminUsersComponent implements OnInit {
       next: (updated) => {
         this.toast.success(this.t('adminUi.users.success.role'));
         this.selectedUser.set({ ...user, role: updated.role });
-        this.users.set(this.users().map((u) => (u.id === user.id ? { ...u, role: updated.role } : u)));
+        this.users.set(
+          this.users().map((u) => (u.id === user.id ? { ...u, role: updated.role } : u)),
+        );
         const profile = this.profile();
-        if (profile) this.profile.set({ ...profile, user: { ...profile.user, role: updated.role } });
+        if (profile)
+          this.profile.set({ ...profile, user: { ...profile.user, role: updated.role } });
         this.closeRoleChange();
       },
       error: (err) => {
@@ -1388,7 +1757,7 @@ export class AdminUsersComponent implements OnInit {
         this.roleChangeError.set(msg);
         this.toast.error(msg);
         this.roleChangeBusy.set(false);
-      }
+      },
     });
   }
 
@@ -1446,7 +1815,7 @@ export class AdminUsersComponent implements OnInit {
         this.deleteUserError.set(msg);
         this.toast.error(msg);
         this.deleteUserBusy.set(false);
-      }
+      },
     });
   }
 
@@ -1458,7 +1827,7 @@ export class AdminUsersComponent implements OnInit {
         this.toast.success(this.t('adminUi.users.success.revoke'));
         this.sessions.set([]);
       },
-      error: () => this.toast.error(this.t('adminUi.users.errors.revoke'))
+      error: () => this.toast.error(this.t('adminUi.users.errors.revoke')),
     });
   }
 
@@ -1484,7 +1853,7 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.users.errors.sessionRevoke'));
         this.revokingSessionId.set(null);
-      }
+      },
     });
   }
 
@@ -1493,7 +1862,10 @@ export class AdminUsersComponent implements OnInit {
     if (!user) return;
     this.internalBusy.set(true);
     this.usersApi
-      .updateInternal(user.id, { vip: this.vip, admin_note: this.adminNote.trim() ? this.adminNote.trim() : null })
+      .updateInternal(user.id, {
+        vip: this.vip,
+        admin_note: this.adminNote.trim() ? this.adminNote.trim() : null,
+      })
       .subscribe({
         next: (updated) => {
           const profile = this.profile();
@@ -1508,7 +1880,7 @@ export class AdminUsersComponent implements OnInit {
         error: () => {
           this.toast.error(this.t('adminUi.users.errors.internal'));
           this.internalBusy.set(false);
-        }
+        },
       });
   }
 
@@ -1549,7 +1921,7 @@ export class AdminUsersComponent implements OnInit {
         this.couponPromotionsError.set(this.t('adminUi.users.errors.couponPromotions'));
         this.couponPromotions.set([]);
         this.couponPromotionsLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1561,8 +1933,12 @@ export class AdminUsersComponent implements OnInit {
     if (!promotionId) return;
 
     const prefix = this.couponPrefix.trim() ? this.couponPrefix.trim() : null;
-    const rawDays = typeof this.couponValidityDays === 'string' ? Number(this.couponValidityDays) : this.couponValidityDays;
-    const validityDays = Number.isFinite(rawDays) && Number(rawDays) > 0 ? Math.floor(Number(rawDays)) : null;
+    const rawDays =
+      typeof this.couponValidityDays === 'string'
+        ? Number(this.couponValidityDays)
+        : this.couponValidityDays;
+    const validityDays =
+      Number.isFinite(rawDays) && Number(rawDays) > 0 ? Math.floor(Number(rawDays)) : null;
 
     this.couponIssueBusy.set(true);
     this.couponIssueError.set(null);
@@ -1573,7 +1949,7 @@ export class AdminUsersComponent implements OnInit {
         promotion_id: promotionId,
         prefix,
         validity_days: validityDays,
-        send_email: this.couponSendEmail
+        send_email: this.couponSendEmail,
       })
       .subscribe({
         next: (coupon) => {
@@ -1585,7 +1961,7 @@ export class AdminUsersComponent implements OnInit {
           this.couponIssueError.set(this.t('adminUi.users.errors.couponIssued'));
           this.toast.error(this.t('adminUi.users.errors.couponIssued'));
           this.couponIssueBusy.set(false);
-        }
+        },
       });
   }
 
@@ -1603,22 +1979,24 @@ export class AdminUsersComponent implements OnInit {
     const untilIso = new Date(Date.now() + mins * 60_000).toISOString();
     const reason = this.lockedReason.trim() ? this.lockedReason.trim() : null;
     this.securityBusy.set(true);
-    this.usersApi.updateSecurity(user.id, { locked_until: untilIso, locked_reason: reason }).subscribe({
-      next: (updated) => {
-        const profile = this.profile();
-        if (profile) {
-          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
-        }
-        this.lockedReason = (updated?.locked_reason || '').toString();
-        this.passwordResetRequired = Boolean(updated?.password_reset_required);
-        this.toast.success(this.t('adminUi.users.success.security'));
-        this.securityBusy.set(false);
-      },
-      error: () => {
-        this.toast.error(this.t('adminUi.users.errors.security'));
-        this.securityBusy.set(false);
-      }
-    });
+    this.usersApi
+      .updateSecurity(user.id, { locked_until: untilIso, locked_reason: reason })
+      .subscribe({
+        next: (updated) => {
+          const profile = this.profile();
+          if (profile) {
+            this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+          }
+          this.lockedReason = (updated?.locked_reason || '').toString();
+          this.passwordResetRequired = Boolean(updated?.password_reset_required);
+          this.toast.success(this.t('adminUi.users.success.security'));
+          this.securityBusy.set(false);
+        },
+        error: () => {
+          this.toast.error(this.t('adminUi.users.errors.security'));
+          this.securityBusy.set(false);
+        },
+      });
   }
 
   unlock(): void {
@@ -1639,7 +2017,7 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.users.errors.security'));
         this.securityBusy.set(false);
-      }
+      },
     });
   }
 
@@ -1648,22 +2026,27 @@ export class AdminUsersComponent implements OnInit {
     if (!user) return;
     const reason = this.lockedReason.trim() ? this.lockedReason.trim() : null;
     this.securityBusy.set(true);
-    this.usersApi.updateSecurity(user.id, { password_reset_required: this.passwordResetRequired, locked_reason: reason }).subscribe({
-      next: (updated) => {
-        const profile = this.profile();
-        if (profile) {
-          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
-        }
-        this.lockedReason = (updated?.locked_reason || '').toString();
-        this.passwordResetRequired = Boolean(updated?.password_reset_required);
-        this.toast.success(this.t('adminUi.users.success.security'));
-        this.securityBusy.set(false);
-      },
-      error: () => {
-        this.toast.error(this.t('adminUi.users.errors.security'));
-        this.securityBusy.set(false);
-      }
-    });
+    this.usersApi
+      .updateSecurity(user.id, {
+        password_reset_required: this.passwordResetRequired,
+        locked_reason: reason,
+      })
+      .subscribe({
+        next: (updated) => {
+          const profile = this.profile();
+          if (profile) {
+            this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+          }
+          this.lockedReason = (updated?.locked_reason || '').toString();
+          this.passwordResetRequired = Boolean(updated?.password_reset_required);
+          this.toast.success(this.t('adminUi.users.success.security'));
+          this.securityBusy.set(false);
+        },
+        error: () => {
+          this.toast.error(this.t('adminUi.users.errors.security'));
+          this.securityBusy.set(false);
+        },
+      });
   }
 
   sendPasswordResetEmail(): void {
@@ -1680,7 +2063,7 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.users.errors.passwordResetSent'));
         this.passwordResetEmailBusy.set(false);
-      }
+      },
     });
   }
 
@@ -1697,15 +2080,15 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.emailHistoryError.set(this.t('adminUi.users.errors.verificationHistory'));
         this.emailHistoryLoading.set(false);
-      }
+      },
     });
   }
 
-	  resendVerification(): void {
-	    const user = this.selectedUser();
-	    if (!user) return;
-	    this.emailVerificationBusy.set(true);
-	    this.usersApi.resendEmailVerification(user.id).subscribe({
+  resendVerification(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    this.emailVerificationBusy.set(true);
+    this.usersApi.resendEmailVerification(user.id).subscribe({
       next: () => {
         this.toast.success(this.t('adminUi.users.success.verificationResent'));
         this.emailVerificationBusy.set(false);
@@ -1714,65 +2097,67 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.users.errors.verificationResent'));
         this.emailVerificationBusy.set(false);
-      }
+      },
     });
-	  }
+  }
 
-	  overrideVerification(): void {
-	    const user = this.selectedUser();
-	    if (!user) return;
-      if (user.email_verified) return;
-	    this.overrideVerificationError.set(null);
-	    this.overrideVerificationPassword = '';
-	    this.overrideVerificationOpen.set(true);
-	  }
+  overrideVerification(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    if (user.email_verified) return;
+    this.overrideVerificationError.set(null);
+    this.overrideVerificationPassword = '';
+    this.overrideVerificationOpen.set(true);
+  }
 
-	  closeOverrideVerification(): void {
-	    this.overrideVerificationOpen.set(false);
-	    this.overrideVerificationError.set(null);
-	    this.overrideVerificationPassword = '';
-	  }
+  closeOverrideVerification(): void {
+    this.overrideVerificationOpen.set(false);
+    this.overrideVerificationError.set(null);
+    this.overrideVerificationPassword = '';
+  }
 
-	  confirmOverrideVerification(): void {
-	    const user = this.selectedUser();
-	    if (!user) return;
-	    if (user.email_verified) {
-	      this.closeOverrideVerification();
-	      return;
-	    }
+  confirmOverrideVerification(): void {
+    const user = this.selectedUser();
+    if (!user) return;
+    if (user.email_verified) {
+      this.closeOverrideVerification();
+      return;
+    }
 
-	    const password = (this.overrideVerificationPassword || '').trim();
-	    if (!password) {
-	      const msg = this.t('adminUi.users.overrideVerificationPasswordRequired');
-	      this.overrideVerificationError.set(msg);
-	      this.toast.error(msg);
-	      return;
-	    }
+    const password = (this.overrideVerificationPassword || '').trim();
+    if (!password) {
+      const msg = this.t('adminUi.users.overrideVerificationPasswordRequired');
+      this.overrideVerificationError.set(msg);
+      this.toast.error(msg);
+      return;
+    }
 
-	    this.emailVerificationBusy.set(true);
-	    this.overrideVerificationError.set(null);
-	    this.usersApi.overrideEmailVerification(user.id, password).subscribe({
-	      next: (updated) => {
-	        const profile = this.profile();
-	        if (profile) {
-	          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
-	        }
-	        const nextVerified = Boolean(updated?.email_verified);
-	        this.selectedUser.set({ ...user, email_verified: nextVerified });
-	        this.users.set(this.users().map((u) => (u.id === user.id ? { ...u, email_verified: nextVerified } : u)));
-	        this.toast.success(this.t('adminUi.users.success.verificationOverridden'));
-	        this.emailVerificationBusy.set(false);
-          this.closeOverrideVerification();
-	        this.loadEmailHistory();
-	      },
-	      error: (err) => {
-	        const msg = err?.error?.detail || this.t('adminUi.users.errors.verificationOverridden');
-	        this.overrideVerificationError.set(msg);
-	        this.toast.error(msg);
-	        this.emailVerificationBusy.set(false);
-	      }
-	    });
-	  }
+    this.emailVerificationBusy.set(true);
+    this.overrideVerificationError.set(null);
+    this.usersApi.overrideEmailVerification(user.id, password).subscribe({
+      next: (updated) => {
+        const profile = this.profile();
+        if (profile) {
+          this.profile.set({ ...profile, user: { ...profile.user, ...updated } });
+        }
+        const nextVerified = Boolean(updated?.email_verified);
+        this.selectedUser.set({ ...user, email_verified: nextVerified });
+        this.users.set(
+          this.users().map((u) => (u.id === user.id ? { ...u, email_verified: nextVerified } : u)),
+        );
+        this.toast.success(this.t('adminUi.users.success.verificationOverridden'));
+        this.emailVerificationBusy.set(false);
+        this.closeOverrideVerification();
+        this.loadEmailHistory();
+      },
+      error: (err) => {
+        const msg = err?.error?.detail || this.t('adminUi.users.errors.verificationOverridden');
+        this.overrideVerificationError.set(msg);
+        this.toast.error(msg);
+        this.emailVerificationBusy.set(false);
+      },
+    });
+  }
 
   impersonate(): void {
     const user = this.selectedUser();
@@ -1794,7 +2179,7 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.toast.error(this.t('adminUi.users.errors.impersonate'));
         this.impersonateBusy.set(false);
-      }
+      },
     });
   }
 
@@ -1819,11 +2204,15 @@ export class AdminUsersComponent implements OnInit {
   }
 
   rolePillClass(role: string): string {
-    if (role === 'owner') return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100';
-    if (role === 'admin') return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
+    if (role === 'owner')
+      return 'bg-indigo-100 text-indigo-900 dark:bg-indigo-900/30 dark:text-indigo-100';
+    if (role === 'admin')
+      return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
     if (role === 'support') return 'bg-sky-100 text-sky-900 dark:bg-sky-900/30 dark:text-sky-100';
-    if (role === 'fulfillment') return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100';
-    if (role === 'content') return 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/30 dark:text-fuchsia-100';
+    if (role === 'fulfillment')
+      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100';
+    if (role === 'content')
+      return 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/30 dark:text-fuchsia-100';
     return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
   }
 
@@ -1843,7 +2232,7 @@ export class AdminUsersComponent implements OnInit {
         role: this.role === 'all' ? undefined : this.role,
         page: this.page,
         limit: this.limit,
-        include_pii: this.piiReveal() ? true : undefined
+        include_pii: this.piiReveal() ? true : undefined,
       })
       .subscribe({
         next: (res) => {
@@ -1880,7 +2269,7 @@ export class AdminUsersComponent implements OnInit {
           this.error.set(this.t('adminUi.users.errors.load'));
           this.errorRequestId.set(extractRequestId(err));
           this.loading.set(false);
-        }
+        },
       });
   }
 
@@ -1900,7 +2289,7 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.aliasesError.set(this.t('adminUi.users.errors.aliases'));
         this.aliasesLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1920,7 +2309,7 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.profileError.set(this.t('adminUi.users.errors.profile'));
         this.profileLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1940,7 +2329,7 @@ export class AdminUsersComponent implements OnInit {
       error: () => {
         this.sessionsError.set(this.t('adminUi.users.errors.sessionsLoad'));
         this.sessionsLoading.set(false);
-      }
+      },
     });
   }
 }

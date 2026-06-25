@@ -21,7 +21,9 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_user_token(session_factory, email="wish@example.com"):
     async def create_and_token():
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email=email, password="wishpass", name="Wish User"))
+            user = await create_user(
+                session, UserCreate(email=email, password="wishpass", name="Wish User")
+            )
             tokens = await issue_tokens_for_user(session, user)
             return tokens["access_token"], user.id
 

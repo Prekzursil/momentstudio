@@ -78,4 +78,3 @@ def downgrade() -> None:
         .where(variants.c.product_id == product_id, variants.c.name == "350 ml")
         .values(name="12oz")
     )
-

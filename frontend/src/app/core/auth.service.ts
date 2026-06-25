@@ -178,7 +178,10 @@ export class AuthService {
   private stepUpInFlight: Observable<string | null> | null = null;
   private lastRevalidateAt = 0;
 
-  constructor(private readonly api: ApiService, private router: Router) {
+  constructor(
+    private readonly api: ApiService,
+    private router: Router,
+  ) {
     this.bootstrap();
     this.installRevalidationHooks();
   }
@@ -200,7 +203,13 @@ export class AuthService {
 
   isStaff(): boolean {
     const role = this.role();
-    return role === 'owner' || role === 'admin' || role === 'support' || role === 'fulfillment' || role === 'content';
+    return (
+      role === 'owner' ||
+      role === 'admin' ||
+      role === 'support' ||
+      role === 'fulfillment' ||
+      role === 'content'
+    );
   }
 
   canAccessAdminSection(section: string): boolean {
@@ -210,8 +219,10 @@ export class AuthService {
     const key = (section || '').toLowerCase().trim();
     if (!key) return false;
     if (role === 'support') return key === 'dashboard' || key === 'users' || key === 'support';
-    if (role === 'fulfillment') return key === 'dashboard' || key === 'orders' || key === 'returns' || key === 'inventory';
-    if (role === 'content') return key === 'dashboard' || key === 'content' || key === 'products' || key === 'coupons';
+    if (role === 'fulfillment')
+      return key === 'dashboard' || key === 'orders' || key === 'returns' || key === 'inventory';
+    if (role === 'content')
+      return key === 'dashboard' || key === 'content' || key === 'products' || key === 'coupons';
     return false;
   }
 
@@ -253,39 +264,42 @@ export class AuthService {
     identifier: string,
     password: string,
     captchaToken?: string,
-    opts?: { remember?: boolean }
+    opts?: { remember?: boolean },
   ): Observable<AuthResponse | TwoFactorChallengeResponse> {
     return this.api
       .post<AuthResponse | TwoFactorChallengeResponse>('/auth/login', {
         identifier,
         password,
         captcha_token: captchaToken ?? null,
-        remember: opts?.remember ?? false
+        remember: opts?.remember ?? false,
       })
       .pipe(
         tap((res) => {
           if (this.isAuthResponse(res)) {
             this.persist(res, opts?.remember ?? false);
           }
-        })
+        }),
       );
   }
 
-  register(payload: {
-    name: string;
-    username: string;
-    email: string;
-    password: string;
-    first_name: string;
-    middle_name?: string | null;
-    last_name: string;
-    date_of_birth: string;
-    phone: string;
-    preferred_language?: string;
-    captcha_token?: string | null;
-    accept_terms: boolean;
-    accept_privacy: boolean;
-  }, opts?: { remember?: boolean }): Observable<AuthResponse> {
+  register(
+    payload: {
+      name: string;
+      username: string;
+      email: string;
+      password: string;
+      first_name: string;
+      middle_name?: string | null;
+      last_name: string;
+      date_of_birth: string;
+      phone: string;
+      preferred_language?: string;
+      captcha_token?: string | null;
+      accept_terms: boolean;
+      accept_privacy: boolean;
+    },
+    opts?: { remember?: boolean },
+  ): Observable<AuthResponse> {
     return this.api
       .post<AuthResponse>('/auth/register', payload)
       .pipe(tap((res) => this.persist(res, opts?.remember ?? false)));
@@ -294,12 +308,14 @@ export class AuthService {
   changePassword(current: string, newPassword: string): Observable<{ detail: string }> {
     return this.api.post<{ detail: string }>('/auth/password/change', {
       current_password: current,
-      new_password: newPassword
+      new_password: newPassword,
     });
   }
 
   startGoogleLogin(): Observable<string> {
-    return this.api.get<{ auth_url: string }>('/auth/google/start').pipe(map((res) => res.auth_url));
+    return this.api
+      .get<{ auth_url: string }>('/auth/google/start')
+      .pipe(map((res) => res.auth_url));
   }
 
   completeGoogleLogin(code: string, state: string): Observable<GoogleCallbackResponse> {
@@ -308,11 +324,15 @@ export class AuthService {
         if (res.tokens) {
           this.persist({ user: res.user, tokens: res.tokens }, false);
         }
-      })
+      }),
     );
   }
 
-  completeTwoFactorLogin(twoFactorToken: string, code: string, remember: boolean): Observable<AuthResponse> {
+  completeTwoFactorLogin(
+    twoFactorToken: string,
+    code: string,
+    remember: boolean,
+  ): Observable<AuthResponse> {
     return this.api
       .post<AuthResponse>('/auth/login/2fa', { two_factor_token: twoFactorToken, code })
       .pipe(tap((res) => this.persist(res, remember)));
@@ -332,25 +352,31 @@ export class AuthService {
       preferred_language?: string;
       accept_terms: boolean;
       accept_privacy: boolean;
-    }
+    },
   ): Observable<AuthResponse> {
     return this.api
-      .post<AuthResponse>('/auth/google/complete', payload, { Authorization: `Bearer ${completionToken}` })
+      .post<AuthResponse>('/auth/google/complete', payload, {
+        Authorization: `Bearer ${completionToken}`,
+      })
       .pipe(tap((res) => this.persist(res, false)));
   }
 
   startGoogleLink(): Observable<string> {
-    return this.api.get<{ auth_url: string }>('/auth/google/link/start').pipe(map((res) => res.auth_url));
+    return this.api
+      .get<{ auth_url: string }>('/auth/google/link/start')
+      .pipe(map((res) => res.auth_url));
   }
 
   completeGoogleLink(code: string, state: string, password: string): Observable<AuthUser> {
-    return this.api.post<AuthUser>('/auth/google/link', { code, state, password }).pipe(
-      tap((user) => this.setUser(user))
-    );
+    return this.api
+      .post<AuthUser>('/auth/google/link', { code, state, password })
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   unlinkGoogle(password: string): Observable<AuthUser> {
-    return this.api.post<AuthUser>('/auth/google/unlink', { password }).pipe(tap((user) => this.setUser(user)));
+    return this.api
+      .post<AuthUser>('/auth/google/unlink', { password })
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   uploadAvatar(file: File): Observable<AuthUser> {
@@ -359,14 +385,18 @@ export class AuthService {
     }
     const formData = new FormData();
     formData.append('file', file);
-    return this.api.post<AuthUser>('/auth/me/avatar', formData).pipe(tap((user) => this.setUser(user)));
+    return this.api
+      .post<AuthUser>('/auth/me/avatar', formData)
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   useGoogleAvatar(): Observable<AuthUser> {
     if (!this.isAuthenticated()) {
       return of({} as AuthUser);
     }
-    return this.api.post<AuthUser>('/auth/me/avatar/use-google', {}).pipe(tap((user) => this.setUser(user)));
+    return this.api
+      .post<AuthUser>('/auth/me/avatar/use-google', {})
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   removeAvatar(): Observable<AuthUser> {
@@ -383,7 +413,7 @@ export class AuthService {
     return this.api.patch<AuthUser>('/auth/me/language', { preferred_language: lang }).pipe(
       tap((user) => {
         this.setUser(user);
-      })
+      }),
     );
   }
 
@@ -395,14 +425,18 @@ export class AuthService {
     if (!this.isAuthenticated()) {
       return of({} as AuthUser);
     }
-    return this.api.patch<AuthUser>('/auth/me/notifications', payload).pipe(tap((user) => this.setUser(user)));
+    return this.api
+      .patch<AuthUser>('/auth/me/notifications', payload)
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   updateTrainingMode(enabled: boolean): Observable<AuthUser> {
     if (!this.isAuthenticated()) {
       return of({} as AuthUser);
     }
-    return this.api.patch<AuthUser>('/auth/me/training-mode', { enabled }).pipe(tap((user) => this.setUser(user)));
+    return this.api
+      .patch<AuthUser>('/auth/me/training-mode', { enabled })
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   updateProfile(payload: {
@@ -424,14 +458,18 @@ export class AuthService {
     if (!this.isAuthenticated()) {
       return of({} as AuthUser);
     }
-    return this.api.patch<AuthUser>('/auth/me/username', { username, password }).pipe(tap((user) => this.setUser(user)));
+    return this.api
+      .patch<AuthUser>('/auth/me/username', { username, password })
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   updateEmail(email: string, password: string): Observable<AuthUser> {
     if (!this.isAuthenticated()) {
       return of({} as AuthUser);
     }
-    return this.api.patch<AuthUser>('/auth/me/email', { email, password }).pipe(tap((user) => this.setUser(user)));
+    return this.api
+      .patch<AuthUser>('/auth/me/email', { email, password })
+      .pipe(tap((user) => this.setUser(user)));
   }
 
   getAliases(): Observable<UserAliasesResponse> {
@@ -444,11 +482,18 @@ export class AuthService {
 
   requestEmailVerification(next?: string): Observable<{ detail: string }> {
     const normalized = typeof next === 'string' ? next.trim() : '';
-    return this.api.post<{ detail: string }>('/auth/verify/request', {}, undefined, normalized ? { next: normalized } : undefined);
+    return this.api.post<{ detail: string }>(
+      '/auth/verify/request',
+      {},
+      undefined,
+      normalized ? { next: normalized } : undefined,
+    );
   }
 
   confirmEmailVerification(token: string): Observable<{ detail: string; email_verified: boolean }> {
-    return this.api.post<{ detail: string; email_verified: boolean }>('/auth/verify/confirm', { token });
+    return this.api.post<{ detail: string; email_verified: boolean }>('/auth/verify/confirm', {
+      token,
+    });
   }
 
   listEmails(): Observable<UserEmailsResponse> {
@@ -459,13 +504,16 @@ export class AuthService {
     return this.api.post<SecondaryEmail>('/auth/me/emails', { email });
   }
 
-  requestSecondaryEmailVerification(secondaryEmailId: string, next?: string): Observable<{ detail: string }> {
+  requestSecondaryEmailVerification(
+    secondaryEmailId: string,
+    next?: string,
+  ): Observable<{ detail: string }> {
     const normalized = typeof next === 'string' ? next.trim() : '';
     return this.api.post<{ detail: string }>(
       `/auth/me/emails/${secondaryEmailId}/verify/request`,
       {},
       undefined,
-      normalized ? { next: normalized } : undefined
+      normalized ? { next: normalized } : undefined,
     );
   }
 
@@ -474,7 +522,9 @@ export class AuthService {
   }
 
   deleteSecondaryEmail(secondaryEmailId: string, password: string): Observable<void> {
-    return this.api.delete<void>(`/auth/me/emails/${secondaryEmailId}`, undefined, undefined, { password });
+    return this.api.delete<void>(`/auth/me/emails/${secondaryEmailId}`, undefined, undefined, {
+      password,
+    });
   }
 
   makeSecondaryEmailPrimary(secondaryEmailId: string, password: string): Observable<AuthUser> {
@@ -488,7 +538,9 @@ export class AuthService {
   }
 
   revokeOtherSessions(password: string): Observable<RefreshSessionsRevokeResponse> {
-    return this.api.post<RefreshSessionsRevokeResponse>('/auth/me/sessions/revoke-others', { password });
+    return this.api.post<RefreshSessionsRevokeResponse>('/auth/me/sessions/revoke-others', {
+      password,
+    });
   }
 
   listSecurityEvents(limit: number = 30): Observable<UserSecurityEventInfo[]> {
@@ -511,8 +563,14 @@ export class AuthService {
     return this.api.post<TwoFactorStatusResponse>('/auth/me/2fa/disable', { password, code });
   }
 
-  regenerateTwoFactorRecoveryCodes(password: string, code: string): Observable<TwoFactorEnableResponse> {
-    return this.api.post<TwoFactorEnableResponse>('/auth/me/2fa/recovery-codes/regenerate', { password, code });
+  regenerateTwoFactorRecoveryCodes(
+    password: string,
+    code: string,
+  ): Observable<TwoFactorEnableResponse> {
+    return this.api.post<TwoFactorEnableResponse>('/auth/me/2fa/recovery-codes/regenerate', {
+      password,
+      code,
+    });
   }
 
   listPasskeys(): Observable<PasskeyInfo[]> {
@@ -520,31 +578,49 @@ export class AuthService {
   }
 
   startPasskeyRegistration(password: string): Observable<PasskeyRegistrationOptionsResponse> {
-    return this.api.post<PasskeyRegistrationOptionsResponse>('/auth/me/passkeys/register/options', { password });
+    return this.api.post<PasskeyRegistrationOptionsResponse>('/auth/me/passkeys/register/options', {
+      password,
+    });
   }
 
-  completePasskeyRegistration(registrationToken: string, credential: any, name?: string | null): Observable<PasskeyInfo> {
+  completePasskeyRegistration(
+    registrationToken: string,
+    credential: any,
+    name?: string | null,
+  ): Observable<PasskeyInfo> {
     return this.api.post<PasskeyInfo>('/auth/me/passkeys/register/verify', {
       registration_token: registrationToken,
       credential,
-      name: name ?? null
+      name: name ?? null,
     });
   }
 
   deletePasskey(passkeyId: string, password: string): Observable<void> {
-    return this.api.delete<void>(`/auth/me/passkeys/${passkeyId}`, undefined, undefined, { password });
-  }
-
-  startPasskeyLogin(identifier: string | null, remember: boolean): Observable<PasskeyAuthenticationOptionsResponse> {
-    return this.api.post<PasskeyAuthenticationOptionsResponse>('/auth/passkeys/login/options', {
-      identifier: (identifier ?? '').trim() || null,
-      remember
+    return this.api.delete<void>(`/auth/me/passkeys/${passkeyId}`, undefined, undefined, {
+      password,
     });
   }
 
-  completePasskeyLogin(authenticationToken: string, credential: any, remember: boolean): Observable<AuthResponse> {
+  startPasskeyLogin(
+    identifier: string | null,
+    remember: boolean,
+  ): Observable<PasskeyAuthenticationOptionsResponse> {
+    return this.api.post<PasskeyAuthenticationOptionsResponse>('/auth/passkeys/login/options', {
+      identifier: (identifier ?? '').trim() || null,
+      remember,
+    });
+  }
+
+  completePasskeyLogin(
+    authenticationToken: string,
+    credential: any,
+    remember: boolean,
+  ): Observable<AuthResponse> {
     return this.api
-      .post<AuthResponse>('/auth/passkeys/login/verify', { authentication_token: authenticationToken, credential })
+      .post<AuthResponse>('/auth/passkeys/login/verify', {
+        authentication_token: authenticationToken,
+        credential,
+      })
       .pipe(tap((res) => this.persist(res, remember)));
   }
 
@@ -560,7 +636,8 @@ export class AuthService {
     }
 
     const refreshToken = this.getRefreshToken();
-    const body = refreshToken && !this.isJwtExpired(refreshToken) ? { refresh_token: refreshToken } : {};
+    const body =
+      refreshToken && !this.isJwtExpired(refreshToken) ? { refresh_token: refreshToken } : {};
     const refresh$ = this.api.post<AuthTokens>('/auth/refresh', body, headers).pipe(
       tap((tokens) => this.setTokens(tokens)),
       map((tokens) => tokens),
@@ -568,7 +645,7 @@ export class AuthService {
       finalize(() => {
         this.refreshInFlight = null;
       }),
-      shareReplay(1)
+      shareReplay(1),
     );
 
     this.refreshInFlight = refresh$;
@@ -587,7 +664,7 @@ export class AuthService {
     const body = refreshToken ? { refresh_token: refreshToken } : {};
     return this.api.post<void>('/auth/logout', body, headers).pipe(
       catchError(() => of(void 0)),
-      map(() => void 0)
+      map(() => void 0),
     );
   }
 
@@ -617,7 +694,10 @@ export class AuthService {
   }
 
   confirmPasswordReset(token: string, newPassword: string): Observable<void> {
-    return this.api.post<void>('/auth/password-reset/confirm', { token, new_password: newPassword });
+    return this.api.post<void>('/auth/password-reset/confirm', {
+      token,
+      new_password: newPassword,
+    });
   }
 
   loadCurrentUser(): Observable<AuthUser> {
@@ -649,22 +729,23 @@ export class AuthService {
     const me = () =>
       this.api.get<AuthUser>('/auth/me', undefined, headers).pipe(
         tap((user) => this.setUser(user)),
-        map(() => true)
+        map(() => true),
       );
 
-    const ensure$ = (this.hasValidAccessToken()
-      ? me()
-      : (() => {
-          return this.refresh({ silent }).pipe(
-            switchMap((tokens) => {
-              if (!tokens) {
-                this.clearSession();
-                return of(false);
-              }
-              return me();
-            })
-          );
-        })()
+    const ensure$ = (
+      this.hasValidAccessToken()
+        ? me()
+        : (() => {
+            return this.refresh({ silent }).pipe(
+              switchMap((tokens) => {
+                if (!tokens) {
+                  this.clearSession();
+                  return of(false);
+                }
+                return me();
+              }),
+            );
+          })()
     ).pipe(
       catchError(() => {
         this.clearSession();
@@ -673,7 +754,7 @@ export class AuthService {
       finalize(() => {
         this.ensureInFlight = null;
       }),
-      shareReplay(1)
+      shareReplay(1),
     );
 
     this.ensureInFlight = ensure$;
@@ -703,6 +784,7 @@ export class AuthService {
   }
 
   private installRevalidationHooks(): void {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     const cooldownMs = 10_000;
     const revalidate = () => {
@@ -730,7 +812,10 @@ export class AuthService {
   }
 
   private isAuthResponse(res: AuthResponse | TwoFactorChallengeResponse): res is AuthResponse {
-    return Boolean((res as AuthResponse | null)?.tokens?.access_token && (res as AuthResponse | null)?.tokens?.refresh_token);
+    return Boolean(
+      (res as AuthResponse | null)?.tokens?.access_token &&
+        (res as AuthResponse | null)?.tokens?.refresh_token,
+    );
   }
 
   setTokens(tokens: AuthTokens | null): void {
@@ -797,7 +882,9 @@ export class AuthService {
     const parts = raw.split('.');
     if (parts.length !== 3) return null;
     try {
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as {
+        exp?: number;
+      };
       return typeof payload.exp === 'number' ? payload.exp : null;
     } catch {
       return null;
@@ -809,7 +896,10 @@ export class AuthService {
     const parts = raw.split('.');
     if (parts.length !== 3) return null;
     try {
-      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as Record<
+        string,
+        unknown
+      >;
       return payload && typeof payload === 'object' ? payload : null;
     } catch {
       return null;
@@ -886,6 +976,7 @@ export class AuthService {
   }
 
   private bootstrapImpersonation(): void {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
 
     const fromUrl = this.readImpersonationTokenFromUrl();
@@ -909,6 +1000,7 @@ export class AuthService {
   }
 
   private readImpersonationTokenFromUrl(): string | null {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return null;
     const hash = (window.location.hash || '').replace(/^#/, '').trim();
     if (!hash) return null;
@@ -919,7 +1011,11 @@ export class AuthService {
 
   private clearImpersonationTokenFromUrl(): void {
     try {
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname + window.location.search,
+      );
     } catch {
       // ignore
     }
@@ -942,6 +1038,7 @@ export class AuthService {
   }
 
   private clearImpersonation(): void {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     try {
       window.sessionStorage.removeItem(AuthService.IMPERSONATION_TOKEN_KEY);
@@ -951,6 +1048,7 @@ export class AuthService {
   }
 
   private getStorage(mode: StorageMode): Storage | null {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return null;
     try {
       return mode === 'local' ? window.localStorage : window.sessionStorage;
@@ -959,4 +1057,3 @@ export class AuthService {
     }
   }
 }
-

@@ -32,5 +32,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     # PostgreSQL does not support removing enum values from a type. We remap
     # staff roles back to 'admin' so older code paths continue to work.
-    op.execute("UPDATE users SET role = 'admin' WHERE role IN ('support', 'fulfillment', 'content')")
-
+    op.execute(
+        "UPDATE users SET role = 'admin' WHERE role IN ('support', 'fulfillment', 'content')"
+    )

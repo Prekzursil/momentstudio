@@ -55,7 +55,7 @@ export class AdminRecentService {
       subtitle: (item.subtitle || '').slice(0, 240),
       url: (item.url || '').slice(0, 500) || '/',
       state: item.state && typeof item.state === 'object' ? item.state : null,
-      viewed_at: now
+      viewed_at: now,
     };
     if (!entry.key) return;
 
@@ -104,7 +104,7 @@ export class AdminRecentService {
             typeof item.key === 'string' &&
             typeof item.type === 'string' &&
             typeof item.label === 'string' &&
-            typeof item.url === 'string'
+            typeof item.url === 'string',
         )
         .slice(0, this.maxItems);
     } catch {
@@ -140,4 +140,3 @@ export class AdminRecentService {
     }
   }
 }
-

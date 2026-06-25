@@ -4,7 +4,15 @@ from datetime import datetime, timezone
 from urllib.parse import quote_plus
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Request,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -29,7 +37,10 @@ from app.services import notifications as notification_service
 from app.services import coupons_v2 as coupons_service
 from app.services import promo_usage
 from app.api.v1 import cart as cart_api
-from app.schemas.payment_capabilities import PaymentsCapabilitiesResponse, PaymentMethodCapability
+from app.schemas.payment_capabilities import (
+    PaymentsCapabilitiesResponse,
+    PaymentMethodCapability,
+)
 from app.services.payment_provider import is_mock_payments
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -76,7 +87,9 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
     paypal_reason = None if paypal_enabled else "PayPal is not configured"
     paypal_reason_code = None if paypal_enabled else "missing_credentials"
 
-    netopia_configured, netopia_config_reason = netopia_service.netopia_configuration_status()
+    netopia_configured, netopia_config_reason = (
+        netopia_service.netopia_configuration_status()
+    )
     netopia_supported = True
     netopia_enabled = False
     if not settings.netopia_enabled:
@@ -113,7 +126,9 @@ async def payment_capabilities() -> PaymentsCapabilitiesResponse:
             reason_code=netopia_reason_code,
             reason=netopia_reason,
         ),
-        cod=PaymentMethodCapability(supported=True, configured=True, enabled=True, reason=None),
+        cod=PaymentMethodCapability(
+            supported=True, configured=True, enabled=True, reason=None
+        ),
     )
 
 
@@ -132,7 +147,9 @@ async def create_payment_intent(
         query = query.where(Cart.session_id == session_id)
     cart = (await session.execute(query)).scalar_one_or_none()
     if not cart:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart not found")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cart not found"
+        )
     data = await payments.create_payment_intent(session, cart)
     return data
 
@@ -145,9 +162,14 @@ async def stripe_webhook(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     payload = await request.body()
-    event, record = await payments.handle_webhook_event(session, payload, stripe_signature)
+    event, record = await payments.handle_webhook_event(
+        session, payload, stripe_signature
+    )
 
-    already_processed = bool(getattr(record, "processed_at", None)) and not (getattr(record, "last_error", None) or "").strip()
+    already_processed = (
+        bool(getattr(record, "processed_at", None))
+        and not (getattr(record, "last_error", None) or "").strip()
+    )
     if already_processed:
         return {"received": True, "type": event.get("type")}
 
@@ -167,7 +189,7 @@ async def stripe_webhook(
         if updated:
             updated.processed_at = None
             if isinstance(exc, HTTPException):
-                updated.last_error = str(exc.detail)
+                updated.last_error = str(getattr(exc, "detail", exc))
             else:
                 updated.last_error = str(exc)
             session.add(updated)
@@ -184,17 +206,27 @@ async def paypal_webhook(
     try:
         event = await request.json()
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload"
+        ) from exc
     if not isinstance(event, dict):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload"
+        )
 
-    verified = await paypal_service.verify_webhook_signature(headers=dict(request.headers), event=event)
+    verified = await paypal_service.verify_webhook_signature(
+        headers=dict(request.headers), event=event
+    )
     if not verified:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature"
+        )
 
     event_id = str(event.get("id") or "").strip()
     if not event_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal event id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing PayPal event id"
+        )
 
     now = datetime.now(timezone.utc)
     event_type = str(event.get("event_type") or "").strip() or None
@@ -203,7 +235,11 @@ async def paypal_webhook(
         "id": event_id,
         "event_type": event_type,
         "create_time": event.get("create_time"),
-        "resource": {"id": resource.get("id")} if isinstance(resource, dict) and resource.get("id") else None,
+        "resource": (
+            {"id": resource.get("id")}
+            if isinstance(resource, dict) and resource.get("id")
+            else None
+        ),
     }
 
     record = PayPalWebhookEvent(
@@ -220,7 +256,13 @@ async def paypal_webhook(
     except IntegrityError:
         await session.rollback()
         existing = (
-            (await session.execute(select(PayPalWebhookEvent).where(PayPalWebhookEvent.paypal_event_id == event_id)))
+            (
+                await session.execute(
+                    select(PayPalWebhookEvent).where(
+                        PayPalWebhookEvent.paypal_event_id == event_id
+                    )
+                )
+            )
             .scalars()
             .first()
         )
@@ -235,7 +277,10 @@ async def paypal_webhook(
         await session.refresh(existing)
         record = existing
 
-    already_processed = bool(getattr(record, "processed_at", None)) and not (getattr(record, "last_error", None) or "").strip()
+    already_processed = (
+        bool(getattr(record, "processed_at", None))
+        and not (getattr(record, "last_error", None) or "").strip()
+    )
     if already_processed:
         return {"received": True, "type": event.get("event_type")}
 
@@ -255,7 +300,7 @@ async def paypal_webhook(
         if updated:
             updated.processed_at = None
             if isinstance(exc, HTTPException):
-                updated.last_error = str(exc.detail)
+                updated.last_error = str(getattr(exc, "detail", exc))
             else:
                 updated.last_error = str(exc)
             session.add(updated)
@@ -287,7 +332,14 @@ async def netopia_webhook(
         "payload_bytes": len(payload),
     }
 
-    def _warn_and_ack(error_type: int, error_code: str, message: str, reason: str, *, exc_info: bool = False) -> dict:
+    def _warn_and_ack(
+        error_type: int,
+        error_code: str,
+        message: str,
+        reason: str,
+        *,
+        exc_info: bool = False,
+    ) -> dict:
         logger.warning(
             "Netopia webhook acknowledged with error: %s (%s)",
             reason,
@@ -310,29 +362,49 @@ async def netopia_webhook(
         )
 
     try:
-        netopia_service.verify_ipn(verification_token=verification_token, payload=payload)
+        netopia_service.verify_ipn(
+            verification_token=verification_token, payload=payload
+        )
     except HTTPException as exc:
-        detail = str(exc.detail) if getattr(exc, "detail", None) else "Invalid Netopia signature"
+        detail = (
+            str(exc.detail)
+            if getattr(exc, "detail", None)
+            else "Invalid Netopia signature"
+        )
         return _warn_and_ack(2, "INVALID_IPN", detail, "IPN verification failed")
     except Exception:
-        return _warn_and_ack(2, "INVALID_IPN", "Invalid Netopia signature", "IPN verification crashed", exc_info=True)
+        return _warn_and_ack(
+            2,
+            "INVALID_IPN",
+            "Invalid Netopia signature",
+            "IPN verification crashed",
+            exc_info=True,
+        )
 
     try:
         event = json.loads(payload)
     except Exception:
-        return _warn_and_ack(2, "INVALID_PAYLOAD", "Invalid payload", "payload is not valid JSON")
+        return _warn_and_ack(
+            2, "INVALID_PAYLOAD", "Invalid payload", "payload is not valid JSON"
+        )
     if not isinstance(event, dict):
-        return _warn_and_ack(2, "INVALID_PAYLOAD", "Invalid payload", "payload root is not an object")
+        return _warn_and_ack(
+            2, "INVALID_PAYLOAD", "Invalid payload", "payload root is not an object"
+        )
 
     try:
-        order_info = event.get("order") if isinstance(event.get("order"), dict) else {}
-        payment_info = event.get("payment") if isinstance(event.get("payment"), dict) else {}
+        order_raw = event.get("order")
+        order_info = order_raw if isinstance(order_raw, dict) else {}
+        payment_raw = event.get("payment")
+        payment_info = payment_raw if isinstance(payment_raw, dict) else {}
         order_id_raw = str(order_info.get("orderID") or "").strip()
         ntp_id = str(payment_info.get("ntpID") or "").strip() or None
         payment_message = str(payment_info.get("message") or "").strip() or None
         payment_status_raw = payment_info.get("status")
         try:
-            payment_status = int(payment_status_raw) if payment_status_raw is not None else None
+            payment_status = (
+                int(payment_status_raw) if payment_status_raw is not None else None
+            )
         except Exception:
             payment_status = None
 
@@ -351,15 +423,12 @@ async def netopia_webhook(
         candidate = order_id_raw.split("_", 1)[0].strip() if order_id_raw else ""
         order_uuid = _try_uuid(order_id_raw) or _try_uuid(candidate)
 
-        query = (
-            select(Order)
-            .options(
-                selectinload(Order.user),
-                selectinload(Order.items).selectinload(OrderItem.product),
-                selectinload(Order.events),
-                selectinload(Order.shipping_address),
-                selectinload(Order.billing_address),
-            )
+        query = select(Order).options(
+            selectinload(Order.user),
+            selectinload(Order.items).selectinload(OrderItem.product),
+            selectinload(Order.events),
+            selectinload(Order.shipping_address),
+            selectinload(Order.billing_address),
         )
         if order_uuid:
             query = query.where(Order.id == order_uuid)
@@ -376,7 +445,10 @@ async def netopia_webhook(
         # Status codes based on Netopia IPN docs / official examples.
         paid_statuses = {3, 5}  # STATUS_PAID / STATUS_CONFIRMED
         if payment_status in paid_statuses:
-            already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+            already_captured = any(
+                getattr(evt, "event", None) == "payment_captured"
+                for evt in (order.events or [])
+            )
             if not already_captured and order.status in {
                 OrderStatus.pending_payment,
                 OrderStatus.pending_acceptance,
@@ -395,29 +467,41 @@ async def netopia_webhook(
                             note="pending_payment -> pending_acceptance",
                         )
                     )
-                session.add(OrderEvent(order_id=order.id, event="payment_captured", note=note))
+                session.add(
+                    OrderEvent(order_id=order.id, event="payment_captured", note=note)
+                )
                 await promo_usage.record_promo_usage(session, order=order, note=note)
                 session.add(order)
                 await session.commit()
                 await session.refresh(order)
-                await coupons_service.redeem_coupon_for_order(session, order=order, note=note)
+                await coupons_service.redeem_coupon_for_order(
+                    session, order=order, note=note
+                )
 
                 if order.user and order.user.id:
                     await notification_service.create_notification(
                         session,
                         user_id=order.user.id,
                         type="order",
-                        title="Payment received"
-                        if (order.user.preferred_language or "en") != "ro"
-                        else "Plată confirmată",
-                        body=f"Reference {order.reference_code}" if order.reference_code else None,
+                        title=(
+                            "Payment received"
+                            if (order.user.preferred_language or "en") != "ro"
+                            else "Plată confirmată"
+                        ),
+                        body=(
+                            f"Reference {order.reference_code}"
+                            if order.reference_code
+                            else None
+                        ),
                         url=_account_orders_url(order),
                     )
 
-                checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-                customer_to = (order.user.email if order.user and order.user.email else None) or getattr(
-                    order, "customer_email", None
+                checkout_settings = (
+                    await checkout_settings_service.get_checkout_settings(session)
                 )
+                customer_to = (
+                    order.user.email if order.user and order.user.email else None
+                ) or getattr(order, "customer_email", None)
                 customer_lang = order.user.preferred_language if order.user else None
                 if customer_to:
                     background_tasks.add_task(
@@ -429,7 +513,9 @@ async def netopia_webhook(
                         receipt_share_days=checkout_settings.receipt_share_days,
                     )
                 owner = await auth_service.get_owner_user(session)
-                admin_to = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                admin_to = (
+                    owner.email if owner and owner.email else None
+                ) or settings.admin_alert_email
                 if admin_to:
                     background_tasks.add_task(
                         email_service.send_new_order_notification,
@@ -474,4 +560,10 @@ async def netopia_webhook(
         return _ack(1, payment_status, msg)
     except Exception:
         await session.rollback()
-        return _warn_and_ack(2, "INTERNAL_ERROR", "Internal processing error", "unhandled processing error", exc_info=True)
+        return _warn_and_ack(
+            2,
+            "INTERNAL_ERROR",
+            "Internal processing error",
+            "unhandled processing error",
+            exc_info=True,
+        )

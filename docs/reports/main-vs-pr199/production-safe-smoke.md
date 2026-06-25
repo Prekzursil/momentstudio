@@ -1,7 +1,7 @@
 # Production Safe Smoke (PR #199 Baseline Runtime)
 
-Date: 2026-02-16  
-Target: `https://momentstudio.ro`  
+Date: 2026-02-16
+Target: `https://momentstudio.ro`
 Access level: public + safe auth probes only (no destructive/admin mutations)
 
 ## Probe Summary
@@ -42,4 +42,3 @@ Access level: public + safe auth probes only (no destructive/admin mutations)
 
 Coverage gap recorded:
 - Authenticated session and checkout pre-payment stages were validated locally, but only anonymous-safe probes were run on production.
-

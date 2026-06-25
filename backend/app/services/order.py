@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from collections import defaultdict
 import logging
-from typing import Sequence
+from typing import Sequence, TypedDict
 from uuid import UUID
 import secrets
 import string
@@ -51,7 +51,9 @@ _ORDER_STOCK_RESTORE_EVENT = "stock_restored"
 
 async def _commit_stock_for_order(session: AsyncSession, order: Order) -> None:
     # Serialize stock adjustments per-order so concurrent status updates can't double-deduct inventory.
-    await session.execute(select(Order.id).where(Order.id == order.id).with_for_update())
+    await session.execute(
+        select(Order.id).where(Order.id == order.id).with_for_update()
+    )
 
     existing = (
         (
@@ -98,7 +100,9 @@ async def _commit_stock_for_order(session: AsyncSession, order: Order) -> None:
             for p in (
                 (
                     await session.execute(
-                        select(Product).where(Product.id.in_(product_ids)).with_for_update(of=Product)
+                        select(Product)
+                        .where(Product.id.in_(product_ids))
+                        .with_for_update(of=Product)
                     )
                 )
                 .scalars()
@@ -113,7 +117,9 @@ async def _commit_stock_for_order(session: AsyncSession, order: Order) -> None:
             for v in (
                 (
                     await session.execute(
-                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update(of=ProductVariant)
+                        select(ProductVariant)
+                        .where(ProductVariant.id.in_(variant_ids))
+                        .with_for_update(of=ProductVariant)
                     )
                 )
                 .scalars()
@@ -189,7 +195,9 @@ def _try_uuid(value: object) -> UUID | None:
 
 async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
     # Serialize stock adjustments per-order so concurrent cancellations can't double-restock inventory.
-    await session.execute(select(Order.id).where(Order.id == order.id).with_for_update())
+    await session.execute(
+        select(Order.id).where(Order.id == order.id).with_for_update()
+    )
 
     already_restored = (
         (
@@ -255,7 +263,9 @@ async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
             for p in (
                 (
                     await session.execute(
-                        select(Product).where(Product.id.in_(product_ids)).with_for_update(of=Product)
+                        select(Product)
+                        .where(Product.id.in_(product_ids))
+                        .with_for_update(of=Product)
                     )
                 )
                 .scalars()
@@ -270,7 +280,9 @@ async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
             for v in (
                 (
                     await session.execute(
-                        select(ProductVariant).where(ProductVariant.id.in_(variant_ids)).with_for_update(of=ProductVariant)
+                        select(ProductVariant)
+                        .where(ProductVariant.id.in_(variant_ids))
+                        .with_for_update(of=ProductVariant)
                     )
                 )
                 .scalars()
@@ -324,7 +336,10 @@ async def _restore_stock_for_order(session: AsyncSession, order: Order) -> None:
             order_id=order.id,
             event=_ORDER_STOCK_RESTORE_EVENT,
             note=None,
-            data={"lines": restored_lines, "committed_event_id": str(getattr(committed, "id", "") or "") or None},
+            data={
+                "lines": restored_lines,
+                "committed_event_id": str(getattr(committed, "id", "") or "") or None,
+            },
         )
     )
 
@@ -362,7 +377,9 @@ async def build_order_from_cart(
     invoice_vat_id: str | None = None,
 ) -> Order:
     if not cart.items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty"
+        )
 
     qty_by_key: dict[tuple[UUID, UUID | None], int] = defaultdict(int)
     product_ids: set[UUID] = set()
@@ -404,7 +421,10 @@ async def build_order_from_cart(
             or getattr(prod, "status", None) != ProductStatus.published
         ]
         if missing or unavailable:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="One or more cart items are unavailable")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more cart items are unavailable",
+            )
 
     variants_by_id: dict[UUID, ProductVariant] = {}
     if variant_ids:
@@ -423,7 +443,9 @@ async def build_order_from_cart(
         variants_by_id = {v.id: v for v in variant_rows}
         missing_variants = variant_ids - set(variants_by_id.keys())
         if missing_variants:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant"
+            )
 
     if qty_by_key:
         open_statuses = {OrderStatus.pending_payment, OrderStatus.pending_acceptance}
@@ -442,7 +464,9 @@ async def build_order_from_cart(
             )
             .select_from(OrderItem)
             .join(Order, Order.id == OrderItem.order_id)
-            .where(Order.status.in_(open_statuses), OrderItem.product_id.in_(product_ids))
+            .where(
+                Order.status.in_(open_statuses), OrderItem.product_id.in_(product_ids)
+            )
             .group_by(OrderItem.product_id, OrderItem.variant_id)
         )
         reserved_rows = (await session.execute(reserved_stmt)).all()
@@ -452,7 +476,7 @@ async def build_order_from_cart(
 
         for (product_id, variant_id), quantity in qty_by_key.items():
             product = products_by_id.get(product_id)
-            if not product:
+            if not product:  # pragma: no cover -- unreachable: product_ids and qty_by_key are built from the same cart-item loop, and the `missing` check above raises if any product is absent, so every qty_by_key product is present in products_by_id here
                 continue
             if bool(getattr(product, "allow_backorder", False)):
                 continue
@@ -461,13 +485,18 @@ async def build_order_from_cart(
             if variant_id:
                 variant = variants_by_id.get(variant_id)
                 if not variant or getattr(variant, "product_id", None) != product_id:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid variant")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid variant",
+                    )
                 stock_qty = int(getattr(variant, "stock_quantity", 0) or 0)
             else:
                 stock_qty = int(getattr(product, "stock_quantity", 0) or 0)
             available_qty = stock_qty - reserved_qty
             if quantity > available_qty:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient stock"
+                )
 
     subtotal = Decimal("0.00")
     items: list[OrderItem] = []
@@ -491,13 +520,19 @@ async def build_order_from_cart(
     computed_shipping = Decimal("0.00")
     computed_total = Decimal("0.00")
 
-    if tax_amount is not None and shipping_amount is not None and total_amount is not None:
+    if (
+        tax_amount is not None
+        and shipping_amount is not None
+        and total_amount is not None
+    ):
         computed_fee = Decimal(fee_amount or 0)
         computed_tax = Decimal(tax_amount)
         computed_shipping = Decimal(shipping_amount)
         computed_total = Decimal(total_amount)
     else:
-        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+        checkout_settings = await checkout_settings_service.get_checkout_settings(
+            session
+        )
         taxable = subtotal - discount_val
         if taxable < 0:
             taxable = Decimal("0.00")
@@ -529,7 +564,9 @@ async def build_order_from_cart(
 
     method = (payment_method or "").strip().lower()
     initial_status = (
-        OrderStatus.pending_payment if method in {"stripe", "paypal", "netopia"} else OrderStatus.pending_acceptance
+        OrderStatus.pending_payment
+        if method in {"stripe", "paypal", "netopia"}
+        else OrderStatus.pending_acceptance
     )
     promo_clean = (promo_code or "").strip().upper() or None
     if promo_clean and len(promo_clean) > 40:
@@ -587,7 +624,11 @@ async def build_order_from_cart(
         metrics.record_order_created()
     except Exception as exc:
         # metrics should never break order creation
-        logger.debug("order_created_metric_emit_failed", extra={"order_id": str(order.id)}, exc_info=exc)
+        logger.debug(
+            "order_created_metric_emit_failed",
+            extra={"order_id": str(order.id)},
+            exc_info=exc,
+        )
     hydrated = await get_order_by_id(session, order.id)
     return hydrated or order
 
@@ -630,7 +671,12 @@ async def search_orders_for_user(
         filters.append(Order.status == status)
     if cleaned_q:
         pattern = f"%{cleaned_q}%"
-        filters.append(or_(Order.reference_code.ilike(pattern), cast(Order.id, String).ilike(pattern)))
+        filters.append(
+            or_(
+                Order.reference_code.ilike(pattern),
+                cast(Order.id, String).ilike(pattern),
+            )
+        )
     if from_dt:
         filters.append(Order.created_at >= from_dt)
     if to_dt:
@@ -648,7 +694,9 @@ async def search_orders_for_user(
             .select_from(Order)
             .where(
                 Order.user_id == user_id,
-                Order.status.in_([OrderStatus.pending_payment, OrderStatus.pending_acceptance]),
+                Order.status.in_(
+                    [OrderStatus.pending_payment, OrderStatus.pending_acceptance]
+                ),
             ),
         )
     ).scalar_one()
@@ -672,7 +720,9 @@ async def search_orders_for_user(
     return list(orders), int(total_items), int(pending_count)
 
 
-async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Order | None:
+async def get_order(
+    session: AsyncSession, user_id: UUID, order_id: UUID
+) -> Order | None:
     result = await session.execute(
         select(Order)
         .where(Order.user_id == user_id, Order.id == order_id)
@@ -688,7 +738,11 @@ async def get_order(session: AsyncSession, user_id: UUID, order_id: UUID) -> Ord
     return result.scalar_one_or_none()
 
 
-async def list_orders(session: AsyncSession, status: OrderStatus | None = None, user_id: UUID | None = None) -> list[Order]:
+async def list_orders(
+    session: AsyncSession,
+    status: OrderStatus | None = None,
+    user_id: UUID | None = None,
+) -> list[Order]:
     query = (
         select(Order)
         .options(
@@ -725,7 +779,14 @@ async def admin_search_orders(
     to_dt=None,
     page: int = 1,
     limit: int = 20,
-) -> tuple[list[tuple[Order, str | None, str | None, str | None, datetime | None, bool, str | None]], int]:
+) -> tuple[
+    list[
+        tuple[
+            Order, str | None, str | None, str | None, datetime | None, bool, str | None
+        ]
+    ],
+    int,
+]:
     """Paginated order search for the admin UI.
 
     Returns rows of (Order, customer_email, customer_username, sla_kind, sla_started_at, fraud_flagged, fraud_severity) plus total_items.
@@ -747,9 +808,13 @@ async def admin_search_orders(
     accept_cutoff = now - timedelta(hours=accept_hours)
     ship_cutoff = now - timedelta(hours=ship_hours)
 
-    window_minutes = max(1, int(getattr(settings, "fraud_velocity_window_minutes", 60 * 24) or 60 * 24))
+    window_minutes = max(
+        1, int(getattr(settings, "fraud_velocity_window_minutes", 60 * 24) or 60 * 24)
+    )
     threshold = max(2, int(getattr(settings, "fraud_velocity_threshold", 3) or 3))
-    retry_threshold = max(1, int(getattr(settings, "fraud_payment_retry_threshold", 2) or 2))
+    retry_threshold = max(
+        1, int(getattr(settings, "fraud_payment_retry_threshold", 2) or 2)
+    )
     fraud_since = now - timedelta(minutes=window_minutes)
 
     entered_pending_acceptance_at = (
@@ -810,12 +875,18 @@ async def admin_search_orders(
     )
     email_count = func.coalesce(email_velocity_subq.c.email_count, 0)
     user_count = func.coalesce(user_velocity_subq.c.user_count, 0)
-    fraud_flagged_expr = or_(email_count > 1, user_count > 1, Order.payment_retry_count >= retry_threshold)
+    fraud_flagged_expr = or_(
+        email_count > 1, user_count > 1, Order.payment_retry_count >= retry_threshold
+    )
     fraud_flagged_col = fraud_flagged_expr.label("fraud_flagged")
     fraud_severity_col = case(
         (or_(email_count >= threshold, user_count >= threshold), literal("high")),
         (
-            or_(email_count > 1, user_count > 1, Order.payment_retry_count >= retry_threshold),
+            or_(
+                email_count > 1,
+                user_count > 1,
+                Order.payment_retry_count >= retry_threshold,
+            ),
             literal("medium"),
         ),
         (Order.payment_retry_count > 0, literal("low")),
@@ -827,14 +898,26 @@ async def admin_search_orders(
         filters.append(Order.user_id == user_id)
     if tag_clean:
         filters.append(
-            exists(select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == tag_clean))
+            exists(
+                select(OrderTag.id).where(
+                    OrderTag.order_id == Order.id, OrderTag.tag == tag_clean
+                )
+            )
         )
     if not include_test and tag_clean != "test":
         filters.append(
-            ~exists(select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == "test"))
+            ~exists(
+                select(OrderTag.id).where(
+                    OrderTag.order_id == Order.id, OrderTag.tag == "test"
+                )
+            )
         )
     if pending_any:
-        filters.append(Order.status.in_([OrderStatus.pending_payment, OrderStatus.pending_acceptance]))
+        filters.append(
+            Order.status.in_(
+                [OrderStatus.pending_payment, OrderStatus.pending_acceptance]
+            )
+        )
     elif statuses:
         filters.append(Order.status.in_(statuses))
     elif status:
@@ -849,16 +932,25 @@ async def admin_search_orders(
         elif sla_clean == "any_overdue":
             filters.append(
                 or_(
-                    and_(Order.status == OrderStatus.pending_acceptance, accept_started_at <= accept_cutoff),
-                    and_(Order.status == OrderStatus.paid, ship_started_at <= ship_cutoff),
+                    and_(
+                        Order.status == OrderStatus.pending_acceptance,
+                        accept_started_at <= accept_cutoff,
+                    ),
+                    and_(
+                        Order.status == OrderStatus.paid, ship_started_at <= ship_cutoff
+                    ),
                 )
             )
     if fraud_clean:
         fraud_approved = exists(
-            select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == "fraud_approved")
+            select(OrderTag.id).where(
+                OrderTag.order_id == Order.id, OrderTag.tag == "fraud_approved"
+            )
         )
         fraud_denied = exists(
-            select(OrderTag.id).where(OrderTag.order_id == Order.id, OrderTag.tag == "fraud_denied")
+            select(OrderTag.id).where(
+                OrderTag.order_id == Order.id, OrderTag.tag == "fraud_denied"
+            )
         )
         if fraud_clean == "queue":
             filters.append(fraud_flagged_expr)
@@ -889,8 +981,16 @@ async def admin_search_orders(
         select(func.count())
         .select_from(Order)
         .join(User, Order.user_id == User.id, isouter=True)
-        .join(email_velocity_subq, email_velocity_subq.c.email == func.lower(Order.customer_email), isouter=True)
-        .join(user_velocity_subq, user_velocity_subq.c.user_id == Order.user_id, isouter=True)
+        .join(
+            email_velocity_subq,
+            email_velocity_subq.c.email == func.lower(Order.customer_email),
+            isouter=True,
+        )
+        .join(
+            user_velocity_subq,
+            user_velocity_subq.c.user_id == Order.user_id,
+            isouter=True,
+        )
     )
     if filters:
         count_stmt = count_stmt.where(*filters)
@@ -907,8 +1007,16 @@ async def admin_search_orders(
             fraud_severity_col,
         )
         .join(User, Order.user_id == User.id, isouter=True)
-        .join(email_velocity_subq, email_velocity_subq.c.email == func.lower(Order.customer_email), isouter=True)
-        .join(user_velocity_subq, user_velocity_subq.c.user_id == Order.user_id, isouter=True)
+        .join(
+            email_velocity_subq,
+            email_velocity_subq.c.email == func.lower(Order.customer_email),
+            isouter=True,
+        )
+        .join(
+            user_velocity_subq,
+            user_velocity_subq.c.user_id == Order.user_id,
+            isouter=True,
+        )
         .order_by(Order.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -918,9 +1026,29 @@ async def admin_search_orders(
 
     result = await session.execute(stmt)
     raw_rows = result.all()
-    rows: list[tuple[Order, str | None, str | None, str | None, datetime | None, bool, str | None]] = [
-        (order, email, username, sla_kind, sla_started_at, bool(fraud_flagged), fraud_severity)
-        for (order, email, username, sla_kind, sla_started_at, fraud_flagged, fraud_severity) in raw_rows
+    rows: list[
+        tuple[
+            Order, str | None, str | None, str | None, datetime | None, bool, str | None
+        ]
+    ] = [
+        (
+            order,
+            email,
+            username,
+            sla_kind,
+            sla_started_at,
+            bool(fraud_flagged),
+            fraud_severity,
+        )
+        for (
+            order,
+            email,
+            username,
+            sla_kind,
+            sla_started_at,
+            fraud_flagged,
+            fraud_severity,
+        ) in raw_rows
     ]
     return rows, total_items
 
@@ -962,7 +1090,9 @@ async def compute_fraud_signals(session: AsyncSession, order: Order) -> list[dic
     signals: list[dict] = []
 
     now = datetime.now(timezone.utc)
-    window_minutes = max(1, int(getattr(settings, "fraud_velocity_window_minutes", 60 * 24) or 60 * 24))
+    window_minutes = max(
+        1, int(getattr(settings, "fraud_velocity_window_minutes", 60 * 24) or 60 * 24)
+    )
     threshold = max(2, int(getattr(settings, "fraud_velocity_threshold", 3) or 3))
     since = now - timedelta(minutes=window_minutes)
 
@@ -973,7 +1103,10 @@ async def compute_fraud_signals(session: AsyncSession, order: Order) -> list[dic
                 await session.execute(
                     select(func.count())
                     .select_from(Order)
-                    .where(func.lower(Order.customer_email) == email, Order.created_at >= since)
+                    .where(
+                        func.lower(Order.customer_email) == email,
+                        Order.created_at >= since,
+                    )
                 )
             ).scalar_one()
             or 0
@@ -992,7 +1125,9 @@ async def compute_fraud_signals(session: AsyncSession, order: Order) -> list[dic
         user_count = int(
             (
                 await session.execute(
-                    select(func.count()).select_from(Order).where(Order.user_id == user_id, Order.created_at >= since)
+                    select(func.count())
+                    .select_from(Order)
+                    .where(Order.user_id == user_id, Order.created_at >= since)
                 )
             ).scalar_one()
             or 0
@@ -1006,18 +1141,31 @@ async def compute_fraud_signals(session: AsyncSession, order: Order) -> list[dic
                 }
             )
 
-    shipping_country = (getattr(getattr(order, "shipping_address", None), "country", None) or "").strip().upper()
-    billing_country = (getattr(getattr(order, "billing_address", None), "country", None) or "").strip().upper()
+    shipping_country = (
+        (getattr(getattr(order, "shipping_address", None), "country", None) or "")
+        .strip()
+        .upper()
+    )
+    billing_country = (
+        (getattr(getattr(order, "billing_address", None), "country", None) or "")
+        .strip()
+        .upper()
+    )
     if shipping_country and billing_country and shipping_country != billing_country:
         signals.append(
             {
                 "code": "country_mismatch",
                 "severity": "low",
-                "data": {"shipping_country": shipping_country, "billing_country": billing_country},
+                "data": {
+                    "shipping_country": shipping_country,
+                    "billing_country": billing_country,
+                },
             }
         )
 
-    retry_threshold = max(1, int(getattr(settings, "fraud_payment_retry_threshold", 2) or 2))
+    retry_threshold = max(
+        1, int(getattr(settings, "fraud_payment_retry_threshold", 2) or 2)
+    )
     retries = int(getattr(order, "payment_retry_count", 0) or 0)
     if retries > 0:
         signals.append(
@@ -1032,9 +1180,16 @@ async def compute_fraud_signals(session: AsyncSession, order: Order) -> list[dic
 
 
 ALLOWED_TRANSITIONS = {
-    OrderStatus.pending_payment: {OrderStatus.pending_acceptance, OrderStatus.cancelled},
+    OrderStatus.pending_payment: {
+        OrderStatus.pending_acceptance,
+        OrderStatus.cancelled,
+    },
     OrderStatus.pending_acceptance: {OrderStatus.paid, OrderStatus.cancelled},
-    OrderStatus.paid: {OrderStatus.shipped, OrderStatus.refunded, OrderStatus.cancelled},
+    OrderStatus.paid: {
+        OrderStatus.shipped,
+        OrderStatus.refunded,
+        OrderStatus.cancelled,
+    },
     OrderStatus.shipped: {OrderStatus.delivered, OrderStatus.refunded},
     OrderStatus.delivered: {OrderStatus.refunded},
     OrderStatus.cancelled: set(),
@@ -1049,7 +1204,10 @@ def _has_payment_captured(order: Order) -> bool:
     if method == "paypal":
         return bool((getattr(order, "paypal_capture_id", None) or "").strip())
     if method == "stripe":
-        return any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+        return any(
+            getattr(evt, "event", None) == "payment_captured"
+            for evt in (order.events or [])
+        )
     return False
 
 
@@ -1068,14 +1226,21 @@ def _address_snapshot(addr: Address | None) -> dict[str, object] | None:
     }
 
 
-async def _ensure_order_address_snapshot(session: AsyncSession, order: Order, kind: str) -> Address:
+async def _ensure_order_address_snapshot(
+    session: AsyncSession, order: Order, kind: str
+) -> Address:
     if kind not in {"shipping", "billing"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid address kind")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid address kind"
+        )
     attr_name = f"{kind}_address"
     id_attr = f"{kind}_address_id"
     existing = getattr(order, attr_name, None)
     if not existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Order has no {kind} address")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Order has no {kind} address",
+        )
     if getattr(existing, "user_id", None) is None:
         return existing
 
@@ -1102,16 +1267,33 @@ async def _ensure_order_address_snapshot(session: AsyncSession, order: Order, ki
 
 
 def _apply_address_update(addr: Address, updates: dict) -> None:
-    forbidden = {"is_default_shipping", "is_default_billing", "user_id", "id", "created_at", "updated_at"}
+    forbidden = {
+        "is_default_shipping",
+        "is_default_billing",
+        "user_id",
+        "id",
+        "created_at",
+        "updated_at",
+    }
     cleaned = {k: v for k, v in (updates or {}).items() if k not in forbidden}
 
     for field in ("line1", "city", "postal_code", "country"):
-        if field in cleaned and (cleaned[field] is None or not str(cleaned[field]).strip()):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required")
+        if field in cleaned and (
+            cleaned[field] is None or not str(cleaned[field]).strip()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=f"{field} is required"
+            )
 
-    target_country = str(cleaned.get("country", getattr(addr, "country", "")) or "").strip()
-    target_postal = str(cleaned.get("postal_code", getattr(addr, "postal_code", "")) or "").strip()
-    country, postal_code = address_service._validate_address_fields(target_country, target_postal)
+    target_country = str(
+        cleaned.get("country", getattr(addr, "country", "")) or ""
+    ).strip()
+    target_postal = str(
+        cleaned.get("postal_code", getattr(addr, "postal_code", "")) or ""
+    ).strip()
+    country, postal_code = address_service._validate_address_fields(
+        target_country, target_postal
+    )
     cleaned["country"] = country
     cleaned["postal_code"] = postal_code
 
@@ -1123,10 +1305,16 @@ def _apply_address_update(addr: Address, updates: dict) -> None:
     addr.is_default_billing = False
 
 
-async def _rerate_order_shipping(session: AsyncSession, order: Order) -> dict[str, dict[str, str]]:
-    previous_shipping = pricing.quantize_money(Decimal(getattr(order, "shipping_amount", 0) or 0))
+async def _rerate_order_shipping(
+    session: AsyncSession, order: Order
+) -> dict[str, dict[str, str]]:
+    previous_shipping = pricing.quantize_money(
+        Decimal(getattr(order, "shipping_amount", 0) or 0)
+    )
     previous_tax = pricing.quantize_money(Decimal(getattr(order, "tax_amount", 0) or 0))
-    previous_total = pricing.quantize_money(Decimal(getattr(order, "total_amount", 0) or 0))
+    previous_total = pricing.quantize_money(
+        Decimal(getattr(order, "total_amount", 0) or 0)
+    )
 
     taxable_subtotal = (
         Decimal(order.total_amount)
@@ -1137,23 +1325,45 @@ async def _rerate_order_shipping(session: AsyncSession, order: Order) -> dict[st
     if taxable_subtotal < 0:
         taxable_subtotal = Decimal("0.00")
     checkout_settings = await checkout_settings_service.get_checkout_settings(session)
-    taxable_subtotal = pricing.quantize_money(taxable_subtotal, rounding=checkout_settings.money_rounding)
+    taxable_subtotal = pricing.quantize_money(
+        taxable_subtotal, rounding=checkout_settings.money_rounding
+    )
     shipping_amount = Decimal(checkout_settings.shipping_fee_ron)
     threshold = checkout_settings.free_shipping_threshold_ron
     if threshold is not None and threshold >= 0 and taxable_subtotal >= threshold:
         shipping_amount = Decimal("0.00")
-    shipping_amount = pricing.quantize_money(shipping_amount, rounding=checkout_settings.money_rounding)
+    shipping_amount = pricing.quantize_money(
+        shipping_amount, rounding=checkout_settings.money_rounding
+    )
 
-    fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0), rounding=checkout_settings.money_rounding)
-    subtotal_items = sum((Decimal(getattr(item, "subtotal", 0) or 0) for item in getattr(order, "items", []) or []), start=Decimal("0.00"))
-    subtotal_items = pricing.quantize_money(subtotal_items, rounding=checkout_settings.money_rounding)
+    fee_amount = pricing.quantize_money(
+        Decimal(getattr(order, "fee_amount", 0) or 0),
+        rounding=checkout_settings.money_rounding,
+    )
+    subtotal_items = sum(
+        (
+            Decimal(getattr(item, "subtotal", 0) or 0)
+            for item in getattr(order, "items", []) or []
+        ),
+        start=Decimal("0.00"),
+    )
+    subtotal_items = pricing.quantize_money(
+        subtotal_items, rounding=checkout_settings.money_rounding
+    )
     discount_val = subtotal_items - taxable_subtotal
     if discount_val < 0:
         discount_val = Decimal("0.00")
-    discount_val = pricing.quantize_money(discount_val, rounding=checkout_settings.money_rounding)
+    discount_val = pricing.quantize_money(
+        discount_val, rounding=checkout_settings.money_rounding
+    )
     country_code = getattr(getattr(order, "shipping_address", None), "country", None)
     lines: list[TaxableProductLine] = [
-        TaxableProductLine(product_id=item.product_id, subtotal=pricing.quantize_money(Decimal(item.subtotal), rounding=checkout_settings.money_rounding))
+        TaxableProductLine(
+            product_id=item.product_id,
+            subtotal=pricing.quantize_money(
+                Decimal(item.subtotal), rounding=checkout_settings.money_rounding
+            ),
+        )
         for item in getattr(order, "items", []) or []
         if getattr(item, "product_id", None)
     ]
@@ -1170,31 +1380,42 @@ async def _rerate_order_shipping(session: AsyncSession, order: Order) -> dict[st
     order.shipping_amount = shipping_amount
     order.tax_amount = vat_amount
     order.total_amount = pricing.quantize_money(
-        taxable_subtotal + fee_amount + shipping_amount + vat_amount, rounding=checkout_settings.money_rounding
+        taxable_subtotal + fee_amount + shipping_amount + vat_amount,
+        rounding=checkout_settings.money_rounding,
     )
 
     return {
-        "shipping_amount": {"from": str(previous_shipping), "to": str(order.shipping_amount)},
+        "shipping_amount": {
+            "from": str(previous_shipping),
+            "to": str(order.shipping_amount),
+        },
         "tax_amount": {"from": str(previous_tax), "to": str(order.tax_amount)},
         "total_amount": {"from": str(previous_total), "to": str(order.total_amount)},
     }
 
 
 async def update_order(
-    session: AsyncSession, order: Order, payload: OrderUpdate, shipping_method: ShippingMethod | None = None
+    session: AsyncSession,
+    order: Order,
+    payload: OrderUpdate,
+    shipping_method: ShippingMethod | None = None,
 ) -> Order:
     data = payload.model_dump(exclude_unset=True)
     explicit_status = bool(data.get("status"))
     previous_tracking_number = getattr(order, "tracking_number", None)
     previous_tracking_url = getattr(order, "tracking_url", None)
     previous_courier = getattr(order, "courier", None)
-    previous_shipping_method_name = getattr(getattr(order, "shipping_method", None), "name", None)
+    previous_shipping_method_name = getattr(
+        getattr(order, "shipping_method", None), "name", None
+    )
     cancel_reason = data.pop("cancel_reason", None)
     cancel_reason_clean: str | None
     if cancel_reason is None:
         cancel_reason_clean = None
     else:
-        cancel_reason_clean = (str(cancel_reason) if cancel_reason is not None else "").strip()
+        cancel_reason_clean = (
+            str(cancel_reason) if cancel_reason is not None else ""
+        ).strip()
         if cancel_reason_clean:
             cancel_reason_clean = cancel_reason_clean[:2000]
     if "status" in data and data["status"]:
@@ -1217,16 +1438,26 @@ async def update_order(
             OrderStatus.paid,
         }:
             if cancel_reason_clean is None or not cancel_reason_clean:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cancel reason is required",
+                )
         allowed = set(ALLOWED_TRANSITIONS.get(current_status, set()))
         # COD orders start in "pending_acceptance" and should be shippable without a payment capture step.
         if payment_method == "cod" and current_status == OrderStatus.pending_acceptance:
             allowed.update({OrderStatus.shipped, OrderStatus.delivered})
         if next_status not in allowed:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status transition")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid status transition",
+            )
         order.status = next_status
         data.pop("status")
-        if next_status in {OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered}:
+        if next_status in {
+            OrderStatus.paid,
+            OrderStatus.shipped,
+            OrderStatus.delivered,
+        }:
             await _commit_stock_for_order(session, order)
         elif next_status == OrderStatus.cancelled:
             await _restore_stock_for_order(session, order)
@@ -1235,14 +1466,24 @@ async def update_order(
             order.id,
             "status_change",
             f"{current_status.value} -> {next_status.value}",
-            data={"changes": {"status": {"from": current_status.value, "to": next_status.value}}},
+            data={
+                "changes": {
+                    "status": {"from": current_status.value, "to": next_status.value}
+                }
+            },
         )
 
     if cancel_reason_clean is not None:
         if not cancel_reason_clean:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason is required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cancel reason is required",
+            )
         if order.status != OrderStatus.cancelled:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cancel reason can only be set for cancelled orders")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cancel reason can only be set for cancelled orders",
+            )
         previous_reason = (getattr(order, "cancel_reason", None) or "").strip()
         if previous_reason != cancel_reason_clean:
             order.cancel_reason = cancel_reason_clean
@@ -1264,7 +1505,11 @@ async def update_order(
             )
 
     if any(field in data for field in ("tracking_number", "tracking_url", "courier")):
-        target_courier = data.get("courier") if "courier" in data else getattr(order, "courier", None)
+        target_courier = (
+            data.get("courier")
+            if "courier" in data
+            else getattr(order, "courier", None)
+        )
         if "tracking_number" in data:
             data["tracking_number"] = tracking_service.validate_tracking_number(
                 courier=target_courier, tracking_number=data.get("tracking_number")
@@ -1272,9 +1517,13 @@ async def update_order(
         elif "courier" in data:
             existing_tracking = getattr(order, "tracking_number", None)
             if (existing_tracking or "").strip():
-                tracking_service.validate_tracking_number(courier=target_courier, tracking_number=existing_tracking)
+                tracking_service.validate_tracking_number(
+                    courier=target_courier, tracking_number=existing_tracking
+                )
         if "tracking_url" in data:
-            data["tracking_url"] = tracking_service.validate_tracking_url(tracking_url=data.get("tracking_url"))
+            data["tracking_url"] = tracking_service.validate_tracking_url(
+                tracking_url=data.get("tracking_url")
+            )
 
     if shipping_method:
         order.shipping_method_id = shipping_method.id
@@ -1295,7 +1544,9 @@ async def update_order(
                 )
             )
         await session.refresh(order, attribute_names=["items", "shipping_address"])
-        checkout_settings = await checkout_settings_service.get_checkout_settings(session)
+        checkout_settings = await checkout_settings_service.get_checkout_settings(
+            session
+        )
         taxable_subtotal = (
             Decimal(order.total_amount)
             - Decimal(order.shipping_amount)
@@ -1304,23 +1555,47 @@ async def update_order(
         )
         if taxable_subtotal < 0:
             taxable_subtotal = Decimal("0.00")
-        taxable_subtotal = pricing.quantize_money(taxable_subtotal, rounding=checkout_settings.money_rounding)
+        taxable_subtotal = pricing.quantize_money(
+            taxable_subtotal, rounding=checkout_settings.money_rounding
+        )
         shipping_amount = Decimal(checkout_settings.shipping_fee_ron)
         threshold = checkout_settings.free_shipping_threshold_ron
         if threshold is not None and threshold >= 0 and taxable_subtotal >= threshold:
             shipping_amount = Decimal("0.00")
-        shipping_amount = pricing.quantize_money(shipping_amount, rounding=checkout_settings.money_rounding)
+        shipping_amount = pricing.quantize_money(
+            shipping_amount, rounding=checkout_settings.money_rounding
+        )
 
-        fee_amount = pricing.quantize_money(Decimal(getattr(order, "fee_amount", 0) or 0), rounding=checkout_settings.money_rounding)
-        subtotal_items = sum((Decimal(getattr(item, "subtotal", 0) or 0) for item in getattr(order, "items", []) or []), start=Decimal("0.00"))
-        subtotal_items = pricing.quantize_money(subtotal_items, rounding=checkout_settings.money_rounding)
+        fee_amount = pricing.quantize_money(
+            Decimal(getattr(order, "fee_amount", 0) or 0),
+            rounding=checkout_settings.money_rounding,
+        )
+        subtotal_items = sum(
+            (
+                Decimal(getattr(item, "subtotal", 0) or 0)
+                for item in getattr(order, "items", []) or []
+            ),
+            start=Decimal("0.00"),
+        )
+        subtotal_items = pricing.quantize_money(
+            subtotal_items, rounding=checkout_settings.money_rounding
+        )
         discount_val = subtotal_items - taxable_subtotal
         if discount_val < 0:
             discount_val = Decimal("0.00")
-        discount_val = pricing.quantize_money(discount_val, rounding=checkout_settings.money_rounding)
-        country_code = getattr(getattr(order, "shipping_address", None), "country", None)
+        discount_val = pricing.quantize_money(
+            discount_val, rounding=checkout_settings.money_rounding
+        )
+        country_code = getattr(
+            getattr(order, "shipping_address", None), "country", None
+        )
         lines: list[TaxableProductLine] = [
-            TaxableProductLine(product_id=item.product_id, subtotal=pricing.quantize_money(Decimal(item.subtotal), rounding=checkout_settings.money_rounding))
+            TaxableProductLine(
+                product_id=item.product_id,
+                subtotal=pricing.quantize_money(
+                    Decimal(item.subtotal), rounding=checkout_settings.money_rounding
+                ),
+            )
             for item in getattr(order, "items", []) or []
             if getattr(item, "product_id", None)
         ]
@@ -1337,17 +1612,30 @@ async def update_order(
         order.shipping_amount = shipping_amount
         order.tax_amount = vat_amount
         order.total_amount = pricing.quantize_money(
-            taxable_subtotal + fee_amount + shipping_amount + vat_amount, rounding=checkout_settings.money_rounding
+            taxable_subtotal + fee_amount + shipping_amount + vat_amount,
+            rounding=checkout_settings.money_rounding,
         )
 
     for field, value in data.items():
         setattr(order, field, value)
 
     tracking_changes: dict[str, dict[str, object]] = {}
-    if "tracking_number" in data and getattr(order, "tracking_number", None) != previous_tracking_number:
-        tracking_changes["tracking_number"] = {"from": previous_tracking_number, "to": getattr(order, "tracking_number", None)}
-    if "tracking_url" in data and getattr(order, "tracking_url", None) != previous_tracking_url:
-        tracking_changes["tracking_url"] = {"from": previous_tracking_url, "to": getattr(order, "tracking_url", None)}
+    if (
+        "tracking_number" in data
+        and getattr(order, "tracking_number", None) != previous_tracking_number
+    ):
+        tracking_changes["tracking_number"] = {
+            "from": previous_tracking_number,
+            "to": getattr(order, "tracking_number", None),
+        }
+    if (
+        "tracking_url" in data
+        and getattr(order, "tracking_url", None) != previous_tracking_url
+    ):
+        tracking_changes["tracking_url"] = {
+            "from": previous_tracking_url,
+            "to": getattr(order, "tracking_url", None),
+        }
     if tracking_changes:
         session.add(
             OrderEvent(
@@ -1376,13 +1664,12 @@ async def update_order(
         )
 
     tracking_in_payload = any(
-        (str(data.get(key) or "").strip() for key in ("tracking_number", "tracking_url"))
+        (
+            str(data.get(key) or "").strip()
+            for key in ("tracking_number", "tracking_url")
+        )
     )
-    if (
-        not explicit_status
-        and tracking_in_payload
-        and order.status == OrderStatus.paid
-    ):
+    if not explicit_status and tracking_in_payload and order.status == OrderStatus.paid:
         previous = OrderStatus(order.status)
         order.status = OrderStatus.shipped
         await _commit_stock_for_order(session, order)
@@ -1391,7 +1678,11 @@ async def update_order(
             order.id,
             "status_auto_ship",
             f"{previous.value} -> {OrderStatus.shipped.value}",
-            data={"changes": {"status": {"from": previous.value, "to": OrderStatus.shipped.value}}},
+            data={
+                "changes": {
+                    "status": {"from": previous.value, "to": OrderStatus.shipped.value}
+                }
+            },
         )
     session.add(order)
     await session.commit()
@@ -1407,17 +1698,38 @@ async def update_order_addresses(
     actor: str | None = None,
     actor_user_id: UUID | None = None,
 ) -> Order:
-    if order.status in {OrderStatus.shipped, OrderStatus.delivered, OrderStatus.cancelled, OrderStatus.refunded}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order addresses cannot be edited in this status")
+    if order.status in {
+        OrderStatus.shipped,
+        OrderStatus.delivered,
+        OrderStatus.cancelled,
+        OrderStatus.refunded,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order addresses cannot be edited in this status",
+        )
 
-    await session.refresh(order, attribute_names=["shipping_address", "billing_address", "items"])
+    await session.refresh(
+        order, attribute_names=["shipping_address", "billing_address", "items"]
+    )
 
     changes: dict[str, object] = {}
-    shipping_updates = payload.shipping_address.model_dump(exclude_unset=True) if payload.shipping_address else {}
-    billing_updates = payload.billing_address.model_dump(exclude_unset=True) if payload.billing_address else {}
+    shipping_updates = (
+        payload.shipping_address.model_dump(exclude_unset=True)
+        if payload.shipping_address
+        else {}
+    )
+    billing_updates = (
+        payload.billing_address.model_dump(exclude_unset=True)
+        if payload.billing_address
+        else {}
+    )
 
     if not shipping_updates and not billing_updates:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No address updates provided")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No address updates provided",
+        )
 
     if shipping_updates:
         previous = _address_snapshot(getattr(order, "shipping_address", None))
@@ -1435,14 +1747,31 @@ async def update_order_addresses(
 
     if payload.rerate_shipping and shipping_updates:
         if _has_payment_captured(order):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot re-rate shipping after payment capture")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot re-rate shipping after payment capture",
+            )
         amount_changes = await _rerate_order_shipping(session, order)
         changes.update(amount_changes)
 
     note_clean = (payload.note or "").strip() or None
     actor_clean = (actor or "").strip() or None
-    note = f"{actor_clean}: {note_clean}" if actor_clean and note_clean else (actor_clean or note_clean)
-    session.add(OrderEvent(order_id=order.id, event="addresses_updated", note=note, data={"changes": changes, "actor_user_id": str(actor_user_id) if actor_user_id else None}))
+    note = (
+        f"{actor_clean}: {note_clean}"
+        if actor_clean and note_clean
+        else (actor_clean or note_clean)
+    )
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="addresses_updated",
+            note=note,
+            data={
+                "changes": changes,
+                "actor_user_id": str(actor_user_id) if actor_user_id else None,
+            },
+        )
+    )
 
     session.add(order)
     await session.commit()
@@ -1451,13 +1780,19 @@ async def update_order_addresses(
     return hydrated or order
 
 
-async def add_admin_note(session: AsyncSession, order: Order, *, note: str, actor_user_id: UUID | None = None) -> Order:
+async def add_admin_note(
+    session: AsyncSession, order: Order, *, note: str, actor_user_id: UUID | None = None
+) -> Order:
     note_clean = (note or "").strip()
     if not note_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Note is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Note is required"
+        )
     note_clean = note_clean[:5000]
 
-    session.add(OrderAdminNote(order_id=order.id, actor_user_id=actor_user_id, note=note_clean))
+    session.add(
+        OrderAdminNote(order_id=order.id, actor_user_id=actor_user_id, note=note_clean)
+    )
     await session.commit()
 
     hydrated = await get_order_by_id_admin(session, order.id)
@@ -1465,7 +1800,9 @@ async def add_admin_note(session: AsyncSession, order: Order, *, note: str, acto
 
 
 async def list_order_tags(session: AsyncSession) -> list[str]:
-    result = await session.execute(select(OrderTag.tag).distinct().order_by(OrderTag.tag))
+    result = await session.execute(
+        select(OrderTag.tag).distinct().order_by(OrderTag.tag)
+    )
     return [row[0] for row in result.all() if row and row[0]]
 
 
@@ -1483,6 +1820,14 @@ async def list_order_tag_stats(session: AsyncSession) -> list[tuple[str, int]]:
     return rows
 
 
+class _OrderTagRenameResult(TypedDict):
+    from_tag: str
+    to_tag: str
+    updated: int
+    merged: int
+    total: int
+
+
 async def rename_order_tag(
     session: AsyncSession,
     *,
@@ -1490,21 +1835,35 @@ async def rename_order_tag(
     to_tag: str,
     actor_user_id: UUID | None = None,
     max_affected_orders: int = 5000,
-) -> dict[str, object]:
+) -> "_OrderTagRenameResult":
     from_clean = _normalize_order_tag(from_tag)
     to_clean = _normalize_order_tag(to_tag)
     if not from_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="from_tag is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="from_tag is required"
+        )
     if not to_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="to_tag is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="to_tag is required"
+        )
     if from_clean == to_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tags must be different")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Tags must be different"
+        )
 
-    rows = (await session.execute(select(OrderTag).where(OrderTag.tag == from_clean))).scalars().all()
+    rows = (
+        (await session.execute(select(OrderTag).where(OrderTag.tag == from_clean)))
+        .scalars()
+        .all()
+    )
     if not rows:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tag not found"
+        )
 
-    affected_order_ids = {row.order_id for row in rows if getattr(row, "order_id", None)}
+    affected_order_ids = {
+        row.order_id for row in rows if getattr(row, "order_id", None)
+    }
     if len(affected_order_ids) > max_affected_orders:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1513,7 +1872,9 @@ async def rename_order_tag(
 
     existing_targets = (
         await session.execute(
-            select(OrderTag.order_id).where(OrderTag.order_id.in_(affected_order_ids), OrderTag.tag == to_clean)
+            select(OrderTag.order_id).where(
+                OrderTag.order_id.in_(affected_order_ids), OrderTag.tag == to_clean
+            )
         )
     ).all()
     orders_with_target = {row[0] for row in existing_targets if row and row[0]}
@@ -1545,43 +1906,79 @@ async def rename_order_tag(
 
     await session.commit()
     total = updated + merged
-    return {"from_tag": from_clean, "to_tag": to_clean, "updated": updated, "merged": merged, "total": total}
+    return {
+        "from_tag": from_clean,
+        "to_tag": to_clean,
+        "updated": updated,
+        "merged": merged,
+        "total": total,
+    }
 
 
-async def add_order_tag(session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None) -> Order:
+async def add_order_tag(
+    session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None
+) -> Order:
     tag_clean = _normalize_order_tag(tag)
     if not tag_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tag is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Tag is required"
+        )
 
     existing = (
-        await session.execute(select(OrderTag).where(OrderTag.order_id == order.id, OrderTag.tag == tag_clean))
+        await session.execute(
+            select(OrderTag).where(
+                OrderTag.order_id == order.id, OrderTag.tag == tag_clean
+            )
+        )
     ).scalar_one_or_none()
     if existing:
         hydrated = await get_order_by_id_admin(session, order.id)
         return hydrated or order
 
     session.add(OrderTag(order_id=order.id, actor_user_id=actor_user_id, tag=tag_clean))
-    session.add(OrderEvent(order_id=order.id, event="tag_added", note=tag_clean, data={"tag": tag_clean}))
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="tag_added",
+            note=tag_clean,
+            data={"tag": tag_clean},
+        )
+    )
     await session.commit()
 
     hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
 
 
-async def remove_order_tag(session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None) -> Order:
+async def remove_order_tag(
+    session: AsyncSession, order: Order, *, tag: str, actor_user_id: UUID | None = None
+) -> Order:
     tag_clean = _normalize_order_tag(tag)
     if not tag_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tag is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Tag is required"
+        )
 
     existing = (
-        await session.execute(select(OrderTag).where(OrderTag.order_id == order.id, OrderTag.tag == tag_clean))
+        await session.execute(
+            select(OrderTag).where(
+                OrderTag.order_id == order.id, OrderTag.tag == tag_clean
+            )
+        )
     ).scalar_one_or_none()
     if not existing:
         hydrated = await get_order_by_id_admin(session, order.id)
         return hydrated or order
 
     await session.delete(existing)
-    session.add(OrderEvent(order_id=order.id, event="tag_removed", note=tag_clean, data={"tag": tag_clean}))
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="tag_removed",
+            note=tag_clean,
+            data={"tag": tag_clean},
+        )
+    )
     await session.commit()
 
     hydrated = await get_order_by_id_admin(session, order.id)
@@ -1598,7 +1995,10 @@ async def review_order_fraud(
 ) -> Order:
     decision_clean = (decision or "").strip().lower()
     if decision_clean not in {"approve", "deny"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid fraud review decision")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid fraud review decision",
+        )
 
     target_tag = "fraud_approved" if decision_clean == "approve" else "fraud_denied"
     remove_tag = "fraud_denied" if decision_clean == "approve" else "fraud_approved"
@@ -1608,10 +2008,17 @@ async def review_order_fraud(
         note_clean = note_clean[:500]
 
     tags = (
-        await session.execute(
-            select(OrderTag).where(OrderTag.order_id == order.id, OrderTag.tag.in_([target_tag, remove_tag]))
+        (
+            await session.execute(
+                select(OrderTag).where(
+                    OrderTag.order_id == order.id,
+                    OrderTag.tag.in_([target_tag, remove_tag]),
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     by_tag = {row.tag: row for row in tags if row and row.tag}
 
     removed = by_tag.get(remove_tag)
@@ -1619,7 +2026,9 @@ async def review_order_fraud(
         await session.delete(removed)
 
     if target_tag not in by_tag:
-        session.add(OrderTag(order_id=order.id, actor_user_id=actor_user_id, tag=target_tag))
+        session.add(
+            OrderTag(order_id=order.id, actor_user_id=actor_user_id, tag=target_tag)
+        )
 
     audit_note = f"{decision_clean}: {note_clean}" if note_clean else decision_clean
     session.add(
@@ -1634,8 +2043,14 @@ async def review_order_fraud(
             },
         )
     )
-    admin_note = f"Fraud review: {decision_clean}" + (f" - {note_clean}" if note_clean else "")
-    session.add(OrderAdminNote(order_id=order.id, actor_user_id=actor_user_id, note=admin_note[:5000]))
+    admin_note = f"Fraud review: {decision_clean}" + (
+        f" - {note_clean}" if note_clean else ""
+    )
+    session.add(
+        OrderAdminNote(
+            order_id=order.id, actor_user_id=actor_user_id, note=admin_note[:5000]
+        )
+    )
 
     await session.commit()
     hydrated = await get_order_by_id_admin(session, order.id)
@@ -1652,13 +2067,21 @@ async def create_order_shipment(
 ) -> Order:
     tracking_number = (payload.tracking_number or "").strip()
     if not tracking_number:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tracking number is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tracking number is required",
+        )
 
     courier = (payload.courier or "").strip() or None
     tracking_url = (payload.tracking_url or "").strip() or None
-    tracking_number_validated = tracking_service.validate_tracking_number(courier=courier, tracking_number=tracking_number)
+    tracking_number_validated = tracking_service.validate_tracking_number(
+        courier=courier, tracking_number=tracking_number
+    )
     if not tracking_number_validated:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tracking number is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tracking number is required",
+        )
     tracking_number = tracking_number_validated
     tracking_url = tracking_service.validate_tracking_url(tracking_url=tracking_url)
 
@@ -1666,7 +2089,8 @@ async def create_order_shipment(
         (
             await session.execute(
                 select(OrderShipment.id).where(
-                    OrderShipment.order_id == order.id, OrderShipment.tracking_number == tracking_number
+                    OrderShipment.order_id == order.id,
+                    OrderShipment.tracking_number == tracking_number,
                 )
             )
         )
@@ -1674,7 +2098,9 @@ async def create_order_shipment(
         .first()
     )
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists"
+        )
 
     shipment = OrderShipment(
         order_id=order.id,
@@ -1700,7 +2126,13 @@ async def create_order_shipment(
             order_id=order.id,
             event="shipment_added",
             note=note,
-            data={"shipment": {"tracking_number": tracking_number, "tracking_url": tracking_url, "courier": courier}},
+            data={
+                "shipment": {
+                    "tracking_number": tracking_number,
+                    "tracking_url": tracking_url,
+                    "courier": courier,
+                }
+            },
         )
     )
 
@@ -1708,7 +2140,9 @@ async def create_order_shipment(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists"
+        ) from exc
 
     hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
@@ -1725,7 +2159,9 @@ async def update_order_shipment(
 ) -> Order:
     shipment = await session.get(OrderShipment, shipment_id)
     if not shipment or shipment.order_id != order.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found"
+        )
 
     data = payload.model_dump(exclude_unset=True)
     previous_tracking_number = getattr(shipment, "tracking_number", None)
@@ -1735,7 +2171,10 @@ async def update_order_shipment(
     if "tracking_number" in data:
         tracking_number = (str(data.get("tracking_number") or "")).strip()
         if not tracking_number:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tracking number is required")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tracking number is required",
+            )
         existing = (
             (
                 await session.execute(
@@ -1750,7 +2189,9 @@ async def update_order_shipment(
             .first()
         )
         if existing:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists"
+            )
         shipment.tracking_number = tracking_number
 
     if "tracking_url" in data:
@@ -1759,21 +2200,35 @@ async def update_order_shipment(
     if "courier" in data:
         shipment.courier = (str(data.get("courier") or "")).strip() or None
 
-    shipment.tracking_number = tracking_service.validate_tracking_number(
-        courier=getattr(shipment, "courier", None),
-        tracking_number=getattr(shipment, "tracking_number", None),
-    ) or shipment.tracking_number
-    shipment.tracking_url = tracking_service.validate_tracking_url(tracking_url=getattr(shipment, "tracking_url", None))
+    shipment.tracking_number = (
+        tracking_service.validate_tracking_number(
+            courier=getattr(shipment, "courier", None),
+            tracking_number=getattr(shipment, "tracking_number", None),
+        )
+        or shipment.tracking_number
+    )
+    shipment.tracking_url = tracking_service.validate_tracking_url(
+        tracking_url=getattr(shipment, "tracking_url", None)
+    )
 
     session.add(shipment)
 
     changes: dict[str, dict[str, object]] = {}
     if getattr(shipment, "tracking_number", None) != previous_tracking_number:
-        changes["tracking_number"] = {"from": previous_tracking_number, "to": getattr(shipment, "tracking_number", None)}
+        changes["tracking_number"] = {
+            "from": previous_tracking_number,
+            "to": getattr(shipment, "tracking_number", None),
+        }
     if getattr(shipment, "tracking_url", None) != previous_tracking_url:
-        changes["tracking_url"] = {"from": previous_tracking_url, "to": getattr(shipment, "tracking_url", None)}
+        changes["tracking_url"] = {
+            "from": previous_tracking_url,
+            "to": getattr(shipment, "tracking_url", None),
+        }
     if getattr(shipment, "courier", None) != previous_courier:
-        changes["courier"] = {"from": previous_courier, "to": getattr(shipment, "courier", None)}
+        changes["courier"] = {
+            "from": previous_courier,
+            "to": getattr(shipment, "courier", None),
+        }
 
     if changes:
         actor_clean = (actor or "").strip() or None
@@ -1791,7 +2246,9 @@ async def update_order_shipment(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Shipment already exists"
+        ) from exc
 
     hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
@@ -1807,20 +2264,35 @@ async def delete_order_shipment(
 ) -> Order:
     shipment = await session.get(OrderShipment, shipment_id)
     if not shipment or shipment.order_id != order.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shipment not found"
+        )
 
     tracking_number = getattr(shipment, "tracking_number", None)
     await session.delete(shipment)
 
     actor_clean = (actor or "").strip() or None
-    note = f"{actor_clean}: {tracking_number}" if actor_clean and tracking_number else (actor_clean or tracking_number)
-    session.add(OrderEvent(order_id=order.id, event="shipment_deleted", note=note, data={"shipment_id": str(shipment_id)}))
+    note = (
+        f"{actor_clean}: {tracking_number}"
+        if actor_clean and tracking_number
+        else (actor_clean or tracking_number)
+    )
+    session.add(
+        OrderEvent(
+            order_id=order.id,
+            event="shipment_deleted",
+            note=note,
+            data={"shipment_id": str(shipment_id)},
+        )
+    )
 
     try:
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Could not delete shipment") from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="Could not delete shipment"
+        ) from exc
 
     hydrated = await get_order_by_id_admin(session, order.id)
     return hydrated or order
@@ -1830,7 +2302,9 @@ async def _generate_reference_code(session: AsyncSession, length: int = 10) -> s
     chars = string.ascii_uppercase + string.digits
     while True:
         candidate = "".join(secrets.choice(chars) for _ in range(length))
-        result = await session.execute(select(Order).where(Order.reference_code == candidate))
+        result = await session.execute(
+            select(Order).where(Order.reference_code == candidate)
+        )
         if not result.scalar_one_or_none():
             return candidate
 
@@ -1843,7 +2317,9 @@ def _calculate_shipping(subtotal: Decimal, method: ShippingMethod | None) -> Dec
     return base + Decimal(method.rate_per_kg or 0) * subtotal
 
 
-async def create_shipping_method(session: AsyncSession, payload: ShippingMethodCreate) -> ShippingMethod:
+async def create_shipping_method(
+    session: AsyncSession, payload: ShippingMethodCreate
+) -> ShippingMethod:
     method = ShippingMethod(**payload.model_dump())
     session.add(method)
     await session.commit()
@@ -1851,12 +2327,16 @@ async def create_shipping_method(session: AsyncSession, payload: ShippingMethodC
     return method
 
 
-async def get_shipping_method(session: AsyncSession, method_id: UUID) -> ShippingMethod | None:
+async def get_shipping_method(
+    session: AsyncSession, method_id: UUID
+) -> ShippingMethod | None:
     return await session.get(ShippingMethod, method_id)
 
 
 async def list_shipping_methods(session: AsyncSession) -> list[ShippingMethod]:
-    result = await session.execute(select(ShippingMethod).order_by(ShippingMethod.created_at.desc()))
+    result = await session.execute(
+        select(ShippingMethod).order_by(ShippingMethod.created_at.desc())
+    )
     return list(result.scalars().unique())
 
 
@@ -1878,17 +2358,29 @@ async def get_order_by_id(session: AsyncSession, order_id: UUID) -> Order | None
     return result.scalar_one_or_none()
 
 
-async def update_fulfillment(session: AsyncSession, order: Order, item_id: UUID, shipped_quantity: int) -> Order:
+async def update_fulfillment(
+    session: AsyncSession, order: Order, item_id: UUID, shipped_quantity: int
+) -> Order:
     item = next((i for i in order.items if i.id == item_id), None)
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order item not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Order item not found"
+        )
     if shipped_quantity > item.quantity:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Shipped quantity exceeds ordered")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shipped quantity exceeds ordered",
+        )
     item.shipped_quantity = shipped_quantity
     session.add(item)
     await session.commit()
     await session.refresh(order, attribute_names=["items"])
-    await _log_event(session, order.id, "fulfillment_update", f"Item {item_id} shipped {shipped_quantity}")
+    await _log_event(
+        session,
+        order.id,
+        "fulfillment_update",
+        f"Item {item_id} shipped {shipped_quantity}",
+    )
     await session.refresh(order)
     await session.refresh(order, attribute_names=["events"])
     hydrated = await get_order_by_id(session, order.id)
@@ -1897,21 +2389,40 @@ async def update_fulfillment(session: AsyncSession, order: Order, item_id: UUID,
 
 async def retry_payment(session: AsyncSession, order: Order) -> Order:
     if order.status != OrderStatus.pending_payment:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Retry only allowed for pending_payment orders")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Retry only allowed for pending_payment orders",
+        )
     order.payment_retry_count += 1
-    await _log_event(session, order.id, "payment_retry", f"Attempt {order.payment_retry_count}")
+    await _log_event(
+        session, order.id, "payment_retry", f"Attempt {order.payment_retry_count}"
+    )
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
     return hydrated or order
 
 
-async def refund_order(session: AsyncSession, order: Order, note: str | None = None) -> Order:
-    if order.status not in {OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund allowed only for paid/shipped/delivered orders")
+async def refund_order(
+    session: AsyncSession, order: Order, note: str | None = None
+) -> Order:
+    if order.status not in {
+        OrderStatus.paid,
+        OrderStatus.shipped,
+        OrderStatus.delivered,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refund allowed only for paid/shipped/delivered orders",
+        )
     previous = order.status
     order.status = OrderStatus.refunded
-    await _log_event(session, order.id, "refund_requested", note or f"Manual refund requested from {previous.value}")
+    await _log_event(
+        session,
+        order.id,
+        "refund_requested",
+        note or f"Manual refund requested from {previous.value}",
+    )
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
@@ -1928,25 +2439,44 @@ async def create_order_refund(
     process_payment: bool = False,
     actor: str | None = None,
 ) -> Order:
-    if order.status not in {OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund allowed only for paid/shipped/delivered orders")
+    if order.status not in {
+        OrderStatus.paid,
+        OrderStatus.shipped,
+        OrderStatus.delivered,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refund allowed only for paid/shipped/delivered orders",
+        )
 
     await session.refresh(order, attribute_names=["refunds", "items"])
-    already_refunded = sum((Decimal(r.amount) for r in (order.refunds or [])), Decimal("0.00"))
+    already_refunded = sum(
+        (Decimal(r.amount) for r in (order.refunds or [])), Decimal("0.00")
+    )
     total_amount = pricing.quantize_money(Decimal(order.total_amount))
     remaining = pricing.quantize_money(total_amount - already_refunded)
     if remaining <= 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order already fully refunded")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order already fully refunded",
+        )
 
     amount_q = pricing.quantize_money(Decimal(amount))
     if amount_q <= 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refund amount")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid refund amount"
+        )
     if amount_q > remaining:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund amount exceeds remaining refundable")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Refund amount exceeds remaining refundable",
+        )
 
     note_clean = (note or "").strip()
     if not note_clean:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund note is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Refund note is required"
+        )
     note_clean = note_clean[:2000]
 
     selected_items: list[dict] = []
@@ -1954,7 +2484,9 @@ async def create_order_refund(
         items_by_id = {it.id: it for it in (order.items or [])}
         refunded_qty: dict[UUID, int] = {}
         for existing_refund in order.refunds or []:
-            payload = existing_refund.data if isinstance(existing_refund.data, dict) else {}
+            payload = (
+                existing_refund.data if isinstance(existing_refund.data, dict) else {}
+            )
             rows = payload.get("items") if isinstance(payload, dict) else None
             if not isinstance(rows, list):
                 continue
@@ -1973,7 +2505,9 @@ async def create_order_refund(
                     continue
                 if parsed_qty <= 0:
                     continue
-                refunded_qty[parsed_item_id] = refunded_qty.get(parsed_item_id, 0) + parsed_qty
+                refunded_qty[parsed_item_id] = (
+                    refunded_qty.get(parsed_item_id, 0) + parsed_qty
+                )
 
         requested_qty: dict[UUID, int] = {}
         for item_id, qty in items:
@@ -1986,21 +2520,32 @@ async def create_order_refund(
         for item_id, q in requested_qty.items():
             order_item = items_by_id.get(item_id)
             if not order_item:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid order item"
+                )
             ordered_qty = int(order_item.quantity or 0)
             already_qty = int(refunded_qty.get(item_id, 0))
             remaining_qty = ordered_qty - already_qty
             if remaining_qty <= 0:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Order item already fully refunded")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Order item already fully refunded",
+                )
             if q > remaining_qty:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund quantity exceeds remaining refundable quantity")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Refund quantity exceeds remaining refundable quantity",
+                )
             selected_items.append({"order_item_id": str(order_item.id), "quantity": q})
 
             unit_price = Decimal(str(getattr(order_item, "unit_price", "0") or "0"))
             items_total += pricing.quantize_money(unit_price * Decimal(q))
 
         if selected_items and amount_q > pricing.quantize_money(items_total):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refund amount exceeds selected items total")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Refund amount exceeds selected items total",
+            )
 
     provider = "manual"
     provider_refund_id: str | None = None
@@ -2008,21 +2553,38 @@ async def create_order_refund(
     if process_payment:
         method = (getattr(order, "payment_method", None) or "").strip().lower()
         if method == "stripe":
-            payment_intent_id = (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+            payment_intent_id = (
+                getattr(order, "stripe_payment_intent_id", None) or ""
+            ).strip()
             if not payment_intent_id:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe payment intent id required")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Stripe payment intent id required",
+                )
             cents = int((amount_q * 100).to_integral_value(rounding=ROUND_HALF_UP))
-            refund = await payments.refund_payment_intent(payment_intent_id, amount_cents=cents)
+            refund = await payments.refund_payment_intent(
+                payment_intent_id, amount_cents=cents
+            )
             provider = "stripe"
             provider_refund_id = refund.get("id") if isinstance(refund, dict) else None
         elif method == "paypal":
             capture_id = (getattr(order, "paypal_capture_id", None) or "").strip()
             if not capture_id:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="PayPal capture id required")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="PayPal capture id required",
+                )
             provider = "paypal"
-            provider_refund_id = (await paypal.refund_capture(paypal_capture_id=capture_id, amount_ron=amount_q)) or None
+            provider_refund_id = (
+                await paypal.refund_capture(
+                    paypal_capture_id=capture_id, amount_ron=amount_q
+                )
+            ) or None
         else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Automatic refunds not supported for this payment method")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Automatic refunds not supported for this payment method",
+            )
 
     record = OrderRefund(
         order_id=order.id,
@@ -2031,13 +2593,15 @@ async def create_order_refund(
         provider=provider,
         provider_refund_id=provider_refund_id,
         note=note_clean,
-        data={
-            "items": selected_items,
-            "actor": actor,
-            "process_payment": bool(process_payment),
-        }
-        if (selected_items or actor or process_payment)
-        else None,
+        data=(
+            {
+                "items": selected_items,
+                "actor": actor,
+                "process_payment": bool(process_payment),
+            }
+            if (selected_items or actor or process_payment)
+            else None
+        ),
     )
     session.add(record)
 
@@ -2045,16 +2609,32 @@ async def create_order_refund(
     event_note = f"{amount_q} {order.currency} ({provider}{' ' + provider_refund_id if provider_refund_id else ''})"
     if prefix:
         event_note = f"{prefix}: {event_note}"
-    if note_clean:
+    if note_clean:  # pragma: no cover -- always truthy: an empty note raises at the `Refund note is required` guard above, so note_clean is never falsy here
         event_note = f"{event_note} - {note_clean}"
-    session.add(OrderEvent(order_id=order.id, event="refund_partial", note=event_note[:2000]))
+    session.add(
+        OrderEvent(order_id=order.id, event="refund_partial", note=event_note[:2000])
+    )
 
-    remaining_after = pricing.quantize_money(total_amount - (already_refunded + amount_q))
+    remaining_after = pricing.quantize_money(
+        total_amount - (already_refunded + amount_q)
+    )
     if remaining_after <= 0 and order.status != OrderStatus.refunded:
         previous = OrderStatus(order.status)
         order.status = OrderStatus.refunded
-        session.add(OrderEvent(order_id=order.id, event="status_change", note=f"{previous.value} -> refunded"))
-        session.add(OrderEvent(order_id=order.id, event="refund_completed", note="Order fully refunded via partial refunds"))
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="status_change",
+                note=f"{previous.value} -> refunded",
+            )
+        )
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="refund_completed",
+                note="Order fully refunded via partial refunds",
+            )
+        )
         session.add(order)
 
     await session.commit()
@@ -2062,48 +2642,87 @@ async def create_order_refund(
     return hydrated or order
 
 
-async def capture_payment(session: AsyncSession, order: Order, intent_id: str | None = None) -> Order:
+async def capture_payment(
+    session: AsyncSession, order: Order, intent_id: str | None = None
+) -> Order:
     payment_intent_id = intent_id or order.stripe_payment_intent_id
     if not payment_intent_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required"
+        )
     if (
         intent_id
         and (getattr(order, "stripe_payment_intent_id", None) or "").strip()
-        and intent_id != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+        and intent_id
+        != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
     ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch")
-    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch"
+        )
+    if order.status not in {
+        OrderStatus.pending_payment,
+        OrderStatus.pending_acceptance,
+        OrderStatus.paid,
+    }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Capture only allowed for pending_payment, pending_acceptance, or paid orders",
         )
     order.stripe_payment_intent_id = payment_intent_id
     await session.refresh(order, attribute_names=["events"])
-    already_captured = any(getattr(evt, "event", None) == "payment_captured" for evt in (order.events or []))
+    already_captured = any(
+        getattr(evt, "event", None) == "payment_captured"
+        for evt in (order.events or [])
+    )
     if not already_captured:
         await payments.capture_payment_intent(payment_intent_id)
-        session.add(OrderEvent(order_id=order.id, event="payment_captured", note=f"Intent {payment_intent_id}"))
-        await promo_usage.record_promo_usage(session, order=order, note=f"Stripe {payment_intent_id}".strip())
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="payment_captured",
+                note=f"Intent {payment_intent_id}",
+            )
+        )
+        await promo_usage.record_promo_usage(
+            session, order=order, note=f"Stripe {payment_intent_id}".strip()
+        )
     if order.status == OrderStatus.pending_payment:
         order.status = OrderStatus.pending_acceptance
-        session.add(OrderEvent(order_id=order.id, event="status_change", note="pending_payment -> pending_acceptance"))
+        session.add(
+            OrderEvent(
+                order_id=order.id,
+                event="status_change",
+                note="pending_payment -> pending_acceptance",
+            )
+        )
     session.add(order)
     await session.commit()
     hydrated = await get_order_by_id(session, order.id)
     return hydrated or order
 
 
-async def void_payment(session: AsyncSession, order: Order, intent_id: str | None = None) -> Order:
+async def void_payment(
+    session: AsyncSession, order: Order, intent_id: str | None = None
+) -> Order:
     payment_intent_id = intent_id or order.stripe_payment_intent_id
     if not payment_intent_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent id required"
+        )
     if (
         intent_id
         and (getattr(order, "stripe_payment_intent_id", None) or "").strip()
-        and intent_id != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
+        and intent_id
+        != (getattr(order, "stripe_payment_intent_id", None) or "").strip()
     ):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch")
-    if order.status not in {OrderStatus.pending_payment, OrderStatus.pending_acceptance, OrderStatus.paid}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payment intent mismatch"
+        )
+    if order.status not in {
+        OrderStatus.pending_payment,
+        OrderStatus.pending_acceptance,
+        OrderStatus.paid,
+    }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Void only allowed for pending_payment, pending_acceptance, or paid orders",
@@ -2131,7 +2750,11 @@ async def void_payment(session: AsyncSession, order: Order, intent_id: str | Non
 
 
 async def _log_event(
-    session: AsyncSession, order_id: UUID, event: str, note: str | None = None, data: dict | None = None
+    session: AsyncSession,
+    order_id: UUID,
+    event: str,
+    note: str | None = None,
+    data: dict | None = None,
 ) -> None:
     evt = OrderEvent(order_id=order_id, event=event, note=note, data=data)
     session.add(evt)

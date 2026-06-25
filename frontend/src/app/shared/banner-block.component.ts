@@ -13,10 +13,16 @@ import { ButtonComponent } from './button.component';
       <ng-container *ngIf="slide.variant === 'split'; else fullTpl">
         <div class="grid gap-6 lg:gap-10 lg:grid-cols-[1fr_1.4fr] items-start">
           <div class="grid gap-4">
-            <p *ngIf="tagline" class="font-cinzel font-semibold text-[28px] tracking-[0.3em] text-slate-500 dark:text-slate-400">
+            <p
+              *ngIf="tagline"
+              class="font-cinzel font-semibold text-[28px] tracking-[0.3em] text-slate-500 dark:text-slate-400"
+            >
               {{ tagline }}
             </p>
-            <h2 *ngIf="slide.headline" class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-slate-900 dark:text-slate-50">
+            <h2
+              *ngIf="slide.headline"
+              class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-slate-900 dark:text-slate-50"
+            >
               {{ slide.headline }}
             </h2>
             <p *ngIf="slide.subheadline" class="text-lg text-slate-600 dark:text-slate-300">
@@ -41,8 +47,16 @@ import { ButtonComponent } from './button.component';
             <ng-container *ngIf="imageUrl(); else splitPlaceholder">
               <ng-container *ngIf="useOptimizedAsset(); else splitPlainImage">
                 <picture class="block">
-                  <source type="image/avif" [attr.srcset]="optimizedSrcset('avif')" [attr.sizes]="splitSizes()" />
-                  <source type="image/webp" [attr.srcset]="optimizedSrcset('webp')" [attr.sizes]="splitSizes()" />
+                  <source
+                    type="image/avif"
+                    [attr.srcset]="optimizedSrcset('avif')"
+                    [attr.sizes]="splitSizes()"
+                  />
+                  <source
+                    type="image/webp"
+                    [attr.srcset]="optimizedSrcset('webp')"
+                    [attr.sizes]="splitSizes()"
+                  />
                   <img
                     [ngClass]="imageClass()"
                     [src]="imageUrl()"
@@ -81,12 +95,22 @@ import { ButtonComponent } from './button.component';
       </ng-container>
 
       <ng-template #fullTpl>
-        <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div
+          class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+        >
           <ng-container *ngIf="imageUrl(); else fullPlaceholder">
             <ng-container *ngIf="useOptimizedAsset(); else fullPlainImage">
               <picture class="block">
-                <source type="image/avif" [attr.srcset]="optimizedSrcset('avif')" [attr.sizes]="fullSizes()" />
-                <source type="image/webp" [attr.srcset]="optimizedSrcset('webp')" [attr.sizes]="fullSizes()" />
+                <source
+                  type="image/avif"
+                  [attr.srcset]="optimizedSrcset('avif')"
+                  [attr.sizes]="fullSizes()"
+                />
+                <source
+                  type="image/webp"
+                  [attr.srcset]="optimizedSrcset('webp')"
+                  [attr.sizes]="fullSizes()"
+                />
                 <img
                   [ngClass]="fullImageClass()"
                   [src]="imageUrl()"
@@ -124,10 +148,18 @@ import { ButtonComponent } from './button.component';
           <div class="absolute inset-0" [ngClass]="overlayClass()"></div>
           <div class="absolute inset-0 p-6 sm:p-10 flex items-end">
             <div class="grid gap-3 max-w-2xl">
-              <p *ngIf="tagline" class="font-cinzel font-semibold text-[18px] tracking-[0.3em]" [ngClass]="textClass()">
+              <p
+                *ngIf="tagline"
+                class="font-cinzel font-semibold text-[18px] tracking-[0.3em]"
+                [ngClass]="textClass()"
+              >
                 {{ tagline }}
               </p>
-              <h2 *ngIf="slide.headline" class="text-3xl sm:text-4xl font-semibold leading-tight" [ngClass]="textClass()">
+              <h2
+                *ngIf="slide.headline"
+                class="text-3xl sm:text-4xl font-semibold leading-tight"
+                [ngClass]="textClass()"
+              >
                 {{ slide.headline }}
               </h2>
               <p *ngIf="slide.subheadline" class="text-base sm:text-lg" [ngClass]="subTextClass()">
@@ -151,7 +183,7 @@ import { ButtonComponent } from './button.component';
         </div>
       </ng-template>
     </div>
-  `
+  `,
 })
 export class BannerBlockComponent {
   @Input({ required: true }) slide!: Slide;
@@ -182,14 +214,16 @@ export class BannerBlockComponent {
   useOptimizedAsset(): boolean {
     const normalized = this.normalizeAssetUrl(this.imageUrl());
     return (
-      normalized === BannerBlockComponent.OPTIMIZED_JPEG_FALLBACK || normalized.startsWith(`${BannerBlockComponent.OPTIMIZED_ASSET_PREFIX}-`)
+      normalized === BannerBlockComponent.OPTIMIZED_JPEG_FALLBACK ||
+      normalized.startsWith(`${BannerBlockComponent.OPTIMIZED_ASSET_PREFIX}-`)
     );
   }
 
   optimizedSrcset(format: 'avif' | 'webp' | 'jpg'): string {
     if (!this.useOptimizedAsset()) return '';
     const entries = BannerBlockComponent.OPTIMIZED_WIDTHS.map((width) => {
-      if (format === 'jpg' && width === 1280) return `${BannerBlockComponent.OPTIMIZED_JPEG_FALLBACK} ${width}w`;
+      if (format === 'jpg' && width === 1280)
+        return `${BannerBlockComponent.OPTIMIZED_JPEG_FALLBACK} ${width}w`;
       const ext = format === 'jpg' ? 'jpg' : format;
       return `${BannerBlockComponent.OPTIMIZED_ASSET_PREFIX}-${width}.${ext} ${width}w`;
     });
@@ -237,6 +271,8 @@ export class BannerBlockComponent {
   }
 
   subTextClass(): string {
-    return this.slide.text_style === 'light' ? 'text-slate-100' : 'text-slate-700 dark:text-slate-200';
+    return this.slide.text_style === 'light'
+      ? 'text-slate-100'
+      : 'text-slate-700 dark:text-slate-200';
   }
 }

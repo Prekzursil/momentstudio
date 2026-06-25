@@ -5,14 +5,22 @@ import { TranslateModule } from '@ngx-translate/core';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
 
-type BulkPricePreview = { old_min: string; old_max: string; new_min: string; new_max: string; currency: string };
+type BulkPricePreview = {
+  old_min: string;
+  old_max: string;
+  new_min: string;
+  new_max: string;
+  currency: string;
+};
 
 @Component({
   selector: 'app-admin-products-bulk-actions',
   standalone: true,
   imports: [CommonModule, FormsModule, TranslateModule, ButtonComponent, InputComponent],
   template: `
-    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20">
+    <div
+      class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/20"
+    >
       <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
           {{ 'adminUi.products.bulk.selected' | translate: { count: selectedCount } }}
@@ -35,8 +43,12 @@ type BulkPricePreview = { old_min: string; old_max: string; new_min: string; new
             (ngModelChange)="bulkSaleTypeChange.emit($event)"
             [disabled]="disabled"
           >
-            <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
-            <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
+            <option [ngValue]="'percent'">
+              {{ 'adminUi.products.sale.typePercent' | translate }}
+            </option>
+            <option [ngValue]="'amount'">
+              {{ 'adminUi.products.sale.typeAmount' | translate }}
+            </option>
           </select>
         </label>
 
@@ -187,8 +199,12 @@ type BulkPricePreview = { old_min: string; old_max: string; new_min: string; new
             (ngModelChange)="bulkPriceModeChange.emit($event)"
             [disabled]="disabled"
           >
-            <option [ngValue]="'percent'">{{ 'adminUi.products.bulk.priceAdjust.modePercent' | translate }}</option>
-            <option [ngValue]="'amount'">{{ 'adminUi.products.bulk.priceAdjust.modeAmount' | translate }}</option>
+            <option [ngValue]="'percent'">
+              {{ 'adminUi.products.bulk.priceAdjust.modePercent' | translate }}
+            </option>
+            <option [ngValue]="'amount'">
+              {{ 'adminUi.products.bulk.priceAdjust.modeAmount' | translate }}
+            </option>
           </select>
         </label>
 
@@ -231,7 +247,9 @@ type BulkPricePreview = { old_min: string; old_max: string; new_min: string; new
         {{ 'adminUi.products.bulk.priceAdjust.preview' | translate: bulkPricePreview }}
       </p>
 
-      <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.products.bulk.note' | translate }}</p>
+      <p class="text-xs text-slate-500 dark:text-slate-400">
+        {{ 'adminUi.products.bulk.note' | translate }}
+      </p>
 
       <div
         *ngIf="bulkError"
@@ -240,7 +258,7 @@ type BulkPricePreview = { old_min: string; old_max: string; new_min: string; new
         {{ bulkError }}
       </div>
     </div>
-  `
+  `,
 })
 export class AdminProductsBulkActionsComponent {
   @Input({ required: true }) selectedCount = 0;
@@ -284,4 +302,3 @@ export class AdminProductsBulkActionsComponent {
   @Output() clearUnpublishSchedule = new EventEmitter<void>();
   @Output() applyPriceAdjustment = new EventEmitter<void>();
 }
-

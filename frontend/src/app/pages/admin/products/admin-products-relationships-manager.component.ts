@@ -14,9 +14,13 @@ import { InputComponent } from '../../../shared/input.component';
       data-ignore-dirty
       class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
     >
-      <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+      <summary
+        class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+      >
         <div class="min-w-0 grid gap-1">
-          <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
+          <h3
+            class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200"
+          >
             {{ 'adminUi.products.relationships.title' | translate }}
           </h3>
           <p class="text-xs text-slate-500 dark:text-slate-400">
@@ -30,7 +34,9 @@ import { InputComponent } from '../../../shared/input.component';
           >
             {{ relationshipsRelated.length + relationshipsUpsells.length }}
           </span>
-          <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
+          <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400"
+            >▸</span
+          >
         </div>
       </summary>
 
@@ -78,7 +84,9 @@ import { InputComponent } from '../../../shared/input.component';
             >
               <div class="min-w-0">
                 <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }} · {{ p.sku }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {{ p.slug }} · {{ p.sku }}
+                </p>
               </div>
               <div class="flex items-center gap-1">
                 <app-button
@@ -100,16 +108,26 @@ import { InputComponent } from '../../../shared/input.component';
           </div>
 
           <div class="grid gap-4 lg:grid-cols-2">
-            <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div
+              class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            >
               <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                 {{ 'adminUi.products.relationships.related' | translate }}
               </p>
-              <div *ngIf="relationshipsRelated.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="relationshipsRelated.length === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'adminUi.products.relationships.empty' | translate }}
               </div>
-              <div *ngFor="let p of relationshipsRelated; let idx = index" class="flex items-center justify-between gap-2">
+              <div
+                *ngFor="let p of relationshipsRelated; let idx = index"
+                class="flex items-center justify-between gap-2"
+              >
                 <div class="min-w-0">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">
+                    {{ p.name }}
+                  </p>
                   <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
                 </div>
                 <div class="flex items-center gap-1">
@@ -138,16 +156,26 @@ import { InputComponent } from '../../../shared/input.component';
               </div>
             </div>
 
-            <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <div
+              class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+            >
               <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                 {{ 'adminUi.products.relationships.upsells' | translate }}
               </p>
-              <div *ngIf="relationshipsUpsells.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="relationshipsUpsells.length === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'adminUi.products.relationships.empty' | translate }}
               </div>
-              <div *ngFor="let p of relationshipsUpsells; let idx = index" class="flex items-center justify-between gap-2">
+              <div
+                *ngFor="let p of relationshipsUpsells; let idx = index"
+                class="flex items-center justify-between gap-2"
+              >
                 <div class="min-w-0">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">{{ p.name }}</p>
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate">
+                    {{ p.name }}
+                  </p>
                   <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ p.slug }}</p>
                 </div>
                 <div class="flex items-center gap-1">
@@ -188,7 +216,7 @@ import { InputComponent } from '../../../shared/input.component';
         </div>
       </div>
     </details>
-  `
+  `,
 })
 export class AdminProductsRelationshipsManagerComponent {
   @Input({ required: true }) hasEditingSlug = false;
@@ -203,9 +231,15 @@ export class AdminProductsRelationshipsManagerComponent {
   @Input() relationshipsMessage: string | null = null;
 
   @Output() relationshipSearchChanged = new EventEmitter<string | number>();
-  @Output() addRequested = new EventEmitter<{ item: AdminProductListItem; kind: 'related' | 'upsell' }>();
-  @Output() moveRequested = new EventEmitter<{ kind: 'related' | 'upsell'; index: number; direction: -1 | 1 }>();
+  @Output() addRequested = new EventEmitter<{
+    item: AdminProductListItem;
+    kind: 'related' | 'upsell';
+  }>();
+  @Output() moveRequested = new EventEmitter<{
+    kind: 'related' | 'upsell';
+    index: number;
+    direction: -1 | 1;
+  }>();
   @Output() removeRequested = new EventEmitter<{ id: string; kind: 'related' | 'upsell' }>();
   @Output() saveRequested = new EventEmitter<void>();
 }
-

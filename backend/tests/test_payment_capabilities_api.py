@@ -32,7 +32,9 @@ def test_app() -> Dict[str, object]:
     app.dependency_overrides.clear()
 
 
-def test_payment_capabilities_exposes_netopia_disabled(test_app: Dict[str, object]) -> None:
+def test_payment_capabilities_exposes_netopia_disabled(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
 
     res = client.get("/api/v1/payments/capabilities")
@@ -42,4 +44,3 @@ def test_payment_capabilities_exposes_netopia_disabled(test_app: Dict[str, objec
     assert data["cod"]["enabled"] is True
     assert data["netopia"]["supported"] is True
     assert data["netopia"]["enabled"] is False
-

@@ -6,4 +6,3 @@ class AdminPaginationMeta(BaseModel):
     total_pages: int
     page: int
     limit: int
-

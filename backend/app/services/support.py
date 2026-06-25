@@ -70,9 +70,17 @@ async def create_contact_submission(
 
     for recipient in await _support_recipients(session):
         if topic == ContactSubmissionTopic.feedback:
-            title = "New admin feedback" if (recipient.preferred_language or "en") != "ro" else "Feedback nou"
+            title = (
+                "New admin feedback"
+                if (recipient.preferred_language or "en") != "ro"
+                else "Feedback nou"
+            )
         else:
-            title = "New contact message" if (recipient.preferred_language or "en") != "ro" else "Mesaj nou de contact"
+            title = (
+                "New contact message"
+                if (recipient.preferred_language or "en") != "ro"
+                else "Mesaj nou de contact"
+            )
         body = f"From: {record.email}"
         await notification_service.create_notification(
             session,
@@ -86,24 +94,35 @@ async def create_contact_submission(
     return record
 
 
-async def get_contact_submission(session: AsyncSession, submission_id: UUID) -> ContactSubmission | None:
+async def get_contact_submission(
+    session: AsyncSession, submission_id: UUID
+) -> ContactSubmission | None:
     return await session.get(ContactSubmission, submission_id)
 
 
-async def get_contact_submission_with_messages(session: AsyncSession, submission_id: UUID) -> ContactSubmission | None:
+async def get_contact_submission_with_messages(
+    session: AsyncSession, submission_id: UUID
+) -> ContactSubmission | None:
     stmt = (
         select(ContactSubmission)
         .where(ContactSubmission.id == submission_id)
-        .options(selectinload(ContactSubmission.messages), selectinload(ContactSubmission.user))
+        .options(
+            selectinload(ContactSubmission.messages),
+            selectinload(ContactSubmission.user),
+        )
     )
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
-async def list_contact_submissions_for_user(session: AsyncSession, *, user: User) -> list[ContactSubmission]:
+async def list_contact_submissions_for_user(
+    session: AsyncSession, *, user: User
+) -> list[ContactSubmission]:
     stmt = (
         select(ContactSubmission)
         .where(ContactSubmission.user_id == user.id)
-        .order_by(ContactSubmission.updated_at.desc(), ContactSubmission.created_at.desc())
+        .order_by(
+            ContactSubmission.updated_at.desc(), ContactSubmission.created_at.desc()
+        )
     )
     return list((await session.execute(stmt)).scalars().all())
 
@@ -118,20 +137,34 @@ async def add_contact_submission_message(
 ) -> ContactSubmission:
     cleaned = (message or "").strip()
     if not cleaned:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Message is required"
+        )
     if len(cleaned) > 10_000:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message too long")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Message too long"
+        )
 
     if from_admin:
         if actor.role not in (UserRole.admin, UserRole.owner, UserRole.support):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+            )
     else:
         if not submission.user_id or submission.user_id != actor.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+            )
         if submission.status == ContactSubmissionStatus.resolved:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ticket is resolved")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Ticket is resolved"
+            )
 
-    session.add(ContactSubmissionMessage(submission_id=submission.id, from_admin=bool(from_admin), message=cleaned))
+    session.add(
+        ContactSubmissionMessage(
+            submission_id=submission.id, from_admin=bool(from_admin), message=cleaned
+        )
+    )
 
     # Ensure list ordering reflects new activity.
     submission.updated_at = datetime.now(timezone.utc)
@@ -143,8 +176,12 @@ async def add_contact_submission_message(
 
     session.expire(submission, ["messages"])
     updated = await get_contact_submission_with_messages(session, submission.id)
-    if not updated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found")
+    if (
+        not updated
+    ):  # pragma: no cover - defensive; the submission was just committed above
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Submission not found"
+        )
 
     if from_admin:
         usernames = {u for u in _MENTION_RE.findall(cleaned or "") if u}
@@ -156,10 +193,18 @@ async def add_contact_submission_message(
             )
             mentioned = (await session.execute(stmt)).scalars().all()
             for mentioned_user in mentioned:
-                if not mentioned_user or not mentioned_user.id or mentioned_user.id == actor.id:
+                if (
+                    not mentioned_user
+                    or not mentioned_user.id
+                    or mentioned_user.id == actor.id
+                ):
                     continue
                 lang = mentioned_user.preferred_language or "en"
-                title = "Mentioned in support ticket" if lang != "ro" else "Menționat în tichet de suport"
+                title = (
+                    "Mentioned in support ticket"
+                    if lang != "ro"
+                    else "Menționat în tichet de suport"
+                )
                 actor_name = (actor.username or "").strip() or "support"
                 body = (
                     f"You were mentioned by {actor_name}."
@@ -178,7 +223,11 @@ async def add_contact_submission_message(
     if from_admin and updated.user_id:
         user = await session.get(User, updated.user_id)
         if user and user.id:
-            title = "Support reply" if (user.preferred_language or "en") != "ro" else "Răspuns de la suport"
+            title = (
+                "Support reply"
+                if (user.preferred_language or "en") != "ro"
+                else "Răspuns de la suport"
+            )
             body = "You have a new reply in your support ticket."
             if (user.preferred_language or "en") == "ro":
                 body = "Ai un răspuns nou în tichetul tău de suport."
@@ -193,7 +242,11 @@ async def add_contact_submission_message(
 
     if not from_admin:
         for recipient in await _support_recipients(session):
-            title = "Support ticket update" if (recipient.preferred_language or "en") != "ro" else "Actualizare tichet suport"
+            title = (
+                "Support ticket update"
+                if (recipient.preferred_language or "en") != "ro"
+                else "Actualizare tichet suport"
+            )
             body = f"From: {updated.email}"
             await notification_service.create_notification(
                 session,
@@ -229,7 +282,9 @@ async def list_contact_submissions(
             func.lower(ContactSubmission.email).like(like)
             | func.lower(ContactSubmission.name).like(like)
             | func.lower(ContactSubmission.message).like(like)
-            | func.lower(func.coalesce(ContactSubmission.order_reference, "")).like(like)
+            | func.lower(func.coalesce(ContactSubmission.order_reference, "")).like(
+                like
+            )
         )
     if status_filter is not None:
         stmt = stmt.where(ContactSubmission.status == status_filter)
@@ -247,7 +302,8 @@ async def list_contact_submissions(
             else:
                 like = f"%{cleaned.lower()}%"
                 stmt = stmt.where(
-                    func.lower(ContactSubmission.email).like(like) | func.lower(ContactSubmission.name).like(like)
+                    func.lower(ContactSubmission.email).like(like)
+                    | func.lower(ContactSubmission.name).like(like)
                 )
     if assignee_filter:
         cleaned = assignee_filter.strip()
@@ -258,19 +314,33 @@ async def list_contact_submissions(
                 try:
                     assignee_id = UUID(cleaned)
                 except Exception as exc:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid assignee filter") from exc
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid assignee filter",
+                    ) from exc
                 stmt = stmt.where(ContactSubmission.assignee_user_id == assignee_id)
 
-    total = await session.scalar(stmt.with_only_columns(func.count(func.distinct(ContactSubmission.id))).order_by(None))
+    total = await session.scalar(
+        stmt.with_only_columns(
+            func.count(func.distinct(ContactSubmission.id))
+        ).order_by(None)
+    )
     total_items = int(total or 0)
 
     rows = (
-        await session.execute(
-            stmt.order_by(ContactSubmission.updated_at.desc(), ContactSubmission.created_at.desc())
-            .limit(limit)
-            .offset(offset)
+        (
+            await session.execute(
+                stmt.order_by(
+                    ContactSubmission.updated_at.desc(),
+                    ContactSubmission.created_at.desc(),
+                )
+                .limit(limit)
+                .offset(offset)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return list(rows), total_items
 
 
@@ -285,7 +355,9 @@ async def update_contact_submission(
     actor: User,
 ) -> ContactSubmission:
     if actor.role not in (UserRole.admin, UserRole.owner, UserRole.support):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
 
     if status_value is not None and submission.status != status_value:
         submission.status = status_value
@@ -303,9 +375,13 @@ async def update_contact_submission(
         if assignee_id is not None:
             target = await session.get(User, assignee_id)
             if not target or not target.id or target.deleted_at is not None:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Assignee not found")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Assignee not found"
+                )
             if target.role not in (UserRole.owner, UserRole.admin, UserRole.support):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid assignee")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid assignee"
+                )
         else:
             target = None
 
@@ -340,15 +416,21 @@ async def update_contact_submission(
     return submission
 
 
-async def list_canned_responses(session: AsyncSession, *, include_inactive: bool = False) -> list[SupportCannedResponse]:
+async def list_canned_responses(
+    session: AsyncSession, *, include_inactive: bool = False
+) -> list[SupportCannedResponse]:
     stmt = select(SupportCannedResponse)
     if not include_inactive:
         stmt = stmt.where(SupportCannedResponse.is_active.is_(True))
-    stmt = stmt.order_by(SupportCannedResponse.title.asc(), SupportCannedResponse.created_at.desc())
+    stmt = stmt.order_by(
+        SupportCannedResponse.title.asc(), SupportCannedResponse.created_at.desc()
+    )
     return list((await session.execute(stmt)).scalars().all())
 
 
-async def get_canned_response(session: AsyncSession, response_id: UUID) -> SupportCannedResponse | None:
+async def get_canned_response(
+    session: AsyncSession, response_id: UUID
+) -> SupportCannedResponse | None:
     return await session.get(SupportCannedResponse, response_id)
 
 
@@ -362,14 +444,20 @@ async def create_canned_response(
     actor: User,
 ) -> SupportCannedResponse:
     if actor.role not in (UserRole.admin, UserRole.owner, UserRole.support):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
     cleaned_title = (title or "").strip()
     if not cleaned_title:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Title is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Title is required"
+        )
     cleaned_en = (body_en or "").strip()
     cleaned_ro = (body_ro or "").strip()
     if not cleaned_en or not cleaned_ro:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Template body is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Template body is required"
+        )
 
     record = SupportCannedResponse(
         title=cleaned_title[:120],
@@ -396,7 +484,9 @@ async def update_canned_response(
     actor: User,
 ) -> SupportCannedResponse:
     if actor.role not in (UserRole.admin, UserRole.owner, UserRole.support):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
 
     if title is not None:
         cleaned = title.strip()
@@ -419,8 +509,12 @@ async def update_canned_response(
     return record
 
 
-async def delete_canned_response(session: AsyncSession, *, record: SupportCannedResponse, actor: User) -> None:
+async def delete_canned_response(
+    session: AsyncSession, *, record: SupportCannedResponse, actor: User
+) -> None:
     if actor.role not in (UserRole.admin, UserRole.owner, UserRole.support):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
     await session.delete(record)
     await session.commit()

@@ -239,7 +239,9 @@ def test_unexpected_token_cluster_is_suppressed_for_admin_surface() -> None:
     assert findings == []
 
 
-def test_unexpected_token_cluster_is_suppressed_for_storefront_json_parser_noise() -> None:
+def test_unexpected_token_cluster_is_suppressed_for_storefront_json_parser_noise() -> (
+    None
+):
     module = _load_module()
     findings = module._build_deterministic_findings(
         seo_snapshot=[],
@@ -262,7 +264,9 @@ def test_unexpected_token_cluster_is_suppressed_for_storefront_json_parser_noise
     assert findings == []
 
 
-def test_unexpected_token_cluster_remains_for_storefront_without_benign_context() -> None:
+def test_unexpected_token_cluster_remains_for_storefront_without_benign_context() -> (
+    None
+):
     module = _load_module()
     findings = module._build_deterministic_findings(
         seo_snapshot=[],
@@ -318,7 +322,9 @@ def test_canonical_policy_requires_clean_en_and_lang_ro() -> None:
         console_errors=[],
         layout_signals=[],
     )
-    mismatches = [row for row in findings if row["rule_id"] == "seo_canonical_policy_mismatch"]
+    mismatches = [
+        row for row in findings if row["rule_id"] == "seo_canonical_policy_mismatch"
+    ]
     assert len(mismatches) == 2
 
 
@@ -404,6 +410,8 @@ def test_visibility_issue_emits_actionable_finding() -> None:
             }
         ],
     )
-    matches = [row for row in findings if row["rule_id"] == "ux_visibility_after_interaction"]
+    matches = [
+        row for row in findings if row["rule_id"] == "ux_visibility_after_interaction"
+    ]
     assert len(matches) == 1
     assert matches[0]["severity"] == "s2"

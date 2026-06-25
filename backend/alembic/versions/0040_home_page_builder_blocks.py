@@ -27,7 +27,9 @@ def upgrade() -> None:
     conn = op.get_bind()
     now = datetime.now(timezone.utc)
 
-    content_status = postgresql.ENUM("draft", "published", name="contentstatus", create_type=False)
+    content_status = postgresql.ENUM(
+        "draft", "published", name="contentstatus", create_type=False
+    )
 
     content_blocks = sa.table(
         "content_blocks",
@@ -85,7 +87,9 @@ def upgrade() -> None:
         lang: str | None = None,
         translation_ro: tuple[str, str] | None = None,
     ) -> None:
-        existing = conn.execute(sa.select(content_blocks.c.id).where(content_blocks.c.key == key)).first()
+        existing = conn.execute(
+            sa.select(content_blocks.c.id).where(content_blocks.c.key == key)
+        ).first()
         if existing:
             return
 

@@ -15,7 +15,7 @@ export class AdminClientErrorLoggerService {
   constructor(
     private readonly admin: AdminService,
     private readonly auth: AuthService,
-    private readonly router: Router
+    private readonly router: Router,
   ) {}
 
   init(): void {
@@ -24,9 +24,11 @@ export class AdminClientErrorLoggerService {
     if (typeof window === 'undefined') return;
 
     this.updateEnabled(this.router.url);
-    this.router.events.pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd)).subscribe((event) => {
-      this.updateEnabled(event.urlAfterRedirects || event.url);
-    });
+    this.router.events
+      .pipe(filter((event): event is NavigationEnd => event instanceof NavigationEnd))
+      .subscribe((event) => {
+        this.updateEnabled(event.urlAfterRedirects || event.url);
+      });
 
     window.addEventListener('error', (event) => this.onWindowError(event));
     window.addEventListener('unhandledrejection', (event) => this.onUnhandledRejection(event));
@@ -40,7 +42,13 @@ export class AdminClientErrorLoggerService {
   private shouldSend(): boolean {
     if (!this.enabled) return false;
     const role = this.auth.role();
-    return role === 'owner' || role === 'admin' || role === 'support' || role === 'fulfillment' || role === 'content';
+    return (
+      role === 'owner' ||
+      role === 'admin' ||
+      role === 'support' ||
+      role === 'fulfillment' ||
+      role === 'content'
+    );
   }
 
   private send(payload: AdminClientErrorIn): void {
@@ -63,7 +71,7 @@ export class AdminClientErrorLoggerService {
     kind: AdminClientErrorKind,
     message: string,
     stack: string | null,
-    context?: Record<string, any> | null
+    context?: Record<string, any> | null,
   ): AdminClientErrorIn {
     const url = typeof location !== 'undefined' ? location.href : null;
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
@@ -78,8 +86,8 @@ export class AdminClientErrorLoggerService {
       context: {
         app_env: appConfig.appEnv,
         ...(appConfig.appVersion ? { app_version: appConfig.appVersion } : {}),
-        ...(context || {})
-      }
+        ...context,
+      },
     };
   }
 
@@ -92,8 +100,8 @@ export class AdminClientErrorLoggerService {
       this.buildBasePayload('window_error', message || 'Window error', stack, {
         filename: event.filename,
         lineno: event.lineno,
-        colno: event.colno
-      })
+        colno: event.colno,
+      }),
     );
   }
 
@@ -102,8 +110,8 @@ export class AdminClientErrorLoggerService {
     captureException(reason);
     const message = reason instanceof Error ? reason.message : String(reason);
     const stack = reason instanceof Error ? reason.stack || null : null;
-    this.send(this.buildBasePayload('unhandled_rejection', message || 'Unhandled rejection', stack));
+    this.send(
+      this.buildBasePayload('unhandled_rejection', message || 'Unhandled rejection', stack),
+    );
   }
 }
-
-

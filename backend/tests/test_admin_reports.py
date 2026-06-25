@@ -19,7 +19,9 @@ from app.services import email as email_service
 @pytest.mark.anyio
 async def test_send_report_now_updates_last_sent(monkeypatch):
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
-    SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    SessionLocal = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -29,7 +31,9 @@ async def test_send_report_now_updates_last_sent(monkeypatch):
     async def fake_send_admin_report_summary(*args, **kwargs) -> bool:
         return True
 
-    monkeypatch.setattr(email_service, "send_admin_report_summary", fake_send_admin_report_summary)
+    monkeypatch.setattr(
+        email_service, "send_admin_report_summary", fake_send_admin_report_summary
+    )
 
     async with SessionLocal() as session:
         owner = User(
@@ -101,11 +105,18 @@ async def test_send_report_now_updates_last_sent(monkeypatch):
 
     async with SessionLocal() as session:
         now = datetime(2025, 1, 8, 10, 0, tzinfo=timezone.utc)
-        res = await admin_reports.send_report_now(session, kind="weekly", force=True, now=now)
+        res = await admin_reports.send_report_now(
+            session, kind="weekly", force=True, now=now
+        )
         assert res["delivered"] == 2
         assert res["attempted"] == 2
         assert res["skipped"] is False
 
-        block = (await session.execute(select(ContentBlock).where(ContentBlock.key == "site.reports"))).scalar_one()
-        assert str(block.meta.get("reports_weekly_last_sent_period_end")).startswith("2025-01-06T08:00:00")
-
+        block = (
+            await session.execute(
+                select(ContentBlock).where(ContentBlock.key == "site.reports")
+            )
+        ).scalar_one()
+        assert str(block.meta.get("reports_weekly_last_sent_period_end")).startswith(
+            "2025-01-06T08:00:00"
+        )

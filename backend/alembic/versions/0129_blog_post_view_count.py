@@ -19,10 +19,12 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("content_blocks", sa.Column("view_count", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column(
+        "content_blocks",
+        sa.Column("view_count", sa.Integer(), nullable=False, server_default="0"),
+    )
     op.alter_column("content_blocks", "view_count", server_default=None)
 
 
 def downgrade() -> None:
     op.drop_column("content_blocks", "view_count")
-

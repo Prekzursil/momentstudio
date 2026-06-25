@@ -30,16 +30,26 @@ type BlockDef = {
   standalone: true,
   imports: [CommonModule, TranslateModule, ButtonComponent],
   template: `
-    <div class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+    <div
+      class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
+    >
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="grid gap-0.5 min-w-0">
-          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.content.blockLibrary.title' | translate }}</p>
-          <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.content.blockLibrary.hint' | translate }}</p>
+          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'adminUi.content.blockLibrary.title' | translate }}
+          </p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.content.blockLibrary.hint' | translate }}
+          </p>
         </div>
 
         <div class="flex items-center gap-2">
-          <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{ 'adminUi.content.blockLibrary.templateLabel' | translate }}</span>
-          <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">{{
+            'adminUi.content.blockLibrary.templateLabel' | translate
+          }}</span>
+          <div
+            class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
             <button
               type="button"
               class="px-3 py-1.5 text-xs font-semibold"
@@ -75,20 +85,30 @@ type BlockDef = {
           (dragend)="onDragEnd()"
         >
           <div class="h-12 rounded-lg bg-gradient-to-r" [ngClass]="b.gradient"></div>
-          <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50">{{ b.titleKey | translate }}</p>
+          <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {{ b.titleKey | translate }}
+          </p>
           <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ b.descKey | translate }}</p>
           <div class="mt-3 flex justify-end">
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.add' | translate" (action)="addBlock(b.type)"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.add' | translate"
+              (action)="addBlock(b.type)"
+            ></app-button>
           </div>
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class CmsBlockLibraryComponent {
   @Input() context: CmsBlockLibraryContext = 'page';
   @Input() allowedTypes: ReadonlyArray<CmsBlockLibraryBlockType> | null = null;
-  @Output() add = new EventEmitter<{ type: CmsBlockLibraryBlockType; template: CmsBlockLibraryTemplate }>();
+  @Output() add = new EventEmitter<{
+    type: CmsBlockLibraryBlockType;
+    template: CmsBlockLibraryTemplate;
+  }>();
   @Output() dragActive = new EventEmitter<boolean>();
 
   template = signal<CmsBlockLibraryTemplate>('starter');
@@ -98,68 +118,68 @@ export class CmsBlockLibraryComponent {
       type: 'text',
       titleKey: 'adminUi.home.sections.blocks.text',
       descKey: 'adminUi.content.blockLibrary.items.text',
-      gradient: 'from-indigo-500/50 to-fuchsia-500/50'
+      gradient: 'from-indigo-500/50 to-fuchsia-500/50',
     },
     {
       type: 'columns',
       titleKey: 'adminUi.home.sections.blocks.columns',
       descKey: 'adminUi.content.blockLibrary.items.columns',
-      gradient: 'from-slate-500/50 to-slate-700/50'
+      gradient: 'from-slate-500/50 to-slate-700/50',
     },
     {
       type: 'cta',
       titleKey: 'adminUi.home.sections.blocks.cta',
       descKey: 'adminUi.content.blockLibrary.items.cta',
-      gradient: 'from-emerald-500/50 to-lime-500/50'
+      gradient: 'from-emerald-500/50 to-lime-500/50',
     },
     {
       type: 'faq',
       titleKey: 'adminUi.home.sections.blocks.faq',
       descKey: 'adminUi.content.blockLibrary.items.faq',
-      gradient: 'from-sky-500/50 to-cyan-500/50'
+      gradient: 'from-sky-500/50 to-cyan-500/50',
     },
     {
       type: 'testimonials',
       titleKey: 'adminUi.home.sections.blocks.testimonials',
       descKey: 'adminUi.content.blockLibrary.items.testimonials',
-      gradient: 'from-pink-500/50 to-rose-500/50'
+      gradient: 'from-pink-500/50 to-rose-500/50',
     },
     {
       type: 'product_grid',
       titleKey: 'adminUi.home.sections.blocks.product_grid',
       descKey: 'adminUi.content.blockLibrary.items.product_grid',
-      gradient: 'from-emerald-500/50 to-teal-500/50'
+      gradient: 'from-emerald-500/50 to-teal-500/50',
     },
     {
       type: 'form',
       titleKey: 'adminUi.home.sections.blocks.form',
       descKey: 'adminUi.content.blockLibrary.items.form',
-      gradient: 'from-amber-500/50 to-orange-500/50'
+      gradient: 'from-amber-500/50 to-orange-500/50',
     },
     {
       type: 'image',
       titleKey: 'adminUi.home.sections.blocks.image',
       descKey: 'adminUi.content.blockLibrary.items.image',
-      gradient: 'from-sky-500/50 to-indigo-500/50'
+      gradient: 'from-sky-500/50 to-indigo-500/50',
     },
     {
       type: 'gallery',
       titleKey: 'adminUi.home.sections.blocks.gallery',
       descKey: 'adminUi.content.blockLibrary.items.gallery',
-      gradient: 'from-emerald-500/50 to-teal-500/50'
+      gradient: 'from-emerald-500/50 to-teal-500/50',
     },
     {
       type: 'banner',
       titleKey: 'adminUi.home.sections.blocks.banner',
       descKey: 'adminUi.content.blockLibrary.items.banner',
-      gradient: 'from-amber-500/50 to-orange-500/50'
+      gradient: 'from-amber-500/50 to-orange-500/50',
     },
     {
       type: 'carousel',
       titleKey: 'adminUi.home.sections.blocks.carousel',
       descKey: 'adminUi.content.blockLibrary.items.carousel',
-      gradient: 'from-violet-500/50 to-indigo-500/50'
-    }
+      gradient: 'from-violet-500/50 to-indigo-500/50',
+    },
   ];
 
   filteredBlocks(): BlockDef[] {
@@ -175,7 +195,12 @@ export class CmsBlockLibraryComponent {
 
   onDragStart(event: DragEvent, type: CmsBlockLibraryBlockType): void {
     try {
-      const payload = JSON.stringify({ kind: 'cms-block', scope: this.context, type, template: this.template() });
+      const payload = JSON.stringify({
+        kind: 'cms-block',
+        scope: this.context,
+        type,
+        template: this.template(),
+      });
       event.dataTransfer?.setData('text/plain', payload);
       if (event.dataTransfer) event.dataTransfer.effectAllowed = 'copy';
     } catch {

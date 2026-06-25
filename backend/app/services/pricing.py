@@ -47,7 +47,9 @@ def compute_fee(
     if fee_value <= 0:
         return Decimal("0.00")
     if fee_type == "percent":
-        return quantize_money(taxable_subtotal * fee_value / Decimal("100"), rounding=rounding)
+        return quantize_money(
+            taxable_subtotal * fee_value / Decimal("100"), rounding=rounding
+        )
     return quantize_money(fee_value, rounding=rounding)
 
 
@@ -92,17 +94,29 @@ def compute_totals(
     vat_override: Decimal | None = None,
 ) -> PricingBreakdown:
     subtotal_q = quantize_money(subtotal, rounding=rounding)
-    discount_q = quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
+    discount_q = (
+        quantize_money(discount, rounding=rounding) if discount > 0 else Decimal("0.00")
+    )
     taxable = subtotal_q - discount_q
     if taxable < 0:
         taxable = Decimal("0.00")
     taxable = quantize_money(taxable, rounding=rounding)
-    shipping_q = quantize_money(shipping, rounding=rounding) if shipping > 0 else Decimal("0.00")
-    fee = compute_fee(taxable_subtotal=taxable, enabled=fee_enabled, fee_type=fee_type, fee_value=fee_value, rounding=rounding)
+    shipping_q = (
+        quantize_money(shipping, rounding=rounding) if shipping > 0 else Decimal("0.00")
+    )
+    fee = compute_fee(
+        taxable_subtotal=taxable,
+        enabled=fee_enabled,
+        fee_type=fee_type,
+        fee_value=fee_value,
+        rounding=rounding,
+    )
     if not vat_enabled:
         vat = Decimal("0.00")
     elif vat_override is not None:
-        vat = quantize_money(vat_override if vat_override > 0 else Decimal("0.00"), rounding=rounding)
+        vat = quantize_money(
+            vat_override if vat_override > 0 else Decimal("0.00"), rounding=rounding
+        )
     else:
         vat = compute_vat(
             taxable_subtotal=taxable,
@@ -115,7 +129,7 @@ def compute_totals(
             rounding=rounding,
         )
     total = taxable + shipping_q + fee + vat
-    if total < 0:
+    if total < 0:  # pragma: no cover - unreachable: all summands are clamped >= 0
         total = Decimal("0.00")
     total = quantize_money(total, rounding=rounding)
     return PricingBreakdown(

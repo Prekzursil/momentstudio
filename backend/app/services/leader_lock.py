@@ -42,7 +42,11 @@ def _leader_engine() -> AsyncEngine:
     if _LEADER_ENGINE is not None:
         return _LEADER_ENGINE
 
-    connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+    connect_args = (
+        {"check_same_thread": False}
+        if settings.database_url.startswith("sqlite")
+        else {}
+    )
     _LEADER_ENGINE = create_async_engine(
         settings.database_url,
         future=True,
@@ -79,23 +83,35 @@ async def run_as_leader(
         try:
             async with _leader_engine().connect() as conn:
                 acquired = bool(
-                    (await conn.execute(text("SELECT pg_try_advisory_lock(:id)"), {"id": lock_id})).scalar()
+                    (
+                        await conn.execute(
+                            text("SELECT pg_try_advisory_lock(:id)"), {"id": lock_id}
+                        )
+                    ).scalar()
                 )
                 if not acquired:
                     with suppress(asyncio.TimeoutError):
                         await asyncio.wait_for(stop.wait(), timeout=retry)
                     continue
 
-                logger.info("leader_lock_acquired", extra={"lock_name": name, "lock_id": lock_id})
+                logger.info(
+                    "leader_lock_acquired",
+                    extra={"lock_name": name, "lock_id": lock_id},
+                )
                 try:
                     await work(stop)
                 finally:
                     with suppress(Exception):
-                        await conn.execute(text("SELECT pg_advisory_unlock(:id)"), {"id": lock_id})
+                        await conn.execute(
+                            text("SELECT pg_advisory_unlock(:id)"), {"id": lock_id}
+                        )
                 return
         except asyncio.CancelledError:
             break
         except Exception as exc:
-            logger.warning("leader_lock_failed", extra={"lock_name": name, "lock_id": lock_id, "error": str(exc)})
+            logger.warning(
+                "leader_lock_failed",
+                extra={"lock_name": name, "lock_id": lock_id, "error": str(exc)},
+            )
             with suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(stop.wait(), timeout=retry)

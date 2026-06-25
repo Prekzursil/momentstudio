@@ -14,22 +14,46 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
 @Component({
   selector: 'app-admin-order-exports',
   standalone: true,
-  imports: [CommonModule, TranslateModule, BreadcrumbComponent, ButtonComponent, ErrorStateComponent, SkeletonComponent, AdminPageHeaderComponent],
+  imports: [
+    CommonModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    ErrorStateComponent,
+    SkeletonComponent,
+    AdminPageHeaderComponent,
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-      <app-admin-page-header [titleKey]="'adminUi.orders.exports.title'" [hintKey]="'adminUi.orders.exports.hint'">
+      <app-admin-page-header
+        [titleKey]="'adminUi.orders.exports.title'"
+        [hintKey]="'adminUi.orders.exports.hint'"
+      >
         <ng-template #primaryActions>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.exports.back' | translate" (action)="backToOrders()"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.orders.exports.back' | translate"
+            (action)="backToOrders()"
+          ></app-button>
         </ng-template>
 
         <ng-template #secondaryActions>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="load()"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.actions.refresh' | translate"
+            (action)="load()"
+          ></app-button>
         </ng-template>
       </app-admin-page-header>
 
-      <div *ngIf="loading()" class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div
+        *ngIf="loading()"
+        class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <app-skeleton [rows]="6"></app-skeleton>
       </div>
 
@@ -48,19 +72,38 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
         <table class="w-full text-sm">
           <thead class="bg-slate-50 text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
             <tr>
-              <th class="px-4 py-3 text-left font-semibold">{{ 'adminUi.orders.exports.table.kind' | translate }}</th>
-              <th class="px-4 py-3 text-left font-semibold">{{ 'adminUi.orders.exports.table.orders' | translate }}</th>
-              <th class="px-4 py-3 text-left font-semibold">{{ 'adminUi.orders.exports.table.file' | translate }}</th>
-              <th class="px-4 py-3 text-left font-semibold">{{ 'adminUi.orders.exports.table.created' | translate }}</th>
-              <th class="px-4 py-3 text-left font-semibold">{{ 'adminUi.orders.exports.table.expires' | translate }}</th>
-              <th class="px-4 py-3 text-right font-semibold">{{ 'adminUi.orders.exports.table.actions' | translate }}</th>
+              <th class="px-4 py-3 text-left font-semibold">
+                {{ 'adminUi.orders.exports.table.kind' | translate }}
+              </th>
+              <th class="px-4 py-3 text-left font-semibold">
+                {{ 'adminUi.orders.exports.table.orders' | translate }}
+              </th>
+              <th class="px-4 py-3 text-left font-semibold">
+                {{ 'adminUi.orders.exports.table.file' | translate }}
+              </th>
+              <th class="px-4 py-3 text-left font-semibold">
+                {{ 'adminUi.orders.exports.table.created' | translate }}
+              </th>
+              <th class="px-4 py-3 text-left font-semibold">
+                {{ 'adminUi.orders.exports.table.expires' | translate }}
+              </th>
+              <th class="px-4 py-3 text-right font-semibold">
+                {{ 'adminUi.orders.exports.table.actions' | translate }}
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-            <tr *ngFor="let item of items()" class="hover:bg-slate-50/70 dark:hover:bg-slate-950/30">
-              <td class="px-4 py-3 font-medium text-slate-900 dark:text-slate-50">{{ kindLabel(item.kind) }}</td>
+            <tr
+              *ngFor="let item of items()"
+              class="hover:bg-slate-50/70 dark:hover:bg-slate-950/30"
+            >
+              <td class="px-4 py-3 font-medium text-slate-900 dark:text-slate-50">
+                {{ kindLabel(item.kind) }}
+              </td>
               <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
-                <ng-container *ngIf="item.order_reference; else batchTpl">{{ item.order_reference }}</ng-container>
+                <ng-container *ngIf="item.order_reference; else batchTpl">{{
+                  item.order_reference
+                }}</ng-container>
                 <ng-template #batchTpl>
                   {{ item.order_count || 0 }} {{ 'adminUi.orders.exports.ordersCount' | translate }}
                 </ng-template>
@@ -68,9 +111,13 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
               <td class="px-4 py-3 text-slate-700 dark:text-slate-200">
                 <span class="truncate block max-w-[340px]">{{ item.filename }}</span>
               </td>
-              <td class="px-4 py-3 text-slate-600 dark:text-slate-300">{{ item.created_at | date: 'short' }}</td>
               <td class="px-4 py-3 text-slate-600 dark:text-slate-300">
-                <ng-container *ngIf="item.expires_at; else neverTpl">{{ item.expires_at | date: 'short' }}</ng-container>
+                {{ item.created_at | date: 'short' }}
+              </td>
+              <td class="px-4 py-3 text-slate-600 dark:text-slate-300">
+                <ng-container *ngIf="item.expires_at; else neverTpl">{{
+                  item.expires_at | date: 'short'
+                }}</ng-container>
                 <ng-template #neverTpl>—</ng-template>
               </td>
               <td class="px-4 py-3 text-right">
@@ -93,15 +140,30 @@ import { AdminPageHeaderComponent } from '../shared/admin-page-header.component'
         </table>
       </div>
 
-      <div *ngIf="meta()" class="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
+      <div
+        *ngIf="meta()"
+        class="flex items-center justify-between text-sm text-slate-600 dark:text-slate-300"
+      >
         <div>{{ page }} / {{ meta()!.total_pages }}</div>
         <div class="flex items-center gap-2">
-          <app-button size="sm" variant="ghost" [label]="'adminUi.actions.prev' | translate" [disabled]="page <= 1" (action)="goTo(page - 1)"></app-button>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.actions.next' | translate" [disabled]="page >= meta()!.total_pages" (action)="goTo(page + 1)"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.actions.prev' | translate"
+            [disabled]="page <= 1"
+            (action)="goTo(page - 1)"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.actions.next' | translate"
+            [disabled]="page >= meta()!.total_pages"
+            (action)="goTo(page + 1)"
+          ></app-button>
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class AdminOrderExportsComponent implements OnInit {
   loading = signal(true);
@@ -118,14 +180,14 @@ export class AdminOrderExportsComponent implements OnInit {
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
     { label: 'adminUi.nav.orders', url: '/admin/orders' },
-    { label: 'adminUi.orders.exports.title' }
+    { label: 'adminUi.orders.exports.title' },
   ];
 
   constructor(
     private readonly api: AdminOrdersService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    private readonly router: Router
+    private readonly router: Router,
   ) {}
 
   ngOnInit(): void {
@@ -148,7 +210,7 @@ export class AdminOrderExportsComponent implements OnInit {
     this.api.listDocumentExports({ page: this.page, limit: this.limit }).subscribe({
       next: (res) => {
         this.items.set(res?.items || []);
-        this.meta.set((res)?.meta || null);
+        this.meta.set(res?.meta || null);
         this.loading.set(false);
       },
       error: (err) => {
@@ -157,7 +219,7 @@ export class AdminOrderExportsComponent implements OnInit {
         this.items.set([]);
         this.meta.set(null);
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -202,8 +264,7 @@ export class AdminOrderExportsComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.exports.errors.download'));
         this.busyId.set(null);
-      }
+      },
     });
   }
 }
-

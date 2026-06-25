@@ -29,7 +29,17 @@ type HomeSectionId =
   | 'recently_viewed'
   | 'why';
 
-type HomeBlockType = HomeSectionId | 'text' | 'columns' | 'cta' | 'faq' | 'testimonials' | 'image' | 'gallery' | 'banner' | 'carousel';
+type HomeBlockType =
+  | HomeSectionId
+  | 'text'
+  | 'columns'
+  | 'cta'
+  | 'faq'
+  | 'testimonials'
+  | 'image'
+  | 'gallery'
+  | 'banner'
+  | 'carousel';
 
 interface HomeBlockBase {
   key: string;
@@ -162,7 +172,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
   { key: 'featured_collections', type: 'featured_collections', enabled: true },
   { key: 'story', type: 'story', enabled: true },
   { key: 'recently_viewed', type: 'recently_viewed', enabled: true },
-  { key: 'why', type: 'why', enabled: true }
+  { key: 'why', type: 'why', enabled: true },
 ];
 
 @Component({
@@ -176,7 +186,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
     SkeletonComponent,
     TranslateModule,
     BannerBlockComponent,
-    CarouselBlockComponent
+    CarouselBlockComponent,
   ],
   template: `
     <section class="grid gap-10">
@@ -205,8 +215,14 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'featured_products'">
             <div class="grid gap-4">
               <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.featured' | translate }}</h2>
-                <app-button [label]="'home.viewAll' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'home.featured' | translate }}
+                </h2>
+                <app-button
+                  [label]="'home.viewAll' | translate"
+                  variant="ghost"
+                  [routerLink]="['/shop']"
+                ></app-button>
               </div>
 
               <div *ngIf="featuredLoading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -218,17 +234,34 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                 class="border border-amber-200 bg-amber-50 rounded-2xl p-4 flex items-center justify-between dark:border-amber-900/40 dark:bg-amber-950/30"
               >
                 <div>
-                  <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'home.featuredError.title' | translate }}</p>
-                  <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'home.featuredError.copy' | translate }}</p>
+                  <p class="font-semibold text-amber-900 dark:text-amber-100">
+                    {{ 'home.featuredError.title' | translate }}
+                  </p>
+                  <p class="text-sm text-amber-800 dark:text-amber-200">
+                    {{ 'home.featuredError.copy' | translate }}
+                  </p>
                 </div>
-                <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadFeatured()"></app-button>
+                <app-button
+                  [label]="'shop.retry' | translate"
+                  size="sm"
+                  (action)="loadFeatured()"
+                ></app-button>
               </div>
 
-              <div *ngIf="!featuredLoading() && !featuredError() && featured.length" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <app-product-card *ngFor="let product of featured" [product]="product"></app-product-card>
+              <div
+                *ngIf="!featuredLoading() && !featuredError() && featured.length"
+                class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              >
+                <app-product-card
+                  *ngFor="let product of featured"
+                  [product]="product"
+                ></app-product-card>
               </div>
 
-              <div *ngIf="!featuredLoading() && !featuredError() && !featured.length" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="!featuredLoading() && !featuredError() && !featured.length"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'home.noFeatured' | translate }}
               </div>
             </div>
@@ -237,13 +270,15 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'sale_products'">
             <div class="grid gap-4">
               <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.saleProducts' | translate }}</h2>
-	                <app-button
-	                  [label]="'home.viewAll' | translate"
-	                  variant="ghost"
-	                  [routerLink]="['/shop']"
-	                  [queryParams]="{ on_sale: 1 }"
-	                ></app-button>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'home.saleProducts' | translate }}
+                </h2>
+                <app-button
+                  [label]="'home.viewAll' | translate"
+                  variant="ghost"
+                  [routerLink]="['/shop']"
+                  [queryParams]="{ on_sale: 1 }"
+                ></app-button>
               </div>
 
               <div *ngIf="saleLoading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -255,20 +290,34 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                 class="border border-amber-200 bg-amber-50 rounded-2xl p-4 flex items-center justify-between dark:border-amber-900/40 dark:bg-amber-950/30"
               >
                 <div>
-                  <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'home.saleError.title' | translate }}</p>
-                  <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'home.saleError.copy' | translate }}</p>
+                  <p class="font-semibold text-amber-900 dark:text-amber-100">
+                    {{ 'home.saleError.title' | translate }}
+                  </p>
+                  <p class="text-sm text-amber-800 dark:text-amber-200">
+                    {{ 'home.saleError.copy' | translate }}
+                  </p>
                 </div>
-                <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadSaleProducts()"></app-button>
+                <app-button
+                  [label]="'shop.retry' | translate"
+                  size="sm"
+                  (action)="loadSaleProducts()"
+                ></app-button>
               </div>
 
               <div
                 *ngIf="!saleLoading() && !saleError() && saleProducts.length"
                 class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
               >
-                <app-product-card *ngFor="let product of saleProducts" [product]="product"></app-product-card>
+                <app-product-card
+                  *ngFor="let product of saleProducts"
+                  [product]="product"
+                ></app-product-card>
               </div>
 
-              <div *ngIf="!saleLoading() && !saleError() && !saleProducts.length" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="!saleLoading() && !saleError() && !saleProducts.length"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'home.saleEmpty' | translate }}
               </div>
             </div>
@@ -277,8 +326,14 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'new_arrivals'">
             <div class="grid gap-4">
               <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.newArrivals' | translate }}</h2>
-                <app-button [label]="'home.viewAll' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'home.newArrivals' | translate }}
+                </h2>
+                <app-button
+                  [label]="'home.viewAll' | translate"
+                  variant="ghost"
+                  [routerLink]="['/shop']"
+                ></app-button>
               </div>
 
               <div *ngIf="newArrivalsLoading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -290,20 +345,34 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                 class="border border-amber-200 bg-amber-50 rounded-2xl p-4 flex items-center justify-between dark:border-amber-900/40 dark:bg-amber-950/30"
               >
                 <div>
-                  <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'home.newArrivalsError.title' | translate }}</p>
-                  <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'home.newArrivalsError.copy' | translate }}</p>
+                  <p class="font-semibold text-amber-900 dark:text-amber-100">
+                    {{ 'home.newArrivalsError.title' | translate }}
+                  </p>
+                  <p class="text-sm text-amber-800 dark:text-amber-200">
+                    {{ 'home.newArrivalsError.copy' | translate }}
+                  </p>
                 </div>
-                <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadNewArrivals()"></app-button>
+                <app-button
+                  [label]="'shop.retry' | translate"
+                  size="sm"
+                  (action)="loadNewArrivals()"
+                ></app-button>
               </div>
 
               <div
                 *ngIf="!newArrivalsLoading() && !newArrivalsError() && newArrivals.length"
                 class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
               >
-                <app-product-card *ngFor="let product of newArrivals" [product]="product"></app-product-card>
+                <app-product-card
+                  *ngFor="let product of newArrivals"
+                  [product]="product"
+                ></app-product-card>
               </div>
 
-              <div *ngIf="!newArrivalsLoading() && !newArrivalsError() && !newArrivals.length" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="!newArrivalsLoading() && !newArrivalsError() && !newArrivals.length"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'home.newArrivalsEmpty' | translate }}
               </div>
             </div>
@@ -311,7 +380,9 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 
           <ng-container *ngSwitchCase="'featured_collections'">
             <div class="grid gap-4">
-              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.collections' | translate }}</h2>
+              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'home.collections' | translate }}
+              </h2>
 
               <div *ngIf="collectionsLoading()" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <app-skeleton *ngFor="let i of skeletons" height="220px"></app-skeleton>
@@ -322,25 +393,46 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                 class="border border-amber-200 bg-amber-50 rounded-2xl p-4 flex items-center justify-between dark:border-amber-900/40 dark:bg-amber-950/30"
               >
                 <div>
-                  <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'home.collectionsError.title' | translate }}</p>
-                  <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'home.collectionsError.copy' | translate }}</p>
+                  <p class="font-semibold text-amber-900 dark:text-amber-100">
+                    {{ 'home.collectionsError.title' | translate }}
+                  </p>
+                  <p class="text-sm text-amber-800 dark:text-amber-200">
+                    {{ 'home.collectionsError.copy' | translate }}
+                  </p>
                 </div>
-                <app-button [label]="'shop.retry' | translate" size="sm" (action)="loadCollections()"></app-button>
+                <app-button
+                  [label]="'shop.retry' | translate"
+                  size="sm"
+                  (action)="loadCollections()"
+                ></app-button>
               </div>
 
-              <div *ngIf="!collectionsLoading() && !collectionsError() && featuredCollections.length" class="grid gap-8">
+              <div
+                *ngIf="!collectionsLoading() && !collectionsError() && featuredCollections.length"
+                class="grid gap-8"
+              >
                 <div *ngFor="let col of featuredCollections" class="grid gap-3">
                   <div class="grid gap-1">
-                    <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ col.name }}</h3>
-                    <p *ngIf="col.description" class="text-sm text-slate-600 dark:text-slate-300">{{ col.description }}</p>
+                    <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                      {{ col.name }}
+                    </h3>
+                    <p *ngIf="col.description" class="text-sm text-slate-600 dark:text-slate-300">
+                      {{ col.description }}
+                    </p>
                   </div>
                   <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <app-product-card *ngFor="let product of col.products.slice(0, 6)" [product]="product"></app-product-card>
+                    <app-product-card
+                      *ngFor="let product of col.products.slice(0, 6)"
+                      [product]="product"
+                    ></app-product-card>
                   </div>
                 </div>
               </div>
 
-              <div *ngIf="!collectionsLoading() && !collectionsError() && !featuredCollections.length" class="text-sm text-slate-600 dark:text-slate-300">
+              <div
+                *ngIf="!collectionsLoading() && !collectionsError() && !featuredCollections.length"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
                 {{ 'home.collectionsEmpty' | translate }}
               </div>
             </div>
@@ -348,11 +440,20 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 
           <ng-container *ngSwitchCase="'story'">
             <div class="grid gap-4" *ngIf="!storyLoading() && storyBlock()">
-              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ storyBlock()!.title }}</h2>
+              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ storyBlock()!.title }}
+              </h2>
               <app-card>
-                <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="storyHtml()"></div>
+                <div
+                  class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+                  [innerHTML]="storyHtml()"
+                ></div>
                 <div class="mt-4">
-                  <app-button [label]="'nav.about' | translate" variant="ghost" [routerLink]="['/about']"></app-button>
+                  <app-button
+                    [label]="'nav.about' | translate"
+                    variant="ghost"
+                    [routerLink]="['/about']"
+                  ></app-button>
                 </div>
               </app-card>
             </div>
@@ -361,9 +462,17 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'text'">
             <ng-container *ngIf="asTextBlock(block) as tb">
               <div class="grid gap-4">
-                <h2 *ngIf="tb.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ tb.title }}</h2>
+                <h2
+                  *ngIf="tb.title"
+                  class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                >
+                  {{ tb.title }}
+                </h2>
                 <app-card>
-                  <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="tb.body_html"></div>
+                  <div
+                    class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+                    [innerHTML]="tb.body_html"
+                  ></div>
                 </app-card>
               </div>
             </ng-container>
@@ -372,9 +481,20 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'image'">
             <ng-container *ngIf="asImageBlock(block) as img">
               <div class="grid gap-4">
-                <h2 *ngIf="img.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ img.title }}</h2>
+                <h2
+                  *ngIf="img.title"
+                  class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                >
+                  {{ img.title }}
+                </h2>
                 <app-card>
-                  <a *ngIf="img.link_url; else imageOnly" [href]="img.link_url" class="block" target="_blank" rel="noopener noreferrer">
+                  <a
+                    *ngIf="img.link_url; else imageOnly"
+                    [href]="img.link_url"
+                    class="block"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <img
                       class="w-full rounded-2xl object-cover"
                       [src]="img.url"
@@ -392,7 +512,9 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                       loading="lazy"
                     />
                   </ng-template>
-                  <p *ngIf="img.caption" class="mt-3 text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                  <p *ngIf="img.caption" class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                    {{ img.caption }}
+                  </p>
                 </app-card>
               </div>
             </ng-container>
@@ -401,7 +523,12 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'gallery'">
             <ng-container *ngIf="asGalleryBlock(block) as gal">
               <div class="grid gap-4">
-                <h2 *ngIf="gal.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ gal.title }}</h2>
+                <h2
+                  *ngIf="gal.title"
+                  class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                >
+                  {{ gal.title }}
+                </h2>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <app-card *ngFor="let image of gal.images">
                     <img
@@ -411,7 +538,12 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
                       [style.object-position]="focalPosition(image.focal_x, image.focal_y)"
                       loading="lazy"
                     />
-                    <p *ngIf="image.caption" class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ image.caption }}</p>
+                    <p
+                      *ngIf="image.caption"
+                      class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+                    >
+                      {{ image.caption }}
+                    </p>
                   </app-card>
                 </div>
               </div>
@@ -421,12 +553,25 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'columns'">
             <ng-container *ngIf="asColumnsBlock(block) as cols">
               <div class="grid gap-4">
-                <h2 *ngIf="cols.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ cols.title }}</h2>
+                <h2
+                  *ngIf="cols.title"
+                  class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                >
+                  {{ cols.title }}
+                </h2>
                 <app-card>
                   <div [ngClass]="columnsGridClasses(cols)">
                     <div *ngFor="let col of cols.columns" class="grid gap-2">
-                      <h3 *ngIf="col.title" class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ col.title }}</h3>
-                      <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="col.body_html"></div>
+                      <h3
+                        *ngIf="col.title"
+                        class="text-lg font-semibold text-slate-900 dark:text-slate-50"
+                      >
+                        {{ col.title }}
+                      </h3>
+                      <div
+                        class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+                        [innerHTML]="col.body_html"
+                      ></div>
                     </div>
                   </div>
                 </app-card>
@@ -437,9 +582,17 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'cta'">
             <ng-container *ngIf="asCtaBlock(block) as cta">
               <div class="grid gap-4">
-                <h2 *ngIf="cta.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ cta.title }}</h2>
+                <h2
+                  *ngIf="cta.title"
+                  class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                >
+                  {{ cta.title }}
+                </h2>
                 <app-card>
-                  <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="cta.body_html"></div>
+                  <div
+                    class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+                    [innerHTML]="cta.body_html"
+                  ></div>
                   <div class="mt-4 flex" *ngIf="cta.cta_label && cta.cta_url">
                     <ng-container *ngIf="isExternalHttpUrl(cta.cta_url); else internalCta">
                       <app-button
@@ -461,17 +614,27 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'faq'">
             <ng-container *ngIf="asFaqBlock(block) as faq">
               <div class="grid gap-4">
-                <h2 *ngIf="faq.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ faq.title }}</h2>
+                <h2
+                  *ngIf="faq.title"
+                  class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                >
+                  {{ faq.title }}
+                </h2>
                 <app-card>
                   <div class="grid gap-2">
                     <details
                       *ngFor="let item of faq.items"
                       class="rounded-xl border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
                     >
-                      <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+                      <summary
+                        class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
+                      >
                         {{ item.question }}
                       </summary>
-                      <div class="mt-2 markdown text-base text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="item.answer_html"></div>
+                      <div
+                        class="mt-2 markdown text-base text-slate-700 leading-relaxed dark:text-slate-200"
+                        [innerHTML]="item.answer_html"
+                      ></div>
                     </details>
                   </div>
                 </app-card>
@@ -482,14 +645,27 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'testimonials'">
             <ng-container *ngIf="asTestimonialsBlock(block) as ts">
               <div class="grid gap-4">
-                <h2 *ngIf="ts.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ ts.title }}</h2>
+                <h2
+                  *ngIf="ts.title"
+                  class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                >
+                  {{ ts.title }}
+                </h2>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <app-card *ngFor="let t of ts.items">
-                    <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="t.quote_html"></div>
-                    <p *ngIf="t.author || t.role" class="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    <div
+                      class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+                      [innerHTML]="t.quote_html"
+                    ></div>
+                    <p
+                      *ngIf="t.author || t.role"
+                      class="mt-3 text-sm font-semibold text-slate-900 dark:text-slate-50"
+                    >
                       <span *ngIf="t.author">{{ t.author }}</span>
                       <span *ngIf="t.author && t.role"> · </span>
-                      <span *ngIf="t.role" class="font-normal text-slate-500 dark:text-slate-400">{{ t.role }}</span>
+                      <span *ngIf="t.role" class="font-normal text-slate-500 dark:text-slate-400">{{
+                        t.role
+                      }}</span>
                     </p>
                   </app-card>
                 </div>
@@ -500,18 +676,29 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
           <ng-container *ngSwitchCase="'recently_viewed'">
             <div *ngIf="recentlyViewed.length" class="grid gap-4">
               <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'product.recentlyViewed' | translate }}</h2>
-                <app-button [label]="'home.viewAll' | translate" variant="ghost" [routerLink]="['/shop']"></app-button>
+                <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'product.recentlyViewed' | translate }}
+                </h2>
+                <app-button
+                  [label]="'home.viewAll' | translate"
+                  variant="ghost"
+                  [routerLink]="['/shop']"
+                ></app-button>
               </div>
               <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <app-product-card *ngFor="let product of recentlyViewed" [product]="product"></app-product-card>
+                <app-product-card
+                  *ngFor="let product of recentlyViewed"
+                  [product]="product"
+                ></app-product-card>
               </div>
             </div>
           </ng-container>
 
           <ng-container *ngSwitchCase="'why'">
             <div class="grid gap-4">
-              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ 'home.why' | translate }}</h2>
+              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'home.why' | translate }}
+              </h2>
               <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <app-card [title]="'home.cards.strictTitle' | translate">
                   <p>{{ 'home.cards.strict' | translate }}</p>
@@ -531,7 +718,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
         </ng-container>
       </ng-container>
     </section>
-  `
+  `,
 })
 export class HomeComponent implements OnInit, OnDestroy {
   blocks = signal<HomeBlock[]>(DEFAULT_BLOCKS);
@@ -581,7 +768,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     private readonly auth: AuthService,
     private readonly route: ActivatedRoute,
     private readonly api: ApiService,
-    private readonly markdown: MarkdownService
+    private readonly markdown: MarkdownService,
   ) {}
 
   ngOnInit(): void {
@@ -616,23 +803,25 @@ export class HomeComponent implements OnInit, OnDestroy {
   private loadLayout(): void {
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     if (this.previewToken) {
-      this.api.get<HomePreviewResponse>('/content/home/preview', { token: this.previewToken, lang }).subscribe({
-        next: (resp) => {
-          this.blocks.set(this.parseBlocks(resp?.sections?.meta, lang));
-          const story = resp?.story ?? null;
-          this.storyBlock.set(story);
-          this.storyHtml.set(story ? this.markdown.render(story.body_markdown || '') : '');
-          this.storyLoading.set(false);
-          this.loadSectionData({ skipStory: true });
-        },
-        error: () => {
-          this.blocks.set(DEFAULT_BLOCKS);
-          this.storyBlock.set(null);
-          this.storyHtml.set('');
-          this.storyLoading.set(false);
-          this.loadSectionData({ skipStory: true });
-        }
-      });
+      this.api
+        .get<HomePreviewResponse>('/content/home/preview', { token: this.previewToken, lang })
+        .subscribe({
+          next: (resp) => {
+            this.blocks.set(this.parseBlocks(resp?.sections?.meta, lang));
+            const story = resp?.story ?? null;
+            this.storyBlock.set(story);
+            this.storyHtml.set(story ? this.markdown.render(story.body_markdown || '') : '');
+            this.storyLoading.set(false);
+            this.loadSectionData({ skipStory: true });
+          },
+          error: () => {
+            this.blocks.set(DEFAULT_BLOCKS);
+            this.storyBlock.set(null);
+            this.storyHtml.set('');
+            this.storyLoading.set(false);
+            this.loadSectionData({ skipStory: true });
+          },
+        });
       return;
     }
 
@@ -644,7 +833,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       error: () => {
         this.blocks.set(DEFAULT_BLOCKS);
         this.loadSectionData();
-      }
+      },
     });
   }
 
@@ -654,6 +843,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     const ensureUniqueKey = (raw: unknown, fallback: string): string | null => {
       const key = (typeof raw === 'string' ? raw.trim() : '') || fallback;
+      /* istanbul ignore next -- fallback is always a non-empty generated key, so `!key` is unreachable */
       if (!key) return null;
       if (seenKeys.has(key)) return null;
       seenKeys.add(key);
@@ -667,7 +857,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       const preferred = typeof record[lang] === 'string' ? String(record[lang]).trim() : '';
       if (preferred) return preferred;
       const otherLang = lang === 'ro' ? 'en' : 'ro';
-      const fallback = typeof record[otherLang] === 'string' ? String(record[otherLang]).trim() : '';
+      const fallback =
+        typeof record[otherLang] === 'string' ? String(record[otherLang]).trim() : '';
       return fallback || null;
     };
 
@@ -677,13 +868,28 @@ export class HomeComponent implements OnInit, OnDestroy {
       return trimmed ? trimmed : null;
     };
 
-    const readBoolean = (value: unknown, fallback = false): boolean => {
+    const readBoolean = (
+      value: unknown,
+      /* istanbul ignore next -- every caller passes an explicit fallback */ fallback = false,
+    ): boolean => {
       if (typeof value === 'boolean') return value;
       if (typeof value === 'number') return value === 1;
       if (typeof value === 'string') {
         const normalized = value.trim().toLowerCase();
-        if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on') return true;
-        if (normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'off') return false;
+        if (
+          normalized === '1' ||
+          normalized === 'true' ||
+          normalized === 'yes' ||
+          normalized === 'on'
+        )
+          return true;
+        if (
+          normalized === '0' ||
+          normalized === 'false' ||
+          normalized === 'no' ||
+          normalized === 'off'
+        )
+          return false;
       }
       return fallback;
     };
@@ -697,7 +903,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       return fallback;
     };
 
-    const normalizeVariant = (value: unknown): 'full' | 'split' => (readString(value) === 'full' ? 'full' : 'split');
+    const normalizeVariant = (value: unknown): 'full' | 'split' =>
+      readString(value) === 'full' ? 'full' : 'split';
 
     const normalizeSize = (value: unknown): 'S' | 'M' | 'L' => {
       const raw = readString(value);
@@ -709,7 +916,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       return 'M';
     };
 
-    const normalizeTextStyle = (value: unknown): 'light' | 'dark' => (readString(value) === 'light' ? 'light' : 'dark');
+    const normalizeTextStyle = (value: unknown): 'light' | 'dark' =>
+      readString(value) === 'light' ? 'light' : 'dark';
 
     const normalizeColumnsBreakpoint = (value: unknown): ColumnsBreakpoint => {
       const raw = readString(value);
@@ -730,7 +938,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         size: normalizeSize(rec['size']),
         text_style: normalizeTextStyle(rec['text_style']),
         focal_x: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_x'], 50)))),
-        focal_y: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50))))
+        focal_y: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50)))),
       };
     };
 
@@ -741,7 +949,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         interval_ms: Math.max(1000, readNumber(rec['interval_ms'], 5000)),
         show_dots: readBoolean(rec['show_dots'], true),
         show_arrows: readBoolean(rec['show_arrows'], true),
-        pause_on_hover: readBoolean(rec['pause_on_hover'], true)
+        pause_on_hover: readBoolean(rec['pause_on_hover'], true),
       };
     };
 
@@ -792,7 +1000,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             caption: readLocalized(rec['caption']),
             link_url: typeof rec['link_url'] === 'string' ? rec['link_url'].trim() : null,
             focal_x: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_x'], 50)))),
-            focal_y: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50))))
+            focal_y: Math.max(0, Math.min(100, Math.round(readNumber(rec['focal_y'], 50)))),
           });
           continue;
         }
@@ -810,7 +1018,7 @@ export class HomeComponent implements OnInit, OnDestroy {
                 alt: readLocalized(imgRec['alt']),
                 caption: readLocalized(imgRec['caption']),
                 focal_x: Math.max(0, Math.min(100, Math.round(readNumber(imgRec['focal_x'], 50)))),
-                focal_y: Math.max(0, Math.min(100, Math.round(readNumber(imgRec['focal_y'], 50))))
+                focal_y: Math.max(0, Math.min(100, Math.round(readNumber(imgRec['focal_y'], 50)))),
               });
             }
           }
@@ -820,7 +1028,13 @@ export class HomeComponent implements OnInit, OnDestroy {
         }
 
         if (type === 'banner') {
-          configured.push({ key, type, enabled, title: readLocalized(rec['title']), slide: parseSlide(rec['slide']) });
+          configured.push({
+            key,
+            type,
+            enabled,
+            title: readLocalized(rec['title']),
+            slide: parseSlide(rec['slide']),
+          });
           continue;
         }
 
@@ -837,7 +1051,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             enabled,
             title: readLocalized(rec['title']),
             slides,
-            settings: parseCarouselSettings(rec['settings'])
+            settings: parseCarouselSettings(rec['settings']),
           });
           continue;
         }
@@ -864,7 +1078,9 @@ export class HomeComponent implements OnInit, OnDestroy {
             title: readLocalized(rec['title']),
             columns,
             columns_count: columns.length === 3 ? 3 : 2,
-            breakpoint: normalizeColumnsBreakpoint(rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'])
+            breakpoint: normalizeColumnsBreakpoint(
+              rec['columns_breakpoint'] ?? rec['breakpoint'] ?? rec['stack_at'],
+            ),
           });
           continue;
         }
@@ -885,7 +1101,7 @@ export class HomeComponent implements OnInit, OnDestroy {
             body_html: this.markdown.render(body),
             cta_label: ctaLabel,
             cta_url: ctaUrl,
-            cta_new_tab: ctaNewTab
+            cta_new_tab: ctaNewTab,
           });
           continue;
         }
@@ -971,7 +1187,9 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private ensureAllDefaultBlocks(blocks: HomeBlock[]): HomeBlock[] {
     const out = [...blocks];
-    const existing = new Set(out.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId));
+    const existing = new Set(
+      out.filter((b) => this.isHomeSectionId(b.type)).map((b) => b.type as HomeSectionId),
+    );
     for (const block of DEFAULT_BLOCKS.filter((b) => this.isHomeSectionId(b.type))) {
       const id = block.type as HomeSectionId;
       if (!existing.has(id)) out.push({ key: id, type: id, enabled: block.enabled });
@@ -1015,7 +1233,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     const ids = new Set(
       this.enabledBlocks()
         .map((b) => (this.isHomeSectionId(b.type) ? (b.type as HomeSectionId) : null))
-        .filter((x): x is HomeSectionId => Boolean(x))
+        .filter((x): x is HomeSectionId => Boolean(x)),
     );
     if (ids.has('featured_products')) this.loadFeatured();
     if (ids.has('sale_products')) this.loadSaleProducts();
@@ -1068,9 +1286,11 @@ export class HomeComponent implements OnInit, OnDestroy {
   columnsGridClasses(block: HomeColumnsBlock): string {
     const matrix: Record<ColumnsCount, Record<ColumnsBreakpoint, string>> = {
       2: { sm: 'sm:grid-cols-2', md: 'md:grid-cols-2', lg: 'lg:grid-cols-2' },
-      3: { sm: 'sm:grid-cols-3', md: 'md:grid-cols-3', lg: 'lg:grid-cols-3' }
+      3: { sm: 'sm:grid-cols-3', md: 'md:grid-cols-3', lg: 'lg:grid-cols-3' },
     };
-    return ['grid', 'gap-6', 'grid-cols-1', matrix[block.columns_count][block.breakpoint]].join(' ');
+    return ['grid', 'gap-6', 'grid-cols-1', matrix[block.columns_count][block.breakpoint]].join(
+      ' ',
+    );
   }
 
   loadFeatured(): void {
@@ -1083,7 +1303,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         limit: 6,
         sort: 'newest',
         page: 1,
-        lang
+        lang,
       })
       .subscribe({
         next: (resp) => {
@@ -1094,22 +1314,22 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.featured = [];
           this.featuredLoading.set(false);
           this.featuredError.set(true);
-        }
+        },
       });
   }
 
-	  loadSaleProducts(): void {
-	    this.saleLoading.set(true);
-	    this.saleError.set(false);
-      const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
-	    this.catalog
-	      .listProducts({
-	        on_sale: true,
-	        limit: 6,
-	        sort: 'newest',
-	        page: 1,
-          lang
-	      })
+  loadSaleProducts(): void {
+    this.saleLoading.set(true);
+    this.saleError.set(false);
+    const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
+    this.catalog
+      .listProducts({
+        on_sale: true,
+        limit: 6,
+        sort: 'newest',
+        page: 1,
+        lang,
+      })
       .subscribe({
         next: (resp) => {
           this.saleProducts = resp.items;
@@ -1119,7 +1339,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.saleProducts = [];
           this.saleLoading.set(false);
           this.saleError.set(true);
-        }
+        },
       });
   }
 
@@ -1132,7 +1352,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         limit: 6,
         sort: 'newest',
         page: 1,
-        lang
+        lang,
       })
       .subscribe({
         next: (resp) => {
@@ -1143,7 +1363,7 @@ export class HomeComponent implements OnInit, OnDestroy {
           this.newArrivals = [];
           this.newArrivalsLoading.set(false);
           this.newArrivalsError.set(true);
-        }
+        },
       });
   }
 
@@ -1160,7 +1380,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.featuredCollections = [];
         this.collectionsLoading.set(false);
         this.collectionsError.set(true);
-      }
+      },
     });
   }
 
@@ -1177,7 +1397,7 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.storyBlock.set(null);
         this.storyHtml.set('');
         this.storyLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1188,7 +1408,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       'home',
       lang,
       this.translate.instant('meta.descriptions.home'),
-      this.translate.instant('home.metaDescription')
+      this.translate.instant('home.metaDescription'),
     );
     this.title.setTitle(title);
     this.meta.updateTag({ name: 'description', content: description });
@@ -1203,9 +1423,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         name: title,
         description,
         url: canonical,
-        inLanguage: lang
-      }
+        inLanguage: lang,
+      },
     ]);
   }
 }
-

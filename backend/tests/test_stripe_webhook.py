@@ -41,13 +41,17 @@ def test_app() -> Dict[str, object]:
     app.dependency_overrides.clear()
 
 
-def test_webhook_rejects_invalid_signature(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_webhook_rejects_invalid_signature(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
     monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
 
     def fake_construct_event(payload, sig_header, secret):
         raise Exception("bad signature")
 
-    monkeypatch.setattr("app.services.payments.stripe.Webhook.construct_event", fake_construct_event)
+    monkeypatch.setattr(
+        "app.services.payments.stripe.Webhook.construct_event", fake_construct_event
+    )
 
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     res = client.post(
@@ -59,20 +63,29 @@ def test_webhook_rejects_invalid_signature(monkeypatch: pytest.MonkeyPatch, test
     assert res.json()["detail"] == "Invalid payload"
 
 
-def test_webhook_idempotency(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_webhook_idempotency(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
     monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
     monkeypatch.setattr(
         "app.services.payments.stripe.Webhook.construct_event",
-        lambda payload, sig_header, secret: {"id": "evt_123", "type": "payment_intent.succeeded"},
+        lambda payload, sig_header, secret: {
+            "id": "evt_123",
+            "type": "payment_intent.succeeded",
+        },
     )
 
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory: Callable = test_app["session_factory"]  # type: ignore[assignment]
 
-    res1 = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    res1 = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert res1.status_code == 200, res1.text
 
-    res2 = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    res2 = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert res2.status_code == 200, res2.text
 
     async def count() -> int:
@@ -83,7 +96,9 @@ def test_webhook_idempotency(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str
     assert asyncio.run(count()) == 1
 
 
-def test_webhook_dispute_notifies_owner_once(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_webhook_dispute_notifies_owner_once(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
     monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test")
     monkeypatch.setattr(settings, "admin_alert_email", None)
 
@@ -126,7 +141,11 @@ def test_webhook_dispute_notifies_owner_once(monkeypatch: pytest.MonkeyPatch, te
         sent["event_type"] = event_type
         return True
 
-    monkeypatch.setattr(email_service, "send_stripe_dispute_notification", fake_send_stripe_dispute_notification)
+    monkeypatch.setattr(
+        email_service,
+        "send_stripe_dispute_notification",
+        fake_send_stripe_dispute_notification,
+    )
 
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory = test_app["session_factory"]
@@ -147,9 +166,13 @@ def test_webhook_dispute_notifies_owner_once(monkeypatch: pytest.MonkeyPatch, te
 
     asyncio.run(seed_owner())
 
-    res1 = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    res1 = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert res1.status_code == 200, res1.text
-    res2 = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    res2 = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert res2.status_code == 200, res2.text
 
     assert sent["count"] == 1
@@ -194,7 +217,9 @@ def test_webhook_payment_intent_succeeded_does_not_mark_order_paid(
 
     asyncio.run(seed_order())
 
-    res = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    res = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert res.status_code == 200, res.text
 
     async def fetch() -> tuple[OrderStatus, bool]:

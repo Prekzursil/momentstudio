@@ -1,6 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
-import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import {
+  CdkDragDrop,
+  DragDropModule,
+  moveItemInArray,
+  transferArrayItem,
+} from '@angular/cdk/drag-drop';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -18,7 +23,12 @@ import { ActionBarComponent } from '../../../shared/action-bar.component';
 import { FormSectionComponent } from '../../../shared/form-section.component';
 import { ToastService } from '../../../core/toast.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
-import { AdminOrderListItem, AdminOrderListResponse, AdminOrderTagStat, AdminOrdersService } from '../../../core/admin-orders.service';
+import {
+  AdminOrderListItem,
+  AdminOrderListResponse,
+  AdminOrderTagStat,
+  AdminOrdersService,
+} from '../../../core/admin-orders.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 import { AuthService } from '../../../core/auth.service';
 import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
@@ -29,9 +39,12 @@ import {
   defaultAdminTableLayout,
   loadAdminTableLayout,
   saveAdminTableLayout,
-  visibleAdminTableColumnIds
+  visibleAdminTableColumnIds,
 } from '../shared/admin-table-layout';
-import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import {
+  AdminTableLayoutColumnDef,
+  TableLayoutModalComponent,
+} from '../shared/table-layout-modal.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 
@@ -42,7 +55,7 @@ import {
   loadTagColorOverrides,
   persistTagColorOverrides,
   tagColorFor,
-  tagChipColorClass as tagChipColorClassFromHelper
+  tagChipColorClass as tagChipColorClassFromHelper,
 } from './order-tag-colors';
 
 type OrderStatusFilter =
@@ -111,57 +124,82 @@ const ORDERS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'tags', labelKey: 'adminUi.orders.table.tags' },
   { id: 'total', labelKey: 'adminUi.orders.table.total' },
   { id: 'created', labelKey: 'adminUi.orders.table.created' },
-  { id: 'actions', labelKey: 'adminUi.orders.table.actions', required: true }
+  { id: 'actions', labelKey: 'adminUi.orders.table.actions', required: true },
 ];
 
 const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
   ...defaultAdminTableLayout(ORDERS_TABLE_COLUMNS),
-  hidden: ['tags']
+  hidden: ['tags'],
 });
 
-  @Component({
-    selector: 'app-admin-orders',
-    standalone: true,
-		  imports: [
-		    CommonModule,
-		    FormsModule,
-        DragDropModule,
-		    ScrollingModule,
-		    TranslateModule,
-		    BreadcrumbComponent,
-		    ButtonComponent,
-		    ErrorStateComponent,
-	    InputComponent,
-	    HelpPanelComponent,
-	    SkeletonComponent,
-      ActionBarComponent,
-      FormSectionComponent,
-	    LocalizedCurrencyPipe,
-	    TableLayoutModalComponent,
-      AdminPageHeaderComponent
-	  ],
+@Component({
+  selector: 'app-admin-orders',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    DragDropModule,
+    ScrollingModule,
+    TranslateModule,
+    BreadcrumbComponent,
+    ButtonComponent,
+    ErrorStateComponent,
+    InputComponent,
+    HelpPanelComponent,
+    SkeletonComponent,
+    ActionBarComponent,
+    FormSectionComponent,
+    LocalizedCurrencyPipe,
+    TableLayoutModalComponent,
+    AdminPageHeaderComponent,
+  ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-	      <app-admin-page-header [titleKey]="'adminUi.orders.title'" [hintKey]="'adminUi.orders.hint'">
-	        <ng-template #primaryActions>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.export' | translate" (action)="openExportModal()"></app-button>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.orders.exports.nav' | translate" (action)="openExports()"></app-button>
-	        </ng-template>
+      <app-admin-page-header [titleKey]="'adminUi.orders.title'" [hintKey]="'adminUi.orders.hint'">
+        <ng-template #primaryActions>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.orders.export' | translate"
+            (action)="openExportModal()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.orders.exports.nav' | translate"
+            (action)="openExports()"
+          ></app-button>
+        </ng-template>
 
-		        <ng-template #secondaryActions>
-		          <app-button size="sm" variant="ghost" [label]="viewToggleLabelKey() | translate" (action)="toggleViewMode()"></app-button>
-		          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.orders.tags.manage' | translate"
-                (action)="openTagManager()"
-              ></app-button>
-		          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
-		        </ng-template>
-	      </app-admin-page-header>
+        <ng-template #secondaryActions>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="viewToggleLabelKey() | translate"
+            (action)="toggleViewMode()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="densityToggleLabelKey() | translate"
+            (action)="toggleDensity()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.orders.tags.manage' | translate"
+            (action)="openTagManager()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.tableLayout.title' | translate"
+            (action)="openLayoutModal()"
+          ></app-button>
+        </ng-template>
+      </app-admin-page-header>
 
       <app-table-layout-modal
         [open]="layoutModalOpen()"
@@ -172,7 +210,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
         (applied)="applyTableLayout($event)"
       ></app-table-layout-modal>
 
-      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+      <section
+        class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <app-help-panel
           [titleKey]="'adminUi.help.title'"
           [subtitleKey]="'adminUi.orders.help.subtitle'"
@@ -186,109 +226,144 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
           </ul>
         </app-help-panel>
 
-          <app-form-section [titleKey]="'adminUi.orders.filtersTitle'" [descriptionKey]="'adminUi.orders.filtersHint'">
-	        <div class="grid gap-3 lg:grid-cols-[1fr_220px_220px_220px_220px_auto] items-end">
-	          <app-input [label]="'adminUi.orders.search' | translate" [(value)]="q"></app-input>
+        <app-form-section
+          [titleKey]="'adminUi.orders.filtersTitle'"
+          [descriptionKey]="'adminUi.orders.filtersHint'"
+        >
+          <div class="grid gap-3 lg:grid-cols-[1fr_220px_220px_220px_220px_auto] items-end">
+            <app-input [label]="'adminUi.orders.search' | translate" [(value)]="q"></app-input>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.orders.statusFilter' | translate }}
-	            <select
-	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	              [(ngModel)]="status"
-	            >
-	              <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
-	              <option value="sales">{{ 'adminUi.orders.sales' | translate }}</option>
-	              <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
-	              <option value="pending_payment">{{ 'adminUi.orders.pending_payment' | translate }}</option>
-	              <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
-	              <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
-	              <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
-	              <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
-              <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
-              <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
-            </select>
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.statusFilter' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="status"
+              >
+                <option value="all">{{ 'adminUi.orders.all' | translate }}</option>
+                <option value="sales">{{ 'adminUi.orders.sales' | translate }}</option>
+                <option value="pending">{{ 'adminUi.orders.pending' | translate }}</option>
+                <option value="pending_payment">
+                  {{ 'adminUi.orders.pending_payment' | translate }}
+                </option>
+                <option value="pending_acceptance">
+                  {{ 'adminUi.orders.pending_acceptance' | translate }}
+                </option>
+                <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
+                <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
+                <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
+                <option value="cancelled">{{ 'adminUi.orders.cancelled' | translate }}</option>
+                <option value="refunded">{{ 'adminUi.orders.refunded' | translate }}</option>
+              </select>
+            </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.orders.sla.filter' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="sla"
-            >
-              <option value="all">{{ 'adminUi.orders.sla.options.all' | translate }}</option>
-              <option value="any_overdue">{{ 'adminUi.orders.sla.options.any_overdue' | translate }}</option>
-              <option value="accept_overdue">{{ 'adminUi.orders.sla.options.accept_overdue' | translate }}</option>
-              <option value="ship_overdue">{{ 'adminUi.orders.sla.options.ship_overdue' | translate }}</option>
-            </select>
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.sla.filter' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="sla"
+              >
+                <option value="all">{{ 'adminUi.orders.sla.options.all' | translate }}</option>
+                <option value="any_overdue">
+                  {{ 'adminUi.orders.sla.options.any_overdue' | translate }}
+                </option>
+                <option value="accept_overdue">
+                  {{ 'adminUi.orders.sla.options.accept_overdue' | translate }}
+                </option>
+                <option value="ship_overdue">
+                  {{ 'adminUi.orders.sla.options.ship_overdue' | translate }}
+                </option>
+              </select>
+            </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.orders.fraud.filter' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="fraud"
-            >
-              <option value="all">{{ 'adminUi.orders.fraud.options.all' | translate }}</option>
-              <option value="queue">{{ 'adminUi.orders.fraud.options.queue' | translate }}</option>
-              <option value="flagged">{{ 'adminUi.orders.fraud.options.flagged' | translate }}</option>
-              <option value="approved">{{ 'adminUi.orders.fraud.options.approved' | translate }}</option>
-              <option value="denied">{{ 'adminUi.orders.fraud.options.denied' | translate }}</option>
-            </select>
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.fraud.filter' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="fraud"
+              >
+                <option value="all">{{ 'adminUi.orders.fraud.options.all' | translate }}</option>
+                <option value="queue">
+                  {{ 'adminUi.orders.fraud.options.queue' | translate }}
+                </option>
+                <option value="flagged">
+                  {{ 'adminUi.orders.fraud.options.flagged' | translate }}
+                </option>
+                <option value="approved">
+                  {{ 'adminUi.orders.fraud.options.approved' | translate }}
+                </option>
+                <option value="denied">
+                  {{ 'adminUi.orders.fraud.options.denied' | translate }}
+                </option>
+              </select>
+            </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.orders.tagFilter' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="tag"
-            >
-              <option value="">{{ 'adminUi.orders.tags.all' | translate }}</option>
-              <option *ngFor="let tagOption of tagOptions()" [value]="tagOption">{{ tagLabel(tagOption) }}</option>
-            </select>
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.tagFilter' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="tag"
+              >
+                <option value="">{{ 'adminUi.orders.tags.all' | translate }}</option>
+                <option *ngFor="let tagOption of tagOptions()" [value]="tagOption">
+                  {{ tagLabel(tagOption) }}
+                </option>
+              </select>
+            </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.orders.testOrdersFilter' | translate }}
-            <select
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="includeTestOrders"
-            >
-              <option [ngValue]="true">{{ 'adminUi.orders.testOrders.include' | translate }}</option>
-              <option [ngValue]="false">{{ 'adminUi.orders.testOrders.exclude' | translate }}</option>
-            </select>
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.testOrdersFilter' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="includeTestOrders"
+              >
+                <option [ngValue]="true">
+                  {{ 'adminUi.orders.testOrders.include' | translate }}
+                </option>
+                <option [ngValue]="false">
+                  {{ 'adminUi.orders.testOrders.exclude' | translate }}
+                </option>
+              </select>
+            </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.orders.from' | translate }}
-            <input
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              type="date"
-              [(ngModel)]="fromDate"
-            />
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.from' | translate }}
+              <input
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                type="date"
+                [(ngModel)]="fromDate"
+              />
+            </label>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ 'adminUi.orders.to' | translate }}
-            <input
-              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              type="date"
-              [(ngModel)]="toDate"
-            />
-          </label>
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.to' | translate }}
+              <input
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                type="date"
+                [(ngModel)]="toDate"
+              />
+            </label>
 
-	          <div class="hidden sm:flex items-center gap-2">
-	            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
-	            <app-button
-	              size="sm"
-	              variant="ghost"
-	              [label]="'adminUi.actions.reset' | translate"
-	              (action)="resetFilters()"
-	            ></app-button>
-	          </div>
-	        </div>
+            <div class="hidden sm:flex items-center gap-2">
+              <app-button
+                size="sm"
+                [label]="'adminUi.actions.refresh' | translate"
+                (action)="applyFilters()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.reset' | translate"
+                (action)="resetFilters()"
+              ></app-button>
+            </div>
+          </div>
 
           <app-action-bar class="sm:hidden" [stickyOnMobile]="false">
-            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
+            <app-button
+              size="sm"
+              [label]="'adminUi.actions.refresh' | translate"
+              (action)="applyFilters()"
+            ></app-button>
             <app-button
               size="sm"
               variant="ghost"
@@ -298,7 +373,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
           </app-action-bar>
 
           <div class="flex flex-wrap items-end justify-between gap-3">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+            <label
+              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto"
+            >
               {{ 'adminUi.orders.presets.label' | translate }}
               <select
                 class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
@@ -306,7 +383,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                 (ngModelChange)="applyPreset($event)"
               >
                 <option value="">{{ 'adminUi.orders.presets.none' | translate }}</option>
-                <option *ngFor="let preset of presets" [value]="preset.id">{{ preset.name }}</option>
+                <option *ngFor="let preset of presets" [value]="preset.id">
+                  {{ preset.name }}
+                </option>
               </select>
             </label>
 
@@ -328,7 +407,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
           </div>
 
           <div class="flex flex-wrap items-end justify-between gap-3">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
+            <label
+              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto"
+            >
               {{ 'adminUi.favorites.savedViews.label' | translate }}
               <select
                 class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
@@ -336,7 +417,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                 (ngModelChange)="applySavedView($event)"
               >
                 <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
-                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+                <option *ngFor="let view of savedViews()" [value]="view.key">
+                  {{ view.label }}
+                </option>
               </select>
             </label>
 
@@ -344,142 +427,164 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
               <app-button
                 size="sm"
                 variant="ghost"
-                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
+                [label]="
+                  (isCurrentViewPinned()
+                    ? 'adminUi.favorites.savedViews.unpinCurrent'
+                    : 'adminUi.favorites.savedViews.pinCurrent'
+                  ) | translate
+                "
                 [disabled]="favorites.loading()"
                 (action)="toggleCurrentViewPin()"
               ></app-button>
             </div>
           </div>
-          </app-form-section>
+        </app-form-section>
 
-	        <app-error-state
-            *ngIf="error()"
-            [message]="error()!"
-            [requestId]="errorRequestId()"
-            [showRetry]="true"
-            (retry)="retryLoad()"
-          ></app-error-state>
+        <app-error-state
+          *ngIf="error()"
+          [message]="error()!"
+          [requestId]="errorRequestId()"
+          [showRetry]="true"
+          (retry)="retryLoad()"
+        ></app-error-state>
 
-	        <div *ngIf="loading(); else tableTpl">
-	          <app-skeleton [rows]="8"></app-skeleton>
-	        </div>
-		        <ng-template #tableTpl>
-              <ng-container *ngIf="viewMode() === 'kanban'; else listTpl">
-                <div class="grid gap-3">
-                  <div class="text-xs text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.orders.kanban.hint' | translate }}
-                  </div>
+        <div *ngIf="loading(); else tableTpl">
+          <app-skeleton [rows]="8"></app-skeleton>
+        </div>
+        <ng-template #tableTpl>
+          <ng-container *ngIf="viewMode() === 'kanban'; else listTpl">
+            <div class="grid gap-3">
+              <div class="text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.orders.kanban.hint' | translate }}
+              </div>
 
-                  <div *ngIf="kanbanTotalCards() === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.orders.empty' | translate }}
-                  </div>
+              <div
+                *ngIf="kanbanTotalCards() === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
+                {{ 'adminUi.orders.empty' | translate }}
+              </div>
 
-                  <div *ngIf="kanbanTotalCards() > 0" class="overflow-x-auto pb-2">
-                    <div class="flex gap-4 min-w-[900px]" cdkDropListGroup>
-                      <ng-container *ngFor="let colStatus of kanbanColumnStatuses(); trackBy: trackKanbanStatus">
-                        <div
-                          class="w-[320px] shrink-0 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-800 dark:bg-slate-950/30"
+              <div *ngIf="kanbanTotalCards() > 0" class="overflow-x-auto pb-2">
+                <div class="flex gap-4 min-w-[900px]" cdkDropListGroup>
+                  <ng-container
+                    *ngFor="let colStatus of kanbanColumnStatuses(); trackBy: trackKanbanStatus"
+                  >
+                    <div
+                      class="w-[320px] shrink-0 rounded-2xl border border-slate-200 bg-slate-50 shadow-sm dark:border-slate-800 dark:bg-slate-950/30"
+                    >
+                      <div
+                        class="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800"
+                      >
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                          {{ 'adminUi.orders.' + colStatus | translate }}
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-300">
+                          {{
+                            kanbanTotalsByStatus()[colStatus] ??
+                              (kanbanItemsByStatus()[colStatus]?.length || 0)
+                          }}
+                        </div>
+                      </div>
+
+                      <div
+                        cdkDropList
+                        [cdkDropListData]="kanbanItemsByStatus()[colStatus] || []"
+                        (cdkDropListDropped)="onKanbanDrop($event, colStatus)"
+                        class="min-h-[160px] p-3 grid gap-2"
+                      >
+                        <ng-container
+                          *ngFor="
+                            let order of kanbanItemsByStatus()[colStatus] || [];
+                            trackBy: trackOrderId
+                          "
                         >
-                          <div class="flex items-center justify-between gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
-                            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                              {{ ('adminUi.orders.' + colStatus) | translate }}
-                            </div>
-                            <div class="text-xs text-slate-500 dark:text-slate-300">
-                              {{ kanbanTotalsByStatus()[colStatus] ?? (kanbanItemsByStatus()[colStatus]?.length || 0) }}
-                            </div>
-                          </div>
-
                           <div
-                            cdkDropList
-                            [cdkDropListData]="kanbanItemsByStatus()[colStatus] || []"
-                            (cdkDropListDropped)="onKanbanDrop($event, colStatus)"
-                            class="min-h-[160px] p-3 grid gap-2"
+                            cdkDrag
+                            [cdkDragData]="order"
+                            [cdkDragDisabled]="kanbanBusy()"
+                            class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing dark:border-slate-800 dark:bg-slate-900"
                           >
-                            <ng-container
-                              *ngFor="let order of kanbanItemsByStatus()[colStatus] || []; trackBy: trackOrderId"
-                            >
-                              <div
-                                cdkDrag
-                                [cdkDragData]="order"
-                                [cdkDragDisabled]="kanbanBusy()"
-                                class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm cursor-grab active:cursor-grabbing dark:border-slate-800 dark:bg-slate-900"
-                              >
-                                <div class="flex items-start justify-between gap-2">
-                                  <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-2 min-w-0">
-                                      <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-                                        {{ order.reference_code || (order.id | slice: 0:8) }}
-                                      </div>
-                                      <ng-container *ngIf="slaBadge(order) as badge">
-                                        <span
-                                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                                          [ngClass]="badge.className"
-                                          [attr.title]="badge.title"
-                                        >
-                                          {{ badge.label }}
-                                        </span>
-                                      </ng-container>
-                                      <ng-container *ngIf="fraudBadge(order) as fraud">
-                                        <span
-                                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                                          [ngClass]="fraud.className"
-                                          [attr.title]="fraud.title"
-                                        >
-                                          {{ fraud.label }}
-                                        </span>
-                                      </ng-container>
-                                    </div>
-                                    <div class="text-xs text-slate-600 dark:text-slate-300 truncate">
-                                      {{ customerLabel(order) }}
-                                    </div>
+                            <div class="flex items-start justify-between gap-2">
+                              <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2 min-w-0">
+                                  <div
+                                    class="font-semibold text-slate-900 dark:text-slate-50 truncate"
+                                  >
+                                    {{ order.reference_code || (order.id | slice: 0 : 8) }}
                                   </div>
-                                  <button
-                                    type="button"
-                                    class="shrink-0 rounded-md px-2 py-1 text-xs text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50"
-                                    (click)="$event.stopPropagation(); open(order.id)"
-                                    [attr.aria-label]="'adminUi.orders.view' | translate"
-                                  >
-                                    {{ 'adminUi.orders.view' | translate }}
-                                  </button>
-                                </div>
-
-                                <div class="mt-2 flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300">
-                                  <span class="font-medium text-slate-700 dark:text-slate-200">
-                                    {{ order.total_amount | localizedCurrency : order.currency }}
-                                  </span>
-                                  <span>{{ order.created_at | date: 'short' }}</span>
-                                </div>
-
-                                <div class="mt-2 flex flex-wrap gap-1">
-                                  <span
-                                    *ngIf="order.payment_method"
-                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
-                                  >
-                                    {{ order.payment_method }}
-                                  </span>
-                                  <ng-container *ngFor="let tagValue of order.tags || []">
+                                  <ng-container *ngIf="slaBadge(order) as badge">
                                     <span
-                                      class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
-                                      [ngClass]="tagChipColorClass(tagValue)"
+                                      class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                                      [ngClass]="badge.className"
+                                      [attr.title]="badge.title"
                                     >
-                                      {{ tagLabel(tagValue) }}
+                                      {{ badge.label }}
+                                    </span>
+                                  </ng-container>
+                                  <ng-container *ngIf="fraudBadge(order) as fraud">
+                                    <span
+                                      class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                                      [ngClass]="fraud.className"
+                                      [attr.title]="fraud.title"
+                                    >
+                                      {{ fraud.label }}
                                     </span>
                                   </ng-container>
                                 </div>
+                                <div class="text-xs text-slate-600 dark:text-slate-300 truncate">
+                                  {{ customerLabel(order) }}
+                                </div>
                               </div>
-                            </ng-container>
-                          </div>
-                        </div>
-                      </ng-container>
-                    </div>
-                  </div>
-                </div>
-              </ng-container>
+                              <button
+                                type="button"
+                                class="shrink-0 rounded-md px-2 py-1 text-xs text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-50"
+                                (click)="$event.stopPropagation(); open(order.id)"
+                                [attr.aria-label]="'adminUi.orders.view' | translate"
+                              >
+                                {{ 'adminUi.orders.view' | translate }}
+                              </button>
+                            </div>
 
-              <ng-template #listTpl>
-		          <div *ngIf="orders().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-		            {{ 'adminUi.orders.empty' | translate }}
-		          </div>
+                            <div
+                              class="mt-2 flex items-center justify-between gap-2 text-xs text-slate-600 dark:text-slate-300"
+                            >
+                              <span class="font-medium text-slate-700 dark:text-slate-200">
+                                {{ order.total_amount | localizedCurrency: order.currency }}
+                              </span>
+                              <span>{{ order.created_at | date: 'short' }}</span>
+                            </div>
+
+                            <div class="mt-2 flex flex-wrap gap-1">
+                              <span
+                                *ngIf="order.payment_method"
+                                class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                              >
+                                {{ order.payment_method }}
+                              </span>
+                              <ng-container *ngFor="let tagValue of order.tags || []">
+                                <span
+                                  class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
+                                  [ngClass]="tagChipColorClass(tagValue)"
+                                >
+                                  {{ tagLabel(tagValue) }}
+                                </span>
+                              </ng-container>
+                            </div>
+                          </div>
+                        </ng-container>
+                      </div>
+                    </div>
+                  </ng-container>
+                </div>
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-template #listTpl>
+            <div *ngIf="orders().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.orders.empty' | translate }}
+            </div>
 
             <div
               *ngIf="selectedIds.size"
@@ -498,7 +603,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                     [disabled]="bulkBusy"
                   >
                     <option value="">{{ 'adminUi.orders.bulk.noChange' | translate }}</option>
-                    <option value="pending_acceptance">{{ 'adminUi.orders.pending_acceptance' | translate }}</option>
+                    <option value="pending_acceptance">
+                      {{ 'adminUi.orders.pending_acceptance' | translate }}
+                    </option>
                     <option value="paid">{{ 'adminUi.orders.paid' | translate }}</option>
                     <option value="shipped">{{ 'adminUi.orders.shipped' | translate }}</option>
                     <option value="delivered">{{ 'adminUi.orders.delivered' | translate }}</option>
@@ -514,8 +621,12 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                   >
                     <option value="">{{ 'adminUi.orders.bulk.noChange' | translate }}</option>
                     <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
-                    <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
-                    <option value="clear">{{ 'adminUi.orders.bulk.clearCourier' | translate }}</option>
+                    <option value="fan_courier">
+                      {{ 'checkout.courierFanCourier' | translate }}
+                    </option>
+                    <option value="clear">
+                      {{ 'adminUi.orders.bulk.clearCourier' | translate }}
+                    </option>
                   </select>
                 </label>
 
@@ -568,8 +679,12 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                     [disabled]="bulkBusy"
                   >
                     <option value="">{{ 'adminUi.orders.bulk.noChange' | translate }}</option>
-                    <option value="confirmation">{{ 'adminUi.orders.bulk.emailConfirmation' | translate }}</option>
-                    <option value="delivery">{{ 'adminUi.orders.bulk.emailDelivery' | translate }}</option>
+                    <option value="confirmation">
+                      {{ 'adminUi.orders.bulk.emailConfirmation' | translate }}
+                    </option>
+                    <option value="delivery">
+                      {{ 'adminUi.orders.bulk.emailDelivery' | translate }}
+                    </option>
                   </select>
                 </label>
 
@@ -581,231 +696,332 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                   (action)="resendBulkEmails()"
                 ></app-button>
 
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.orders.bulk.packingSlips' | translate"
-	                  [disabled]="bulkBusy"
-	                  (action)="downloadBatchPackingSlips()"
-	                ></app-button>
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.orders.bulk.pickListCsv' | translate"
-	                  [disabled]="bulkBusy"
-	                  (action)="downloadPickListCsv()"
-	                ></app-button>
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.orders.bulk.pickListPdf' | translate"
-	                  [disabled]="bulkBusy"
-	                  (action)="downloadPickListPdf()"
-	                ></app-button>
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.orders.bulk.shippingLabels' | translate"
-	                  [disabled]="bulkBusy"
-	                  (action)="openShippingLabelsModal()"
-	                ></app-button>
-	                <app-button
-	                  size="sm"
-	                  variant="ghost"
-	                  [label]="'adminUi.orders.bulk.clearSelection' | translate"
-	                  [disabled]="bulkBusy"
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.packingSlips' | translate"
+                  [disabled]="bulkBusy"
+                  (action)="downloadBatchPackingSlips()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.pickListCsv' | translate"
+                  [disabled]="bulkBusy"
+                  (action)="downloadPickListCsv()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.pickListPdf' | translate"
+                  [disabled]="bulkBusy"
+                  (action)="downloadPickListPdf()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.shippingLabels' | translate"
+                  [disabled]="bulkBusy"
+                  (action)="openShippingLabelsModal()"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.bulk.clearSelection' | translate"
+                  [disabled]="bulkBusy"
                   (action)="clearSelection()"
                 ></app-button>
               </div>
             </div>
 
-          <div *ngIf="orders().length > 0" class="grid gap-3 md:hidden">
-            <article
-              *ngFor="let order of orders(); trackBy: trackOrderId"
-              class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
-                    {{ order.reference_code || (order.id | slice: 0:8) }}
-                  </h3>
-                  <div class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ customerLabel(order) }}</div>
-                  <div class="mt-1 flex flex-wrap gap-1">
-                    <ng-container *ngFor="let tagValue of order.tags || []">
-                      <span
-                        class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
-                        [ngClass]="tagChipColorClass(tagValue)"
-                      >
-                        {{ tagLabel(tagValue) }}
-                      </span>
-                    </ng-container>
-                  </div>
-                </div>
-
-                <span
-                  [ngClass]="statusPillClass(order.status)"
-                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                >
-                  {{ ('adminUi.orders.' + order.status) | translate }}
-                </span>
-              </div>
-
-              <div class="mt-3 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
-                <div>
-                  <span class="font-semibold">{{ 'adminUi.orders.table.total' | translate }}:</span>
-                  {{ order.total_amount | localizedCurrency : order.currency }}
-                </div>
-                <div>
-                  <span class="font-semibold">{{ 'adminUi.orders.table.created' | translate }}:</span>
-                  {{ order.created_at | date: 'short' }}
-                </div>
-              </div>
-
-              <app-action-bar class="mt-3" [stickyOnMobile]="false">
-                <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  <input
-                    type="checkbox"
-                    [checked]="selectedIds.has(order.id)"
-                    (change)="toggleSelected(order.id, $any($event.target).checked)"
-                    [disabled]="bulkBusy"
-                    [attr.aria-label]="'adminUi.orders.a11y.selectOrder' | translate: { ref: order.reference_code || (order.id | slice: 0:8) }"
-                  />
-                  {{ 'adminUi.actions.bulkActions' | translate }}
-                </label>
-
-                <app-button size="sm" variant="ghost" [label]="'adminUi.orders.view' | translate" (action)="open(order.id)"></app-button>
-              </app-action-bar>
-            </article>
-          </div>
-
-          <div *ngIf="orders().length > 0" class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <ng-template #ordersTableHeader>
-              <tr>
-                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
-                  <th *ngSwitchCase="'select'" class="text-left font-semibold w-10" [ngClass]="cellPaddingClass()">
-                    <input
-                      type="checkbox"
-                      [checked]="allSelectedOnPage()"
-                      [indeterminate]="someSelectedOnPage()"
-                      (change)="toggleSelectAllOnPage($any($event.target).checked)"
-                      [disabled]="bulkBusy"
-                      [attr.aria-label]="'adminUi.orders.a11y.selectAllOnPage' | translate"
-                    />
-                  </th>
-                  <th *ngSwitchCase="'reference'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                    {{ 'adminUi.orders.table.reference' | translate }}
-                  </th>
-                  <th *ngSwitchCase="'customer'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                    {{ 'adminUi.orders.table.customer' | translate }}
-                  </th>
-                  <th *ngSwitchCase="'status'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                    {{ 'adminUi.orders.table.status' | translate }}
-                  </th>
-                  <th *ngSwitchCase="'tags'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                    {{ 'adminUi.orders.table.tags' | translate }}
-                  </th>
-                  <th *ngSwitchCase="'total'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                    {{ 'adminUi.orders.table.total' | translate }}
-                  </th>
-                  <th *ngSwitchCase="'created'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
-                    {{ 'adminUi.orders.table.created' | translate }}
-                  </th>
-                  <th *ngSwitchCase="'actions'" class="text-right font-semibold" [ngClass]="cellPaddingClass()">
-                    {{ 'adminUi.orders.table.actions' | translate }}
-                  </th>
-                </ng-container>
-              </tr>
-            </ng-template>
-
-            <ng-template #ordersTableRow let-order>
-              <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
-                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
-                  <td *ngSwitchCase="'select'" [ngClass]="cellPaddingClass()">
-                    <input
-                      type="checkbox"
-                      [checked]="selectedIds.has(order.id)"
-                      (change)="toggleSelected(order.id, $any($event.target).checked)"
-                      [disabled]="bulkBusy"
-                      [attr.aria-label]="'adminUi.orders.a11y.selectOrder' | translate: { ref: order.reference_code || (order.id | slice: 0:8) }"
-                    />
-                  </td>
-                  <td
-                    *ngSwitchCase="'reference'"
-                    class="font-medium text-slate-900 dark:text-slate-50"
-                    [ngClass]="cellPaddingClass()"
-                  >
-                    {{ order.reference_code || (order.id | slice: 0:8) }}
-                  </td>
-                  <td *ngSwitchCase="'customer'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
-                    {{ customerLabel(order) }}
-                  </td>
-                  <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span
-                        [ngClass]="statusPillClass(order.status)"
-                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                      >
-                        {{ ('adminUi.orders.' + order.status) | translate }}
-                      </span>
-                      <ng-container *ngIf="slaBadge(order) as badge">
-                        <span
-                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                          [ngClass]="badge.className"
-                          [attr.title]="badge.title"
-                        >
-                          {{ badge.label }}
-                        </span>
-                      </ng-container>
-                      <ng-container *ngIf="fraudBadge(order) as fraud">
-                        <span
-                          class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
-                          [ngClass]="fraud.className"
-                          [attr.title]="fraud.title"
-                        >
-                          {{ fraud.label }}
-                        </span>
-                      </ng-container>
+            <div *ngIf="orders().length > 0" class="grid gap-3 md:hidden">
+              <article
+                *ngFor="let order of orders(); trackBy: trackOrderId"
+                class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                      {{ order.reference_code || (order.id | slice: 0 : 8) }}
+                    </h3>
+                    <div class="text-xs text-slate-600 dark:text-slate-300 truncate">
+                      {{ customerLabel(order) }}
                     </div>
-                  </td>
-                  <td *ngSwitchCase="'tags'" [ngClass]="cellPaddingClass()">
-                    <div class="flex flex-wrap gap-1">
+                    <div class="mt-1 flex flex-wrap gap-1">
                       <ng-container *ngFor="let tagValue of order.tags || []">
                         <span
-                          class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                          class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] border"
                           [ngClass]="tagChipColorClass(tagValue)"
                         >
                           {{ tagLabel(tagValue) }}
                         </span>
                       </ng-container>
-                      <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400">—</span>
                     </div>
-                  </td>
-                  <td *ngSwitchCase="'total'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
-                    {{ order.total_amount | localizedCurrency : order.currency }}
-                  </td>
-                  <td *ngSwitchCase="'created'" class="text-slate-600 dark:text-slate-300" [ngClass]="cellPaddingClass()">
-                    {{ order.created_at | date: 'short' }}
-                  </td>
-                  <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
-                    <app-button size="sm" variant="ghost" [label]="'adminUi.orders.view' | translate" (action)="open(order.id)"></app-button>
-                  </td>
-                </ng-container>
-              </tr>
-            </ng-template>
+                  </div>
 
-            <ng-container *ngIf="orders().length > 100; else ordersTableStandard">
-              <cdk-virtual-scroll-viewport
-                class="block h-[min(70vh,720px)]"
-                [itemSize]="orderRowHeight"
-                [minBufferPx]="orderRowHeight * 10"
-                [maxBufferPx]="orderRowHeight * 20"
-              >
+                  <span
+                    [ngClass]="statusPillClass(order.status)"
+                    class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                  >
+                    {{ 'adminUi.orders.' + order.status | translate }}
+                  </span>
+                </div>
+
+                <div class="mt-3 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+                  <div>
+                    <span class="font-semibold"
+                      >{{ 'adminUi.orders.table.total' | translate }}:</span
+                    >
+                    {{ order.total_amount | localizedCurrency: order.currency }}
+                  </div>
+                  <div>
+                    <span class="font-semibold"
+                      >{{ 'adminUi.orders.table.created' | translate }}:</span
+                    >
+                    {{ order.created_at | date: 'short' }}
+                  </div>
+                </div>
+
+                <app-action-bar class="mt-3" [stickyOnMobile]="false">
+                  <label
+                    class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  >
+                    <input
+                      type="checkbox"
+                      [checked]="selectedIds.has(order.id)"
+                      (change)="toggleSelected(order.id, $any($event.target).checked)"
+                      [disabled]="bulkBusy"
+                      [attr.aria-label]="
+                        'adminUi.orders.a11y.selectOrder'
+                          | translate: { ref: order.reference_code || (order.id | slice: 0 : 8) }
+                      "
+                    />
+                    {{ 'adminUi.actions.bulkActions' | translate }}
+                  </label>
+
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.view' | translate"
+                    (action)="open(order.id)"
+                  ></app-button>
+                </app-action-bar>
+              </article>
+            </div>
+
+            <div
+              *ngIf="orders().length > 0"
+              class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            >
+              <ng-template #ordersTableHeader>
+                <tr>
+                  <ng-container
+                    *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId"
+                    [ngSwitch]="colId"
+                  >
+                    <th
+                      *ngSwitchCase="'select'"
+                      class="text-left font-semibold w-10"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      <input
+                        type="checkbox"
+                        [checked]="allSelectedOnPage()"
+                        [indeterminate]="someSelectedOnPage()"
+                        (change)="toggleSelectAllOnPage($any($event.target).checked)"
+                        [disabled]="bulkBusy"
+                        [attr.aria-label]="'adminUi.orders.a11y.selectAllOnPage' | translate"
+                      />
+                    </th>
+                    <th
+                      *ngSwitchCase="'reference'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.orders.table.reference' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'customer'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.orders.table.customer' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'status'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.orders.table.status' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'tags'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.orders.table.tags' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'total'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.orders.table.total' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'created'"
+                      class="text-left font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.orders.table.created' | translate }}
+                    </th>
+                    <th
+                      *ngSwitchCase="'actions'"
+                      class="text-right font-semibold"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ 'adminUi.orders.table.actions' | translate }}
+                    </th>
+                  </ng-container>
+                </tr>
+              </ng-template>
+
+              <ng-template #ordersTableRow let-order>
+                <tr
+                  class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                >
+                  <ng-container
+                    *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId"
+                    [ngSwitch]="colId"
+                  >
+                    <td *ngSwitchCase="'select'" [ngClass]="cellPaddingClass()">
+                      <input
+                        type="checkbox"
+                        [checked]="selectedIds.has(order.id)"
+                        (change)="toggleSelected(order.id, $any($event.target).checked)"
+                        [disabled]="bulkBusy"
+                        [attr.aria-label]="
+                          'adminUi.orders.a11y.selectOrder'
+                            | translate: { ref: order.reference_code || (order.id | slice: 0 : 8) }
+                        "
+                      />
+                    </td>
+                    <td
+                      *ngSwitchCase="'reference'"
+                      class="font-medium text-slate-900 dark:text-slate-50"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ order.reference_code || (order.id | slice: 0 : 8) }}
+                    </td>
+                    <td
+                      *ngSwitchCase="'customer'"
+                      class="text-slate-700 dark:text-slate-200"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ customerLabel(order) }}
+                    </td>
+                    <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span
+                          [ngClass]="statusPillClass(order.status)"
+                          class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                        >
+                          {{ 'adminUi.orders.' + order.status | translate }}
+                        </span>
+                        <ng-container *ngIf="slaBadge(order) as badge">
+                          <span
+                            class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                            [ngClass]="badge.className"
+                            [attr.title]="badge.title"
+                          >
+                            {{ badge.label }}
+                          </span>
+                        </ng-container>
+                        <ng-container *ngIf="fraudBadge(order) as fraud">
+                          <span
+                            class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
+                            [ngClass]="fraud.className"
+                            [attr.title]="fraud.title"
+                          >
+                            {{ fraud.label }}
+                          </span>
+                        </ng-container>
+                      </div>
+                    </td>
+                    <td *ngSwitchCase="'tags'" [ngClass]="cellPaddingClass()">
+                      <div class="flex flex-wrap gap-1">
+                        <ng-container *ngFor="let tagValue of order.tags || []">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                            [ngClass]="tagChipColorClass(tagValue)"
+                          >
+                            {{ tagLabel(tagValue) }}
+                          </span>
+                        </ng-container>
+                        <span *ngIf="(order.tags || []).length === 0" class="text-xs text-slate-400"
+                          >—</span
+                        >
+                      </div>
+                    </td>
+                    <td
+                      *ngSwitchCase="'total'"
+                      class="text-slate-700 dark:text-slate-200"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ order.total_amount | localizedCurrency: order.currency }}
+                    </td>
+                    <td
+                      *ngSwitchCase="'created'"
+                      class="text-slate-600 dark:text-slate-300"
+                      [ngClass]="cellPaddingClass()"
+                    >
+                      {{ order.created_at | date: 'short' }}
+                    </td>
+                    <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
+                      <app-button
+                        size="sm"
+                        variant="ghost"
+                        [label]="'adminUi.orders.view' | translate"
+                        (action)="open(order.id)"
+                      ></app-button>
+                    </td>
+                  </ng-container>
+                </tr>
+              </ng-template>
+
+              <ng-container *ngIf="orders().length > 100; else ordersTableStandard">
+                <cdk-virtual-scroll-viewport
+                  class="block h-[min(70vh,720px)]"
+                  [itemSize]="orderRowHeight"
+                  [minBufferPx]="orderRowHeight * 10"
+                  [maxBufferPx]="orderRowHeight * 20"
+                >
+                  <table class="min-w-[1050px] w-full text-sm">
+                    <thead
+                      class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200"
+                    >
+                      <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
+                    </thead>
+                    <tbody>
+                      <ng-container *cdkVirtualFor="let order of orders(); trackBy: trackOrderId">
+                        <ng-container
+                          [ngTemplateOutlet]="ordersTableRow"
+                          [ngTemplateOutletContext]="{ $implicit: order }"
+                        ></ng-container>
+                      </ng-container>
+                    </tbody>
+                  </table>
+                </cdk-virtual-scroll-viewport>
+              </ng-container>
+              <ng-template #ordersTableStandard>
                 <table class="min-w-[1050px] w-full text-sm">
-                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <thead
+                    class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200"
+                  >
                     <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
                   </thead>
                   <tbody>
-                    <ng-container *cdkVirtualFor="let order of orders(); trackBy: trackOrderId">
+                    <ng-container *ngFor="let order of orders(); trackBy: trackOrderId">
                       <ng-container
                         [ngTemplateOutlet]="ordersTableRow"
                         [ngTemplateOutletContext]="{ $implicit: order }"
@@ -813,183 +1029,215 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                     </ng-container>
                   </tbody>
                 </table>
-              </cdk-virtual-scroll-viewport>
-            </ng-container>
-            <ng-template #ordersTableStandard>
-              <table class="min-w-[1050px] w-full text-sm">
-                <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                  <ng-container [ngTemplateOutlet]="ordersTableHeader"></ng-container>
-                </thead>
-                <tbody>
-                  <ng-container *ngFor="let order of orders(); trackBy: trackOrderId">
-                    <ng-container
-                      [ngTemplateOutlet]="ordersTableRow"
-                      [ngTemplateOutletContext]="{ $implicit: order }"
-                    ></ng-container>
-                  </ng-container>
-                </tbody>
-              </table>
-            </ng-template>
-          </div>
-
-		          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
-	            <div>
-	              {{ 'adminUi.orders.pagination' | translate: { page: meta()!.page, total_pages: meta()!.total_pages, total_items: meta()!.total_items } }}
-	            </div>
-            <div class="flex items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.orders.prev' | translate"
-                [disabled]="meta()!.page <= 1"
-                (action)="goToPage(meta()!.page - 1)"
-              ></app-button>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.orders.next' | translate"
-                [disabled]="meta()!.page >= meta()!.total_pages"
-                (action)="goToPage(meta()!.page + 1)"
-              ></app-button>
+              </ng-template>
             </div>
-		          </div>
-		        </ng-template>
-	          </ng-template>
-			      </section>
 
-        <ng-container *ngIf="shippingLabelsModalOpen()">
-          <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeShippingLabelsModal()">
             <div
-              class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-              (click)="$event.stopPropagation()"
+              *ngIf="meta()"
+              class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200"
             >
-              <div class="flex items-center justify-between gap-3">
-                <div class="grid gap-1">
-                  <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
-                    {{ 'adminUi.orders.shippingLabelsModal.title' | translate }}
-                  </h3>
-                  <div class="text-xs text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.orders.shippingLabelsModal.hint' | translate: { count: selectedIds.size } }}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
-                  (click)="closeShippingLabelsModal()"
-                  [disabled]="shippingLabelsBusy"
-                  [attr.aria-label]="'adminUi.actions.cancel' | translate"
-                >
-                  ✕
-                </button>
+              <div>
+                {{
+                  'adminUi.orders.pagination'
+                    | translate
+                      : {
+                          page: meta()!.page,
+                          total_pages: meta()!.total_pages,
+                          total_items: meta()!.total_items,
+                        }
+                }}
               </div>
+              <div class="flex items-center gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.prev' | translate"
+                  [disabled]="meta()!.page <= 1"
+                  (action)="goToPage(meta()!.page - 1)"
+                ></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.orders.next' | translate"
+                  [disabled]="meta()!.page >= meta()!.total_pages"
+                  (action)="goToPage(meta()!.page + 1)"
+                ></app-button>
+              </div>
+            </div>
+          </ng-template>
+        </ng-template>
+      </section>
 
-              <div class="mt-4 grid gap-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                  <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                    <input type="file" class="hidden" multiple (change)="onShippingLabelsSelected($event)" />
-                    <span class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.shippingLabelsModal.chooseFiles' | translate }}</span>
-                    <span class="text-xs text-slate-500 dark:text-slate-300">{{ 'adminUi.orders.shippingLabelsModal.chooseFilesHint' | translate }}</span>
-                  </label>
-
-                  <div class="flex items-center gap-2">
-                    <app-button
-                      size="sm"
-                      [label]="'adminUi.orders.shippingLabelsModal.uploadAll' | translate"
-                      [disabled]="shippingLabelsBusy || shippingLabelsUploads.length === 0"
-                      (action)="uploadAllShippingLabels()"
-                    ></app-button>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.orders.shippingLabelsModal.downloadZip' | translate"
-                      [disabled]="shippingLabelsBusy"
-                      (action)="downloadSelectedShippingLabelsZip()"
-                    ></app-button>
-                  </div>
+      <ng-container *ngIf="shippingLabelsModalOpen()">
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          (click)="closeShippingLabelsModal()"
+        >
+          <div
+            class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <div class="grid gap-1">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.orders.shippingLabelsModal.title' | translate }}
+                </h3>
+                <div class="text-xs text-slate-600 dark:text-slate-300">
+                  {{
+                    'adminUi.orders.shippingLabelsModal.hint'
+                      | translate: { count: selectedIds.size }
+                  }}
                 </div>
+              </div>
+              <button
+                type="button"
+                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 disabled:opacity-50 dark:text-slate-400 dark:hover:text-slate-50"
+                (click)="closeShippingLabelsModal()"
+                [disabled]="shippingLabelsBusy"
+                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+              >
+                ✕
+              </button>
+            </div>
 
-                <div *ngIf="shippingLabelsUploads.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.orders.shippingLabelsModal.empty' | translate }}
-                </div>
-
-                <div
-                  *ngIf="shippingLabelsUploads.length > 0"
-                  class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+            <div class="mt-4 grid gap-4">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <label
+                  class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                 >
-                  <table class="min-w-[900px] w-full text-sm">
-                    <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                      <tr>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.file' | translate }}</th>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.order' | translate }}</th>
-                        <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.status' | translate }}</th>
-                        <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.shippingLabelsModal.table.actions' | translate }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        *ngFor="let row of shippingLabelsUploads; let idx = index"
-                        class="border-t border-slate-200 dark:border-slate-800"
-                      >
-                        <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-                          <div class="font-medium truncate max-w-[420px]">{{ row.file.name }}</div>
-                          <div
-                            *ngIf="row.error"
-                            class="mt-1 text-xs text-rose-700 dark:text-rose-300"
-                          >
-                            {{ row.error }}
-                          </div>
-                        </td>
-                        <td class="px-3 py-2">
-                          <select
-                            class="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [(ngModel)]="shippingLabelsUploads[idx].assignedOrderId"
-                            [disabled]="shippingLabelsBusy"
-                          >
-                            <option [ngValue]="null">{{ 'adminUi.orders.shippingLabelsModal.unassigned' | translate }}</option>
-                            <option *ngFor="let opt of shippingLabelsOrderOptions" [value]="opt.id">{{ opt.label }}</option>
-                          </select>
-                        </td>
-                        <td class="px-3 py-2">
-                          <span
-                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
-                            [ngClass]="shippingLabelStatusPillClass(row.status)"
-                          >
-                            {{ shippingLabelStatusLabelKey(row.status) | translate }}
-                          </span>
-                        </td>
-                        <td class="px-3 py-2 text-right">
-                          <app-button
-                            *ngIf="row.status === 'error'"
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.actions.retry' | translate"
-                            [disabled]="shippingLabelsBusy"
-                            (action)="retryShippingLabelUpload(idx)"
-                          ></app-button>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                  <input
+                    type="file"
+                    class="hidden"
+                    multiple
+                    (change)="onShippingLabelsSelected($event)"
+                  />
+                  <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                    'adminUi.orders.shippingLabelsModal.chooseFiles' | translate
+                  }}</span>
+                  <span class="text-xs text-slate-500 dark:text-slate-300">{{
+                    'adminUi.orders.shippingLabelsModal.chooseFilesHint' | translate
+                  }}</span>
+                </label>
 
-                <div class="flex justify-end">
+                <div class="flex items-center gap-2">
+                  <app-button
+                    size="sm"
+                    [label]="'adminUi.orders.shippingLabelsModal.uploadAll' | translate"
+                    [disabled]="shippingLabelsBusy || shippingLabelsUploads.length === 0"
+                    (action)="uploadAllShippingLabels()"
+                  ></app-button>
                   <app-button
                     size="sm"
                     variant="ghost"
-                    [label]="'adminUi.common.close' | translate"
+                    [label]="'adminUi.orders.shippingLabelsModal.downloadZip' | translate"
                     [disabled]="shippingLabelsBusy"
-                    (action)="closeShippingLabelsModal()"
+                    (action)="downloadSelectedShippingLabelsZip()"
                   ></app-button>
                 </div>
               </div>
+
+              <div
+                *ngIf="shippingLabelsUploads.length === 0"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
+                {{ 'adminUi.orders.shippingLabelsModal.empty' | translate }}
+              </div>
+
+              <div
+                *ngIf="shippingLabelsUploads.length > 0"
+                class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+              >
+                <table class="min-w-[900px] w-full text-sm">
+                  <thead
+                    class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200"
+                  >
+                    <tr>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.shippingLabelsModal.table.file' | translate }}
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.shippingLabelsModal.table.order' | translate }}
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.shippingLabelsModal.table.status' | translate }}
+                      </th>
+                      <th class="text-right font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.shippingLabelsModal.table.actions' | translate }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="let row of shippingLabelsUploads; let idx = index"
+                      class="border-t border-slate-200 dark:border-slate-800"
+                    >
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        <div class="font-medium truncate max-w-[420px]">{{ row.file.name }}</div>
+                        <div
+                          *ngIf="row.error"
+                          class="mt-1 text-xs text-rose-700 dark:text-rose-300"
+                        >
+                          {{ row.error }}
+                        </div>
+                      </td>
+                      <td class="px-3 py-2">
+                        <select
+                          class="h-9 w-full rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          [(ngModel)]="shippingLabelsUploads[idx].assignedOrderId"
+                          [disabled]="shippingLabelsBusy"
+                        >
+                          <option [ngValue]="null">
+                            {{ 'adminUi.orders.shippingLabelsModal.unassigned' | translate }}
+                          </option>
+                          <option *ngFor="let opt of shippingLabelsOrderOptions" [value]="opt.id">
+                            {{ opt.label }}
+                          </option>
+                        </select>
+                      </td>
+                      <td class="px-3 py-2">
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                          [ngClass]="shippingLabelStatusPillClass(row.status)"
+                        >
+                          {{ shippingLabelStatusLabelKey(row.status) | translate }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2 text-right">
+                        <app-button
+                          *ngIf="row.status === 'error'"
+                          size="sm"
+                          variant="ghost"
+                          [label]="'adminUi.actions.retry' | translate"
+                          [disabled]="shippingLabelsBusy"
+                          (action)="retryShippingLabelUpload(idx)"
+                        ></app-button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="flex justify-end">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.common.close' | translate"
+                  [disabled]="shippingLabelsBusy"
+                  (action)="closeShippingLabelsModal()"
+                ></app-button>
+              </div>
             </div>
           </div>
-        </ng-container>
+        </div>
+      </ng-container>
 
-	      <ng-container *ngIf="exportModalOpen()">
-	        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeExportModal()">
-	          <div
-	            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+      <ng-container *ngIf="exportModalOpen()">
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          (click)="closeExportModal()"
+        >
+          <div
+            class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
             (click)="$event.stopPropagation()"
           >
             <div class="flex items-center justify-between gap-3">
@@ -1021,7 +1269,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                     (ngModelChange)="applyExportTemplate($event)"
                   >
                     <option value="">{{ 'adminUi.orders.exportModal.custom' | translate }}</option>
-                    <option *ngFor="let tpl of exportTemplates" [value]="tpl.id">{{ tpl.name }}</option>
+                    <option *ngFor="let tpl of exportTemplates" [value]="tpl.id">
+                      {{ tpl.name }}
+                    </option>
                   </select>
                 </label>
 
@@ -1043,7 +1293,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
               </div>
 
               <div class="grid gap-2">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.orders.exportModal.columnsTitle' | translate }}
                 </div>
                 <div class="grid gap-2 sm:grid-cols-2">
@@ -1058,7 +1310,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                       (change)="toggleExportColumn(col, $any($event.target).checked)"
                     />
                     <span class="font-medium text-slate-900 dark:text-slate-50">
-                      {{ ('adminUi.orders.exportColumns.' + col) | translate }}
+                      {{ 'adminUi.orders.exportColumns.' + col | translate }}
                     </span>
                   </label>
                 </div>
@@ -1083,7 +1335,10 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
       </ng-container>
 
       <ng-container *ngIf="tagManagerOpen()">
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeTagManager()">
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          (click)="closeTagManager()"
+        >
           <div
             class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
             (click)="$event.stopPropagation()"
@@ -1127,7 +1382,10 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                 ></app-button>
               </div>
 
-              <div *ngIf="tagManagerLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <div
+                *ngIf="tagManagerLoading()"
+                class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+              >
                 <app-skeleton [rows]="3"></app-skeleton>
               </div>
 
@@ -1139,20 +1397,39 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
               </div>
 
               <div
-                *ngIf="!tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length === 0"
+                *ngIf="
+                  !tagManagerLoading() &&
+                  !tagManagerError() &&
+                  filteredTagManagerRows().length === 0
+                "
                 class="text-sm text-slate-600 dark:text-slate-300"
               >
                 {{ 'adminUi.orders.tags.empty' | translate }}
               </div>
 
-              <div *ngIf="!tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length" class="overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
+              <div
+                *ngIf="
+                  !tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length
+                "
+                class="overflow-auto rounded-xl border border-slate-200 dark:border-slate-800"
+              >
                 <table class="min-w-[720px] w-full text-sm">
-                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <thead
+                    class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200"
+                  >
                     <tr>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.tag' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.count' | translate }}</th>
-                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.color' | translate }}</th>
-                      <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.tags.table.actions' | translate }}</th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.tags.table.tag' | translate }}
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.tags.table.count' | translate }}
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.tags.table.color' | translate }}
+                      </th>
+                      <th class="text-right font-semibold px-3 py-2">
+                        {{ 'adminUi.orders.tags.table.actions' | translate }}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1162,10 +1439,15 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                     >
                       <td class="px-3 py-2">
                         <div class="flex flex-wrap items-center gap-2">
-                          <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border" [ngClass]="tagChipColorClass(row.tag)">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-0.5 text-xs border"
+                            [ngClass]="tagChipColorClass(row.tag)"
+                          >
                             {{ tagLabel(row.tag) }}
                           </span>
-                          <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{ row.tag }}</span>
+                          <span class="text-xs text-slate-500 dark:text-slate-400 font-mono">{{
+                            row.tag
+                          }}</span>
                         </div>
                       </td>
                       <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
@@ -1178,7 +1460,7 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                           (ngModelChange)="setTagColor(row.tag, $event)"
                         >
                           <option *ngFor="let c of tagColorPalette" [value]="c">
-                            {{ ('adminUi.orders.tags.colors.' + c) | translate }}
+                            {{ 'adminUi.orders.tags.colors.' + c | translate }}
                           </option>
                         </select>
                       </td>
@@ -1195,8 +1477,12 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                 </table>
               </div>
 
-              <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.tags.renameTitle' | translate }}</div>
+              <div
+                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40"
+              >
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.orders.tags.renameTitle' | translate }}
+                </div>
                 <div class="mt-2 grid gap-3 md:grid-cols-[1fr_1fr_auto] items-end">
                   <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                     {{ 'adminUi.orders.tags.renameFrom' | translate }}
@@ -1205,7 +1491,9 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                       [(ngModel)]="tagRenameFrom"
                       [disabled]="tagRenameBusy"
                     >
-                      <option value="">{{ 'adminUi.orders.tags.renameFromPlaceholder' | translate }}</option>
+                      <option value="">
+                        {{ 'adminUi.orders.tags.renameFromPlaceholder' | translate }}
+                      </option>
                       <option *ngFor="let t of tagOptions()" [value]="t">{{ tagLabel(t) }}</option>
                     </select>
                   </label>
@@ -1228,11 +1516,18 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
                     (action)="renameTag()"
                   ></app-button>
                 </div>
-                <div *ngIf="tagRenameError" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ tagRenameError }}</div>
+                <div *ngIf="tagRenameError" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+                  {{ tagRenameError }}
+                </div>
               </div>
 
               <div class="flex justify-end">
-                <app-button size="sm" variant="ghost" [label]="'adminUi.common.close' | translate" (action)="closeTagManager()"></app-button>
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="'adminUi.common.close' | translate"
+                  (action)="closeTagManager()"
+                ></app-button>
               </div>
             </div>
           </div>
@@ -1250,7 +1545,12 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
               {{ 'adminUi.orders.bulk.selected' | translate: { count: selectedIds.size } }}
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <app-button size="sm" variant="ghost" [label]="'adminUi.actions.bulkActions' | translate" (action)="scrollToBulkActions()"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.bulkActions' | translate"
+                (action)="scrollToBulkActions()"
+              ></app-button>
               <app-button
                 size="sm"
                 variant="ghost"
@@ -1262,14 +1562,14 @@ const defaultOrdersTableLayout = (): AdminTableLayoutV1 => ({
           </div>
         </div>
       </div>
-	    </div>
-	  `
+    </div>
+  `,
 })
 export class AdminOrdersComponent implements OnInit {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
-    { label: 'adminUi.orders.title' }
+    { label: 'adminUi.orders.title' },
   ];
 
   readonly orderRowHeight = 44;
@@ -1334,7 +1634,7 @@ export class AdminOrdersComponent implements OnInit {
     'locker_address',
     'user_id',
     'created_at',
-    'updated_at'
+    'updated_at',
   ];
 
   selectedIds = new Set<string>();
@@ -1369,13 +1669,15 @@ export class AdminOrdersComponent implements OnInit {
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
     private readonly auth: AuthService,
-    public favorites: AdminFavoritesService
+    public favorites: AdminFavoritesService,
   ) {}
 
   ngOnInit(): void {
     this.tagColorOverrides = loadTagColorOverrides();
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
+    this.tableLayout.set(
+      loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults),
+    );
     this.viewMode.set(this.loadViewMode());
     this.presets = this.loadPresets();
     this.loadExportState();
@@ -1413,7 +1715,9 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   viewToggleLabelKey(): string {
-    return this.viewMode() === 'kanban' ? 'adminUi.orders.viewMode.table' : 'adminUi.orders.viewMode.kanban';
+    return this.viewMode() === 'kanban'
+      ? 'adminUi.orders.viewMode.table'
+      : 'adminUi.orders.viewMode.kanban';
   }
 
   toggleViewMode(): void {
@@ -1428,7 +1732,15 @@ export class AdminOrdersComponent implements OnInit {
     if (this.status === 'pending') return ['pending_payment', 'pending_acceptance'];
     if (this.status === 'sales') return ['paid', 'shipped', 'delivered', 'refunded'];
     if (this.status === 'all')
-      return ['pending_payment', 'pending_acceptance', 'paid', 'shipped', 'delivered', 'cancelled', 'refunded'];
+      return [
+        'pending_payment',
+        'pending_acceptance',
+        'paid',
+        'shipped',
+        'delivered',
+        'cancelled',
+        'refunded',
+      ];
     return [this.status as KanbanStatus];
   }
 
@@ -1438,7 +1750,10 @@ export class AdminOrdersComponent implements OnInit {
 
   kanbanTotalCards(): number {
     const items = this.kanbanItemsByStatus();
-    return this.kanbanColumnStatuses().reduce((sum, status) => sum + (items[status]?.length ?? 0), 0);
+    return this.kanbanColumnStatuses().reduce(
+      (sum, status) => sum + (items[status]?.length ?? 0),
+      0,
+    );
   }
 
   onKanbanDrop(event: CdkDragDrop<AdminOrderListItem[]>, targetStatus: KanbanStatus): void {
@@ -1463,9 +1778,13 @@ export class AdminOrdersComponent implements OnInit {
 
     let cancelReason: string | null | undefined = undefined;
     if (targetStatus === 'cancelled') {
-      cancelReason = (window.prompt(this.translate.instant('adminUi.orders.kanban.cancelPrompt')) ?? '').trim();
+      cancelReason = (
+        window.prompt(this.translate.instant('adminUi.orders.kanban.cancelPrompt')) ?? ''
+      ).trim();
       if (!cancelReason) {
-        this.toast.error(this.translate.instant('adminUi.orders.kanban.errors.cancelReasonRequired'));
+        this.toast.error(
+          this.translate.instant('adminUi.orders.kanban.errors.cancelReasonRequired'),
+        );
         return;
       }
     }
@@ -1498,11 +1817,11 @@ export class AdminOrdersComponent implements OnInit {
       .pipe(
         finalize(() => {
           this.kanbanBusy.set(false);
-        })
+        }),
       )
       .subscribe({
         next: (updated) => {
-          order.status = (updated?.status ?? targetStatus);
+          order.status = updated?.status ?? targetStatus;
           this.toast.success(this.translate.instant('adminUi.orders.kanban.success.updated'));
         },
         error: () => {
@@ -1510,7 +1829,7 @@ export class AdminOrdersComponent implements OnInit {
           this.kanbanItemsByStatus.set(prevItemsByStatus);
           this.kanbanTotalsByStatus.set(prevTotalsByStatus);
           this.toast.error(this.translate.instant('adminUi.orders.kanban.errors.updateFailed'));
-        }
+        },
       });
   }
 
@@ -1523,7 +1842,7 @@ export class AdminOrdersComponent implements OnInit {
       shipped: ['delivered', 'refunded'],
       delivered: ['refunded'],
       cancelled: [],
-      refunded: []
+      refunded: [],
     };
     const allowed = [...(base[current] ?? [])];
     const method = order.payment_method ? String(order.payment_method).trim().toLowerCase() : '';
@@ -1539,7 +1858,9 @@ export class AdminOrdersComponent implements OnInit {
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => {
-      const focusable = el.querySelector<HTMLElement>('select, input, button, [href], [tabindex]:not([tabindex="-1"])');
+      const focusable = el.querySelector<HTMLElement>(
+        'select, input, button, [href], [tabindex]:not([tabindex="-1"])',
+      );
       focusable?.focus();
     }, 0);
   }
@@ -1603,14 +1924,15 @@ export class AdminOrdersComponent implements OnInit {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state)?.['adminFilterScope'] === 'orders');
+      .filter((item) => item?.type === 'filter' && item?.state?.['adminFilterScope'] === 'orders');
   }
 
   applySavedView(key: string): void {
     this.selectedSavedViewKey = key;
     if (!key) return;
     const view = this.savedViews().find((item) => item.key === key);
-    const filters = view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
+    const filters =
+      view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
     if (!filters || typeof filters !== 'object') return;
 
     this.q = String(filters.q ?? '');
@@ -1621,7 +1943,8 @@ export class AdminOrdersComponent implements OnInit {
     this.fromDate = String(filters.fromDate ?? '');
     this.toDate = String(filters.toDate ?? '');
     this.includeTestOrders = Boolean(filters.includeTestOrders ?? true);
-    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 20;
+    const nextLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : 20;
     this.limit = nextLimit;
     this.page = 1;
     this.selectedPresetId = '';
@@ -1641,7 +1964,9 @@ export class AdminOrdersComponent implements OnInit {
       return;
     }
 
-    const name = (window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? '').trim();
+    const name = (
+      window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? ''
+    ).trim();
     if (!name) {
       this.toast.error(this.translate.instant('adminUi.favorites.savedViews.errors.nameRequired'));
       return;
@@ -1654,7 +1979,7 @@ export class AdminOrdersComponent implements OnInit {
       label: name,
       subtitle: '',
       url: '/admin/orders',
-      state: { adminFilterScope: 'orders', adminFilters: filters }
+      state: { adminFilterScope: 'orders', adminFilters: filters },
     });
     this.selectedSavedViewKey = key;
   }
@@ -1674,7 +1999,10 @@ export class AdminOrdersComponent implements OnInit {
     this.fromDate = String(filters.fromDate ?? '');
     this.toDate = String(filters.toDate ?? '');
     this.includeTestOrders = Boolean(filters.includeTestOrders ?? true);
-    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    const nextLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit)
+        ? filters.limit
+        : this.limit;
     this.limit = nextLimit;
     this.page = 1;
     this.selectedPresetId = '';
@@ -1691,7 +2019,7 @@ export class AdminOrdersComponent implements OnInit {
       fromDate: this.fromDate,
       toDate: this.toDate,
       includeTestOrders: this.includeTestOrders,
-      limit: this.limit
+      limit: this.limit,
     };
   }
 
@@ -1700,14 +2028,18 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   savePreset(): void {
-    const name = (window.prompt(this.translate.instant('adminUi.orders.presets.prompt')) ?? '').trim();
+    const name = (
+      window.prompt(this.translate.instant('adminUi.orders.presets.prompt')) ?? ''
+    ).trim();
     if (!name) {
       this.toast.error(this.translate.instant('adminUi.orders.presets.errors.nameRequired'));
       return;
     }
 
     const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
     const preset: AdminOrdersFilterPreset = {
       id,
       name,
@@ -1721,8 +2053,8 @@ export class AdminOrdersComponent implements OnInit {
         fromDate: this.fromDate,
         toDate: this.toDate,
         includeTestOrders: this.includeTestOrders,
-        limit: this.limit
-      }
+        limit: this.limit,
+      },
     };
 
     this.presets = [preset, ...this.presets].slice(0, 20);
@@ -1736,8 +2068,8 @@ export class AdminOrdersComponent implements OnInit {
     if (!preset) return;
     const ok = window.confirm(
       this.translate.instant('adminUi.orders.presets.confirmDelete', {
-        name: preset.name
-      })
+        name: preset.name,
+      }),
     );
     if (!ok) return;
 
@@ -1797,14 +2129,14 @@ export class AdminOrdersComponent implements OnInit {
           (id) =>
             this.ordersApi.update(id, payload).pipe(
               map(() => ({ id, ok: true as const })),
-              catchError(() => of({ id, ok: false as const }))
+              catchError(() => of({ id, ok: false as const })),
             ),
-          3
+          3,
         ),
         toArray(),
         finalize(() => {
           this.bulkBusy = false;
-        })
+        }),
       )
       .subscribe((results) => {
         const failed = results.filter((r) => !r.ok).map((r) => r.id);
@@ -1814,12 +2146,14 @@ export class AdminOrdersComponent implements OnInit {
           this.toast.error(
             this.translate.instant('adminUi.orders.bulk.partial', {
               success: successCount,
-              total: results.length
-            })
+              total: results.length,
+            }),
           );
         } else {
           this.clearSelection();
-          this.toast.success(this.translate.instant('adminUi.orders.bulk.success', { count: results.length }));
+          this.toast.success(
+            this.translate.instant('adminUi.orders.bulk.success', { count: results.length }),
+          );
         }
         this.bulkStatus = '';
         this.bulkCourier = '';
@@ -1844,23 +2178,20 @@ export class AdminOrdersComponent implements OnInit {
     this.bulkBusy = true;
     from(ids)
       .pipe(
-        mergeMap(
-          (id) => {
-            const req =
-              this.bulkEmailKind === 'delivery'
-                ? this.ordersApi.resendDeliveryEmail(id, note)
-                : this.ordersApi.resendOrderConfirmationEmail(id, note);
-            return req.pipe(
-              map(() => ({ id, ok: true as const })),
-              catchError(() => of({ id, ok: false as const }))
-            );
-          },
-          3
-        ),
+        mergeMap((id) => {
+          const req =
+            this.bulkEmailKind === 'delivery'
+              ? this.ordersApi.resendDeliveryEmail(id, note)
+              : this.ordersApi.resendOrderConfirmationEmail(id, note);
+          return req.pipe(
+            map(() => ({ id, ok: true as const })),
+            catchError(() => of({ id, ok: false as const })),
+          );
+        }, 3),
         toArray(),
         finalize(() => {
           this.bulkBusy = false;
-        })
+        }),
       )
       .subscribe((results) => {
         const failed = results.filter((r) => !r.ok).map((r) => r.id);
@@ -1870,12 +2201,14 @@ export class AdminOrdersComponent implements OnInit {
           this.toast.error(
             this.translate.instant('adminUi.orders.bulk.emailsPartial', {
               success: successCount,
-              total: results.length
-            })
+              total: results.length,
+            }),
           );
         } else {
           this.clearSelection();
-          this.toast.success(this.translate.instant('adminUi.orders.bulk.emailsQueued', { count: results.length }));
+          this.toast.success(
+            this.translate.instant('adminUi.orders.bulk.emailsQueued', { count: results.length }),
+          );
         }
         this.bulkEmailKind = '';
       });
@@ -1894,7 +2227,7 @@ export class AdminOrdersComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.packingSlips'));
         this.bulkBusy = false;
-      }
+      },
     });
   }
 
@@ -1911,7 +2244,7 @@ export class AdminOrdersComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.pickList'));
         this.bulkBusy = false;
-      }
+      },
     });
   }
 
@@ -1928,7 +2261,7 @@ export class AdminOrdersComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.bulk.errors.pickList'));
         this.bulkBusy = false;
-      }
+      },
     });
   }
 
@@ -1954,7 +2287,7 @@ export class AdminOrdersComponent implements OnInit {
       file,
       assignedOrderId: this.autoAssignShippingLabel(file),
       status: 'pending',
-      error: null
+      error: null,
     }));
     this.shippingLabelsUploads = [...this.shippingLabelsUploads, ...nextUploads].slice(0, 50);
     if (input) input.value = '';
@@ -1972,28 +2305,27 @@ export class AdminOrdersComponent implements OnInit {
     this.shippingLabelsBusy = true;
     from(uploadTargets)
       .pipe(
-        mergeMap(
-          ({ item, index }) => {
-            const orderId = (item.assignedOrderId ?? '').trim();
-            if (!orderId) {
-              this.updateShippingLabelUpload(index, {
-                status: 'error',
-                error: this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingOrder')
-              });
-              return of({ index, ok: false as const });
-            }
-            this.updateShippingLabelUpload(index, { status: 'uploading', error: null });
-            return this.ordersApi.uploadShippingLabel(orderId, item.file).pipe(
-              map(() => ({ index, ok: true as const })),
-              catchError((err) => of({ index, ok: false as const, err }))
-            );
-          },
-          2
-        ),
+        mergeMap(({ item, index }) => {
+          const orderId = (item.assignedOrderId ?? '').trim();
+          if (!orderId) {
+            this.updateShippingLabelUpload(index, {
+              status: 'error',
+              error: this.translate.instant(
+                'adminUi.orders.shippingLabelsModal.errors.missingOrder',
+              ),
+            });
+            return of({ index, ok: false as const });
+          }
+          this.updateShippingLabelUpload(index, { status: 'uploading', error: null });
+          return this.ordersApi.uploadShippingLabel(orderId, item.file).pipe(
+            map(() => ({ index, ok: true as const })),
+            catchError((err) => of({ index, ok: false as const, err })),
+          );
+        }, 2),
         toArray(),
         finalize(() => {
           this.shippingLabelsBusy = false;
-        })
+        }),
       )
       .subscribe((results) => {
         const failed = results.filter((r) => !r.ok);
@@ -2006,19 +2338,21 @@ export class AdminOrdersComponent implements OnInit {
           const suffix = requestId ? ` (${requestId})` : '';
           this.updateShippingLabelUpload(result.index, {
             status: 'error',
-            error: `${this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed')}${suffix}`
+            error: `${this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed')}${suffix}`,
           });
         }
         if (failed.length) {
           this.toast.error(
             this.translate.instant('adminUi.orders.shippingLabelsModal.errors.partial', {
               success: results.length - failed.length,
-              total: results.length
-            })
+              total: results.length,
+            }),
           );
           return;
         }
-        this.toast.success(this.translate.instant('adminUi.orders.shippingLabelsModal.success.uploaded'));
+        this.toast.success(
+          this.translate.instant('adminUi.orders.shippingLabelsModal.success.uploaded'),
+        );
       });
   }
 
@@ -2029,7 +2363,7 @@ export class AdminOrdersComponent implements OnInit {
     if (!orderId) {
       this.updateShippingLabelUpload(index, {
         status: 'error',
-        error: this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingOrder')
+        error: this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingOrder'),
       });
       return;
     }
@@ -2040,22 +2374,26 @@ export class AdminOrdersComponent implements OnInit {
       .pipe(
         finalize(() => {
           this.shippingLabelsBusy = false;
-        })
+        }),
       )
       .subscribe({
         next: () => {
           this.updateShippingLabelUpload(index, { status: 'success', error: null });
-          this.toast.success(this.translate.instant('adminUi.orders.shippingLabelsModal.success.uploaded'));
+          this.toast.success(
+            this.translate.instant('adminUi.orders.shippingLabelsModal.success.uploaded'),
+          );
         },
         error: (err) => {
           const requestId = extractRequestId(err);
           const suffix = requestId ? ` (${requestId})` : '';
           this.updateShippingLabelUpload(index, {
             status: 'error',
-            error: `${this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed')}${suffix}`
+            error: `${this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed')}${suffix}`,
           });
-          this.toast.error(this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed'));
-        }
+          this.toast.error(
+            this.translate.instant('adminUi.orders.shippingLabelsModal.errors.uploadFailed'),
+          );
+        },
       });
   }
 
@@ -2066,23 +2404,29 @@ export class AdminOrdersComponent implements OnInit {
     this.ordersApi.downloadBatchShippingLabelsZip(ids).subscribe({
       next: (blob) => {
         this.downloadBlob(blob, 'shipping-labels.zip');
-        this.toast.success(this.translate.instant('adminUi.orders.shippingLabelsModal.success.zipReady'));
+        this.toast.success(
+          this.translate.instant('adminUi.orders.shippingLabelsModal.success.zipReady'),
+        );
         this.shippingLabelsBusy = false;
       },
       error: (err) => {
-        const detail = (err?.error?.detail ?? null);
+        const detail = err?.error?.detail ?? null;
         const missing: string[] = Array.isArray(detail?.missing_shipping_label_order_ids)
           ? detail.missing_shipping_label_order_ids
           : [];
         if (missing.length) {
           this.toast.error(
-            this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingLabels', { count: missing.length })
+            this.translate.instant('adminUi.orders.shippingLabelsModal.errors.missingLabels', {
+              count: missing.length,
+            }),
           );
         } else {
-          this.toast.error(this.translate.instant('adminUi.orders.shippingLabelsModal.errors.zipFailed'));
+          this.toast.error(
+            this.translate.instant('adminUi.orders.shippingLabelsModal.errors.zipFailed'),
+          );
         }
         this.shippingLabelsBusy = false;
-      }
+      },
     });
   }
 
@@ -2156,7 +2500,7 @@ export class AdminOrdersComponent implements OnInit {
     const queryParams: Record<string, string | number | boolean> = {
       nav: 1,
       nav_page: this.page,
-      nav_limit: this.limit
+      nav_limit: this.limit,
     };
     const q = this.q.trim();
     if (q) queryParams['nav_q'] = q;
@@ -2197,7 +2541,9 @@ export class AdminOrdersComponent implements OnInit {
       this.persistExportState();
       return;
     }
-    const tpl = this.exportTemplates.find((candidate) => candidate.id === this.selectedExportTemplateId);
+    const tpl = this.exportTemplates.find(
+      (candidate) => candidate.id === this.selectedExportTemplateId,
+    );
     if (!tpl) return;
     const cols = (tpl.columns || []).filter((c) => this.exportColumnOptions.includes(c));
     this.exportColumns = {};
@@ -2225,7 +2571,7 @@ export class AdminOrdersComponent implements OnInit {
         URL.revokeObjectURL(url);
         this.closeExportModal();
       },
-      error: () => this.toast.error(this.translate.instant('adminUi.orders.errors.export'))
+      error: () => this.toast.error(this.translate.instant('adminUi.orders.errors.export')),
     });
   }
 
@@ -2235,19 +2581,25 @@ export class AdminOrdersComponent implements OnInit {
       this.toast.error(this.translate.instant('adminUi.orders.exportModal.errors.noColumns'));
       return;
     }
-    const name = (window.prompt(this.translate.instant('adminUi.orders.exportModal.templatePrompt')) ?? '').trim();
+    const name = (
+      window.prompt(this.translate.instant('adminUi.orders.exportModal.templatePrompt')) ?? ''
+    ).trim();
     if (!name) {
-      this.toast.error(this.translate.instant('adminUi.orders.exportModal.errors.templateNameRequired'));
+      this.toast.error(
+        this.translate.instant('adminUi.orders.exportModal.errors.templateNameRequired'),
+      );
       return;
     }
 
     const id =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
     const template: AdminOrdersExportTemplate = {
       id,
       name,
       createdAt: new Date().toISOString(),
-      columns
+      columns,
     };
     this.exportTemplates = [template, ...this.exportTemplates].slice(0, 20);
     this.selectedExportTemplateId = template.id;
@@ -2256,12 +2608,14 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   deleteExportTemplate(): void {
-    const tpl = this.exportTemplates.find((candidate) => candidate.id === this.selectedExportTemplateId);
+    const tpl = this.exportTemplates.find(
+      (candidate) => candidate.id === this.selectedExportTemplateId,
+    );
     if (!tpl) return;
     const ok = window.confirm(
       this.translate.instant('adminUi.orders.exportModal.confirmDelete', {
-        name: tpl.name
-      })
+        name: tpl.name,
+      }),
     );
     if (!ok) return;
     this.exportTemplates = this.exportTemplates.filter((candidate) => candidate.id !== tpl.id);
@@ -2315,7 +2669,7 @@ export class AdminOrdersComponent implements OnInit {
       error: () => {
         this.tagManagerError.set(this.translate.instant('adminUi.orders.tags.errors.load'));
         this.tagManagerLoading.set(false);
-      }
+      },
     });
     this.refreshTagOptions();
   }
@@ -2374,22 +2728,22 @@ export class AdminOrdersComponent implements OnInit {
                 op.kind === 'add'
                   ? this.ordersApi.addOrderTag(id, op.tag).pipe(
                       map(() => true),
-                      catchError(() => of(false))
+                      catchError(() => of(false)),
                     )
                   : this.ordersApi.removeOrderTag(id, op.tag).pipe(
                       map(() => true),
-                      catchError(() => of(false))
-                    )
+                      catchError(() => of(false)),
+                    ),
               ),
               toArray(),
-              map((results) => ({ id, ok: results.every(Boolean) }))
+              map((results) => ({ id, ok: results.every(Boolean) })),
             ),
-          3
+          3,
         ),
         toArray(),
         finalize(() => {
           this.bulkBusy = false;
-        })
+        }),
       )
       .subscribe((results) => {
         const failed = results.filter((r) => !r.ok).map((r) => r.id);
@@ -2399,12 +2753,14 @@ export class AdminOrdersComponent implements OnInit {
           this.toast.error(
             this.translate.instant('adminUi.orders.bulk.partial', {
               success: successCount,
-              total: results.length
-            })
+              total: results.length,
+            }),
           );
         } else {
           this.clearSelection();
-          this.toast.success(this.translate.instant('adminUi.orders.bulk.success', { count: results.length }));
+          this.toast.success(
+            this.translate.instant('adminUi.orders.bulk.success', { count: results.length }),
+          );
         }
         this.bulkTagAdd = '';
         this.bulkTagRemove = '';
@@ -2422,7 +2778,7 @@ export class AdminOrdersComponent implements OnInit {
       return;
     }
     const ok = window.confirm(
-      this.translate.instant('adminUi.orders.tags.renameConfirm', { from: fromTag, to: toTag })
+      this.translate.instant('adminUi.orders.tags.renameConfirm', { from: fromTag, to: toTag }),
     );
     if (!ok) return;
 
@@ -2439,31 +2795,41 @@ export class AdminOrdersComponent implements OnInit {
         persistTagColorOverrides(this.tagColorOverrides);
 
         if (this.tag === fromKey) this.tag = toKey;
-        this.toast.success(this.translate.instant('adminUi.orders.tags.renamed', { count: res.total }));
+        this.toast.success(
+          this.translate.instant('adminUi.orders.tags.renamed', { count: res.total }),
+        );
         this.tagRenameFrom = '';
         this.tagRenameTo = '';
         this.reloadTagManager();
         this.load();
       },
       error: (err) => {
-        this.tagRenameError = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.rename');
+        this.tagRenameError =
+          err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.rename');
       },
       complete: () => {
         this.tagRenameBusy = false;
-      }
+      },
     });
   }
 
   private refreshTagOptions(): void {
     this.ordersApi.listOrderTags().subscribe({
       next: (tags) => {
-        const merged = new Set<string>(['vip', 'fraud_risk', 'fraud_approved', 'fraud_denied', 'gift', 'test']);
+        const merged = new Set<string>([
+          'vip',
+          'fraud_risk',
+          'fraud_approved',
+          'fraud_denied',
+          'gift',
+          'test',
+        ]);
         for (const t of tags) merged.add(t);
         this.tagOptions.set(Array.from(merged).sort((a, b) => a.localeCompare(b, 'en')));
       },
       error: () => {
         // ignore
-      }
+      },
     });
   }
 
@@ -2471,9 +2837,7 @@ export class AdminOrdersComponent implements OnInit {
     return orderStatusChipClass(status);
   }
 
-  slaBadge(
-    order: AdminOrderListItem
-  ): { label: string; title: string; className: string } | null {
+  slaBadge(order: AdminOrderListItem): { label: string; title: string; className: string } | null {
     const kind = (order?.sla_kind ?? '').toString().trim().toLowerCase();
     const dueRaw = (order?.sla_due_at ?? '').toString().trim();
     if (!kind || !dueRaw) return null;
@@ -2495,22 +2859,28 @@ export class AdminOrdersComponent implements OnInit {
     const dueSoonMs = 4 * 60 * 60 * 1000;
 
     if (diffMs <= 0) {
-      const label = this.translate.instant('adminUi.orders.sla.badges.overdue', { kind: kindLabel, time });
+      const label = this.translate.instant('adminUi.orders.sla.badges.overdue', {
+        kind: kindLabel,
+        time,
+      });
       return {
         label,
         title: label,
         className:
-          'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-100'
+          'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-100',
       };
     }
 
     if (diffMs <= dueSoonMs) {
-      const label = this.translate.instant('adminUi.orders.sla.badges.dueSoon', { kind: kindLabel, time });
+      const label = this.translate.instant('adminUi.orders.sla.badges.dueSoon', {
+        kind: kindLabel,
+        time,
+      });
       return {
         label,
         title: label,
         className:
-          'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100'
+          'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-950/30 dark:text-amber-100',
       };
     }
 
@@ -2518,7 +2888,7 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   fraudBadge(
-    order: AdminOrderListItem
+    order: AdminOrderListItem,
   ): { label: string; title: string; className: string } | null {
     const severity = (order?.fraud_severity ?? '').toString().trim().toLowerCase();
     if (!severity) return null;
@@ -2526,7 +2896,9 @@ export class AdminOrdersComponent implements OnInit {
     const severityKey = `adminUi.orders.fraudSignals.severity.${severity}`;
     const translatedSeverity = this.translate.instant(severityKey);
     const severityLabel = translatedSeverity === severityKey ? severity : translatedSeverity;
-    const label = this.translate.instant('adminUi.orders.fraud.badges.label', { severity: severityLabel });
+    const label = this.translate.instant('adminUi.orders.fraud.badges.label', {
+      severity: severityLabel,
+    });
 
     const className =
       severity === 'high'
@@ -2561,7 +2933,7 @@ export class AdminOrdersComponent implements OnInit {
 
     const params: Parameters<AdminOrdersService['search']>[0] = {
       page: this.page,
-      limit: this.limit
+      limit: this.limit,
     };
     const q = this.q.trim();
     if (q) params.q = q;
@@ -2584,7 +2956,7 @@ export class AdminOrdersComponent implements OnInit {
         this.error.set(this.translate.instant('adminUi.orders.errors.load'));
         this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -2598,7 +2970,7 @@ export class AdminOrdersComponent implements OnInit {
     const statuses = this.kanbanColumnStatuses();
     const baseParams: Parameters<AdminOrdersService['search']>[0] = {
       page: 1,
-      limit: this.limit
+      limit: this.limit,
     };
     const q = this.q.trim();
     if (q) baseParams.q = q;
@@ -2616,11 +2988,11 @@ export class AdminOrdersComponent implements OnInit {
           (statusValue) =>
             this.ordersApi.search({ ...baseParams, status: statusValue }).pipe(
               map((res) => ({ status: statusValue, res })),
-              catchError((err) => of({ status: statusValue, err, res: null as any }))
+              catchError((err) => of({ status: statusValue, err, res: null as any })),
             ),
-          4
+          4,
         ),
-        toArray()
+        toArray(),
       )
       .subscribe({
         next: (results) => {
@@ -2631,7 +3003,8 @@ export class AdminOrdersComponent implements OnInit {
           for (const result of results) {
             if (result?.res) {
               itemsByStatus[result.status] = result.res.items ?? [];
-              totalsByStatus[result.status] = result.res.meta?.total_items ?? (result.res.items ?? []).length;
+              totalsByStatus[result.status] =
+                result.res.meta?.total_items ?? (result.res.items ?? []).length;
               continue;
             }
             itemsByStatus[result.status] = [];
@@ -2651,7 +3024,7 @@ export class AdminOrdersComponent implements OnInit {
           this.error.set(this.translate.instant('adminUi.orders.errors.load'));
           this.errorRequestId.set(extractRequestId(err));
           this.loading.set(false);
-        }
+        },
       });
   }
 
@@ -2696,32 +3069,52 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   private loadExportState(): void {
-    const defaultColumns = ['id', 'reference_code', 'status', 'total_amount', 'currency', 'user_id', 'created_at'];
+    const defaultColumns = [
+      'id',
+      'reference_code',
+      'status',
+      'total_amount',
+      'currency',
+      'user_id',
+      'created_at',
+    ];
     try {
       const raw = localStorage.getItem(this.exportStorageKey());
       if (!raw) {
         this.exportTemplates = [];
         this.selectedExportTemplateId = '';
         this.exportColumns = {};
-        this.exportColumnOptions.forEach((c) => (this.exportColumns[c] = defaultColumns.includes(c)));
+        this.exportColumnOptions.forEach(
+          (c) => (this.exportColumns[c] = defaultColumns.includes(c)),
+        );
         return;
       }
       const parsed = JSON.parse(raw);
       const templates = Array.isArray(parsed?.templates) ? parsed.templates : [];
       this.exportTemplates = templates
-        .filter((candidate: any) => typeof candidate?.id === 'string' && typeof candidate?.name === 'string')
+        .filter(
+          (candidate: any) =>
+            typeof candidate?.id === 'string' && typeof candidate?.name === 'string',
+        )
         .map((candidate: any) => ({
           id: String(candidate.id),
           name: String(candidate.name),
           createdAt: String(candidate.createdAt ?? ''),
-          columns: Array.isArray(candidate.columns) ? candidate.columns.map((c: any) => String(c)) : []
+          columns: Array.isArray(candidate.columns)
+            ? candidate.columns.map((c: any) => String(c))
+            : [],
         })) as AdminOrdersExportTemplate[];
 
-      this.selectedExportTemplateId = typeof parsed?.selectedTemplateId === 'string' ? parsed.selectedTemplateId : '';
-      let columns: string[] = Array.isArray(parsed?.columns) ? parsed.columns.map((c: any) => String(c)) : [];
+      this.selectedExportTemplateId =
+        typeof parsed?.selectedTemplateId === 'string' ? parsed.selectedTemplateId : '';
+      let columns: string[] = Array.isArray(parsed?.columns)
+        ? parsed.columns.map((c: any) => String(c))
+        : [];
 
       if (this.selectedExportTemplateId) {
-        const tpl = this.exportTemplates.find((candidate) => candidate.id === this.selectedExportTemplateId);
+        const tpl = this.exportTemplates.find(
+          (candidate) => candidate.id === this.selectedExportTemplateId,
+        );
         if (tpl && Array.isArray(tpl.columns) && tpl.columns.length) {
           columns = tpl.columns.slice();
         }
@@ -2749,7 +3142,10 @@ export class AdminOrdersComponent implements OnInit {
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
       return parsed
-        .filter((candidate: any) => typeof candidate?.id === 'string' && typeof candidate?.name === 'string')
+        .filter(
+          (candidate: any) =>
+            typeof candidate?.id === 'string' && typeof candidate?.name === 'string',
+        )
         .map((candidate: any) => ({
           id: String(candidate.id),
           name: String(candidate.name),
@@ -2759,22 +3155,29 @@ export class AdminOrdersComponent implements OnInit {
             status: (candidate?.filters?.status ?? 'all') as OrderStatusFilter,
             sla: ((): SlaFilter => {
               const raw = String(candidate?.filters?.sla ?? 'all');
-              return raw === 'any_overdue' || raw === 'accept_overdue' || raw === 'ship_overdue' ? raw : 'all';
+              return raw === 'any_overdue' || raw === 'accept_overdue' || raw === 'ship_overdue'
+                ? raw
+                : 'all';
             })(),
             fraud: ((): FraudFilter => {
               const raw = String(candidate?.filters?.fraud ?? 'all');
-              return raw === 'queue' || raw === 'flagged' || raw === 'approved' || raw === 'denied' ? raw : 'all';
+              return raw === 'queue' || raw === 'flagged' || raw === 'approved' || raw === 'denied'
+                ? raw
+                : 'all';
             })(),
             tag: String(candidate?.filters?.tag ?? ''),
             fromDate: String(candidate?.filters?.fromDate ?? ''),
             toDate: String(candidate?.filters?.toDate ?? ''),
             includeTestOrders:
-              typeof candidate?.filters?.includeTestOrders === 'boolean' ? candidate.filters.includeTestOrders : true,
+              typeof candidate?.filters?.includeTestOrders === 'boolean'
+                ? candidate.filters.includeTestOrders
+                : true,
             limit:
-              typeof candidate?.filters?.limit === 'number' && Number.isFinite(candidate.filters.limit)
+              typeof candidate?.filters?.limit === 'number' &&
+              Number.isFinite(candidate.filters.limit)
                 ? candidate.filters.limit
-                : 20
-          }
+                : 20,
+          },
         })) as AdminOrdersFilterPreset[];
     } catch {
       return [];
@@ -2796,8 +3199,8 @@ export class AdminOrdersComponent implements OnInit {
         JSON.stringify({
           templates: this.exportTemplates,
           selectedTemplateId: this.selectedExportTemplateId,
-          columns: this.selectedExportColumns()
-        })
+          columns: this.selectedExportColumns(),
+        }),
       );
     } catch {
       // ignore

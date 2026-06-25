@@ -41,7 +41,10 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_user_token(session_factory) -> str:
     async def create_and_token():
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email="addr@example.com", password="addrpass", name="Addr"))
+            user = await create_user(
+                session,
+                UserCreate(email="addr@example.com", password="addrpass", name="Addr"),
+            )
             tokens = await issue_tokens_for_user(session, user)
             return tokens["access_token"]
 
@@ -62,7 +65,9 @@ def test_address_validation(test_app: Dict[str, object]) -> None:
         "postal_code": "010203",
         "country": "ro",
     }
-    ok = client.post("/api/v1/me/addresses", json=valid_payload, headers=auth_headers(token))
+    ok = client.post(
+        "/api/v1/me/addresses", json=valid_payload, headers=auth_headers(token)
+    )
     assert ok.status_code == 201, ok.text
     assert ok.json()["country"] == "RO"
 
@@ -90,7 +95,12 @@ def test_address_default_flags_are_exclusive(test_app: Dict[str, object]) -> Non
 
     first = client.post(
         "/api/v1/me/addresses",
-        json={**base, "label": "Home", "is_default_shipping": True, "is_default_billing": True},
+        json={
+            **base,
+            "label": "Home",
+            "is_default_shipping": True,
+            "is_default_billing": True,
+        },
         headers=auth_headers(token),
     )
     assert first.status_code == 201, first.text
@@ -100,7 +110,13 @@ def test_address_default_flags_are_exclusive(test_app: Dict[str, object]) -> Non
 
     second = client.post(
         "/api/v1/me/addresses",
-        json={**base, "label": "Work", "line1": "456 Work", "postal_code": "010204", "is_default_shipping": True},
+        json={
+            **base,
+            "label": "Work",
+            "line1": "456 Work",
+            "postal_code": "010204",
+            "is_default_shipping": True,
+        },
         headers=auth_headers(token),
     )
     assert second.status_code == 201, second.text
@@ -117,7 +133,13 @@ def test_address_default_flags_are_exclusive(test_app: Dict[str, object]) -> Non
 
     third = client.post(
         "/api/v1/me/addresses",
-        json={**base, "label": "Alt", "line1": "789 Alt", "postal_code": "010205", "is_default_billing": True},
+        json={
+            **base,
+            "label": "Alt",
+            "line1": "789 Alt",
+            "postal_code": "010205",
+            "is_default_billing": True,
+        },
         headers=auth_headers(token),
     )
     assert third.status_code == 201, third.text

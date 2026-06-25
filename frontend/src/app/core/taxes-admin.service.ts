@@ -65,7 +65,8 @@ export class TaxesAdminService {
   }
 
   deleteRate(groupId: string, countryCode: string): Observable<void> {
-    return this.api.delete<void>(`/taxes/admin/groups/${groupId}/rates/${encodeURIComponent(countryCode)}`);
+    return this.api.delete<void>(
+      `/taxes/admin/groups/${groupId}/rates/${encodeURIComponent(countryCode)}`,
+    );
   }
 }
-

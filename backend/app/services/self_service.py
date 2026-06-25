@@ -40,7 +40,9 @@ def _deleted_username(user_id: Any) -> str:
     return f"deleted-{suffix[:22]}"
 
 
-async def process_due_account_deletions(session: AsyncSession, *, limit: int = 200) -> int:
+async def process_due_account_deletions(
+    session: AsyncSession, *, limit: int = 200
+) -> int:
     now = datetime.now(timezone.utc)
     limit_clean = max(1, min(int(limit or 0), 2000))
     rows = (
@@ -72,8 +74,12 @@ async def execute_account_deletion(session: AsyncSession, user: User) -> None:
 
     now = datetime.now(timezone.utc)
     user.deleted_at = now
-    user.deletion_requested_at = _ensure_utc(getattr(user, "deletion_requested_at", None)) or now
-    user.deletion_scheduled_for = _ensure_utc(getattr(user, "deletion_scheduled_for", None)) or now
+    user.deletion_requested_at = (
+        _ensure_utc(getattr(user, "deletion_requested_at", None)) or now
+    )
+    user.deletion_scheduled_for = (
+        _ensure_utc(getattr(user, "deletion_scheduled_for", None)) or now
+    )
 
     user.email = f"deleted+{user.id}@example.invalid"
     user.username = _deleted_username(user.id)
@@ -95,7 +101,9 @@ async def execute_account_deletion(session: AsyncSession, user: User) -> None:
     user.hashed_password = security.hash_password(secrets.token_urlsafe(32))
 
     session.add(user)
-    await session.execute(sa.delete(UserSecondaryEmail).where(UserSecondaryEmail.user_id == user.id))
+    await session.execute(
+        sa.delete(UserSecondaryEmail).where(UserSecondaryEmail.user_id == user.id)
+    )
     await session.execute(
         sa.update(RefreshSession)
         .where(RefreshSession.user_id == user.id, RefreshSession.revoked.is_(False))
@@ -115,21 +123,27 @@ def _is_profile_complete(user: User) -> bool:
     )
 
 
-async def cleanup_incomplete_google_accounts(session: AsyncSession, *, max_age_hours: int = 24 * 30) -> int:
+async def cleanup_incomplete_google_accounts(
+    session: AsyncSession, *, max_age_hours: int = 24 * 30
+) -> int:
     """Soft-delete Google-created accounts that never completed required profile fields.
 
     This is intended as an optional maintenance task to reduce abandoned/incomplete records.
     """
     threshold = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
     rows = (
-        await session.execute(
-            sa.select(User).where(
-                User.google_sub.is_not(None),
-                User.deleted_at.is_(None),
-                User.created_at < threshold,
+        (
+            await session.execute(
+                sa.select(User).where(
+                    User.google_sub.is_not(None),
+                    User.deleted_at.is_(None),
+                    User.created_at < threshold,
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     deleted = 0
     for user in rows:
@@ -150,7 +164,10 @@ async def maybe_cleanup_incomplete_google_accounts(session: AsyncSession) -> int
     """
     global _last_incomplete_google_cleanup_at
     now = datetime.now(timezone.utc)
-    if _last_incomplete_google_cleanup_at and now - _last_incomplete_google_cleanup_at < timedelta(hours=24):
+    if (
+        _last_incomplete_google_cleanup_at
+        and now - _last_incomplete_google_cleanup_at < timedelta(hours=24)
+    ):
         return 0
     _last_incomplete_google_cleanup_at = now
     return await cleanup_incomplete_google_accounts(session, max_age_hours=24 * 30)
@@ -210,7 +227,9 @@ async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:
             "first_name": getattr(user, "first_name", None),
             "middle_name": getattr(user, "middle_name", None),
             "last_name": getattr(user, "last_name", None),
-            "date_of_birth": user.date_of_birth.isoformat() if user.date_of_birth else None,
+            "date_of_birth": (
+                user.date_of_birth.isoformat() if user.date_of_birth else None
+            ),
             "phone": user.phone,
             "avatar_url": user.avatar_url,
             "preferred_language": user.preferred_language,
@@ -259,10 +278,16 @@ async def export_user_data(session: AsyncSession, user: User) -> dict[str, Any]:
         "comments": [
             {
                 "id": str(c.id),
-                "post_slug": str(post_key).split("blog.", 1)[-1] if str(post_key).startswith("blog.") else str(post_key),
+                "post_slug": (
+                    str(post_key).split("blog.", 1)[-1]
+                    if str(post_key).startswith("blog.")
+                    else str(post_key)
+                ),
                 "post_title": post_title,
                 "parent_id": str(c.parent_id) if c.parent_id else None,
-                "status": "deleted" if c.is_deleted else "hidden" if c.is_hidden else "posted",
+                "status": (
+                    "deleted" if c.is_deleted else "hidden" if c.is_hidden else "posted"
+                ),
                 "created_at": iso(c.created_at),
                 "updated_at": iso(c.updated_at),
                 "body": "" if c.is_deleted or c.is_hidden else c.body,

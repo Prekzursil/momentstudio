@@ -20,8 +20,7 @@
       }
       meta.setAttribute('content', color);
     }
-  } catch (err) {
+  } catch {
     // Ignore theme bootstrap errors (e.g. blocked storage).
   }
 })();
-

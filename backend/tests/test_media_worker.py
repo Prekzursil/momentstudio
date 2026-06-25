@@ -28,7 +28,9 @@ class _RedisStub:
 
 
 @pytest.mark.anyio("asyncio")
-async def test_process_queued_jobs_once_advances_jobs_without_redis(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_process_queued_jobs_once_advances_jobs_without_redis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -37,7 +39,11 @@ async def test_process_queued_jobs_once_advances_jobs_without_redis(monkeypatch:
     monkeypatch.setattr(media_worker, "SessionLocal", test_session_factory)
 
     async with test_session_factory() as session:
-        job = MediaJob(job_type=MediaJobType.usage_reconcile, status=MediaJobStatus.queued, payload_json="{}")
+        job = MediaJob(
+            job_type=MediaJobType.usage_reconcile,
+            status=MediaJobStatus.queued,
+            payload_json="{}",
+        )
         session.add(job)
         await session.commit()
         job_id = job.id
@@ -48,7 +54,9 @@ async def test_process_queued_jobs_once_advances_jobs_without_redis(monkeypatch:
         await session.commit()
         return job
 
-    monkeypatch.setattr(media_worker.media_dam, "process_job_inline", _fake_process_job_inline)
+    monkeypatch.setattr(
+        media_worker.media_dam, "process_job_inline", _fake_process_job_inline
+    )
 
     processed_count = await media_worker._process_queued_jobs_once(limit=10)
     assert processed_count == 1
@@ -60,7 +68,9 @@ async def test_process_queued_jobs_once_advances_jobs_without_redis(monkeypatch:
 
 
 @pytest.mark.anyio("asyncio")
-async def test_run_media_worker_fallback_runs_retries_and_logs(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+async def test_run_media_worker_fallback_runs_retries_and_logs(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     calls = {"retry": 0, "process": 0, "heartbeat": 0, "sleep": 0}
 
     monkeypatch.setattr(media_worker, "get_redis", lambda: None)
@@ -72,7 +82,9 @@ async def test_run_media_worker_fallback_runs_retries_and_logs(monkeypatch: pyte
         calls["retry"] += 1
         return 2
 
-    async def _fake_process(*, limit: int = media_worker.FALLBACK_JOB_BATCH_SIZE) -> int:
+    async def _fake_process(
+        *, limit: int = media_worker.FALLBACK_JOB_BATCH_SIZE
+    ) -> int:
         calls["process"] += 1
         return 1
 
@@ -99,7 +111,9 @@ async def test_run_media_worker_fallback_runs_retries_and_logs(monkeypatch: pyte
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("payload", [str(uuid4()).encode("utf-8"), str(uuid4())])
-async def test_run_media_worker_normalizes_decode_modes(monkeypatch: pytest.MonkeyPatch, payload) -> None:
+async def test_run_media_worker_normalizes_decode_modes(
+    monkeypatch: pytest.MonkeyPatch, payload
+) -> None:
     redis = _RedisStub(payload)
     process_mock = AsyncMock()
 
@@ -117,7 +131,9 @@ async def test_run_media_worker_normalizes_decode_modes(monkeypatch: pytest.Monk
 
 
 @pytest.mark.anyio
-async def test_run_media_worker_logs_warning_on_invalid_payload(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+async def test_run_media_worker_logs_warning_on_invalid_payload(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
     redis = _RedisStub(b"\xff\xfe")
     process_mock = AsyncMock()
 

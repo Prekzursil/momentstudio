@@ -19,14 +19,21 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("newsletter_subscribers", sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("newsletter_subscribers", sa.Column("confirmation_sent_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "newsletter_subscribers",
+        sa.Column("confirmed_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "newsletter_subscribers",
+        sa.Column("confirmation_sent_at", sa.DateTime(timezone=True), nullable=True),
+    )
 
     # Existing rows predate double opt-in; treat them as confirmed.
-    op.execute("UPDATE newsletter_subscribers SET confirmed_at = subscribed_at WHERE confirmed_at IS NULL")
+    op.execute(
+        "UPDATE newsletter_subscribers SET confirmed_at = subscribed_at WHERE confirmed_at IS NULL"
+    )
 
 
 def downgrade() -> None:
     op.drop_column("newsletter_subscribers", "confirmation_sent_at")
     op.drop_column("newsletter_subscribers", "confirmed_at")
-

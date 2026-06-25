@@ -2,7 +2,7 @@ import { Directive, ElementRef, HostListener, Input } from '@angular/core';
 
 @Directive({
   selector: 'img[appImgFallback]',
-  standalone: true
+  standalone: true,
 })
 export class ImgFallbackDirective {
   @Input('appImgFallback') fallbackSrc?: string;
@@ -20,4 +20,3 @@ export class ImgFallbackDirective {
     img.removeAttribute('srcset');
   }
 }
-

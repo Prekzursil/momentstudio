@@ -14,19 +14,29 @@ from app.models.legal import LegalConsent, LegalConsentContext
 REQUIRED_DOC_KEYS = ("page.terms-and-conditions", "page.privacy-policy")
 
 
-async def required_doc_versions(session: AsyncSession, *, keys: tuple[str, ...] = REQUIRED_DOC_KEYS) -> dict[str, int]:
+async def required_doc_versions(
+    session: AsyncSession, *, keys: tuple[str, ...] = REQUIRED_DOC_KEYS
+) -> dict[str, int]:
     now = datetime.now(timezone.utc)
     rows = (
         await session.execute(
             select(ContentBlock.key, ContentBlock.version).where(
                 ContentBlock.key.in_(keys),
                 ContentBlock.status == ContentStatus.published,
-                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+                or_(
+                    ContentBlock.published_at.is_(None),
+                    ContentBlock.published_at <= now,
+                ),
+                or_(
+                    ContentBlock.published_until.is_(None),
+                    ContentBlock.published_until > now,
+                ),
             )
         )
     ).all()
-    versions = {str(key): int(version) for key, version in rows if key and version is not None}
+    versions = {
+        str(key): int(version) for key, version in rows if key and version is not None
+    }
     missing = [key for key in keys if key not in versions]
     if missing:
         raise HTTPException(
@@ -46,10 +56,14 @@ async def latest_accepted_versions(
             .group_by(LegalConsent.doc_key)
         )
     ).all()
-    return {str(key): int(version) for key, version in rows if key and version is not None}
+    return {
+        str(key): int(version) for key, version in rows if key and version is not None
+    }
 
 
-def is_satisfied(required_versions: dict[str, int], accepted_versions: dict[str, int]) -> bool:
+def is_satisfied(
+    required_versions: dict[str, int], accepted_versions: dict[str, int]
+) -> bool:
     for key, version in required_versions.items():
         if int(accepted_versions.get(key, 0) or 0) < int(version):
             return False
@@ -77,4 +91,3 @@ def add_consent_records(
                 accepted_at=ts,
             )
         )
-

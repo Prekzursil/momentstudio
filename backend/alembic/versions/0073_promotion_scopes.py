@@ -43,13 +43,29 @@ def upgrade() -> None:
         sa.Column("entity_type", entity_type, nullable=False),
         sa.Column("entity_id", sa.UUID(as_uuid=True), nullable=False),
         sa.Column("mode", scope_mode, nullable=False, server_default="include"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.UniqueConstraint("promotion_id", "entity_type", "entity_id", name="uq_promotion_scopes_promotion_type_entity"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.UniqueConstraint(
+            "promotion_id",
+            "entity_type",
+            "entity_id",
+            name="uq_promotion_scopes_promotion_type_entity",
+        ),
     )
-    op.create_index(op.f("ix_promotion_scopes_promotion_id"), "promotion_scopes", ["promotion_id"], unique=False)
+    op.create_index(
+        op.f("ix_promotion_scopes_promotion_id"),
+        "promotion_scopes",
+        ["promotion_id"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_promotion_scopes_promotion_id"), table_name="promotion_scopes")
+    op.drop_index(
+        op.f("ix_promotion_scopes_promotion_id"), table_name="promotion_scopes"
+    )
     op.drop_table("promotion_scopes")
-

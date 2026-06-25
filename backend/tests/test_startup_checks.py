@@ -19,7 +19,9 @@ def _set_valid_production_baseline(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "stripe_env", "sandbox")
 
 
-def test_validate_production_settings_requires_sentry_dsn(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_production_settings_requires_sentry_dsn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _set_valid_production_baseline(monkeypatch)
     monkeypatch.setattr(settings, "sentry_dsn", "")
 
@@ -29,14 +31,20 @@ def test_validate_production_settings_requires_sentry_dsn(monkeypatch: pytest.Mo
     assert "SENTRY_DSN must be configured in production." in str(exc.value)
 
 
-def test_validate_production_settings_accepts_sentry_dsn(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_production_settings_accepts_sentry_dsn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _set_valid_production_baseline(monkeypatch)
-    monkeypatch.setattr(settings, "sentry_dsn", "https://examplePublicKey@o0.ingest.sentry.io/0")
+    monkeypatch.setattr(
+        settings, "sentry_dsn", "https://examplePublicKey@o0.ingest.sentry.io/0"
+    )
 
     validate_production_settings()
 
 
-def test_validate_non_production_does_not_require_sentry_dsn(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_validate_non_production_does_not_require_sentry_dsn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(settings, "environment", "local")
     monkeypatch.setattr(settings, "sentry_dsn", "")
 

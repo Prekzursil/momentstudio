@@ -27,7 +27,9 @@ async def _run_once() -> int:
                     .select_from(MediaJob)
                     .where(
                         MediaJob.job_type == MediaJobType.usage_reconcile,
-                        MediaJob.status.in_((MediaJobStatus.queued, MediaJobStatus.processing)),
+                        MediaJob.status.in_(
+                            (MediaJobStatus.queued, MediaJobStatus.processing)
+                        ),
                     )
                 )
             )
@@ -36,7 +38,9 @@ async def _run_once() -> int:
         if pending > 0:
             return 0
 
-        limit = max(1, int(getattr(settings, "media_usage_reconcile_batch_size", 200) or 200))
+        limit = max(
+            1, int(getattr(settings, "media_usage_reconcile_batch_size", 200) or 200)
+        )
         job = await media_dam.enqueue_job(
             session,
             asset_id=None,
@@ -53,16 +57,25 @@ async def _run_once() -> int:
 
 
 async def _loop(stop: asyncio.Event) -> None:
-    interval = max(300, int(getattr(settings, "media_usage_reconcile_interval_seconds", 86400) or 86400))
+    interval = max(
+        300,
+        int(
+            getattr(settings, "media_usage_reconcile_interval_seconds", 86400) or 86400
+        ),
+    )
     while not stop.is_set():
         try:
             queued = await _run_once()
             if queued:
-                logger.info("media_usage_reconcile_scheduled", extra={"queued": int(queued)})
+                logger.info(
+                    "media_usage_reconcile_scheduled", extra={"queued": int(queued)}
+                )
         except asyncio.CancelledError:
             break
         except Exception as exc:
-            logger.warning("media_usage_reconcile_scheduler_failed", extra={"error": str(exc)})
+            logger.warning(
+                "media_usage_reconcile_scheduler_failed", extra={"error": str(exc)}
+            )
 
         with suppress(asyncio.TimeoutError):
             await asyncio.wait_for(stop.wait(), timeout=interval)
@@ -76,7 +89,9 @@ def start(app: FastAPI) -> None:
 
     stop = asyncio.Event()
     task = asyncio.create_task(
-        leader_lock.run_as_leader(name="media_usage_reconcile_scheduler", stop=stop, work=_loop)
+        leader_lock.run_as_leader(
+            name="media_usage_reconcile_scheduler", stop=stop, work=_loop
+        )
     )
     app.state.media_usage_reconcile_scheduler_stop = stop
     app.state.media_usage_reconcile_scheduler_task = task
@@ -95,4 +110,3 @@ async def stop(app: FastAPI) -> None:
         delattr(app.state, "media_usage_reconcile_scheduler_stop")
     if getattr(app.state, "media_usage_reconcile_scheduler_task", None) is not None:
         delattr(app.state, "media_usage_reconcile_scheduler_task")
-

@@ -73,7 +73,9 @@ def checkout_app() -> Dict[str, object]:
     app.dependency_overrides.clear()
 
 
-def test_guest_checkout_requires_email_verification(checkout_app: Dict[str, object]) -> None:
+def test_guest_checkout_requires_email_verification(
+    checkout_app: Dict[str, object],
+) -> None:
     client: TestClient = checkout_app["client"]  # type: ignore[assignment]
     SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
 
@@ -194,18 +196,27 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["stripe_metadata"] = metadata or {}
         captured["stripe_line_items"] = line_items or []
         captured["stripe_discount_cents"] = discount_cents
-        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+        return {
+            "session_id": "cs_test",
+            "checkout_url": "https://stripe.example/checkout",
+        }
 
-    async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
+    async def fake_send_order_confirmation(
+        to_email, order, items=None, lang=None, *, receipt_share_days=None
+    ):
         captured["email"] = to_email
         return True
 
-    async def fake_send_new_order_notification(to_email, order, customer_email=None, lang=None):
+    async def fake_send_new_order_notification(
+        to_email, order, customer_email=None, lang=None
+    ):
         captured["admin_email"] = to_email
         captured["admin_customer_email"] = customer_email
         return True
 
-    async def fake_send_verification_email(to_email, token, lang=None, kind="primary", next_path=None):
+    async def fake_send_verification_email(
+        to_email, token, lang=None, kind="primary", next_path=None
+    ):
         _ = lang
         _ = kind
         _ = next_path
@@ -219,10 +230,18 @@ def test_guest_checkout_email_verification_and_create_account(
         captured["welcome_first_name"] = first_name
         return True
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
-    monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
-    monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
-    monkeypatch.setattr(email_service, "send_verification_email", fake_send_verification_email)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
+    monkeypatch.setattr(
+        email_service, "send_order_confirmation", fake_send_order_confirmation
+    )
+    monkeypatch.setattr(
+        email_service, "send_new_order_notification", fake_send_new_order_notification
+    )
+    monkeypatch.setattr(
+        email_service, "send_verification_email", fake_send_verification_email
+    )
     monkeypatch.setattr(email_service, "send_welcome_email", fake_send_welcome_email)
 
     req = client.post(
@@ -235,7 +254,11 @@ def test_guest_checkout_email_verification_and_create_account(
 
     async def fetch_token() -> str:
         async with SessionLocal() as session:
-            cart = (await session.execute(select(Cart).where(Cart.session_id == "guest-def"))).scalar_one()
+            cart = (
+                await session.execute(
+                    select(Cart).where(Cart.session_id == "guest-def")
+                )
+            ).scalar_one()
             assert cart.guest_email_verification_token
             return cart.guest_email_verification_token
 
@@ -283,12 +306,16 @@ def test_guest_checkout_email_verification_and_create_account(
     assert isinstance(line_items, list)
     assert len(line_items) >= 2
     assert any(
-        li.get("price_data", {}).get("product_data", {}).get("name") == "Guest Product 2" and li.get("quantity") == 2
+        li.get("price_data", {}).get("product_data", {}).get("name")
+        == "Guest Product 2"
+        and li.get("quantity") == 2
         for li in line_items
         if isinstance(li, dict)
     )
     assert any(
-        li.get("price_data", {}).get("product_data", {}).get("name") == "Shipping" for li in line_items if isinstance(li, dict)
+        li.get("price_data", {}).get("product_data", {}).get("name") == "Shipping"
+        for li in line_items
+        if isinstance(li, dict)
     )
     body = checkout.json()
     assert body["payment_method"] == "stripe"
@@ -310,10 +337,18 @@ def test_guest_checkout_email_verification_and_create_account(
         lambda payload, sig_header, secret: {
             "id": "evt_guest_checkout_1",
             "type": "checkout.session.completed",
-            "data": {"object": {"id": "cs_test", "payment_intent": "pi_test", "payment_status": "paid"}},
+            "data": {
+                "object": {
+                    "id": "cs_test",
+                    "payment_intent": "pi_test",
+                    "payment_status": "paid",
+                }
+            },
         },
     )
-    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    webhook = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert webhook.status_code == 200, webhook.text
     assert captured.get("email") == "guest2@example.com"
     assert captured.get("admin_email") == "owner2@example.com"
@@ -321,7 +356,11 @@ def test_guest_checkout_email_verification_and_create_account(
 
     async def fetch_user() -> User:
         async with SessionLocal() as session:
-            user = (await session.execute(select(User).where(User.email == "guest2@example.com"))).scalar_one()
+            user = (
+                await session.execute(
+                    select(User).where(User.email == "guest2@example.com")
+                )
+            ).scalar_one()
             return user
 
     user = asyncio.run(fetch_user())
@@ -363,13 +402,17 @@ def test_guest_checkout_email_verification_rate_limited(
     )
     assert add.status_code in (200, 201), add.text
 
-    async def fake_send_verification_email(to_email, token, lang=None, kind="primary", next_path=None):
+    async def fake_send_verification_email(
+        to_email, token, lang=None, kind="primary", next_path=None
+    ):
         _ = lang
         _ = kind
         _ = next_path
         return True
 
-    monkeypatch.setattr(email_service, "send_verification_email", fake_send_verification_email)
+    monkeypatch.setattr(
+        email_service, "send_verification_email", fake_send_verification_email
+    )
 
     req = client.post(
         "/api/v1/orders/guest-checkout/email/request",
@@ -381,7 +424,11 @@ def test_guest_checkout_email_verification_rate_limited(
 
     async def fetch_token() -> str:
         async with SessionLocal() as session:
-            cart = (await session.execute(select(Cart).where(Cart.session_id == "guest-ghi"))).scalar_one()
+            cart = (
+                await session.execute(
+                    select(Cart).where(Cart.session_id == "guest-ghi")
+                )
+            ).scalar_one()
             assert cart.guest_email_verification_token
             return cart.guest_email_verification_token
 
@@ -423,7 +470,9 @@ def test_guest_checkout_email_verification_rate_limited(
     assert confirm2.json()["verified"] is True
 
 
-def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_authenticated_checkout_promo_and_shipping(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = checkout_app["client"]  # type: ignore[assignment]
     SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
 
@@ -450,9 +499,13 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             shipping_method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Express", rate_flat=10.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Express", rate_flat=10.0, rate_per_kg=0),
             )
-            await cart_service.create_promo(session, PromoCodeCreate(code="SAVE10", percentage_off=10, currency="RON"))
+            await cart_service.create_promo(
+                session,
+                PromoCodeCreate(code="SAVE10", percentage_off=10, currency="RON"),
+            )
             session.add(owner)
             session.add(product)
             await session.commit()
@@ -518,21 +571,34 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
         captured["stripe_customer_email"] = customer_email
         captured["stripe_line_items"] = line_items or []
         captured["stripe_discount_cents"] = discount_cents
-        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+        return {
+            "session_id": "cs_test",
+            "checkout_url": "https://stripe.example/checkout",
+        }
 
-    async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
+    async def fake_send_order_confirmation(
+        to_email, order, items=None, lang=None, *, receipt_share_days=None
+    ):
         captured["email"] = to_email
         return True
 
-    async def fake_send_new_order_notification(to_email, order, customer_email=None, lang=None):
+    async def fake_send_new_order_notification(
+        to_email, order, customer_email=None, lang=None
+    ):
         captured["admin_email"] = to_email
         captured["admin_lang"] = lang
         captured["admin_customer_email"] = customer_email
         return True
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
-    monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
-    monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
+    monkeypatch.setattr(
+        email_service, "send_order_confirmation", fake_send_order_confirmation
+    )
+    monkeypatch.setattr(
+        email_service, "send_new_order_notification", fake_send_new_order_notification
+    )
 
     res = client.post(
         "/api/v1/orders/checkout",
@@ -560,14 +626,22 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     line_items = captured.get("stripe_line_items")
     assert isinstance(line_items, list)
     assert any(
-        li.get("price_data", {}).get("product_data", {}).get("name") == "Checkout Product" and li.get("quantity") == 2
+        li.get("price_data", {}).get("product_data", {}).get("name")
+        == "Checkout Product"
+        and li.get("quantity") == 2
         for li in line_items
         if isinstance(li, dict)
     )
     assert any(
-        li.get("price_data", {}).get("product_data", {}).get("name") == "Shipping" for li in line_items if isinstance(li, dict)
+        li.get("price_data", {}).get("product_data", {}).get("name") == "Shipping"
+        for li in line_items
+        if isinstance(li, dict)
     )
-    assert any(li.get("price_data", {}).get("product_data", {}).get("name") == "VAT" for li in line_items if isinstance(li, dict))
+    assert any(
+        li.get("price_data", {}).get("product_data", {}).get("name") == "VAT"
+        for li in line_items
+        if isinstance(li, dict)
+    )
     assert captured.get("email") is None
     assert captured.get("admin_email") is None
     assert captured.get("admin_customer_email") is None
@@ -578,10 +652,18 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
         lambda payload, sig_header, secret: {
             "id": "evt_auth_checkout_1",
             "type": "checkout.session.completed",
-            "data": {"object": {"id": "cs_test", "payment_intent": "pi_test", "payment_status": "paid"}},
+            "data": {
+                "object": {
+                    "id": "cs_test",
+                    "payment_intent": "pi_test",
+                    "payment_status": "paid",
+                }
+            },
         },
     )
-    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    webhook = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert webhook.status_code == 200, webhook.text
     assert captured.get("email") == "buyer@example.com"
     assert captured.get("admin_email") == "owner@example.com"
@@ -589,7 +671,9 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
 
     async def fetch_order():
         async with SessionLocal() as session:
-            result = await session.execute(select(Order).order_by(Order.created_at.desc()))
+            result = await session.execute(
+                select(Order).order_by(Order.created_at.desc())
+            )
             return result.scalars().first()
 
     order = asyncio.run(fetch_order())
@@ -598,7 +682,9 @@ def test_authenticated_checkout_promo_and_shipping(checkout_app: Dict[str, objec
     assert order.stripe_checkout_session_id == "cs_test"
 
 
-def test_checkout_respects_product_delivery_exceptions(checkout_app: Dict[str, object]) -> None:
+def test_checkout_respects_product_delivery_exceptions(
+    checkout_app: Dict[str, object],
+) -> None:
     client: TestClient = checkout_app["client"]  # type: ignore[assignment]
     SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
 
@@ -619,7 +705,8 @@ def test_checkout_respects_product_delivery_exceptions(checkout_app: Dict[str, o
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             shipping_method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0),
             )
             session.add(product)
             await session.commit()
@@ -693,7 +780,10 @@ def test_checkout_respects_product_delivery_exceptions(checkout_app: Dict[str, o
         },
     )
     assert blocked_locker.status_code == 400, blocked_locker.text
-    assert blocked_locker.json().get("detail") == "Locker delivery is not available for cart items"
+    assert (
+        blocked_locker.json().get("detail")
+        == "Locker delivery is not available for cart items"
+    )
 
     blocked_courier = client.post(
         "/api/v1/orders/checkout",
@@ -712,7 +802,10 @@ def test_checkout_respects_product_delivery_exceptions(checkout_app: Dict[str, o
         },
     )
     assert blocked_courier.status_code == 400, blocked_courier.text
-    assert blocked_courier.json().get("detail") == "Selected courier is not available for cart items"
+    assert (
+        blocked_courier.json().get("detail")
+        == "Selected courier is not available for cart items"
+    )
 
 
 def test_authenticated_checkout_creates_separate_billing_address(
@@ -743,9 +836,14 @@ def test_authenticated_checkout_creates_separate_billing_address(
     seeded = asyncio.run(seed())
 
     async def fake_create_checkout_session(*args, **kwargs) -> dict:
-        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+        return {
+            "session_id": "cs_test",
+            "checkout_url": "https://stripe.example/checkout",
+        }
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
 
     register = client.post(
         "/api/v1/auth/register",
@@ -802,7 +900,11 @@ def test_authenticated_checkout_creates_separate_billing_address(
 
     async def fetch_order() -> Order | None:
         async with SessionLocal() as session:
-            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+            return (
+                (await session.execute(select(Order).order_by(Order.created_at.desc())))
+                .scalars()
+                .first()
+            )
 
     order = asyncio.run(fetch_order())
     assert order is not None
@@ -811,7 +913,9 @@ def test_authenticated_checkout_creates_separate_billing_address(
     assert order.billing_address_id != order.shipping_address_id
 
 
-def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_authenticated_checkout_cod_skips_payment_intent(
+    checkout_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = checkout_app["client"]  # type: ignore[assignment]
     SessionLocal = checkout_app["session_factory"]  # type: ignore[assignment]
 
@@ -840,9 +944,14 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
 
     async def fake_create_checkout_session(*args, **kwargs) -> dict:
         called["stripe_called"] = True
-        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+        return {
+            "session_id": "cs_test",
+            "checkout_url": "https://stripe.example/checkout",
+        }
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
 
     register = client.post(
         "/api/v1/auth/register",
@@ -901,7 +1010,11 @@ def test_authenticated_checkout_cod_skips_payment_intent(checkout_app: Dict[str,
 
     async def fetch_order() -> Order | None:
         async with SessionLocal() as session:
-            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+            return (
+                (await session.execute(select(Order).order_by(Order.created_at.desc())))
+                .scalars()
+                .first()
+            )
 
     order = asyncio.run(fetch_order())
     assert order is not None
@@ -954,9 +1067,14 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
 
     async def fake_create_checkout_session(*args, **kwargs) -> dict:
         called["stripe_called"] = True
-        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+        return {
+            "session_id": "cs_test",
+            "checkout_url": "https://stripe.example/checkout",
+        }
 
-    async def fake_paypal_create_order(*, total_ron, reference, return_url, cancel_url, **_kwargs):
+    async def fake_paypal_create_order(
+        *, total_ron, reference, return_url, cancel_url, **_kwargs
+    ):
         called["paypal_created"] = True
         assert str(reference)
         assert str(return_url).startswith("http")
@@ -978,11 +1096,17 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
 
     from app.services import paypal as paypal_service  # imported by orders API
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
     monkeypatch.setattr(paypal_service, "create_order", fake_paypal_create_order)
     monkeypatch.setattr(paypal_service, "capture_order", fake_paypal_capture_order)
-    monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
-    monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
+    monkeypatch.setattr(
+        email_service, "send_order_confirmation", fake_send_order_confirmation
+    )
+    monkeypatch.setattr(
+        email_service, "send_new_order_notification", fake_send_new_order_notification
+    )
 
     register = client.post(
         "/api/v1/auth/register",
@@ -1044,7 +1168,11 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
 
     async def fetch_order() -> Order | None:
         async with SessionLocal() as session:
-            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+            return (
+                (await session.execute(select(Order).order_by(Order.created_at.desc())))
+                .scalars()
+                .first()
+            )
 
     order = asyncio.run(fetch_order())
     assert order is not None
@@ -1053,7 +1181,9 @@ def test_authenticated_checkout_paypal_flow_requires_auth_to_capture(
     assert order.stripe_checkout_session_id is None
 
     # Capturing a signed-in order requires authentication.
-    capture_anon = client.post("/api/v1/orders/paypal/capture", json={"paypal_order_id": "PAYPAL-ORDER-1"})
+    capture_anon = client.post(
+        "/api/v1/orders/paypal/capture", json={"paypal_order_id": "PAYPAL-ORDER-1"}
+    )
     assert capture_anon.status_code == 403, capture_anon.text
 
     capture = client.post(
@@ -1121,7 +1251,9 @@ def test_paypal_webhook_captures_order_without_return(
 
     called: dict[str, int] = {"captured": 0, "order_email": 0, "admin_email": 0}
 
-    async def fake_paypal_create_order(*, total_ron, reference, return_url, cancel_url, **_kwargs):
+    async def fake_paypal_create_order(
+        *, total_ron, reference, return_url, cancel_url, **_kwargs
+    ):
         assert str(reference)
         assert str(return_url).startswith("http")
         assert str(cancel_url).startswith("http")
@@ -1143,13 +1275,21 @@ def test_paypal_webhook_captures_order_without_return(
         called["admin_email"] += 1
         return True
 
-    from app.services import paypal as paypal_service  # imported by orders/payments APIs
+    from app.services import (
+        paypal as paypal_service,
+    )  # imported by orders/payments APIs
 
     monkeypatch.setattr(paypal_service, "create_order", fake_paypal_create_order)
-    monkeypatch.setattr(paypal_service, "verify_webhook_signature", fake_verify_webhook_signature)
+    monkeypatch.setattr(
+        paypal_service, "verify_webhook_signature", fake_verify_webhook_signature
+    )
     monkeypatch.setattr(paypal_service, "capture_order", fake_paypal_capture_order)
-    monkeypatch.setattr(email_service, "send_order_confirmation", fake_send_order_confirmation)
-    monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
+    monkeypatch.setattr(
+        email_service, "send_order_confirmation", fake_send_order_confirmation
+    )
+    monkeypatch.setattr(
+        email_service, "send_new_order_notification", fake_send_new_order_notification
+    )
 
     register = client.post(
         "/api/v1/auth/register",
@@ -1204,14 +1344,22 @@ def test_paypal_webhook_captures_order_without_return(
 
     async def fetch_order() -> Order | None:
         async with SessionLocal() as session:
-            return (await session.execute(select(Order).order_by(Order.created_at.desc()))).scalars().first()
+            return (
+                (await session.execute(select(Order).order_by(Order.created_at.desc())))
+                .scalars()
+                .first()
+            )
 
     order = asyncio.run(fetch_order())
     assert order is not None
     assert order.status.value == "pending_payment"
     assert order.paypal_capture_id is None
 
-    evt = {"id": "WH-EVT-1", "event_type": "CHECKOUT.ORDER.APPROVED", "resource": {"id": "PAYPAL-ORDER-WH-1"}}
+    evt = {
+        "id": "WH-EVT-1",
+        "event_type": "CHECKOUT.ORDER.APPROVED",
+        "resource": {"id": "PAYPAL-ORDER-WH-1"},
+    }
     webhook = client.post("/api/v1/payments/paypal/webhook", json=evt)
     assert webhook.status_code == 200, webhook.text
     assert called["captured"] == 1
@@ -1254,7 +1402,8 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
                 images=[ProductImage(url="/media/img1.png", alt_text="img")],
             )
             shipping_method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0),
             )
             session.add(product)
             await session.commit()
@@ -1317,16 +1466,27 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
         captured["stripe_promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
         captured["stripe_customer_email"] = customer_email
-        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+        return {
+            "session_id": "cs_test",
+            "checkout_url": "https://stripe.example/checkout",
+        }
 
-    async def fake_send_new_order_notification(to_email, order, customer_email=None, lang=None):
+    async def fake_send_new_order_notification(
+        to_email, order, customer_email=None, lang=None
+    ):
         captured["admin_email"] = to_email
         captured["admin_customer_email"] = customer_email
         return True
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
-    monkeypatch.setattr(email_service, "send_new_order_notification", fake_send_new_order_notification)
-    monkeypatch.setattr(email_service, "send_order_confirmation", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
+    monkeypatch.setattr(
+        email_service, "send_new_order_notification", fake_send_new_order_notification
+    )
+    monkeypatch.setattr(
+        email_service, "send_order_confirmation", lambda *_args, **_kwargs: True
+    )
 
     res = client.post(
         "/api/v1/orders/checkout",
@@ -1353,10 +1513,18 @@ def test_checkout_sends_admin_alert_fallback_when_no_owner(
         lambda payload, sig_header, secret: {
             "id": "evt_admin_fallback_1",
             "type": "checkout.session.completed",
-            "data": {"object": {"id": "cs_test", "payment_intent": "pi_test", "payment_status": "paid"}},
+            "data": {
+                "object": {
+                    "id": "cs_test",
+                    "payment_intent": "pi_test",
+                    "payment_status": "paid",
+                }
+            },
         },
     )
-    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    webhook = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert webhook.status_code == 200, webhook.text
     assert captured.get("admin_email") == "ops@example.com"
     assert captured.get("admin_customer_email") == "buyer2@example.com"
@@ -1431,7 +1599,9 @@ def test_checkout_requires_reconsent_when_legal_docs_change(
                 (
                     await session.execute(
                         select(ContentBlock).where(
-                            ContentBlock.key.in_(("page.terms-and-conditions", "page.privacy-policy"))
+                            ContentBlock.key.in_(
+                                ("page.terms-and-conditions", "page.privacy-policy")
+                            )
                         )
                     )
                 )
@@ -1447,9 +1617,14 @@ def test_checkout_requires_reconsent_when_legal_docs_change(
     asyncio.run(bump_legal_versions())
 
     async def fake_create_checkout_session(**_: object) -> dict[str, str]:
-        return {"session_id": "cs_test", "checkout_url": "https://stripe.example/checkout"}
+        return {
+            "session_id": "cs_test",
+            "checkout_url": "https://stripe.example/checkout",
+        }
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
 
     base_payload: dict[str, object] = {
         "line1": "123 Test St",
@@ -1482,7 +1657,11 @@ def test_checkout_requires_reconsent_when_legal_docs_change(
     async def read_consents() -> list[LegalConsent]:
         async with SessionLocal() as session:
             return (
-                (await session.execute(select(LegalConsent).where(LegalConsent.user_id == user_id)))
+                (
+                    await session.execute(
+                        select(LegalConsent).where(LegalConsent.user_id == user_id)
+                    )
+                )
                 .scalars()
                 .all()
             )
@@ -1490,7 +1669,9 @@ def test_checkout_requires_reconsent_when_legal_docs_change(
     consents = asyncio.run(read_consents())
     max_versions: dict[str, int] = {}
     for consent in consents:
-        max_versions[consent.doc_key] = max(int(max_versions.get(consent.doc_key, 0)), int(consent.doc_version))
+        max_versions[consent.doc_key] = max(
+            int(max_versions.get(consent.doc_key, 0)), int(consent.doc_version)
+        )
     assert max_versions.get("page.terms-and-conditions") == 2
     assert max_versions.get("page.privacy-policy") == 2
     assert any(c.context == LegalConsentContext.checkout for c in consents)

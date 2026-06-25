@@ -6,7 +6,7 @@ import {
   loginUi,
   OWNER_IDENTIFIER,
   seedCartWithFirstProduct,
-  uniqueSessionId
+  uniqueSessionId,
 } from './checkout-helpers';
 
 async function createCoupon(request: APIRequestContext, token: string): Promise<string> {
@@ -20,8 +20,8 @@ async function createCoupon(request: APIRequestContext, token: string): Promise<
       percentage_off: 10,
       allow_on_sale_items: true,
       is_active: true,
-      is_automatic: false
-    }
+      is_automatic: false,
+    },
   });
   expect(promoRes.ok()).toBeTruthy();
   const promo = await promoRes.json();
@@ -34,8 +34,8 @@ async function createCoupon(request: APIRequestContext, token: string): Promise<
       code,
       visibility: 'public',
       is_active: true,
-      per_customer_max_redemptions: 1
-    }
+      per_customer_max_redemptions: 1,
+    },
   });
   expect(couponRes.ok()).toBeTruthy();
   const coupon = await couponRes.json();
@@ -65,7 +65,10 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
 
   await page.evaluate(() => localStorage.removeItem('cart_cache'));
   const cartLoad = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/cart') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
   );
   await page.goto('/cart');
   await cartLoad;
@@ -82,7 +85,9 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   await expect(page.locator('aside span.text-emerald-700')).toBeVisible();
 
   // Complete a COD checkout (redemption happens on order creation for COD).
-  const shippingEmail = OWNER_IDENTIFIER.includes('@') ? OWNER_IDENTIFIER : `${OWNER_IDENTIFIER}@example.com`;
+  const shippingEmail = OWNER_IDENTIFIER.includes('@')
+    ? OWNER_IDENTIFIER
+    : `${OWNER_IDENTIFIER}@example.com`;
   await fillShippingAddress(page, shippingEmail);
   await acceptCheckoutConsents(page);
   await expect(page.getByRole('button', { name: 'Place order' })).toBeEnabled();
@@ -96,7 +101,10 @@ test('coupons v2: apply coupon and prevent reuse after redemption', async ({ pag
   if (!product2) return;
   await page.evaluate(() => localStorage.removeItem('cart_cache'));
   const cartLoad2 = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/cart') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
   );
   await page.goto('/cart');
   await cartLoad2;
@@ -119,7 +127,10 @@ test('coupons v2: guests are prompted to sign in', async ({ page, request }) => 
   if (!product) return;
 
   const cartLoad = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/cart') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
   );
   await page.goto('/cart');
   await cartLoad;
@@ -128,6 +139,8 @@ test('coupons v2: guests are prompted to sign in', async ({ page, request }) => 
   await expect(page).toHaveURL(/\/checkout$/);
 
   await expect(page.getByText('Sign in to use coupons.')).toBeVisible();
-  await expect(page.locator('#checkout-step-3').getByRole('link', { name: 'Sign in' })).toBeVisible();
+  await expect(
+    page.locator('#checkout-step-3').getByRole('link', { name: 'Sign in' }),
+  ).toBeVisible();
   await expect(page.locator('input[name="promo"]')).toHaveCount(0);
 });

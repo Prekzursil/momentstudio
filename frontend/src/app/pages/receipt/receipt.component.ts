@@ -12,10 +12,14 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
   providers: [DatePipe],
   template: `
     <div class="mx-auto max-w-4xl px-4 py-10">
-      <div class="flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div
+        class="flex flex-col gap-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+      >
         <div class="flex flex-wrap items-start justify-between gap-4">
           <div class="grid gap-1">
-            <p class="text-xs font-semibold tracking-[0.2em] uppercase text-slate-500 dark:text-slate-400">
+            <p
+              class="text-xs font-semibold tracking-[0.2em] uppercase text-slate-500 dark:text-slate-400"
+            >
               Receipt / Chitanță
             </p>
             <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
@@ -55,7 +59,10 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
         </div>
 
         <div *ngIf="loading" class="text-sm text-slate-600 dark:text-slate-300">Loading…</div>
-        <div *ngIf="error" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+        <div
+          *ngIf="error"
+          class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200"
+        >
           {{ error }}
         </div>
 
@@ -73,46 +80,90 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             </div>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2" *ngIf="receipt.customer_name || receipt.customer_email">
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+          <div
+            class="grid gap-4 sm:grid-cols-2"
+            *ngIf="receipt.customer_name || receipt.customer_email"
+          >
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <p
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 Customer / Client
               </p>
-              <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-50" *ngIf="receipt.customer_name">
+              <p
+                class="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-50"
+                *ngIf="receipt.customer_name"
+              >
                 {{ receipt.customer_name }}
               </p>
-              <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.customer_email">
+              <p
+                class="mt-1 text-sm text-slate-700 dark:text-slate-200"
+                *ngIf="receipt.customer_email"
+              >
                 {{ receipt.customer_email }}
               </p>
             </div>
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <p
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 Status / Stare
               </p>
               <p class="mt-1 text-sm text-slate-700 dark:text-slate-200">
                 {{ receipt.status }}
               </p>
-              <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.payment_method">
+              <p
+                class="mt-1 text-sm text-slate-700 dark:text-slate-200"
+                *ngIf="receipt.payment_method"
+              >
                 Payment / Plată: {{ paymentMethodLabel() }}
               </p>
-              <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.courier || receipt.delivery_type">
-                Delivery / Livrare: {{ receipt.courier || '—' }} · {{ receipt.delivery_type || '—' }}
+              <p
+                class="mt-1 text-sm text-slate-700 dark:text-slate-200"
+                *ngIf="receipt.courier || receipt.delivery_type"
+              >
+                Delivery / Livrare: {{ receipt.courier || '—' }} ·
+                {{ receipt.delivery_type || '—' }}
               </p>
-              <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.delivery_type === 'locker' && (receipt.locker_name || receipt.locker_address)">
-                Locker: {{ receipt.locker_name }} <span *ngIf="receipt.locker_address">— {{ receipt.locker_address }}</span>
+              <p
+                class="mt-1 text-sm text-slate-700 dark:text-slate-200"
+                *ngIf="
+                  receipt.delivery_type === 'locker' &&
+                  (receipt.locker_name || receipt.locker_address)
+                "
+              >
+                Locker: {{ receipt.locker_name }}
+                <span *ngIf="receipt.locker_address">— {{ receipt.locker_address }}</span>
               </p>
-              <p class="mt-1 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.tracking_number">
+              <p
+                class="mt-1 text-sm text-slate-700 dark:text-slate-200"
+                *ngIf="receipt.tracking_number"
+              >
                 AWB / Tracking: {{ receipt.tracking_number }}
               </p>
             </div>
           </div>
 
-          <div class="grid gap-4 sm:grid-cols-2" *ngIf="receipt.shipping_address || receipt.billing_address">
-            <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-              <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+          <div
+            class="grid gap-4 sm:grid-cols-2"
+            *ngIf="receipt.shipping_address || receipt.billing_address"
+          >
+            <div
+              class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+            >
+              <p
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 Shipping / Livrare
               </p>
-              <div class="mt-2 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.shipping_address as a; else missingShip">
+              <div
+                class="mt-2 text-sm text-slate-700 dark:text-slate-200"
+                *ngIf="receipt.shipping_address as a; else missingShip"
+              >
                 <p>{{ a.line1 }}</p>
                 <p *ngIf="a.line2">{{ a.line2 }}</p>
                 <p>{{ a.postal_code }} {{ a.city }}</p>
@@ -123,11 +174,18 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                 <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">—</p>
               </ng-template>
             </div>
-            <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-              <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <div
+              class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+            >
+              <p
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
                 Billing / Facturare
               </p>
-              <div class="mt-2 text-sm text-slate-700 dark:text-slate-200" *ngIf="receipt.billing_address as a; else missingBill">
+              <div
+                class="mt-2 text-sm text-slate-700 dark:text-slate-200"
+                *ngIf="receipt.billing_address as a; else missingBill"
+              >
                 <p>{{ a.line1 }}</p>
                 <p *ngIf="a.line2">{{ a.line2 }}</p>
                 <p>{{ a.postal_code }} {{ a.city }}</p>
@@ -140,14 +198,20 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             </div>
           </div>
 
-          <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
-            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+          <div
+            class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+          >
+            <p
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               Items / Produse
             </p>
             <div class="mt-3 overflow-auto">
               <table class="min-w-full text-sm">
                 <thead>
-                  <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  <tr
+                    class="text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >
                     <th class="py-2 pr-4">Product / Produs</th>
                     <th class="py-2 pr-4">Qty</th>
                     <th class="py-2 pr-4">Unit</th>
@@ -155,7 +219,10 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                   </tr>
                 </thead>
                 <tbody class="text-slate-800 dark:text-slate-100">
-                  <tr *ngFor="let it of receipt.items" class="border-t border-slate-200 dark:border-slate-800">
+                  <tr
+                    *ngFor="let it of receipt.items"
+                    class="border-t border-slate-200 dark:border-slate-800"
+                  >
                     <td class="py-3 pr-4">
                       <a
                         *ngIf="it.slug; else noSlug"
@@ -167,8 +234,12 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
                       <ng-template #noSlug>{{ it.name }}</ng-template>
                     </td>
                     <td class="py-3 pr-4">{{ it.quantity }}</td>
-                    <td class="py-3 pr-4">{{ it.unit_price | localizedCurrency: receipt.currency }}</td>
-                    <td class="py-3 text-right">{{ it.subtotal | localizedCurrency: receipt.currency }}</td>
+                    <td class="py-3 pr-4">
+                      {{ it.unit_price | localizedCurrency: receipt.currency }}
+                    </td>
+                    <td class="py-3 text-right">
+                      {{ it.subtotal | localizedCurrency: receipt.currency }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -177,19 +248,29 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             <div class="mt-4 grid gap-1 text-sm">
               <div class="flex items-center justify-between text-slate-600 dark:text-slate-300">
                 <span>Shipping / Livrare</span>
-                <span>{{ (receipt.shipping_amount || 0) | localizedCurrency: receipt.currency }}</span>
+                <span>{{
+                  receipt.shipping_amount || 0 | localizedCurrency: receipt.currency
+                }}</span>
               </div>
-              <div class="flex items-center justify-between text-slate-600 dark:text-slate-300" *ngIf="(receipt.fee_amount || 0) > 0">
+              <div
+                class="flex items-center justify-between text-slate-600 dark:text-slate-300"
+                *ngIf="(receipt.fee_amount || 0) > 0"
+              >
                 <span>Additional / Cost supl.</span>
-                <span>{{ (receipt.fee_amount || 0) | localizedCurrency: receipt.currency }}</span>
+                <span>{{ receipt.fee_amount || 0 | localizedCurrency: receipt.currency }}</span>
               </div>
-              <div class="flex items-center justify-between text-slate-600 dark:text-slate-300" *ngIf="(receipt.tax_amount || 0) > 0">
+              <div
+                class="flex items-center justify-between text-slate-600 dark:text-slate-300"
+                *ngIf="(receipt.tax_amount || 0) > 0"
+              >
                 <span>VAT / TVA</span>
-                <span>{{ (receipt.tax_amount || 0) | localizedCurrency: receipt.currency }}</span>
+                <span>{{ receipt.tax_amount || 0 | localizedCurrency: receipt.currency }}</span>
               </div>
-              <div class="flex items-center justify-between pt-2 text-base font-semibold text-slate-900 dark:text-slate-50">
+              <div
+                class="flex items-center justify-between pt-2 text-base font-semibold text-slate-900 dark:text-slate-50"
+              >
                 <span>Total / Total</span>
-                <span>{{ (receipt.total_amount || 0) | localizedCurrency: receipt.currency }}</span>
+                <span>{{ receipt.total_amount || 0 | localizedCurrency: receipt.currency }}</span>
               </div>
             </div>
           </div>
@@ -198,7 +279,9 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
             *ngIf="(receipt.refunds || []).length > 0"
             class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
           >
-            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <p
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               Refunds / Rambursări
             </p>
             <div class="mt-3 grid gap-2">
@@ -227,7 +310,7 @@ import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
         </ng-container>
       </div>
     </div>
-  `
+  `,
 })
 export class ReceiptComponent implements OnInit, OnDestroy {
   receipt: ReceiptRead | null = null;
@@ -239,7 +322,10 @@ export class ReceiptComponent implements OnInit, OnDestroy {
 
   private sub?: Subscription;
 
-  constructor(private readonly route: ActivatedRoute, private receipts: ReceiptService) {}
+  constructor(
+    private readonly route: ActivatedRoute,
+    private receipts: ReceiptService,
+  ) {}
 
   paymentMethodLabel(): string {
     const method = (this.receipt?.payment_method ?? '').trim().toLowerCase();
@@ -284,7 +370,7 @@ export class ReceiptComponent implements OnInit, OnDestroy {
         this.loading = false;
         this.receipt = null;
         this.error = err?.error?.detail || 'Receipt not found or link expired.';
-      }
+      },
     });
   }
 
@@ -292,4 +378,3 @@ export class ReceiptComponent implements OnInit, OnDestroy {
     this.sub?.unsubscribe();
   }
 }
-

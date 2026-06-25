@@ -5,7 +5,10 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription, forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { AdminOrderListItem, AdminOrdersService } from '../../../core/admin-orders.service';
-import { AdminContactSubmissionListItem, AdminSupportService } from '../../../core/admin-support.service';
+import {
+  AdminContactSubmissionListItem,
+  AdminSupportService,
+} from '../../../core/admin-support.service';
 import { AuthService } from '../../../core/auth.service';
 import { EmailEventRead, OpsService } from '../../../core/ops.service';
 import { LocalizedCurrencyPipe } from '../../../shared/localized-currency.pipe';
@@ -23,8 +26,12 @@ type CustomerTimelineEvent =
     <div class="grid gap-2">
       <div class="flex items-start justify-between gap-3">
         <div class="grid gap-0.5">
-          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.customerTimeline.title' | translate }}</p>
-          <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.customerTimeline.subtitle' | translate }}</p>
+          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {{ 'adminUi.customerTimeline.title' | translate }}
+          </p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.customerTimeline.subtitle' | translate }}
+          </p>
         </div>
         <button
           *ngIf="showOpsShortcut()"
@@ -48,7 +55,10 @@ type CustomerTimelineEvent =
         {{ error() }}
       </div>
 
-      <div *ngIf="!loading() && !error() && events().length === 0 && !gatedMessage()" class="text-sm text-slate-500 dark:text-slate-400">
+      <div
+        *ngIf="!loading() && !error() && events().length === 0 && !gatedMessage()"
+        class="text-sm text-slate-500 dark:text-slate-400"
+      >
         {{ 'adminUi.customerTimeline.empty' | translate }}
       </div>
 
@@ -64,7 +74,7 @@ type CustomerTimelineEvent =
                   class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
                   [ngClass]="kindBadgeClass(ev.kind)"
                 >
-                  {{ ('adminUi.customerTimeline.kinds.' + ev.kind) | translate }}
+                  {{ 'adminUi.customerTimeline.kinds.' + ev.kind | translate }}
                 </span>
 
                 <ng-container [ngSwitch]="ev.kind">
@@ -83,7 +93,10 @@ type CustomerTimelineEvent =
                   >
                     {{ ticketTitle(ev.ticket) }}
                   </a>
-                  <div *ngSwitchCase="'email'" class="min-w-0 truncate font-medium text-slate-900 dark:text-slate-50">
+                  <div
+                    *ngSwitchCase="'email'"
+                    class="min-w-0 truncate font-medium text-slate-900 dark:text-slate-50"
+                  >
                     {{ ev.email.subject || ('adminUi.customerTimeline.kinds.email' | translate) }}
                   </div>
                 </ng-container>
@@ -92,16 +105,20 @@ type CustomerTimelineEvent =
               <div class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
                 <ng-container [ngSwitch]="ev.kind">
                   <div *ngSwitchCase="'order'">
-                    {{ ('adminUi.orders.' + ev.order.status) | translate }} ·
-                    {{ ev.order.total_amount | localizedCurrency : ev.order.currency }}
+                    {{ 'adminUi.orders.' + ev.order.status | translate }} ·
+                    {{ ev.order.total_amount | localizedCurrency: ev.order.currency }}
                   </div>
                   <div *ngSwitchCase="'ticket'">
-                    {{ ('adminUi.support.topics.' + ev.ticket.topic) | translate }} ·
-                    {{ ('adminUi.support.status.' + ev.ticket.status) | translate }}
+                    {{ 'adminUi.support.topics.' + ev.ticket.topic | translate }} ·
+                    {{ 'adminUi.support.status.' + ev.ticket.status | translate }}
                   </div>
                   <div *ngSwitchCase="'email'">
-                    <span class="font-semibold">{{ ('adminUi.customerTimeline.emailStatus.' + ev.email.status) | translate }}</span>
-                    <span *ngIf="ev.email.status === 'failed'" class="break-words"> · {{ ev.email.error_message || '—' }}</span>
+                    <span class="font-semibold">{{
+                      'adminUi.customerTimeline.emailStatus.' + ev.email.status | translate
+                    }}</span>
+                    <span *ngIf="ev.email.status === 'failed'" class="break-words">
+                      · {{ ev.email.error_message || '—' }}</span
+                    >
                   </div>
                 </ng-container>
               </div>
@@ -114,7 +131,7 @@ type CustomerTimelineEvent =
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class CustomerTimelineComponent implements OnChanges, OnDestroy {
   @Input() userId?: string | null;
@@ -136,11 +153,16 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
     private readonly supportApi: AdminSupportService,
     private readonly opsApi: OpsService,
     private readonly router: Router,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['userId'] || changes['customerEmail'] || changes['includePii'] || changes['excludeOrderId']) {
+    if (
+      changes['userId'] ||
+      changes['customerEmail'] ||
+      changes['includePii'] ||
+      changes['excludeOrderId']
+    ) {
       this.reload();
     }
   }
@@ -158,7 +180,7 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
     const email = (this.customerEmail || '').trim();
     void this.router.navigate(['/admin/ops'], {
       queryParams: { to_email: email || undefined, since_hours: 168 },
-      state: { focusOpsSection: 'emails' } as any
+      state: { focusOpsSection: 'emails' } as any,
     });
   }
 
@@ -200,7 +222,9 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
 
     const hasIdentity = !!userId || (!!email && includePii);
     if (!hasIdentity) {
-      this.gatedMessage.set(email ? 'adminUi.customerTimeline.emailGated' : 'adminUi.customerTimeline.noCustomer');
+      this.gatedMessage.set(
+        email ? 'adminUi.customerTimeline.emailGated' : 'adminUi.customerTimeline.noCustomer',
+      );
       return;
     }
     this.gatedMessage.set(null);
@@ -226,7 +250,7 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
         catchError(() => {
           hadError = true;
           return of([] as AdminOrderListItem[]);
-        })
+        }),
       );
     } else {
       requests['orders'] = of([] as AdminOrderListItem[]);
@@ -239,19 +263,21 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
         catchError(() => {
           hadError = true;
           return of([] as AdminContactSubmissionListItem[]);
-        })
+        }),
       );
     } else {
       requests['tickets'] = of([] as AdminContactSubmissionListItem[]);
     }
 
     if (canOps && includePii && email) {
-      requests['emails'] = this.opsApi.listEmailEvents({ limit: 10, since_hours: 168, to_email: email }).pipe(
-        catchError(() => {
-          hadError = true;
-          return of([] as EmailEventRead[]);
-        })
-      );
+      requests['emails'] = this.opsApi
+        .listEmailEvents({ limit: 10, since_hours: 168, to_email: email })
+        .pipe(
+          catchError(() => {
+            hadError = true;
+            return of([] as EmailEventRead[]);
+          }),
+        );
     } else {
       requests['emails'] = of([] as EmailEventRead[]);
     }
@@ -261,9 +287,21 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
       forkJoin(requests).subscribe({
         next: (res: any) => {
           const events: CustomerTimelineEvent[] = [
-            ...(res?.orders || []).map((o: AdminOrderListItem) => ({ kind: 'order' as const, created_at: o.created_at, order: o })),
-            ...(res?.tickets || []).map((t: AdminContactSubmissionListItem) => ({ kind: 'ticket' as const, created_at: t.created_at, ticket: t })),
-            ...(res?.emails || []).map((e: EmailEventRead) => ({ kind: 'email' as const, created_at: e.created_at, email: e }))
+            ...(res?.orders || []).map((o: AdminOrderListItem) => ({
+              kind: 'order' as const,
+              created_at: o.created_at,
+              order: o,
+            })),
+            ...(res?.tickets || []).map((t: AdminContactSubmissionListItem) => ({
+              kind: 'ticket' as const,
+              created_at: t.created_at,
+              ticket: t,
+            })),
+            ...(res?.emails || []).map((e: EmailEventRead) => ({
+              kind: 'email' as const,
+              created_at: e.created_at,
+              email: e,
+            })),
           ];
 
           events.sort((a, b) => {
@@ -284,9 +322,8 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
         error: () => {
           this.error.set(this.translate.instant('adminUi.customerTimeline.errors.load'));
           this.loading.set(false);
-        }
-      })
+        },
+      }),
     );
   }
 }
-

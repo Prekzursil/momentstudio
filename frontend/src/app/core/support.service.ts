@@ -35,4 +35,3 @@ export class SupportService {
     return this.api.post<ContactSubmissionRead>('/support/contact', payload);
   }
 }
-

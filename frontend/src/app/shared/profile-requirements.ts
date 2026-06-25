@@ -1,12 +1,20 @@
 import { AuthUser } from '../core/auth.service';
 
-export type RequiredProfileField = 'name' | 'username' | 'first_name' | 'last_name' | 'date_of_birth' | 'phone';
+export type RequiredProfileField =
+  | 'name'
+  | 'username'
+  | 'first_name'
+  | 'last_name'
+  | 'date_of_birth'
+  | 'phone';
 
 function cleaned(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
-export function missingRequiredProfileFields(user: Partial<AuthUser> | null | undefined): RequiredProfileField[] {
+export function missingRequiredProfileFields(
+  user: Partial<AuthUser> | null | undefined,
+): RequiredProfileField[] {
   const missing: RequiredProfileField[] = [];
   if (!user) return ['name', 'username', 'first_name', 'last_name', 'date_of_birth', 'phone'];
 
@@ -22,4 +30,3 @@ export function missingRequiredProfileFields(user: Partial<AuthUser> | null | un
 export function isProfileComplete(user: Partial<AuthUser> | null | undefined): boolean {
   return missingRequiredProfileFields(user).length === 0;
 }
-

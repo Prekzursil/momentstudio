@@ -18,5 +18,3 @@ export class HealthService {
     return this.api.get<HealthResponse>('/health/ready');
   }
 }
-
-

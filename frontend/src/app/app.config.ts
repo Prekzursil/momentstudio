@@ -1,4 +1,10 @@
-import { APP_INITIALIZER, ApplicationConfig, importProvidersFrom, inject, isDevMode } from '@angular/core';
+import {
+  APP_INITIALIZER,
+  ApplicationConfig,
+  importProvidersFrom,
+  inject,
+  isDevMode,
+} from '@angular/core';
 import { provideRouter, TitleStrategy, withComponentInputBinding } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -29,20 +35,21 @@ export const appConfig: ApplicationConfig = {
       useFactory: () => {
         const logger = inject(AdminClientErrorLoggerService);
         return () => logger.init();
-      }
+      },
     },
     importProvidersFrom(
       TranslateModule.forRoot({
         fallbackLang: 'en',
         missingTranslationHandler: {
           provide: MissingTranslationHandler,
-          useClass: AppMissingTranslationHandler
-        }
-      })
+          useClass: AppMissingTranslationHandler,
+        },
+      }),
     ),
     ...provideTranslateHttpLoader({
       prefix: '/assets/i18n/',
       suffix: '.json',
-    }), provideClientHydration(withEventReplay()),
-  ]
+    }),
+    provideClientHydration(withEventReplay()),
+  ],
 };

@@ -7,7 +7,11 @@ function padBase64(base64: string): string {
 export function isWebAuthnSupported(): boolean {
   if (typeof window === 'undefined') return false;
   if (!window.isSecureContext) return false;
-  return typeof window.PublicKeyCredential !== 'undefined' && typeof navigator !== 'undefined' && Boolean(navigator.credentials);
+  return (
+    typeof window.PublicKeyCredential !== 'undefined' &&
+    typeof navigator !== 'undefined' &&
+    Boolean(navigator.credentials)
+  );
 }
 
 export function base64urlToUint8Array(value: string): Uint8Array {
@@ -23,7 +27,10 @@ export function base64urlToUint8Array(value: string): Uint8Array {
 }
 
 export function bufferToBase64url(data: ArrayBuffer | ArrayBufferView): string {
-  const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  const bytes =
+    data instanceof ArrayBuffer
+      ? new Uint8Array(data)
+      : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   if (!bytes.length) return '';
 
   let binary = '';
@@ -40,17 +47,19 @@ export function toPublicKeyCredentialCreationOptions(raw: any): PublicKeyCredent
   const challenge = base64urlToUint8Array(raw?.challenge ?? '').buffer;
   const userRaw = raw?.user ?? {};
   const userId = base64urlToUint8Array(userRaw?.id ?? '').buffer;
-  const excludeCredentialsRaw = Array.isArray(raw?.excludeCredentials) ? raw.excludeCredentials : [];
+  const excludeCredentialsRaw = Array.isArray(raw?.excludeCredentials)
+    ? raw.excludeCredentials
+    : [];
   const excludeCredentials = excludeCredentialsRaw.map((cred: any) => ({
     ...cred,
-    id: base64urlToUint8Array(cred?.id ?? '').buffer
+    id: base64urlToUint8Array(cred?.id ?? '').buffer,
   }));
 
   return {
     ...raw,
     challenge,
     user: { ...userRaw, id: userId },
-    excludeCredentials
+    excludeCredentials,
   } as PublicKeyCredentialCreationOptions;
 }
 
@@ -60,14 +69,14 @@ export function toPublicKeyCredentialRequestOptions(raw: any): PublicKeyCredenti
   const allowCredentials = allowCredentialsRaw
     ? allowCredentialsRaw.map((cred: any) => ({
         ...cred,
-        id: base64urlToUint8Array(cred?.id ?? '').buffer
+        id: base64urlToUint8Array(cred?.id ?? '').buffer,
       }))
     : undefined;
 
   return {
     ...raw,
     challenge,
-    allowCredentials
+    allowCredentials,
   } as PublicKeyCredentialRequestOptions;
 }
 
@@ -78,9 +87,11 @@ export function serializePublicKeyCredential(credential: PublicKeyCredential): a
     rawId: bufferToBase64url(credential.rawId),
     type: credential.type,
     response: {
-      clientDataJSON: bufferToBase64url(response.clientDataJSON)
+      clientDataJSON: bufferToBase64url(response.clientDataJSON),
     },
-    clientExtensionResults: credential.getClientExtensionResults ? credential.getClientExtensionResults() : {}
+    clientExtensionResults: credential.getClientExtensionResults
+      ? credential.getClientExtensionResults()
+      : {},
   };
 
   if (response?.attestationObject) {
@@ -97,4 +108,3 @@ export function serializePublicKeyCredential(credential: PublicKeyCredential): a
   }
   return json;
 }
-

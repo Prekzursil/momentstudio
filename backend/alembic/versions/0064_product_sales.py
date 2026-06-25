@@ -19,7 +19,9 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("products", sa.Column("sale_type", sa.String(length=10), nullable=True))
+    op.add_column(
+        "products", sa.Column("sale_type", sa.String(length=10), nullable=True)
+    )
     op.add_column("products", sa.Column("sale_value", sa.Numeric(10, 2), nullable=True))
     op.add_column("products", sa.Column("sale_price", sa.Numeric(10, 2), nullable=True))
 
@@ -28,4 +30,3 @@ def downgrade() -> None:
     op.drop_column("products", "sale_price")
     op.drop_column("products", "sale_value")
     op.drop_column("products", "sale_type")
-

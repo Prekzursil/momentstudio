@@ -12,7 +12,9 @@ import { AccountComponent } from './account.component';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslateModule, ButtonComponent, SkeletonComponent],
   template: `
-    <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
       <ng-container *ngIf="account.loading(); else profileBody">
         <div class="grid gap-3">
           <app-skeleton height="18px" width="200px"></app-skeleton>
@@ -22,413 +24,508 @@ import { AccountComponent } from './account.component';
       </ng-container>
 
       <ng-template #profileBody>
-      <div class="flex items-center justify-between">
-        <div class="grid gap-1">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.sections.profile' | translate }}</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            {{
-              'account.profile.completeness'
-                | translate
-                  : {
-                      completed: account.profileCompleteness().completed,
-                      total: account.profileCompleteness().total,
-                      percent: account.profileCompleteness().percent
-                    }
-            }}
+        <div class="flex items-center justify-between">
+          <div class="grid gap-1">
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'account.sections.profile' | translate }}
+            </h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              {{
+                'account.profile.completeness'
+                  | translate
+                    : {
+                        completed: account.profileCompleteness().completed,
+                        total: account.profileCompleteness().total,
+                        percent: account.profileCompleteness().percent,
+                      }
+              }}
+            </p>
+          </div>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'account.profile.actions.save' | translate"
+            [disabled]="account.savingProfile"
+            (action)="account.saveProfile()"
+          ></app-button>
+        </div>
+
+        <div
+          *ngIf="account.profileCompletionRequired()"
+          class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-2 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+        >
+          <p class="font-semibold">{{ 'account.completeProfile.title' | translate }}</p>
+          <p class="text-xs text-amber-900/90 dark:text-amber-100/90">
+            {{ 'account.completeProfile.copy' | translate }}
           </p>
+          <ul class="grid gap-1 text-xs text-amber-900/90 dark:text-amber-100/90">
+            <li *ngFor="let field of account.missingProfileFields()">
+              • {{ account.requiredFieldLabelKey(field) | translate }}
+            </li>
+          </ul>
         </div>
-        <app-button
-          size="sm"
-          variant="ghost"
-          [label]="'account.profile.actions.save' | translate"
-          [disabled]="account.savingProfile"
-          (action)="account.saveProfile()"
-        ></app-button>
-      </div>
 
-      <div
-        *ngIf="account.profileCompletionRequired()"
-        class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 text-sm grid gap-2 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-      >
-        <p class="font-semibold">{{ 'account.completeProfile.title' | translate }}</p>
-        <p class="text-xs text-amber-900/90 dark:text-amber-100/90">{{ 'account.completeProfile.copy' | translate }}</p>
-        <ul class="grid gap-1 text-xs text-amber-900/90 dark:text-amber-100/90">
-          <li *ngFor="let field of account.missingProfileFields()">• {{ account.requiredFieldLabelKey(field) | translate }}</li>
-        </ul>
-      </div>
+        <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+          <div
+            class="h-2 rounded-full bg-indigo-600"
+            [style.width.%]="account.profileCompleteness().percent"
+          ></div>
+        </div>
 
-      <div class="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-        <div class="h-2 rounded-full bg-indigo-600" [style.width.%]="account.profileCompleteness().percent"></div>
-      </div>
+        <div class="grid gap-4">
+          <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-4">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'account.profile.sections.publicIdentity.title' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'account.profile.sections.publicIdentity.copy' | translate }}
+              </p>
+            </div>
 
-      <div class="grid gap-4">
-	        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-4">
-	          <div class="grid gap-1">
-	            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.profile.sections.publicIdentity.title' | translate }}</h3>
-	            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.sections.publicIdentity.copy' | translate }}</p>
-	          </div>
-
-	          <div class="flex flex-col sm:flex-row sm:items-center gap-4">
-	            <img
-	              [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
-	              [attr.alt]="'account.profile.avatar.alt' | translate"
-	              class="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-800"
-	            />
-	            <div class="flex flex-wrap items-center gap-3">
-	              <label class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300">
-	                {{ 'account.profile.avatar.upload' | translate }}
-	                <input type="file" class="hidden" accept="image/*" (change)="onAvatarFileChange($event)" />
-	              </label>
-              <app-button
-	                *ngIf="account.googlePicture() && (account.profile()?.avatar_url || '') !== (account.googlePicture() || '')"
-	                size="sm"
-	                variant="ghost"
-	                [label]="'account.profile.avatar.useGoogle' | translate"
-	                [disabled]="account.avatarBusy"
-	                (action)="account.useGoogleAvatar()"
-	              ></app-button>
-              <app-button
-	                *ngIf="account.profile()?.avatar_url"
-	                size="sm"
-	                variant="ghost"
-	                [label]="'account.profile.avatar.remove' | translate"
-	                [disabled]="account.avatarBusy"
-	                (action)="account.removeAvatar()"
-	              ></app-button>
-	              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.avatar.hint' | translate }}</span>
-	            </div>
-	          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.displayName' | translate }}
-              <input
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profileName"
-                autocomplete="name"
-                [required]="account.profileCompletionRequired()"
-                [(ngModel)]="account.profileName"
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+              <img
+                [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
+                [attr.alt]="'account.profile.avatar.alt' | translate"
+                class="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-800"
               />
-	              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-	                {{ 'account.profile.publicLabel' | translate: { value: account.publicIdentityLabel() } }}
-	              </span>
-              <span
-                *ngIf="account.displayNameCooldownSeconds() > 0"
-                class="text-xs font-normal text-amber-800 dark:text-amber-200"
-              >
-                {{
-                  'account.cooldowns.displayName'
-                    | translate: { time: account.formatCooldown(account.displayNameCooldownSeconds()) }
-                }}
-              </span>
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.username' | translate }}
-              <input
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profileUsername"
-                autocomplete="username"
-                minlength="3"
-                maxlength="30"
-                pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
-                [required]="account.profileCompletionRequired()"
-                [(ngModel)]="account.profileUsername"
-	              />
-	              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-	                {{ 'account.profile.username.helper' | translate }}
-	              </span>
-              <span
-                *ngIf="account.usernameCooldownSeconds() > 0"
-                class="text-xs font-normal text-amber-800 dark:text-amber-200"
-              >
-                {{ 'account.cooldowns.username' | translate: { time: account.formatCooldown(account.usernameCooldownSeconds()) } }}
-              </span>
-            </label>
-
-            <label
-              *ngIf="account.usernameChanged()"
-              class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 sm:col-span-2"
-            >
-              {{ 'auth.currentPassword' | translate }}
-              <div class="relative">
-                <input
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                  name="profileUsernamePassword"
-                  [type]="showUsernamePassword ? 'text' : 'password'"
-                  autocomplete="current-password"
-                  required
-                  [(ngModel)]="account.profileUsernamePassword"
-                />
-                <button
-                  type="button"
-                  class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
-                  (click)="showUsernamePassword = !showUsernamePassword"
-                  [attr.aria-label]="(showUsernamePassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              <div class="flex flex-wrap items-center gap-3">
+                <label
+                  class="text-sm text-indigo-600 font-medium cursor-pointer dark:text-indigo-300"
                 >
-                  {{ (showUsernamePassword ? 'auth.hide' : 'auth.show') | translate }}
-                </button>
-	              </div>
-	              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'account.profile.username.passwordRequired' | translate }}</span>
-		            </label>
-		          </div>
+                  {{ 'account.profile.avatar.upload' | translate }}
+                  <input
+                    type="file"
+                    class="hidden"
+                    accept="image/*"
+                    (change)="onAvatarFileChange($event)"
+                  />
+                </label>
+                <app-button
+                  *ngIf="
+                    account.googlePicture() &&
+                    (account.profile()?.avatar_url || '') !== (account.googlePicture() || '')
+                  "
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.profile.avatar.useGoogle' | translate"
+                  [disabled]="account.avatarBusy"
+                  (action)="account.useGoogleAvatar()"
+                ></app-button>
+                <app-button
+                  *ngIf="account.profile()?.avatar_url"
+                  size="sm"
+                  variant="ghost"
+                  [label]="'account.profile.avatar.remove' | translate"
+                  [disabled]="account.avatarBusy"
+                  (action)="account.removeAvatar()"
+                ></app-button>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                  'account.profile.avatar.hint' | translate
+                }}</span>
+              </div>
+            </div>
 
-		          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-		            <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'account.profile.preview.title' | translate }}</p>
-		            <div class="mt-3 flex items-start gap-3">
-		              <img
-		                [src]="account.avatar || account.profile()?.avatar_url || account.placeholderAvatar"
-		                [attr.alt]="'account.profile.avatar.previewAlt' | translate"
-		                class="h-10 w-10 rounded-full object-cover border border-slate-200 dark:border-slate-800"
-		              />
-	              <div class="min-w-0 flex-1">
-	                <div class="flex flex-wrap items-center gap-2">
-		                  <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-		                    {{ account.publicIdentityPreviewLabel() }}
-		                  </span>
-		                  <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.preview.justNow' | translate }}</span>
-		                </div>
-		                <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">
-		                  {{ 'account.profile.preview.message' | translate }}
-		                </p>
-		              </div>
-		            </div>
-		          </div>
-	        </div>
-	
-	        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
-	          <div class="grid gap-1">
-	            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.profile.sections.privateInfo.title' | translate }}</h3>
-	            <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'account.profile.sections.privateInfo.copy' | translate }}</p>
-	          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.firstName' | translate }}
-              <input
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profileFirstName"
-                autocomplete="given-name"
-                [required]="account.profileCompletionRequired()"
-                [(ngModel)]="account.profileFirstName"
-              />
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.middleName' | translate }}
-              <input
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profileMiddleName"
-                autocomplete="additional-name"
-                [(ngModel)]="account.profileMiddleName"
-              />
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.lastName' | translate }}
-              <input
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profileLastName"
-                autocomplete="family-name"
-                [required]="account.profileCompletionRequired()"
-                [(ngModel)]="account.profileLastName"
-              />
-            </label>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.dateOfBirth' | translate }}
-              <input
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                name="profileDateOfBirth"
-                type="date"
-                [required]="account.profileCompletionRequired()"
-                [(ngModel)]="account.profileDateOfBirth"
-              />
-            </label>
-
-            <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'auth.phone' | translate }}
-              <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2">
-                <select
-                  name="profilePhoneCountry"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="account.profilePhoneCountry"
-                >
-                  <option *ngFor="let c of account.phoneCountries" [ngValue]="c.code">
-                    {{ c.flag }} {{ c.name }} ({{ c.dial }})
-                  </option>
-                </select>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'auth.displayName' | translate }}
                 <input
-                  name="profilePhoneNational"
-                  type="tel"
                   class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                  autocomplete="tel-national"
-                  pattern="^[0-9]{6,14}$"
-                  placeholder="723204204"
+                  name="profileName"
+                  autocomplete="name"
                   [required]="account.profileCompletionRequired()"
-                  [(ngModel)]="account.profilePhoneNational"
+                  [(ngModel)]="account.profileName"
                 />
-              </div>
-              <div class="grid gap-1">
-                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
-                <span
-                  *ngIf="account.phoneNationalPreview() as preview"
-                  class="text-xs font-normal text-slate-500 dark:text-slate-400"
-                >
-                  {{ 'account.profile.phone.formattedPreview' | translate: { value: preview } }}
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                  {{
+                    'account.profile.publicLabel'
+                      | translate: { value: account.publicIdentityLabel() }
+                  }}
                 </span>
-                <ng-container *ngIf="account.phoneE164Preview() as e164; else phoneInvalid">
-                  <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                    {{ 'account.profile.phone.e164Preview' | translate: { value: e164 } }}
-                  </span>
-                </ng-container>
-                <ng-template #phoneInvalid>
-                  <span
-                    *ngIf="account.profilePhoneNational.trim()"
-                    class="text-xs font-normal text-rose-700 dark:text-rose-300"
+                <span
+                  *ngIf="account.displayNameCooldownSeconds() > 0"
+                  class="text-xs font-normal text-amber-800 dark:text-amber-200"
+                >
+                  {{
+                    'account.cooldowns.displayName'
+                      | translate
+                        : { time: account.formatCooldown(account.displayNameCooldownSeconds()) }
+                  }}
+                </span>
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'auth.username' | translate }}
+                <input
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  name="profileUsername"
+                  autocomplete="username"
+                  minlength="3"
+                  maxlength="30"
+                  pattern="^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+                  [required]="account.profileCompletionRequired()"
+                  [(ngModel)]="account.profileUsername"
+                />
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                  {{ 'account.profile.username.helper' | translate }}
+                </span>
+                <span
+                  *ngIf="account.usernameCooldownSeconds() > 0"
+                  class="text-xs font-normal text-amber-800 dark:text-amber-200"
+                >
+                  {{
+                    'account.cooldowns.username'
+                      | translate
+                        : { time: account.formatCooldown(account.usernameCooldownSeconds()) }
+                  }}
+                </span>
+              </label>
+
+              <label
+                *ngIf="account.usernameChanged()"
+                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 sm:col-span-2"
+              >
+                {{ 'auth.currentPassword' | translate }}
+                <div class="relative">
+                  <input
+                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 pr-16 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    name="profileUsernamePassword"
+                    [type]="showUsernamePassword ? 'text' : 'password'"
+                    autocomplete="current-password"
+                    required
+                    [(ngModel)]="account.profileUsernamePassword"
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
+                    (click)="showUsernamePassword = !showUsernamePassword"
+                    [attr.aria-label]="
+                      (showUsernamePassword ? 'auth.hidePassword' : 'auth.showPassword') | translate
+                    "
                   >
-                    {{ 'validation.phoneInvalid' | translate }}
-                  </span>
-                </ng-template>
+                    {{ (showUsernamePassword ? 'auth.hide' : 'auth.show') | translate }}
+                  </button>
+                </div>
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{
+                  'account.profile.username.passwordRequired' | translate
+                }}</span>
+              </label>
+            </div>
+
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40"
+            >
+              <p
+                class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+              >
+                {{ 'account.profile.preview.title' | translate }}
+              </p>
+              <div class="mt-3 flex items-start gap-3">
+                <img
+                  [src]="
+                    account.avatar || account.profile()?.avatar_url || account.placeholderAvatar
+                  "
+                  [attr.alt]="'account.profile.avatar.previewAlt' | translate"
+                  class="h-10 w-10 rounded-full object-cover border border-slate-200 dark:border-slate-800"
+                />
+                <div class="min-w-0 flex-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                      {{ account.publicIdentityPreviewLabel() }}
+                    </span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                      'account.profile.preview.justNow' | translate
+                    }}</span>
+                  </div>
+                  <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">
+                    {{ 'account.profile.preview.message' | translate }}
+                  </p>
+                </div>
               </div>
-	            </div>
-	
-	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	              {{ 'account.profile.settings.preferredLanguage' | translate }}
-	              <select
-	                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                name="profileLanguage"
-                [(ngModel)]="account.profileLanguage"
-              >
-                <option value="en">EN</option>
-                <option value="ro">RO</option>
-	              </select>
-	            </label>
-	            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	              {{ 'account.profile.settings.theme' | translate }}
-	              <select
-	                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                name="profileTheme"
-                [(ngModel)]="account.profileThemePreference"
-              >
-                <option value="system">{{ 'theme.system' | translate }}</option>
-                <option value="light">{{ 'theme.light' | translate }}</option>
-                <option value="dark">{{ 'theme.dark' | translate }}</option>
-              </select>
-            </label>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-3">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'account.profile.sections.privateInfo.title' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'account.profile.sections.privateInfo.copy' | translate }}
+              </p>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'auth.firstName' | translate }}
+                <input
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  name="profileFirstName"
+                  autocomplete="given-name"
+                  [required]="account.profileCompletionRequired()"
+                  [(ngModel)]="account.profileFirstName"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'auth.middleName' | translate }}
+                <input
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  name="profileMiddleName"
+                  autocomplete="additional-name"
+                  [(ngModel)]="account.profileMiddleName"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'auth.lastName' | translate }}
+                <input
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  name="profileLastName"
+                  autocomplete="family-name"
+                  [required]="account.profileCompletionRequired()"
+                  [(ngModel)]="account.profileLastName"
+                />
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'auth.dateOfBirth' | translate }}
+                <input
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  name="profileDateOfBirth"
+                  type="date"
+                  [required]="account.profileCompletionRequired()"
+                  [(ngModel)]="account.profileDateOfBirth"
+                />
+              </label>
+
+              <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'auth.phone' | translate }}
+                <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2">
+                  <select
+                    name="profilePhoneCountry"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="account.profilePhoneCountry"
+                  >
+                    <option *ngFor="let c of account.phoneCountries" [ngValue]="c.code">
+                      {{ c.flag }} {{ c.name }} ({{ c.dial }})
+                    </option>
+                  </select>
+                  <input
+                    name="profilePhoneNational"
+                    type="tel"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                    autocomplete="tel-national"
+                    pattern="^[0-9]{6,14}$"
+                    placeholder="723204204"
+                    [required]="account.profileCompletionRequired()"
+                    [(ngModel)]="account.profilePhoneNational"
+                  />
+                </div>
+                <div class="grid gap-1">
+                  <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{
+                    'auth.phoneHint' | translate
+                  }}</span>
+                  <span
+                    *ngIf="account.phoneNationalPreview() as preview"
+                    class="text-xs font-normal text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'account.profile.phone.formattedPreview' | translate: { value: preview } }}
+                  </span>
+                  <ng-container *ngIf="account.phoneE164Preview() as e164; else phoneInvalid">
+                    <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      {{ 'account.profile.phone.e164Preview' | translate: { value: e164 } }}
+                    </span>
+                  </ng-container>
+                  <ng-template #phoneInvalid>
+                    <span
+                      *ngIf="account.profilePhoneNational.trim()"
+                      class="text-xs font-normal text-rose-700 dark:text-rose-300"
+                    >
+                      {{ 'validation.phoneInvalid' | translate }}
+                    </span>
+                  </ng-template>
+                </div>
+              </div>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'account.profile.settings.preferredLanguage' | translate }}
+                <select
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  name="profileLanguage"
+                  [(ngModel)]="account.profileLanguage"
+                >
+                  <option value="en">EN</option>
+                  <option value="ro">RO</option>
+                </select>
+              </label>
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'account.profile.settings.theme' | translate }}
+                <select
+                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  name="profileTheme"
+                  [(ngModel)]="account.profileThemePreference"
+                >
+                  <option value="system">{{ 'theme.system' | translate }}</option>
+                  <option value="light">{{ 'theme.light' | translate }}</option>
+                  <option value="dark">{{ 'theme.dark' | translate }}</option>
+                </select>
+              </label>
+            </div>
           </div>
         </div>
-      </div>
-	
-	      <p *ngIf="account.profileError" class="text-sm text-rose-700 dark:text-rose-300">{{ account.profileError }}</p>
-	      <p *ngIf="account.profileSaved" class="text-sm text-emerald-700 dark:text-emerald-300">{{ 'account.profile.savedInline' | translate }}</p>
-	
-	      <div class="grid gap-3 sm:grid-cols-2" *ngIf="account.isAuthenticated()">
-	        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-	          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'account.profile.history.usernameTitle' | translate }}</p>
-          <div *ngIf="account.aliasesLoading()" class="mt-2">
-            <app-skeleton height="44px"></app-skeleton>
+
+        <p *ngIf="account.profileError" class="text-sm text-rose-700 dark:text-rose-300">
+          {{ account.profileError }}
+        </p>
+        <p *ngIf="account.profileSaved" class="text-sm text-emerald-700 dark:text-emerald-300">
+          {{ 'account.profile.savedInline' | translate }}
+        </p>
+
+        <div class="grid gap-3 sm:grid-cols-2" *ngIf="account.isAuthenticated()">
+          <div
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40"
+          >
+            <p
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
+              {{ 'account.profile.history.usernameTitle' | translate }}
+            </p>
+            <div *ngIf="account.aliasesLoading()" class="mt-2">
+              <app-skeleton height="44px"></app-skeleton>
+            </div>
+            <p
+              *ngIf="!account.aliasesLoading() && account.aliases()?.usernames?.length === 0"
+              class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+            >
+              {{ 'account.profile.history.empty' | translate }}
+            </p>
+            <ul
+              *ngIf="!account.aliasesLoading() && account.aliases()?.usernames?.length"
+              class="mt-2 grid gap-2 text-sm"
+            >
+              <li
+                *ngFor="let h of account.aliases()!.usernames"
+                class="flex items-center justify-between gap-2"
+              >
+                <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{
+                  h.username
+                }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{
+                  h.created_at | date: 'short'
+                }}</span>
+              </li>
+            </ul>
           </div>
-	          <p
-	            *ngIf="!account.aliasesLoading() && account.aliases()?.usernames?.length === 0"
-	            class="mt-2 text-sm text-slate-600 dark:text-slate-300"
-	          >
-	            {{ 'account.profile.history.empty' | translate }}
-	          </p>
-          <ul *ngIf="!account.aliasesLoading() && account.aliases()?.usernames?.length" class="mt-2 grid gap-2 text-sm">
-            <li *ngFor="let h of account.aliases()!.usernames" class="flex items-center justify-between gap-2">
-              <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.username }}</span>
-              <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
-            </li>
-          </ul>
-	        </div>
-	        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40">
-	          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'account.profile.history.displayNameTitle' | translate }}</p>
-          <div *ngIf="account.aliasesLoading()" class="mt-2">
-            <app-skeleton height="44px"></app-skeleton>
+          <div
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/40"
+          >
+            <p
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
+              {{ 'account.profile.history.displayNameTitle' | translate }}
+            </p>
+            <div *ngIf="account.aliasesLoading()" class="mt-2">
+              <app-skeleton height="44px"></app-skeleton>
+            </div>
+            <p
+              *ngIf="!account.aliasesLoading() && account.aliases()?.display_names?.length === 0"
+              class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+            >
+              {{ 'account.profile.history.empty' | translate }}
+            </p>
+            <ul
+              *ngIf="!account.aliasesLoading() && account.aliases()?.display_names?.length"
+              class="mt-2 grid gap-2 text-sm"
+            >
+              <li
+                *ngFor="let h of account.aliases()!.display_names"
+                class="flex items-center justify-between gap-2"
+              >
+                <span class="font-medium text-slate-900 dark:text-slate-50 truncate"
+                  >{{ h.name }}#{{ h.name_tag }}</span
+                >
+                <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{
+                  h.created_at | date: 'short'
+                }}</span>
+              </li>
+            </ul>
           </div>
-	          <p
-	            *ngIf="!account.aliasesLoading() && account.aliases()?.display_names?.length === 0"
-	            class="mt-2 text-sm text-slate-600 dark:text-slate-300"
-	          >
-	            {{ 'account.profile.history.empty' | translate }}
-	          </p>
-          <ul *ngIf="!account.aliasesLoading() && account.aliases()?.display_names?.length" class="mt-2 grid gap-2 text-sm">
-            <li *ngFor="let h of account.aliases()!.display_names" class="flex items-center justify-between gap-2">
-              <span class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ h.name }}#{{ h.name_tag }}</span>
-              <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0">{{ h.created_at | date: 'short' }}</span>
-            </li>
-          </ul>
         </div>
-      </div>
-	      <p *ngIf="account.aliasesError()" class="text-sm text-rose-700 dark:text-rose-300">{{ account.aliasesError() }}</p>
-	      <p class="text-xs text-slate-500 dark:text-slate-400">
-	        {{ 'account.profile.sessionHint' | translate }}
-	      </p>
-	      </ng-template>
-	    </section>
+        <p *ngIf="account.aliasesError()" class="text-sm text-rose-700 dark:text-rose-300">
+          {{ account.aliasesError() }}
+        </p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          {{ 'account.profile.sessionHint' | translate }}
+        </p>
+      </ng-template>
+    </section>
 
     <ng-container *ngIf="avatarCropOpen">
-	      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-	        <div
-	          class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-	        >
-	          <div class="flex items-center justify-between gap-3">
-	            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">{{ 'account.profile.avatar.crop.title' | translate }}</h3>
-	            <button
-	              type="button"
-	              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-	              (click)="cancelAvatarCrop()"
-	              [attr.aria-label]="'account.profile.avatar.crop.close' | translate"
-	            >
-	              ✕
-	            </button>
-	          </div>
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div
+          class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'account.profile.avatar.crop.title' | translate }}
+            </h3>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+              (click)="cancelAvatarCrop()"
+              [attr.aria-label]="'account.profile.avatar.crop.close' | translate"
+            >
+              ✕
+            </button>
+          </div>
 
           <div class="mt-4 flex justify-center">
             <div
               class="relative h-64 w-64 overflow-hidden rounded-full border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"
             >
-	              <img
-	                *ngIf="avatarCropUrl"
-	                [src]="avatarCropUrl"
-	                [attr.alt]="'account.profile.avatar.previewAlt' | translate"
-	                class="absolute left-1/2 top-1/2 max-w-none select-none"
-	                [style.transform]="avatarCropTransform"
-	              />
+              <img
+                *ngIf="avatarCropUrl"
+                [src]="avatarCropUrl"
+                [attr.alt]="'account.profile.avatar.previewAlt' | translate"
+                class="absolute left-1/2 top-1/2 max-w-none select-none"
+                [style.transform]="avatarCropTransform"
+              />
             </div>
           </div>
 
-	          <label class="mt-4 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	            {{ 'account.profile.avatar.crop.zoom' | translate }}
-	            <input
-	              type="range"
-	              min="1"
-	              max="3"
-	              step="0.01"
+          <label class="mt-4 grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            {{ 'account.profile.avatar.crop.zoom' | translate }}
+            <input
+              type="range"
+              min="1"
+              max="3"
+              step="0.01"
               class="w-full"
               [(ngModel)]="avatarCropZoom"
               [disabled]="account.avatarBusy"
-	            />
-	          </label>
+            />
+          </label>
 
-	          <p *ngIf="avatarCropErrorKey" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ avatarCropErrorKey | translate }}</p>
+          <p *ngIf="avatarCropErrorKey" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+            {{ avatarCropErrorKey | translate }}
+          </p>
 
-	          <div class="mt-4 flex justify-end gap-2">
-	            <app-button
-	              size="sm"
-	              variant="ghost"
-	              [label]="'account.profile.avatar.crop.cancel' | translate"
-	              [disabled]="account.avatarBusy"
-	              (action)="cancelAvatarCrop()"
-	            ></app-button>
-	            <app-button
-	              size="sm"
-	              [label]="'account.profile.avatar.crop.upload' | translate"
-	              [disabled]="account.avatarBusy || !avatarCropReady"
-	              (action)="confirmAvatarCrop()"
-	            ></app-button>
-	          </div>
+          <div class="mt-4 flex justify-end gap-2">
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'account.profile.avatar.crop.cancel' | translate"
+              [disabled]="account.avatarBusy"
+              (action)="cancelAvatarCrop()"
+            ></app-button>
+            <app-button
+              size="sm"
+              [label]="'account.profile.avatar.crop.upload' | translate"
+              [disabled]="account.avatarBusy || !avatarCropReady"
+              (action)="confirmAvatarCrop()"
+            ></app-button>
+          </div>
         </div>
       </div>
     </ng-container>
-  `
+  `,
 })
 export class AccountProfileComponent implements OnDestroy {
   protected readonly account = inject(AccountComponent);
@@ -510,7 +607,9 @@ export class AccountProfileComponent implements OnDestroy {
     const sy = (img.naturalHeight - crop) / 2;
     ctx.drawImage(img, sx, sy, crop, crop, 0, 0, size, size);
 
-    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png', 0.92));
+    const blob: Blob | null = await new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b), 'image/png', 0.92),
+    );
     if (!blob) {
       this.resetAvatarCrop();
       return;

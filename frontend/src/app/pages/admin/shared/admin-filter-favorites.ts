@@ -22,4 +22,3 @@ function fnv1a(value: string): number {
   }
   return hash >>> 0;
 }
-

@@ -17,7 +17,7 @@ export class LanguageService {
   constructor(
     private readonly translate: TranslateService,
     private readonly auth: AuthService,
-    private readonly toast: ToastService
+    private readonly toast: ToastService,
   ) {
     this.translate.addLangs(['en', 'ro']);
     this.translate.setDefaultLang('en');
@@ -51,13 +51,14 @@ export class LanguageService {
         error: () =>
           this.toast.error(
             this.translate.instant('auth.languageNotSaved'),
-            this.translate.instant('auth.languageNotSavedDetail')
-          )
+            this.translate.instant('auth.languageNotSavedDetail'),
+          ),
       });
     }
   }
 
   private applyDocumentLanguage(lang: AppLanguage): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser */
     if (typeof document === 'undefined') return;
     try {
       document.documentElement.lang = lang;
@@ -66,4 +67,3 @@ export class LanguageService {
     }
   }
 }
-

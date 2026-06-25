@@ -71,7 +71,11 @@ def _redact_payload(payload: Any, *, _depth: int = 0) -> Any:
                 redacted["..."] = "truncated"
                 break
             key = str(k)
-            redacted[key] = "***" if _is_sensitive_key(key) else _redact_payload(v, _depth=_depth + 1)
+            redacted[key] = (
+                "***"
+                if _is_sensitive_key(key)
+                else _redact_payload(v, _depth=_depth + 1)
+            )
         return redacted
     if isinstance(payload, list):
         items: list[Any] = []
@@ -87,7 +91,9 @@ def _redact_payload(payload: Any, *, _depth: int = 0) -> Any:
 
 
 class AuditMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         body_text: str | None = None
         max_bytes = int(getattr(settings, "audit_log_max_body_bytes", 4096) or 4096)
         log_payload = bool(getattr(settings, "audit_log_request_payload", True))
@@ -136,12 +142,17 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         response = await call_next(request)
         if settings.csp_enabled:
             response.headers.setdefault("Content-Security-Policy", settings.csp_policy)
         if settings.secure_cookies:
-            response.headers.setdefault("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                "max-age=63072000; includeSubDomains; preload",
+            )
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
         return response

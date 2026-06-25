@@ -2,7 +2,7 @@ import { Directive, ElementRef, Input, OnDestroy, OnInit, Renderer2 } from '@ang
 
 @Directive({
   selector: '[appLazyImage]',
-  standalone: true
+  standalone: true,
 })
 export class LazyImageDirective implements OnInit, OnDestroy {
   @Input('appLazyImage') src = '';
@@ -10,7 +10,10 @@ export class LazyImageDirective implements OnInit, OnDestroy {
 
   private observer?: IntersectionObserver;
 
-  constructor(private readonly el: ElementRef<HTMLImageElement>, private renderer: Renderer2) {}
+  constructor(
+    private readonly el: ElementRef<HTMLImageElement>,
+    private renderer: Renderer2,
+  ) {}
 
   ngOnInit(): void {
     if (!this.src) return;
@@ -43,4 +46,3 @@ export class LazyImageDirective implements OnInit, OnDestroy {
     this.renderer.addClass(this.el.nativeElement, 'opacity-100');
   }
 }
-

@@ -51,6 +51,8 @@ async def main(delete: bool) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scan for orphaned media files.")
-    parser.add_argument("--delete", action="store_true", help="Delete orphaned files after listing")
+    parser.add_argument(
+        "--delete", action="store_true", help="Delete orphaned files after listing"
+    )
     args = parser.parse_args()
     asyncio.run(main(args.delete))

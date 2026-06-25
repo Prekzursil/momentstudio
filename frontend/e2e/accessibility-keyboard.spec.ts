@@ -15,7 +15,10 @@ async function tabUntilFocused(page: Page, target: Locator, maxTabs = 20): Promi
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
-    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
+    localStorage.setItem(
+      'admin.onboarding.v1',
+      JSON.stringify({ completed_at: new Date().toISOString() }),
+    );
   });
 });
 
@@ -32,7 +35,9 @@ test('shopper keyboard smoke: login form + legal modal focus loop', async ({ pag
   await expect(loginButton).toBeFocused();
 
   await page.goto('/register');
-  const unique = uniqueSessionId('e2e-register').replaceAll(/[^a-z0-9]/gi, '').slice(0, 16);
+  const unique = uniqueSessionId('e2e-register')
+    .replaceAll(/[^a-z0-9]/gi, '')
+    .slice(0, 16);
   const username = `e2e_${unique}`.slice(0, 25);
   const email = `e2e_${unique}@example.com`;
   const password = uniqueSessionId('e2e-pass').slice(0, 24);

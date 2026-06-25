@@ -19,10 +19,26 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("products", sa.Column("publish_scheduled_for", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("products", sa.Column("unpublish_scheduled_for", sa.DateTime(timezone=True), nullable=True))
-    op.create_index(op.f("ix_products_publish_scheduled_for"), "products", ["publish_scheduled_for"], unique=False)
-    op.create_index(op.f("ix_products_unpublish_scheduled_for"), "products", ["unpublish_scheduled_for"], unique=False)
+    op.add_column(
+        "products",
+        sa.Column("publish_scheduled_for", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "products",
+        sa.Column("unpublish_scheduled_for", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.create_index(
+        op.f("ix_products_publish_scheduled_for"),
+        "products",
+        ["publish_scheduled_for"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_products_unpublish_scheduled_for"),
+        "products",
+        ["unpublish_scheduled_for"],
+        unique=False,
+    )
 
 
 def downgrade() -> None:
@@ -30,4 +46,3 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_products_publish_scheduled_for"), table_name="products")
     op.drop_column("products", "unpublish_scheduled_for")
     op.drop_column("products", "publish_scheduled_for")
-

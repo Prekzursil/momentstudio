@@ -70,7 +70,9 @@ def full_app() -> Dict[str, object]:
     app.dependency_overrides.clear()
 
 
-def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_register_login_checkout_flow(
+    full_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = full_app["client"]  # type: ignore[assignment]
     SessionLocal = full_app["session_factory"]  # type: ignore[assignment]
 
@@ -90,9 +92,13 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
                 images=[ProductImage(url="/media/flow.png", alt_text="flow")],
             )
             shipping = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0),
             )
-            await cart_service.create_promo(session, PromoCodeCreate(code="SAVE10", percentage_off=10, currency="RON"))
+            await cart_service.create_promo(
+                session,
+                PromoCodeCreate(code="SAVE10", percentage_off=10, currency="RON"),
+            )
             session.add_all([product])
             await session.commit()
             await session.refresh(product)
@@ -115,7 +121,9 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
         discount_cents: int | None = None,
         promo_code: str | None = None,
     ) -> dict:
-        captured["stripe_session_calls"] = int(captured.get("stripe_session_calls") or 0) + 1
+        captured["stripe_session_calls"] = (
+            int(captured.get("stripe_session_calls") or 0) + 1
+        )
         captured["promo_code"] = promo_code
         captured["amount_cents"] = amount_cents
         captured["customer_email"] = customer_email
@@ -125,13 +133,18 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
         captured["metadata"] = metadata
         captured["line_items"] = line_items or []
         captured["discount_cents"] = discount_cents
-        return {"session_id": "cs_test_logged", "checkout_url": "https://checkout.stripe.test/session/cs_test_logged"}
+        return {
+            "session_id": "cs_test_logged",
+            "checkout_url": "https://checkout.stripe.test/session/cs_test_logged",
+        }
 
     async def fake_order_email(*args, **kwargs):
         captured["email_sent"] = True
         return True
 
-    monkeypatch.setattr(payments, "create_checkout_session", fake_create_checkout_session)
+    monkeypatch.setattr(
+        payments, "create_checkout_session", fake_create_checkout_session
+    )
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_order_email)
 
     # Register and login
@@ -220,7 +233,11 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
 
     async def promo_times_used() -> int:
         async with SessionLocal() as session:
-            promo = (await session.execute(select(PromoCode).where(PromoCode.code == "SAVE10"))).scalar_one()
+            promo = (
+                await session.execute(
+                    select(PromoCode).where(PromoCode.code == "SAVE10")
+                )
+            ).scalar_one()
             return int(promo.times_used)
 
     assert asyncio.run(promo_times_used()) == 0
@@ -231,28 +248,43 @@ def test_register_login_checkout_flow(full_app: Dict[str, object], monkeypatch: 
         lambda payload, sig_header, secret: {
             "id": "evt_full_flow_1",
             "type": "checkout.session.completed",
-            "data": {"object": {"id": "cs_test_logged", "payment_intent": "pi_test", "payment_status": "paid"}},
+            "data": {
+                "object": {
+                    "id": "cs_test_logged",
+                    "payment_intent": "pi_test",
+                    "payment_status": "paid",
+                }
+            },
         },
     )
-    webhook = client.post("/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"})
+    webhook = client.post(
+        "/api/v1/payments/webhook", content=b"{}", headers={"Stripe-Signature": "t"}
+    )
     assert webhook.status_code == 200, webhook.text
     assert captured.get("email_sent") is True
     assert asyncio.run(promo_times_used()) == 1
 
     # Verify order is visible via API endpoints
-    list_res = client.get("/api/v1/orders", headers={"Authorization": f"Bearer {token}"})
+    list_res = client.get(
+        "/api/v1/orders", headers={"Authorization": f"Bearer {token}"}
+    )
     assert list_res.status_code == 200, list_res.text
     ids = {o["id"] for o in list_res.json()}
     assert body["order_id"] in ids
 
-    detail_res = client.get(f"/api/v1/orders/{body['order_id']}", headers={"Authorization": f"Bearer {token}"})
+    detail_res = client.get(
+        f"/api/v1/orders/{body['order_id']}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
     assert detail_res.status_code == 200, detail_res.text
     assert detail_res.json()["id"] == body["order_id"]
 
     # Verify order persisted and tied to user
     async def fetch_order():
         async with SessionLocal() as session:
-            result = await session.execute(select(Order).order_by(Order.created_at.desc()))
+            result = await session.execute(
+                select(Order).order_by(Order.created_at.desc())
+            )
             return result.scalars().first()
 
     order = asyncio.run(fetch_order())

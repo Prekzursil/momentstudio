@@ -30,7 +30,9 @@ def upgrade() -> None:
 
     op.add_column(
         "carts",
-        sa.Column("last_order_id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column(
+            "last_order_id", sa.dialects.postgresql.UUID(as_uuid=True), nullable=True
+        ),
     )
     op.create_foreign_key(
         "fk_carts_last_order_id_orders",
@@ -40,7 +42,9 @@ def upgrade() -> None:
         ["id"],
         ondelete="SET NULL",
     )
-    op.create_index(op.f("ix_carts_last_order_id"), "carts", ["last_order_id"], unique=False)
+    op.create_index(
+        op.f("ix_carts_last_order_id"), "carts", ["last_order_id"], unique=False
+    )
 
 
 def downgrade() -> None:

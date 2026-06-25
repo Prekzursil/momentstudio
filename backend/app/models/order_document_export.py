@@ -23,25 +23,41 @@ class OrderDocumentExportKind(str, enum.Enum):
 class OrderDocumentExport(Base):
     __tablename__ = "order_document_exports"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     kind: Mapped[OrderDocumentExportKind] = mapped_column(
         Enum(OrderDocumentExportKind, native_enum=False),
         nullable=False,
         index=True,
     )
     order_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), nullable=True, index=True
+        UUID(as_uuid=True),
+        ForeignKey("orders.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     order_ids: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    mime_type: Mapped[str] = mapped_column(String(100), nullable=False, default="application/pdf", server_default="application/pdf")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    mime_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="application/pdf",
+        server_default="application/pdf",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     order: Mapped[Order | None] = relationship("Order", lazy="joined")
     created_by: Mapped[User | None] = relationship("User", lazy="joined")
-

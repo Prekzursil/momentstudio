@@ -22,7 +22,9 @@ def upgrade() -> None:
     if bind.dialect.name == "postgresql":
         # Some installs store order status as VARCHAR (no enum type). Only alter the
         # enum if it exists; otherwise no DDL is required to allow the new value.
-        enum_exists = bind.execute(sa.text("SELECT 1 FROM pg_type WHERE typname = 'orderstatus'")).first()
+        enum_exists = bind.execute(
+            sa.text("SELECT 1 FROM pg_type WHERE typname = 'orderstatus'")
+        ).first()
         if not enum_exists:
             return
         with op.get_context().autocommit_block():

@@ -3,17 +3,29 @@ import re
 from datetime import datetime, timedelta, timezone, date
 from functools import partial
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlencode
 from uuid import UUID
 
-import anyio
+import anyio.to_thread
 import jwt
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy import func, select, or_
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 from webauthn.helpers import base64url_to_bytes
 
 from app.core import security
@@ -95,8 +107,12 @@ login_rate_limit = limiter("auth:login", settings.auth_rate_limit_login, 60)
 step_up_rate_limit = limiter("auth:step_up", settings.auth_rate_limit_login, 60)
 two_factor_rate_limit = limiter("auth:2fa", settings.auth_rate_limit_login, 60)
 refresh_rate_limit = limiter("auth:refresh", settings.auth_rate_limit_refresh, 60)
-reset_request_rate_limit = limiter("auth:reset_request", settings.auth_rate_limit_reset_request, 60)
-reset_confirm_rate_limit = limiter("auth:reset_confirm", settings.auth_rate_limit_reset_confirm, 60)
+reset_request_rate_limit = limiter(
+    "auth:reset_request", settings.auth_rate_limit_reset_request, 60
+)
+reset_confirm_rate_limit = limiter(
+    "auth:reset_confirm", settings.auth_rate_limit_reset_confirm, 60
+)
 google_rate_limit = per_identifier_limiter(
     lambda r: r.client.host if r.client else "anon",
     settings.auth_rate_limit_google,
@@ -122,22 +138,35 @@ verify_request_rate_limit = per_identifier_limiter(
     key="auth:verify_request",
 )
 
-_REQUIRED_REGISTRATION_CONSENT_KEYS = ("page.terms-and-conditions", "page.privacy-policy")
+_REQUIRED_REGISTRATION_CONSENT_KEYS = (
+    "page.terms-and-conditions",
+    "page.privacy-policy",
+)
 
 
-async def _require_published_consent_docs(session: AsyncSession, keys: tuple[str, ...]) -> dict[str, int]:
+async def _require_published_consent_docs(
+    session: AsyncSession, keys: tuple[str, ...]
+) -> dict[str, int]:
     now = datetime.now(timezone.utc)
     rows = (
         await session.execute(
             select(ContentBlock.key, ContentBlock.version).where(
                 ContentBlock.key.in_(keys),
                 ContentBlock.status == ContentStatus.published,
-                or_(ContentBlock.published_at.is_(None), ContentBlock.published_at <= now),
-                or_(ContentBlock.published_until.is_(None), ContentBlock.published_until > now),
+                or_(
+                    ContentBlock.published_at.is_(None),
+                    ContentBlock.published_at <= now,
+                ),
+                or_(
+                    ContentBlock.published_until.is_(None),
+                    ContentBlock.published_until > now,
+                ),
             )
         )
     ).all()
-    versions = {str(key): int(version) for key, version in rows if key and version is not None}
+    versions = {
+        str(key): int(version) for key, version in rows if key and version is not None
+    }
     missing = [key for key in keys if key not in versions]
     if missing:
         raise HTTPException(
@@ -158,24 +187,42 @@ def _build_google_state(kind: str, user_id: str | None = None) -> str:
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
-def _validate_google_state(state: str, expected_type: str, expected_user_id: str | None = None) -> None:
+def _validate_google_state(
+    state: str, expected_type: str, expected_user_id: str | None = None
+) -> None:
     data = security.decode_token(state)
     if not data or data.get("type") != expected_type:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state"
+        )
     if expected_user_id and data.get("uid") != expected_user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid state"
+        )
 
 
-def set_refresh_cookie(response: Response, token: str, *, persistent: bool = True) -> None:
-    payload = {
-        "httponly": True,
-        "secure": settings.secure_cookies,
-        "samesite": settings.cookie_samesite.lower(),
-        "path": "/",
-    }
-    if persistent:
-        payload["max_age"] = settings.refresh_token_exp_days * 24 * 60 * 60
-    response.set_cookie("refresh_token", token, **payload)
+def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+    value = settings.cookie_samesite.lower()
+    if value == "strict":
+        return "strict"
+    if value == "none":
+        return "none"
+    return "lax"
+
+
+def set_refresh_cookie(
+    response: Response, token: str, *, persistent: bool = True
+) -> None:
+    max_age = settings.refresh_token_exp_days * 24 * 60 * 60 if persistent else None
+    response.set_cookie(
+        "refresh_token",
+        token,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite=_cookie_samesite(),
+        path="/",
+        max_age=max_age,
+    )
 
 
 def clear_refresh_cookie(response: Response) -> None:
@@ -183,7 +230,7 @@ def clear_refresh_cookie(response: Response) -> None:
         "refresh_token",
         path="/",
         secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
+        samesite=_cookie_samesite(),
     )
 
 
@@ -194,7 +241,7 @@ def set_admin_ip_bypass_cookie(response: Response, token: str) -> None:
         token,
         httponly=True,
         secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
+        samesite=_cookie_samesite(),
         path="/",
         max_age=max_age,
     )
@@ -205,7 +252,7 @@ def clear_admin_ip_bypass_cookie(response: Response) -> None:
         "admin_ip_bypass",
         path="/",
         secure=settings.secure_cookies,
-        samesite=settings.cookie_samesite.lower(),
+        samesite=_cookie_samesite(),
     )
 
 
@@ -267,7 +314,11 @@ async def _resolve_active_refresh_session_jti(
 ) -> str | None:
     if not candidate_jti:
         return None
-    stored = (await session.execute(select(RefreshSession).where(RefreshSession.jti == candidate_jti))).scalar_one_or_none()
+    stored = (
+        await session.execute(
+            select(RefreshSession).where(RefreshSession.jti == candidate_jti)
+        )
+    ).scalar_one_or_none()
     if not stored or stored.user_id != user_id:
         return None
 
@@ -286,7 +337,9 @@ async def _resolve_active_refresh_session_jti(
         return None
 
     replacement = (
-        await session.execute(select(RefreshSession).where(RefreshSession.jti == replacement_jti))
+        await session.execute(
+            select(RefreshSession).where(RefreshSession.jti == replacement_jti)
+        )
     ).scalar_one_or_none()
     if not replacement or replacement.user_id != user_id or replacement.revoked:
         return None
@@ -304,7 +357,9 @@ class ChangePasswordRequest(BaseModel):
 
 
 class PreferredLanguageUpdate(BaseModel):
-    preferred_language: str = Field(pattern="^(en|ro)$", description="Language code, e.g., en or ro")
+    preferred_language: str = Field(
+        pattern="^(en|ro)$", description="Language code, e.g., en or ro"
+    )
 
 
 class GoogleCallback(BaseModel):
@@ -365,7 +420,12 @@ class ProfileUpdate(BaseModel):
 
 
 class AccountDeletionRequest(BaseModel):
-    confirm: str = Field(..., min_length=1, max_length=20, description='Type "DELETE" to confirm account deletion')
+    confirm: str = Field(
+        ...,
+        min_length=1,
+        max_length=20,
+        description='Type "DELETE" to confirm account deletion',
+    )
     password: str = Field(min_length=1, max_length=128, description="Confirm password")
 
 
@@ -374,9 +434,13 @@ class ConfirmPasswordRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+    username: str = Field(
+        min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+    )
     email: EmailStr
-    name: str = Field(min_length=1, max_length=255, description="Display name shown publicly")
+    name: str = Field(
+        min_length=1, max_length=255, description="Display name shown publicly"
+    )
     first_name: str = Field(min_length=1, max_length=100)
     middle_name: str | None = Field(default=None, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -384,7 +448,9 @@ class RegisterRequest(BaseModel):
     phone: str = Field(min_length=7, max_length=32, description="E.164 format")
     password: str = Field(min_length=6, max_length=128)
     preferred_language: str | None = Field(default=None, pattern="^(en|ro)$")
-    captcha_token: str | None = Field(default=None, description="CAPTCHA token (required when CAPTCHA is enabled)")
+    captcha_token: str | None = Field(
+        default=None, description="CAPTCHA token (required when CAPTCHA is enabled)"
+    )
     accept_terms: bool = Field(default=False, description="Accept Terms & Conditions")
     accept_privacy: bool = Field(default=False, description="Accept Privacy Policy")
 
@@ -469,7 +535,9 @@ class PasskeyRegistrationVerifyRequest(BaseModel):
 
 
 class UsernameUpdateRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
+    username: str = Field(
+        min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+    )
     password: str = Field(min_length=1, max_length=128)
 
 
@@ -506,19 +574,27 @@ class UserCooldownsResponse(BaseModel):
     email: CooldownInfo
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse)
+@router.post(
+    "/register", status_code=status.HTTP_201_CREATED, response_model=AuthResponse
+)
 async def register(
     payload: RegisterRequest,
     request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(register_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
-    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
+    await captcha_service.verify(
+        payload.captcha_token, remote_ip=request.client.host if request.client else None
+    )
     if not payload.accept_terms or not payload.accept_privacy:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
-    consent_versions = await _require_published_consent_docs(session, _REQUIRED_REGISTRATION_CONSENT_KEYS)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required"
+        )
+    consent_versions = await _require_published_consent_docs(
+        session, _REQUIRED_REGISTRATION_CONSENT_KEYS
+    )
     user = await auth_service.create_user(
         session,
         UserCreate(
@@ -577,7 +653,9 @@ async def register(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(
+        user=UserResponse.model_validate(user), tokens=TokenPair(**tokens)
+    )
 
 
 @router.post(
@@ -595,22 +673,32 @@ async def login(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse | TwoFactorChallengeResponse:
-    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
+    await captcha_service.verify(
+        payload.captcha_token, remote_ip=request.client.host if request.client else None
+    )
     identifier = (payload.identifier or payload.email or "").strip()
     if not identifier:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Identifier is required"
+        )
     try:
-        user = await auth_service.authenticate_user(session, identifier, payload.password)
+        user = await auth_service.authenticate_user(
+            session, identifier, payload.password
+        )
     except HTTPException:
         metrics.record_login_failure()
         raise
     metrics.record_login_success()
     persistent = bool(payload.remember)
     if bool(getattr(user, "two_factor_enabled", False)):
-        token = security.create_two_factor_token(str(user.id), remember=persistent, method="password")
-        return TwoFactorChallengeResponse(user=UserResponse.model_validate(user), two_factor_token=token)
+        token = security.create_two_factor_token(
+            str(user.id), remember=persistent, method="password"
+        )
+        return TwoFactorChallengeResponse(
+            user=UserResponse.model_validate(user), two_factor_token=token
+        )
 
     is_admin_login = user.role in (UserRole.admin, UserRole.owner)
     known_device = True
@@ -640,7 +728,9 @@ async def login(
     )
     if is_admin_login and not known_device:
         owner = await auth_service.get_owner_user(session)
-        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        to_email = (
+            owner.email if owner and owner.email else None
+        ) or settings.admin_alert_email
         if to_email:
             background_tasks.add_task(
                 email_service.send_admin_login_alert,
@@ -654,43 +744,65 @@ async def login(
                 occurred_at=datetime.now(timezone.utc),
                 lang=owner.preferred_language if owner else None,
             )
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(
+        user=UserResponse.model_validate(user), tokens=TokenPair(**tokens)
+    )
 
 
-@router.post("/login/2fa", response_model=AuthResponse, summary="Complete login with two-factor code")
+@router.post(
+    "/login/2fa",
+    response_model=AuthResponse,
+    summary="Complete login with two-factor code",
+)
 async def login_two_factor(
     payload: TwoFactorLoginRequest,
     request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(two_factor_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
     token_payload = security.decode_token(payload.two_factor_token)
     if not token_payload or token_payload.get("type") != "two_factor":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token"
+        )
 
     sub = token_payload.get("sub")
     try:
         user_id = UUID(str(sub))
     except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token"
+        )
     remember = bool(token_payload.get("remember"))
     method = str(token_payload.get("method") or "password").strip() or "password"
 
     user = await session.get(User, user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor token"
+        )
     if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(
+        user
+    ):
         await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
 
     if not bool(getattr(user, "two_factor_enabled", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled"
+        )
     if not await auth_service.verify_two_factor_code(session, user, payload.code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code"
+        )
 
     is_admin_login = user.role in (UserRole.admin, UserRole.owner)
     known_device = True
@@ -722,7 +834,9 @@ async def login_two_factor(
     )
     if is_admin_login and not known_device:
         owner = await auth_service.get_owner_user(session)
-        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        to_email = (
+            owner.email if owner and owner.email else None
+        ) or settings.admin_alert_email
         if to_email:
             background_tasks.add_task(
                 email_service.send_admin_login_alert,
@@ -737,7 +851,9 @@ async def login_two_factor(
                 lang=owner.preferred_language if owner else None,
             )
 
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(
+        user=UserResponse.model_validate(user), tokens=TokenPair(**tokens)
+    )
 
 
 @router.post(
@@ -758,10 +874,16 @@ async def passkey_login_options(
         else:
             user = await auth_service.get_user_by_username(session, identifier)
 
-    options, _ = await passkeys_service.generate_authentication_options_for_user(session, user)
+    (
+        options,
+        _challenge,
+    ) = await passkeys_service.generate_authentication_options_for_user(session, user)
     challenge = str(options.get("challenge") or "").strip()
     if not challenge:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate passkey challenge")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate passkey challenge",
+        )
 
     token = security.create_webauthn_token(
         purpose="login",
@@ -769,7 +891,9 @@ async def passkey_login_options(
         user_id=str(user.id) if user else None,
         remember=bool(payload.remember),
     )
-    return PasskeyAuthenticationOptionsResponse(authentication_token=token, options=options)
+    return PasskeyAuthenticationOptionsResponse(
+        authentication_token=token, options=options
+    )
 
 
 @router.post(
@@ -783,18 +907,28 @@ async def passkey_login_verify(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(login_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
     token_payload = security.decode_token(payload.authentication_token)
-    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "login":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    if (
+        not token_payload
+        or token_payload.get("type") != "webauthn"
+        or token_payload.get("purpose") != "login"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token"
+        )
     challenge_b64 = str(token_payload.get("challenge") or "").strip()
     if not challenge_b64:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token"
+        )
     try:
         expected_challenge = base64url_to_bytes(challenge_b64)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token"
+        ) from exc
 
     remember = bool(token_payload.get("remember"))
     token_user_id = str(token_payload.get("uid") or "").strip() or None
@@ -812,10 +946,16 @@ async def passkey_login_verify(
             detail="Complete your Google sign-in registration before using passkey login.",
         )
     if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(
+        user
+    ):
         await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
 
     metrics.record_login_success()
     is_admin_login = user.role in (UserRole.admin, UserRole.owner)
@@ -846,7 +986,9 @@ async def passkey_login_verify(
     )
     if is_admin_login and not known_device:
         owner = await auth_service.get_owner_user(session)
-        to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+        to_email = (
+            owner.email if owner and owner.email else None
+        ) or settings.admin_alert_email
         if to_email:
             background_tasks.add_task(
                 email_service.send_admin_login_alert,
@@ -860,10 +1002,14 @@ async def passkey_login_verify(
                 occurred_at=datetime.now(timezone.utc),
                 lang=owner.preferred_language if owner else None,
             )
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(
+        user=UserResponse.model_validate(user), tokens=TokenPair(**tokens)
+    )
 
 
-@router.get("/me/passkeys", response_model=list[PasskeyResponse], summary="List my passkeys")
+@router.get(
+    "/me/passkeys", response_model=list[PasskeyResponse], summary="List my passkeys"
+)
 async def list_my_passkeys(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
@@ -883,12 +1029,19 @@ async def passkey_register_options(
     session: AsyncSession = Depends(get_session),
 ) -> PasskeyRegistrationOptionsResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
 
-    options, _ = await passkeys_service.generate_registration_options_for_user(session, current_user)
+    options, _ = await passkeys_service.generate_registration_options_for_user(
+        session, current_user
+    )
     challenge = str(options.get("challenge") or "").strip()
     if not challenge:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate passkey challenge")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate passkey challenge",
+        )
 
     token = security.create_webauthn_token(
         purpose="register",
@@ -910,18 +1063,30 @@ async def passkey_register_verify(
     session: AsyncSession = Depends(get_session),
 ) -> PasskeyResponse:
     token_payload = security.decode_token(payload.registration_token)
-    if not token_payload or token_payload.get("type") != "webauthn" or token_payload.get("purpose") != "register":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+    if (
+        not token_payload
+        or token_payload.get("type") != "webauthn"
+        or token_payload.get("purpose") != "register"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token"
+        )
     token_user_id = str(token_payload.get("uid") or "").strip()
     if token_user_id != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token"
+        )
     challenge_b64 = str(token_payload.get("challenge") or "").strip()
     if not challenge_b64:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token"
+        )
     try:
         expected_challenge = base64url_to_bytes(challenge_b64)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey token"
+        ) from exc
 
     passkey = await passkeys_service.register_passkey(
         session,
@@ -940,7 +1105,11 @@ async def passkey_register_verify(
     return PasskeyResponse.model_validate(passkey)
 
 
-@router.delete("/me/passkeys/{passkey_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Remove a passkey")
+@router.delete(
+    "/me/passkeys/{passkey_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove a passkey",
+)
 async def passkey_delete(
     passkey_id: UUID,
     payload: ConfirmPasswordRequest,
@@ -949,10 +1118,16 @@ async def passkey_delete(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-    removed = await passkeys_service.delete_passkey(session, user_id=current_user.id, passkey_id=passkey_id)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
+    removed = await passkeys_service.delete_passkey(
+        session, user_id=current_user.id, passkey_id=passkey_id
+    )
     if not removed:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Passkey not found"
+        )
     await auth_service.record_security_event(
         session,
         current_user.id,
@@ -969,7 +1144,7 @@ async def refresh_tokens(
     request: Request,
     session: AsyncSession = Depends(get_session),
     _: None = Depends(refresh_rate_limit),
-    response: Response = None,
+    response: Response = Response(),
 ) -> TokenPair | Response:
     silent_header = str(request.headers.get("X-Silent") or "").strip().lower()
     silent_refresh_probe = silent_header in {"1", "true", "yes", "on"}
@@ -985,52 +1160,81 @@ async def refresh_tokens(
     if not refresh_token:
         if silent_refresh_probe:
             return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token missing"
+        )
 
     payload = security.decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":
         if silent_refresh_probe:
             return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
     jti = str(payload.get("jti") or "").strip()
     sub = payload.get("sub")
     if not jti or not sub:
         if silent_refresh_probe:
             return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
     try:
         token_user_id = UUID(str(sub))
     except Exception:
         if silent_refresh_probe:
             return _silent_no_content()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
 
     # Lock the refresh session row during rotation to make concurrent refreshes multi-tab safe.
     stored = (
-        await session.execute(select(RefreshSession).where(RefreshSession.jti == jti).with_for_update())
+        await session.execute(
+            select(RefreshSession).where(RefreshSession.jti == jti).with_for_update()
+        )
     ).scalar_one_or_none()
     now = datetime.now(timezone.utc)
     stored_expires_at = stored.expires_at if stored else None
     if stored_expires_at and stored_expires_at.tzinfo is None:
         stored_expires_at = stored_expires_at.replace(tzinfo=timezone.utc)
-    if not stored or stored.user_id != token_user_id or not stored_expires_at or stored_expires_at < now:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    if (
+        not stored
+        or stored.user_id != token_user_id
+        or not stored_expires_at
+        or stored_expires_at < now
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
 
     user = await session.get(User, stored.user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
     if getattr(user, "deleted_at", None) is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
-    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(user):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
+    if getattr(user, "deletion_scheduled_for", None) and self_service.is_deletion_due(
+        user
+    ):
         await self_service.execute_account_deletion(session, user)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+        )
     locked_until = getattr(user, "locked_until", None)
     if locked_until and locked_until.tzinfo is None:
         locked_until = locked_until.replace(tzinfo=timezone.utc)
     if locked_until and locked_until > now:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Account temporarily locked"
+        )
     if bool(getattr(user, "password_reset_required", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Password reset required"
+        )
 
     # If the token was already rotated very recently (multi-tab refresh), allow
     # reusing it by issuing tokens for the replacement session without rotating again.
@@ -1038,17 +1242,26 @@ async def refresh_tokens(
         grace_seconds = max(0, int(settings.refresh_token_rotation_grace_seconds or 0))
         rotated_at = getattr(stored, "rotated_at", None)
         replaced_by = (getattr(stored, "replaced_by_jti", None) or "").strip()
-        if stored.revoked_reason == "rotated" and grace_seconds > 0 and rotated_at and replaced_by:
+        if (
+            stored.revoked_reason == "rotated"
+            and grace_seconds > 0
+            and rotated_at
+            and replaced_by
+        ):
             rotated_at_norm = rotated_at
             if rotated_at_norm.tzinfo is None:
                 rotated_at_norm = rotated_at_norm.replace(tzinfo=timezone.utc)
             if rotated_at_norm + timedelta(seconds=grace_seconds) >= now:
                 replacement = (
-                    await session.execute(select(RefreshSession).where(RefreshSession.jti == replaced_by))
+                    await session.execute(
+                        select(RefreshSession).where(RefreshSession.jti == replaced_by)
+                    )
                 ).scalar_one_or_none()
                 replacement_expires_at = replacement.expires_at if replacement else None
                 if replacement_expires_at and replacement_expires_at.tzinfo is None:
-                    replacement_expires_at = replacement_expires_at.replace(tzinfo=timezone.utc)
+                    replacement_expires_at = replacement_expires_at.replace(
+                        tzinfo=timezone.utc
+                    )
                 if (
                     replacement
                     and replacement.user_id == stored.user_id
@@ -1058,17 +1271,23 @@ async def refresh_tokens(
                 ):
                     persistent = bool(getattr(replacement, "persistent", True))
                     access = security.create_access_token(str(user.id), replacement.jti)
-                    refresh = security.create_refresh_token(str(user.id), replacement.jti, replacement_expires_at)
+                    refresh = security.create_refresh_token(
+                        str(user.id), replacement.jti, replacement_expires_at
+                    )
                     if response:
                         set_refresh_cookie(response, refresh, persistent=persistent)
                     return TokenPair(access_token=access, refresh_token=refresh)
 
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
 
     persistent = bool(getattr(stored, "persistent", True))
     if not settings.refresh_token_rotation:
         access = security.create_access_token(str(user.id), stored.jti)
-        refresh = security.create_refresh_token(str(user.id), stored.jti, stored_expires_at)
+        refresh = security.create_refresh_token(
+            str(user.id), stored.jti, stored_expires_at
+        )
         if response:
             set_refresh_cookie(response, refresh, persistent=persistent)
         return TokenPair(access_token=access, refresh_token=refresh)
@@ -1089,7 +1308,9 @@ async def refresh_tokens(
     session.add(stored)
     await session.flush()
     access = security.create_access_token(str(user.id), replacement_session.jti)
-    refresh = security.create_refresh_token(str(user.id), replacement_session.jti, replacement_session.expires_at)
+    refresh = security.create_refresh_token(
+        str(user.id), replacement_session.jti, replacement_session.expires_at
+    )
     await session.commit()
     if response:
         set_refresh_cookie(response, refresh, persistent=persistent)
@@ -1101,14 +1322,16 @@ async def logout(
     payload: RefreshRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
-    response: Response = None,
+    response: Response = Response(),
 ) -> None:
     refresh_token = (payload.refresh_token or "").strip()
     if not refresh_token:
         refresh_token = (request.cookies.get("refresh_token") or "").strip()
     payload_data = decode_token(refresh_token) if refresh_token else None
     if payload_data and payload_data.get("jti"):
-        await auth_service.revoke_refresh_token(session, payload_data["jti"], reason="logout")
+        await auth_service.revoke_refresh_token(
+            session, payload_data["jti"], reason="logout"
+        )
     if response:
         clear_refresh_cookie(response)
         clear_admin_ip_bypass_cookie(response)
@@ -1119,19 +1342,28 @@ class AdminIpBypassRequest(BaseModel):
     token: str = Field(min_length=1, max_length=256)
 
 
-@router.post("/admin/ip-bypass", status_code=status.HTTP_204_NO_CONTENT, summary="Bypass admin IP allowlist for this device")
+@router.post(
+    "/admin/ip-bypass",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Bypass admin IP allowlist for this device",
+)
 async def admin_ip_bypass(
     payload: AdminIpBypassRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(require_admin),
-    response: Response = None,
+    response: Response = Response(),
 ) -> None:
     secret = (settings.admin_ip_bypass_token or "").strip()
     if not secret:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admin IP bypass is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin IP bypass is not configured",
+        )
     if (payload.token or "").strip() != secret:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid bypass token")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid bypass token"
+        )
     token = security.create_admin_ip_bypass_token(str(current_user.id))
     if response:
         set_admin_ip_bypass_cookie(response, token)
@@ -1145,14 +1377,22 @@ async def admin_ip_bypass(
     return None
 
 
-@router.delete("/admin/ip-bypass", status_code=status.HTTP_204_NO_CONTENT, summary="Clear admin IP bypass for this device")
-async def clear_admin_ip_bypass(response: Response = None) -> None:
+@router.delete(
+    "/admin/ip-bypass",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Clear admin IP bypass for this device",
+)
+async def clear_admin_ip_bypass(response: Response = Response()) -> None:
     if response:
         clear_admin_ip_bypass_cookie(response)
     return None
 
 
-@router.get("/admin/access", status_code=status.HTTP_200_OK, summary="Check whether this session can access the admin UI")
+@router.get(
+    "/admin/access",
+    status_code=status.HTTP_200_OK,
+    summary="Check whether this session can access the admin UI",
+)
 async def admin_access(_: User = Depends(require_admin_section("dashboard"))) -> dict:
     return {"allowed": True}
 
@@ -1167,13 +1407,20 @@ async def step_up(
 ) -> StepUpResponse:
     hashed_password = (getattr(current_user, "hashed_password", None) or "").strip()
     if not hashed_password:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password authentication is not available for this account")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password authentication is not available for this account",
+        )
 
     if not security.verify_password(payload.password, hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
 
     expires_minutes = 15
-    token = security.create_step_up_token(str(current_user.id), expires_minutes=expires_minutes)
+    token = security.create_step_up_token(
+        str(current_user.id), expires_minutes=expires_minutes
+    )
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
 
     await auth_service.record_security_event(
@@ -1194,13 +1441,22 @@ async def change_password(
     session: AsyncSession = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    if not security.verify_password(payload.current_password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    if not security.verify_password(
+        payload.current_password, current_user.hashed_password
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
     current_user.hashed_password = security.hash_password(payload.new_password)
     current_user.password_reset_required = False
     session.add(current_user)
     await session.commit()
-    background_tasks.add_task(email_service.send_password_changed, current_user.email, lang=current_user.preferred_language)
+    background_tasks.add_task(
+        email_service.send_password_changed,
+        current_user.email,
+        lang=current_user.preferred_language,
+    )
     await auth_service.record_security_event(
         session,
         current_user.id,
@@ -1244,8 +1500,14 @@ async def read_me(current_user: User = Depends(get_current_user)) -> UserRespons
     return UserResponse.model_validate(current_user)
 
 
-@router.get("/me/2fa", response_model=TwoFactorStatusResponse, summary="Get my two-factor status")
-async def two_factor_status(current_user: User = Depends(get_current_user)) -> TwoFactorStatusResponse:
+@router.get(
+    "/me/2fa",
+    response_model=TwoFactorStatusResponse,
+    summary="Get my two-factor status",
+)
+async def two_factor_status(
+    current_user: User = Depends(get_current_user),
+) -> TwoFactorStatusResponse:
     confirmed_at = getattr(current_user, "two_factor_confirmed_at", None)
     if confirmed_at and confirmed_at.tzinfo is None:
         confirmed_at = confirmed_at.replace(tzinfo=timezone.utc)
@@ -1257,7 +1519,11 @@ async def two_factor_status(current_user: User = Depends(get_current_user)) -> T
     )
 
 
-@router.post("/me/2fa/setup", response_model=TwoFactorSetupResponse, summary="Start two-factor setup")
+@router.post(
+    "/me/2fa/setup",
+    response_model=TwoFactorSetupResponse,
+    summary="Start two-factor setup",
+)
 async def two_factor_setup(
     payload: TwoFactorSetupRequest,
     request: Request,
@@ -1265,8 +1531,12 @@ async def two_factor_setup(
     session: AsyncSession = Depends(get_session),
 ) -> TwoFactorSetupResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-    secret, otpauth_url = await auth_service.start_two_factor_setup(session, current_user)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
+    secret, otpauth_url = await auth_service.start_two_factor_setup(
+        session, current_user
+    )
     await auth_service.record_security_event(
         session,
         current_user.id,
@@ -1277,7 +1547,11 @@ async def two_factor_setup(
     return TwoFactorSetupResponse(secret=secret, otpauth_url=otpauth_url)
 
 
-@router.post("/me/2fa/enable", response_model=TwoFactorEnableResponse, summary="Enable two-factor authentication")
+@router.post(
+    "/me/2fa/enable",
+    response_model=TwoFactorEnableResponse,
+    summary="Enable two-factor authentication",
+)
 async def two_factor_enable(
     payload: TwoFactorEnableRequest,
     request: Request,
@@ -1295,7 +1569,11 @@ async def two_factor_enable(
     return TwoFactorEnableResponse(recovery_codes=codes)
 
 
-@router.post("/me/2fa/disable", response_model=TwoFactorStatusResponse, summary="Disable two-factor authentication")
+@router.post(
+    "/me/2fa/disable",
+    response_model=TwoFactorStatusResponse,
+    summary="Disable two-factor authentication",
+)
 async def two_factor_disable(
     payload: TwoFactorDisableRequest,
     request: Request,
@@ -1303,11 +1581,19 @@ async def two_factor_disable(
     session: AsyncSession = Depends(get_session),
 ) -> TwoFactorStatusResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     if not bool(getattr(current_user, "two_factor_enabled", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
-    if not await auth_service.verify_two_factor_code(session, current_user, payload.code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled"
+        )
+    if not await auth_service.verify_two_factor_code(
+        session, current_user, payload.code
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code"
+        )
     await auth_service.disable_two_factor(session, current_user)
     await auth_service.record_security_event(
         session,
@@ -1316,7 +1602,9 @@ async def two_factor_disable(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
-    return TwoFactorStatusResponse(enabled=False, confirmed_at=None, recovery_codes_remaining=0)
+    return TwoFactorStatusResponse(
+        enabled=False, confirmed_at=None, recovery_codes_remaining=0
+    )
 
 
 @router.post(
@@ -1331,11 +1619,19 @@ async def two_factor_regenerate_codes(
     session: AsyncSession = Depends(get_session),
 ) -> TwoFactorEnableResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     if not bool(getattr(current_user, "two_factor_enabled", False)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled")
-    if not await auth_service.verify_two_factor_code(session, current_user, payload.code):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Two-factor is not enabled"
+        )
+    if not await auth_service.verify_two_factor_code(
+        session, current_user, payload.code
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid two-factor code"
+        )
     codes = await auth_service.regenerate_recovery_codes(session, current_user)
     await auth_service.record_security_event(
         session,
@@ -1358,11 +1654,19 @@ async def read_aliases(
     session: AsyncSession = Depends(get_session),
 ) -> UserAliasesResponse:
     usernames = await auth_service.list_username_history(session, current_user.id)
-    display_names = await auth_service.list_display_name_history(session, current_user.id)
+    display_names = await auth_service.list_display_name_history(
+        session, current_user.id
+    )
     return UserAliasesResponse(
-        usernames=[UsernameHistoryItem(username=row.username, created_at=row.created_at) for row in usernames],
+        usernames=[
+            UsernameHistoryItem(username=row.username, created_at=row.created_at)
+            for row in usernames
+        ],
         display_names=[
-            DisplayNameHistoryItem(name=row.name, name_tag=row.name_tag, created_at=row.created_at) for row in display_names
+            DisplayNameHistoryItem(
+                name=row.name, name_tag=row.name_tag, created_at=row.created_at
+            )
+            for row in display_names
         ],
     )
 
@@ -1383,10 +1687,14 @@ async def read_cooldowns(
             return None
         return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
-    def cooldown_info(*, last: datetime | None, cooldown: timedelta, enforce: bool) -> CooldownInfo:
+    def cooldown_info(
+        *, last: datetime | None, cooldown: timedelta, enforce: bool
+    ) -> CooldownInfo:
         last_dt = normalize_dt(last)
         if not last_dt or not enforce:
-            return CooldownInfo(last_changed_at=last_dt, next_allowed_at=None, remaining_seconds=0)
+            return CooldownInfo(
+                last_changed_at=last_dt, next_allowed_at=None, remaining_seconds=0
+            )
         next_dt = last_dt + cooldown
         remaining = int(max(0, (next_dt - now).total_seconds()))
         return CooldownInfo(
@@ -1409,7 +1717,11 @@ async def read_cooldowns(
     )
 
     email_count = int(
-        await session.scalar(select(func.count()).select_from(UserEmailHistory).where(UserEmailHistory.user_id == current_user.id))
+        await session.scalar(
+            select(func.count())
+            .select_from(UserEmailHistory)
+            .where(UserEmailHistory.user_id == current_user.id)
+        )
         or 0
     )
     email_last = await session.scalar(
@@ -1421,9 +1733,21 @@ async def read_cooldowns(
 
     profile_complete = auth_service.is_profile_complete(current_user)
     return UserCooldownsResponse(
-        username=cooldown_info(last=username_last, cooldown=auth_service.USERNAME_CHANGE_COOLDOWN, enforce=profile_complete),
-        display_name=cooldown_info(last=display_last, cooldown=auth_service.DISPLAY_NAME_CHANGE_COOLDOWN, enforce=profile_complete),
-        email=cooldown_info(last=email_last, cooldown=auth_service.EMAIL_CHANGE_COOLDOWN, enforce=email_count > 1),
+        username=cooldown_info(
+            last=username_last,
+            cooldown=auth_service.USERNAME_CHANGE_COOLDOWN,
+            enforce=profile_complete,
+        ),
+        display_name=cooldown_info(
+            last=display_last,
+            cooldown=auth_service.DISPLAY_NAME_CHANGE_COOLDOWN,
+            enforce=profile_complete,
+        ),
+        email=cooldown_info(
+            last=email_last,
+            cooldown=auth_service.EMAIL_CHANGE_COOLDOWN,
+            enforce=email_count > 1,
+        ),
     )
 
 
@@ -1439,7 +1763,9 @@ async def update_username(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     user = await auth_service.update_username(session, current_user, payload.username)
     return UserResponse.model_validate(user)
 
@@ -1458,13 +1784,32 @@ async def update_email(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     old_email = current_user.email
     user = await auth_service.update_email(session, current_user, str(payload.email))
     record = await auth_service.create_email_verification(session, user)
-    background_tasks.add_task(email_service.send_email_changed, old_email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
-    background_tasks.add_task(email_service.send_email_changed, user.email, old_email=old_email, new_email=user.email, lang=user.preferred_language)
-    background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
+    background_tasks.add_task(
+        email_service.send_email_changed,
+        old_email,
+        old_email=old_email,
+        new_email=user.email,
+        lang=user.preferred_language,
+    )
+    background_tasks.add_task(
+        email_service.send_email_changed,
+        user.email,
+        old_email=old_email,
+        new_email=user.email,
+        lang=user.preferred_language,
+    )
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        user.email,
+        record.token,
+        user.preferred_language,
+    )
     await auth_service.record_security_event(
         session,
         user.id,
@@ -1505,7 +1850,9 @@ async def add_my_secondary_email(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SecondaryEmailResponse:
-    secondary, token = await auth_service.add_secondary_email(session, current_user, str(payload.email))
+    secondary, token = await auth_service.add_secondary_email(
+        session, current_user, str(payload.email)
+    )
     background_tasks.add_task(
         email_service.send_verification_email,
         secondary.email,
@@ -1529,7 +1876,9 @@ async def request_secondary_email_verification(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    token = await auth_service.request_secondary_email_verification(session, current_user, secondary_email_id)
+    token = await auth_service.request_secondary_email_verification(
+        session, current_user, secondary_email_id
+    )
     secondary = await session.get(UserSecondaryEmail, secondary_email_id)
     if secondary:
         background_tasks.add_task(
@@ -1552,7 +1901,9 @@ async def confirm_secondary_email_verification(
     payload: SecondaryEmailConfirmRequest,
     session: AsyncSession = Depends(get_session),
 ) -> SecondaryEmailResponse:
-    secondary = await auth_service.confirm_secondary_email_verification(session, payload.token)
+    secondary = await auth_service.confirm_secondary_email_verification(
+        session, payload.token
+    )
     return SecondaryEmailResponse.model_validate(secondary)
 
 
@@ -1569,8 +1920,12 @@ async def make_secondary_email_primary(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-    user = await auth_service.make_secondary_email_primary(session, current_user, secondary_email_id)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
+    user = await auth_service.make_secondary_email_primary(
+        session, current_user, secondary_email_id
+    )
     await auth_service.record_security_event(
         session,
         user.id,
@@ -1593,7 +1948,9 @@ async def delete_secondary_email(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     await auth_service.delete_secondary_email(session, current_user, secondary_email_id)
 
 
@@ -1610,7 +1967,11 @@ async def export_me(
     )
 
 
-@router.post("/me/export/jobs", response_model=UserDataExportJobResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/me/export/jobs",
+    response_model=UserDataExportJobResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def start_export_job(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
@@ -1628,12 +1989,20 @@ async def start_export_job(
         .scalars()
         .first()
     )
-    if latest and latest.status in (UserDataExportStatus.pending, UserDataExportStatus.running):
+    if latest and latest.status in (
+        UserDataExportStatus.pending,
+        UserDataExportStatus.running,
+    ):
         if latest.status == UserDataExportStatus.pending:
             engine = session.bind
-            if engine is None:
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
-            background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=latest.id)
+            if not isinstance(engine, AsyncEngine):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Database engine unavailable",
+                )
+            background_tasks.add_task(
+                user_export_service.run_user_export_job, engine, job_id=latest.id
+            )
         return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
 
     if latest and latest.status == UserDataExportStatus.succeeded:
@@ -1641,17 +2010,26 @@ async def start_export_job(
         if expires_at and expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=timezone.utc)
         if not expires_at or expires_at > datetime.now(timezone.utc):
-            return UserDataExportJobResponse.model_validate(latest, from_attributes=True)
+            return UserDataExportJobResponse.model_validate(
+                latest, from_attributes=True
+            )
 
-    job = UserDataExportJob(user_id=current_user.id, status=UserDataExportStatus.pending, progress=0)
+    job = UserDataExportJob(
+        user_id=current_user.id, status=UserDataExportStatus.pending, progress=0
+    )
     session.add(job)
     await session.commit()
     await session.refresh(job)
 
     engine = session.bind
-    if engine is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Database engine unavailable")
-    background_tasks.add_task(user_export_service.run_user_export_job, engine, job_id=job.id)
+    if not isinstance(engine, AsyncEngine):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database engine unavailable",
+        )
+    background_tasks.add_task(
+        user_export_service.run_user_export_job, engine, job_id=job.id
+    )
     return UserDataExportJobResponse.model_validate(job, from_attributes=True)
 
 
@@ -1673,7 +2051,9 @@ async def latest_export_job(
         .first()
     )
     if not job:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found"
+        )
     return UserDataExportJobResponse.model_validate(job, from_attributes=True)
 
 
@@ -1685,7 +2065,9 @@ async def get_export_job(
 ) -> UserDataExportJobResponse:
     job = await session.get(UserDataExportJob, job_id)
     if not job or job.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found"
+        )
     return UserDataExportJobResponse.model_validate(job, from_attributes=True)
 
 
@@ -1697,27 +2079,46 @@ async def download_export_job(
 ) -> FileResponse:
     job = await session.get(UserDataExportJob, job_id)
     if not job or job.user_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found"
+        )
     if job.status != UserDataExportStatus.succeeded or not job.file_path:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Export is not ready"
+        )
 
     expires_at = job.expires_at
     if expires_at and expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     if expires_at and expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export job not found"
+        )
 
     path = private_storage.resolve_private_path(job.file_path)
     if not path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Export file not found"
+        )
 
-    stamp = (job.finished_at or job.created_at or datetime.now(timezone.utc)).date().isoformat()
+    stamp = (
+        (job.finished_at or job.created_at or datetime.now(timezone.utc))
+        .date()
+        .isoformat()
+    )
     filename = f"moment-studio-export-{stamp}.json"
-    return FileResponse(path, media_type="application/json", filename=filename, headers={"Cache-Control": "no-store"})
+    return FileResponse(
+        path,
+        media_type="application/json",
+        filename=filename,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/me/delete/status", response_model=AccountDeletionStatus)
-async def account_delete_status(current_user: User = Depends(get_current_user)) -> AccountDeletionStatus:
+async def account_delete_status(
+    current_user: User = Depends(get_current_user),
+) -> AccountDeletionStatus:
     return AccountDeletionStatus(
         requested_at=current_user.deletion_requested_at,
         scheduled_for=current_user.deletion_scheduled_for,
@@ -1733,9 +2134,13 @@ async def request_account_deletion(
     session: AsyncSession = Depends(get_session),
 ) -> AccountDeletionStatus:
     if payload.confirm.strip().upper() != "DELETE":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm')
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail='Type "DELETE" to confirm'
+        )
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     now = datetime.now(timezone.utc)
     scheduled_for = current_user.deletion_scheduled_for
     if scheduled_for and scheduled_for.tzinfo is None:
@@ -1746,7 +2151,9 @@ async def request_account_deletion(
             detail="Account deletion is already scheduled. Cancel it before scheduling again.",
         )
     current_user.deletion_requested_at = now
-    current_user.deletion_scheduled_for = now + timedelta(hours=settings.account_deletion_cooldown_hours)
+    current_user.deletion_scheduled_for = now + timedelta(
+        hours=settings.account_deletion_cooldown_hours
+    )
     session.add(current_user)
     await session.commit()
     await session.refresh(current_user)
@@ -1798,7 +2205,9 @@ async def update_notification_preferences(
     if payload.notify_blog_comments is not None:
         current_user.notify_blog_comments = bool(payload.notify_blog_comments)
     if payload.notify_blog_comment_replies is not None:
-        current_user.notify_blog_comment_replies = bool(payload.notify_blog_comment_replies)
+        current_user.notify_blog_comment_replies = bool(
+            payload.notify_blog_comment_replies
+        )
     if payload.notify_marketing is not None:
         current_user.notify_marketing = bool(payload.notify_marketing)
     session.add(current_user)
@@ -1820,7 +2229,9 @@ async def update_training_mode(
         UserRole.fulfillment,
         UserRole.content,
     ):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required"
+        )
     current_user.admin_training_mode = bool(payload.enabled)
     session.add(current_user)
     await session.commit()
@@ -1840,13 +2251,22 @@ async def list_my_sessions(
     session: AsyncSession = Depends(get_session),
 ) -> list[RefreshSessionResponse]:
     candidate_jti = _extract_refresh_session_jti(request)
-    current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
+    current_jti = await _resolve_active_refresh_session_jti(
+        session, current_user.id, candidate_jti
+    )
 
     rows = (
-        await session.execute(
-            select(RefreshSession).where(RefreshSession.user_id == current_user.id, RefreshSession.revoked.is_(False))
+        (
+            await session.execute(
+                select(RefreshSession).where(
+                    RefreshSession.user_id == current_user.id,
+                    RefreshSession.revoked.is_(False),
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     now = datetime.now(timezone.utc)
     sessions: list[RefreshSessionResponse] = []
@@ -1889,17 +2309,31 @@ async def revoke_other_sessions(
     session: AsyncSession = Depends(get_session),
 ) -> RefreshSessionsRevokeResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     candidate_jti = _extract_refresh_session_jti(request)
-    current_jti = await _resolve_active_refresh_session_jti(session, current_user.id, candidate_jti)
+    current_jti = await _resolve_active_refresh_session_jti(
+        session, current_user.id, candidate_jti
+    )
     if not current_jti:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not identify current session")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Could not identify current session",
+        )
 
     rows = (
-        await session.execute(
-            select(RefreshSession).where(RefreshSession.user_id == current_user.id, RefreshSession.revoked.is_(False))
+        (
+            await session.execute(
+                select(RefreshSession).where(
+                    RefreshSession.user_id == current_user.id,
+                    RefreshSession.revoked.is_(False),
+                )
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     now = datetime.now(timezone.utc)
     to_revoke: list[RefreshSession] = []
@@ -1934,13 +2368,17 @@ async def list_security_events(
     limit: int = Query(default=30, ge=1, le=100),
 ) -> list[UserSecurityEventResponse]:
     rows = (
-        await session.execute(
-            select(UserSecurityEvent)
-            .where(UserSecurityEvent.user_id == current_user.id)
-            .order_by(UserSecurityEvent.created_at.desc())
-            .limit(limit)
+        (
+            await session.execute(
+                select(UserSecurityEvent)
+                .where(UserSecurityEvent.user_id == current_user.id)
+                .order_by(UserSecurityEvent.created_at.desc())
+                .limit(limit)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     events: list[UserSecurityEventResponse] = []
     for row in rows:
@@ -1967,13 +2405,21 @@ async def update_me(
 ) -> UserResponse:
     data = payload.model_dump(exclude_unset=True)
     if "phone" in data and payload.phone is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Phone is required"
+        )
     if "first_name" in data and payload.first_name is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="First name is required"
+        )
     if "last_name" in data and payload.last_name is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Last name is required"
+        )
     if "date_of_birth" in data and payload.date_of_birth is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Date of birth is required"
+        )
     if "name" in data and payload.name is not None:
         await auth_service.update_display_name(session, current_user, payload.name)
     if "phone" in data:
@@ -2009,7 +2455,13 @@ async def upload_avatar(
             file,
             root=avatars_root,
             filename=filename,
-            allowed_content_types=("image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"),
+            allowed_content_types=(
+                "image/png",
+                "image/jpeg",
+                "image/webp",
+                "image/gif",
+                "image/svg+xml",
+            ),
             max_bytes=5 * 1024 * 1024,
         )
     )
@@ -2026,7 +2478,10 @@ async def use_google_avatar(
     session: AsyncSession = Depends(get_session),
 ) -> UserResponse:
     if not current_user.google_picture_url:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No Google profile picture available")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Google profile picture available",
+        )
     current_user.avatar_url = current_user.google_picture_url
     session.add(current_user)
     await session.commit()
@@ -2062,7 +2517,9 @@ async def admin_cleanup_incomplete_google_accounts(
     _: User = Depends(require_admin),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, int]:
-    deleted = await self_service.cleanup_incomplete_google_accounts(session, max_age_hours=max_age_hours)
+    deleted = await self_service.cleanup_incomplete_google_accounts(
+        session, max_age_hours=max_age_hours
+    )
     return {"deleted": deleted}
 
 
@@ -2094,8 +2551,12 @@ async def confirm_password_reset(
     session: AsyncSession = Depends(get_session),
     _: None = Depends(reset_confirm_rate_limit),
 ) -> dict[str, str]:
-    user = await auth_service.confirm_reset_token(session, payload.token, payload.new_password)
-    background_tasks.add_task(email_service.send_password_changed, user.email, lang=user.preferred_language)
+    user = await auth_service.confirm_reset_token(
+        session, payload.token, payload.new_password
+    )
+    background_tasks.add_task(
+        email_service.send_password_changed, user.email, lang=user.preferred_language
+    )
     await auth_service.record_security_event(
         session,
         user.id,
@@ -2109,7 +2570,10 @@ async def confirm_password_reset(
 @router.get("/google/start", response_model=dict)
 async def google_start(_: None = Depends(google_rate_limit)) -> dict:
     if not settings.google_client_id or not settings.google_redirect_uri:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google OAuth not configured")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google OAuth not configured",
+        )
     state = _build_google_state("google_state")
     params = {
         "client_id": settings.google_client_id,
@@ -2130,7 +2594,7 @@ async def google_callback(
     request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
-    response: Response = None,
+    response: Response = Response(),
     _: None = Depends(google_rate_limit),
 ) -> GoogleCallbackResponse:
     _validate_google_state(payload.state, "google_state")
@@ -2141,23 +2605,38 @@ async def google_callback(
     picture = profile.get("picture")
     email_verified = bool(profile.get("email_verified"))
     if not sub or not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google profile")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google profile"
+        )
     domain = email.split("@")[-1]
-    if settings.google_allowed_domains and domain not in settings.google_allowed_domains:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed")
+    if (
+        settings.google_allowed_domains
+        and domain not in settings.google_allowed_domains
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed"
+        )
 
     await self_service.maybe_cleanup_incomplete_google_accounts(session)
 
     existing_sub = await auth_service.get_user_by_google_sub(session, sub)
     if existing_sub:
-        if getattr(existing_sub, "deletion_scheduled_for", None) and self_service.is_deletion_due(existing_sub):
+        if getattr(
+            existing_sub, "deletion_scheduled_for", None
+        ) and self_service.is_deletion_due(existing_sub):
             await self_service.execute_account_deletion(session, existing_sub)
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+            )
         if getattr(existing_sub, "deleted_at", None) is not None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Account deleted"
+            )
         if auth_service.is_profile_complete(existing_sub):
             if bool(getattr(existing_sub, "two_factor_enabled", False)):
-                token = security.create_two_factor_token(str(existing_sub.id), remember=True, method="google")
+                token = security.create_two_factor_token(
+                    str(existing_sub.id), remember=True, method="google"
+                )
                 return GoogleCallbackResponse(
                     user=UserResponse.model_validate(existing_sub),
                     requires_two_factor=True,
@@ -2190,7 +2669,9 @@ async def google_callback(
             )
             if is_admin_login and not known_device:
                 owner = await auth_service.get_owner_user(session)
-                to_email = (owner.email if owner and owner.email else None) or settings.admin_alert_email
+                to_email = (
+                    owner.email if owner and owner.email else None
+                ) or settings.admin_alert_email
                 if to_email:
                     background_tasks.add_task(
                         email_service.send_admin_login_alert,
@@ -2204,11 +2685,18 @@ async def google_callback(
                         occurred_at=datetime.now(timezone.utc),
                         lang=owner.preferred_language if owner else None,
                     )
-            logger.info("google_login_existing", extra={"user_id": str(existing_sub.id)})
-            return GoogleCallbackResponse(user=UserResponse.model_validate(existing_sub), tokens=TokenPair(**tokens))
+            logger.info(
+                "google_login_existing", extra={"user_id": str(existing_sub.id)}
+            )
+            return GoogleCallbackResponse(
+                user=UserResponse.model_validate(existing_sub),
+                tokens=TokenPair(**tokens),
+            )
 
         completion_token = security.create_google_completion_token(str(existing_sub.id))
-        logger.info("google_login_needs_completion", extra={"user_id": str(existing_sub.id)})
+        logger.info(
+            "google_login_needs_completion", extra={"user_id": str(existing_sub.id)}
+        )
         return GoogleCallbackResponse(
             user=UserResponse.model_validate(existing_sub),
             requires_completion=True,
@@ -2216,8 +2704,15 @@ async def google_callback(
         )
 
     existing_email = await auth_service.get_user_by_any_email(session, email)
-    if existing_email and existing_email.google_sub and existing_email.google_sub != sub:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
+    if (
+        existing_email
+        and existing_email.google_sub
+        and existing_email.google_sub != sub
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Google account already linked elsewhere",
+        )
     if existing_email and not existing_email.google_sub:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -2245,8 +2740,12 @@ async def google_callback(
 
 
 class GoogleCompleteRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$")
-    name: str = Field(min_length=1, max_length=255, description="Display name shown publicly")
+    username: str = Field(
+        min_length=3, max_length=30, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{2,29}$"
+    )
+    name: str = Field(
+        min_length=1, max_length=255, description="Display name shown publicly"
+    )
     first_name: str = Field(min_length=1, max_length=100)
     middle_name: str | None = Field(default=None, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
@@ -2298,11 +2797,15 @@ async def google_complete_registration(
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_google_completion_user),
     session: AsyncSession = Depends(get_session),
-    response: Response = None,
+    response: Response = Response(),
 ) -> AuthResponse:
     if not payload.accept_terms or not payload.accept_privacy:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required")
-    consent_versions = await _require_published_consent_docs(session, _REQUIRED_REGISTRATION_CONSENT_KEYS)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Legal consents required"
+        )
+    consent_versions = await _require_published_consent_docs(
+        session, _REQUIRED_REGISTRATION_CONSENT_KEYS
+    )
     user = await auth_service.complete_google_registration(
         session,
         current_user,
@@ -2336,7 +2839,12 @@ async def google_complete_registration(
     )
     if not user.email_verified:
         record = await auth_service.create_email_verification(session, user)
-        background_tasks.add_task(email_service.send_verification_email, user.email, record.token, user.preferred_language)
+        background_tasks.add_task(
+            email_service.send_verification_email,
+            user.email,
+            record.token,
+            user.preferred_language,
+        )
     tokens = await auth_service.issue_tokens_for_user(
         session,
         user,
@@ -2353,13 +2861,20 @@ async def google_complete_registration(
         user_agent=request.headers.get("user-agent"),
         ip_address=request.client.host if request.client else None,
     )
-    return AuthResponse(user=UserResponse.model_validate(user), tokens=TokenPair(**tokens))
+    return AuthResponse(
+        user=UserResponse.model_validate(user), tokens=TokenPair(**tokens)
+    )
 
 
 @router.get("/google/link/start", response_model=dict)
-async def google_link_start(current_user: User = Depends(get_current_user), _: None = Depends(google_rate_limit)) -> dict:
+async def google_link_start(
+    current_user: User = Depends(get_current_user), _: None = Depends(google_rate_limit)
+) -> dict:
     if not settings.google_client_id or not settings.google_redirect_uri:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Google OAuth not configured")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google OAuth not configured",
+        )
     state = _build_google_state("google_link", str(current_user.id))
     params = {
         "client_id": settings.google_client_id,
@@ -2389,24 +2904,38 @@ async def google_link(
 ) -> UserResponse:
     _validate_google_state(payload.state, "google_link", str(current_user.id))
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
     profile = await auth_service.exchange_google_code(payload.code)
     sub = profile.get("sub")
     email = str(profile.get("email") or "").strip().lower()
     name = profile.get("name")
     picture = profile.get("picture")
     if not sub or not email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google profile")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Google profile"
+        )
     domain = email.split("@")[-1]
-    if settings.google_allowed_domains and domain not in settings.google_allowed_domains:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed")
+    if (
+        settings.google_allowed_domains
+        and domain not in settings.google_allowed_domains
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Email domain not allowed"
+        )
     existing_sub = await auth_service.get_user_by_google_sub(session, sub)
     if existing_sub and existing_sub.id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Google account already linked elsewhere")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Google account already linked elsewhere",
+        )
     current_user.google_sub = sub
     current_user.google_email = email
     current_user.google_picture_url = picture
-    current_user.email_verified = bool(profile.get("email_verified")) or current_user.email_verified
+    current_user.email_verified = (
+        bool(profile.get("email_verified")) or current_user.email_verified
+    )
     if not current_user.name:
         current_user.name = name
     session.add(current_user)
@@ -2428,8 +2957,13 @@ async def google_unlink(
     _: None = Depends(google_rate_limit),
 ) -> UserResponse:
     if not security.verify_password(payload.password, current_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password")
-    if current_user.google_picture_url and current_user.avatar_url == current_user.google_picture_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid password"
+        )
+    if (
+        current_user.google_picture_url
+        and current_user.avatar_url == current_user.google_picture_url
+    ):
         current_user.avatar_url = None
     current_user.google_sub = None
     current_user.google_email = None

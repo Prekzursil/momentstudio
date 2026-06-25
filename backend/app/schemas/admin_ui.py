@@ -18,4 +18,3 @@ class AdminFavoritesResponse(BaseModel):
 
 class AdminFavoritesUpdateRequest(BaseModel):
     items: list[AdminFavoriteItem] = Field(default_factory=list, max_length=50)
-

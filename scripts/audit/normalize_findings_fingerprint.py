@@ -12,7 +12,9 @@ def normalize_text(value: str | None) -> str:
     return " ".join(raw.split())
 
 
-def fingerprint_for(*, route: str, rule_id: str, primary_file: str, surface: str) -> str:
+def fingerprint_for(
+    *, route: str, rule_id: str, primary_file: str, surface: str
+) -> str:
     payload = "||".join(
         [
             normalize_text(route),
@@ -47,4 +49,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

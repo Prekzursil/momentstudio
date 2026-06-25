@@ -23,7 +23,7 @@ type ButtonSize = 'md' | 'sm';
         {{ copiedKey | translate }}
       </span>
     </span>
-  `
+  `,
 })
 export class CopyButtonComponent {
   @Input() value = '';
@@ -62,6 +62,7 @@ export class CopyButtonComponent {
   }
 
   private fallbackCopy(value: string): void {
+    /* istanbul ignore next -- unreachable in a browser: SSR guard, `document` is always defined under Karma */
     if (typeof document === 'undefined') throw new Error('No document available');
     const el = document.createElement('textarea');
     el.value = value;
@@ -74,4 +75,3 @@ export class CopyButtonComponent {
     document.body.removeChild(el);
   }
 }
-

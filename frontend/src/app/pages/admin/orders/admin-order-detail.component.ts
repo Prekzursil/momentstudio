@@ -21,13 +21,17 @@ import {
   AdminOrderEvent,
   AdminOrderFraudSignal,
   AdminOrderShipment,
-  AdminOrdersService
+  AdminOrdersService,
 } from '../../../core/admin-orders.service';
 import { AdminReturnsService, ReturnRequestRead } from '../../../core/admin-returns.service';
 import { AdminRecentService } from '../../../core/admin-recent.service';
 import { orderStatusChipClass } from '../../../shared/order-status';
 import { CustomerTimelineComponent } from '../shared/customer-timeline.component';
-import { TagColor, loadTagColorOverrides, tagChipColorClass as tagChipColorClassFromHelper } from './order-tag-colors';
+import {
+  TagColor,
+  loadTagColorOverrides,
+  tagChipColorClass as tagChipColorClassFromHelper,
+} from './order-tag-colors';
 
 type OrderStatus =
   | 'pending'
@@ -80,13 +84,16 @@ type OrderAction =
     ActionBarComponent,
     FormSectionComponent,
     LocalizedCurrencyPipe,
-    CustomerTimelineComponent
+    CustomerTimelineComponent,
   ],
   template: `
     <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
 
-      <div *ngIf="loading(); else contentTpl" class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div
+        *ngIf="loading(); else contentTpl"
+        class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <app-skeleton [rows]="10"></app-skeleton>
       </div>
 
@@ -100,7 +107,9 @@ type OrderAction =
         ></app-error-state>
 
         <div *ngIf="order(); else notFoundTpl" class="grid gap-6">
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+          >
             <div class="flex items-start justify-between gap-3">
               <div class="grid gap-1">
                 <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
@@ -109,7 +118,9 @@ type OrderAction =
                 <div class="text-sm text-slate-600 dark:text-slate-300">
                   {{ customerLabel() }} · {{ order()!.created_at | date: 'medium' }}
                 </div>
-                <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <div
+                  class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400"
+                >
                   <span class="font-mono break-all">{{ order()!.id }}</span>
                   <app-copy-button [value]="order()!.id"></app-copy-button>
                   <ng-container *ngIf="piiReveal() && order()!.customer_email">
@@ -143,7 +154,10 @@ type OrderAction =
                   [disabled]="action() !== null"
                   (action)="togglePiiReveal()"
                 ></app-button>
-                <a routerLink="/admin/orders" class="text-sm text-indigo-600 hover:underline dark:text-indigo-300">
+                <a
+                  routerLink="/admin/orders"
+                  class="text-sm text-indigo-600 hover:underline dark:text-indigo-300"
+                >
                   {{ 'adminUi.orders.backToList' | translate }}
                 </a>
               </div>
@@ -151,70 +165,105 @@ type OrderAction =
 
             <div class="grid gap-3 text-sm md:grid-cols-2">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.table.status' | translate }}</div>
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.orders.table.status' | translate }}
+                </div>
                 <div class="mt-2">
                   <span
                     class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
                     [ngClass]="statusChipClass(order()!.status)"
                   >
-                    {{ ('adminUi.orders.' + order()!.status) | translate }}
+                    {{ 'adminUi.orders.' + order()!.status | translate }}
                   </span>
                 </div>
               </div>
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.table.total' | translate }}</div>
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.orders.table.total' | translate }}
+                </div>
                 <div class="mt-1 font-semibold text-slate-900 dark:text-slate-50">
-                  {{ order()!.total_amount | localizedCurrency : order()!.currency }}
+                  {{ order()!.total_amount | localizedCurrency: order()!.currency }}
                 </div>
                 <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
                   {{ 'adminUi.orders.paymentMethod' | translate }}: {{ paymentMethodLabel() }}
                 </div>
               </div>
-              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 min-w-0 md:col-span-2">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.deliveryMethod' | translate }}</div>
+              <div
+                class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 min-w-0 md:col-span-2"
+              >
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.orders.deliveryMethod' | translate }}
+                </div>
 
                 <div class="mt-2 grid gap-3 min-w-0 sm:grid-cols-2 lg:grid-cols-3">
                   <div class="grid gap-0.5 min-w-0">
-                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <div
+                      class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.orders.shipments.courier' | translate }}
                     </div>
-                    <div class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0">
+                    <div
+                      class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0"
+                    >
                       {{ courierName(order()!.courier) }}
                     </div>
                   </div>
 
                   <div class="grid gap-0.5 min-w-0">
-                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <div
+                      class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.orders.deliveryType' | translate }}
                     </div>
-                    <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                    <div
+                      class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0"
+                    >
                       {{ deliveryTypeLabel() }}
                     </div>
                   </div>
 
                   <div *ngIf="order()!.shipping_method?.name" class="grid gap-0.5 min-w-0">
-                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <div
+                      class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.orders.diff.shippingMethod' | translate }}
                     </div>
-                    <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                    <div
+                      class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0"
+                    >
                       {{ order()!.shipping_method?.name }}
                     </div>
                   </div>
 
                   <div class="grid gap-0.5 min-w-0">
-                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <div
+                      class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.orders.trackingNumber' | translate }}
                     </div>
                     <div class="flex items-start gap-2 min-w-0">
-                      <div class="font-mono font-semibold text-slate-900 dark:text-slate-50 break-all min-w-0">
+                      <div
+                        class="font-mono font-semibold text-slate-900 dark:text-slate-50 break-all min-w-0"
+                      >
                         {{ order()!.tracking_number || '—' }}
                       </div>
-                      <app-copy-button *ngIf="order()!.tracking_number" [value]="order()!.tracking_number"></app-copy-button>
+                      <app-copy-button
+                        *ngIf="order()!.tracking_number"
+                        [value]="order()!.tracking_number"
+                      ></app-copy-button>
                     </div>
                   </div>
 
                   <div class="grid gap-0.5 min-w-0 sm:col-span-2 lg:col-span-2">
-                    <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                    <div
+                      class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                    >
                       {{ 'adminUi.orders.trackingUrl' | translate }}
                     </div>
                     <div class="flex flex-wrap items-center gap-2 min-w-0">
@@ -236,38 +285,63 @@ type OrderAction =
                   </div>
                 </div>
 
-                <div class="mt-3 rounded-lg border border-slate-200/60 bg-slate-50 p-3 dark:border-slate-800/60 dark:bg-slate-900/40 min-w-0">
-                  <ng-container *ngIf="(order()!.delivery_type || '').toLowerCase() === 'locker'; else homeDeliverySummary">
+                <div
+                  class="mt-3 rounded-lg border border-slate-200/60 bg-slate-50 p-3 dark:border-slate-800/60 dark:bg-slate-900/40 min-w-0"
+                >
+                  <ng-container
+                    *ngIf="
+                      (order()!.delivery_type || '').toLowerCase() === 'locker';
+                      else homeDeliverySummary
+                    "
+                  >
                     <div class="grid gap-3 min-w-0 sm:grid-cols-2">
                       <div class="grid gap-0.5 min-w-0">
-                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        <div
+                          class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                        >
                           {{ 'adminUi.orders.lockerName' | translate }}
                         </div>
                         <div class="flex flex-wrap items-start gap-2 min-w-0">
-                          <div class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0">
+                          <div
+                            class="font-semibold text-slate-900 dark:text-slate-50 break-words whitespace-normal min-w-0"
+                          >
                             {{ order()!.locker_name || '—' }}
                           </div>
-                          <app-copy-button *ngIf="order()!.locker_name" [value]="order()!.locker_name!"></app-copy-button>
+                          <app-copy-button
+                            *ngIf="order()!.locker_name"
+                            [value]="order()!.locker_name!"
+                          ></app-copy-button>
                         </div>
                       </div>
 
                       <div class="grid gap-0.5 min-w-0 sm:col-span-2">
-                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        <div
+                          class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                        >
                           {{ 'adminUi.orders.lockerAddress' | translate }}
                         </div>
                         <div class="flex flex-wrap items-start gap-2 min-w-0">
-                          <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                          <div
+                            class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0"
+                          >
                             {{ order()!.locker_address || '—' }}
                           </div>
-                          <app-copy-button *ngIf="order()!.locker_address" [value]="order()!.locker_address!"></app-copy-button>
+                          <app-copy-button
+                            *ngIf="order()!.locker_address"
+                            [value]="order()!.locker_address!"
+                          ></app-copy-button>
                         </div>
                       </div>
 
                       <div *ngIf="order()!.locker_id" class="grid gap-0.5 min-w-0">
-                        <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        <div
+                          class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                        >
                           {{ 'adminUi.orders.lockerId' | translate }}
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0">
+                        <div
+                          class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300 min-w-0"
+                        >
                           <span class="font-mono break-all">{{ order()!.locker_id }}</span>
                           <app-copy-button [value]="order()!.locker_id!"></app-copy-button>
                         </div>
@@ -277,16 +351,26 @@ type OrderAction =
 
                   <ng-template #homeDeliverySummary>
                     <div *ngIf="order()!.shipping_address as addr" class="grid gap-1 min-w-0">
-                      <div class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      <div
+                        class="text-[10px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                      >
                         {{ 'adminUi.orders.shippingAddress' | translate }}
                       </div>
-                      <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
-                        {{ addr.line1 }}<ng-container *ngIf="addr.line2">, {{ addr.line2 }}</ng-container>
+                      <div
+                        class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0"
+                      >
+                        {{ addr.line1
+                        }}<ng-container *ngIf="addr.line2">, {{ addr.line2 }}</ng-container>
                       </div>
-                      <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
-                        {{ addr.city }}{{ addr.region ? ', ' + addr.region : '' }} {{ addr.postal_code }}
+                      <div
+                        class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0"
+                      >
+                        {{ addr.city }}{{ addr.region ? ', ' + addr.region : '' }}
+                        {{ addr.postal_code }}
                       </div>
-                      <div class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0">
+                      <div
+                        class="text-slate-700 dark:text-slate-200 break-words whitespace-normal min-w-0"
+                      >
                         {{ addr.country }}
                       </div>
                     </div>
@@ -298,18 +382,31 @@ type OrderAction =
             <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
               <div class="flex items-start justify-between gap-3">
                 <div class="grid gap-2">
-                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  <div
+                    class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
                     {{ 'adminUi.orders.fraudSignals.title' | translate }}
                   </div>
-                  <div *ngIf="(order()!.fraud_signals || []).length === 0" class="text-xs text-slate-500 dark:text-slate-400">
+                  <div
+                    *ngIf="(order()!.fraud_signals || []).length === 0"
+                    class="text-xs text-slate-500 dark:text-slate-400"
+                  >
                     {{ 'adminUi.orders.fraudSignals.empty' | translate }}
                   </div>
                   <div *ngIf="(order()!.fraud_signals || []).length" class="grid gap-2">
-                    <div *ngFor="let sig of order()!.fraud_signals || []" class="flex items-start justify-between gap-3">
+                    <div
+                      *ngFor="let sig of order()!.fraud_signals || []"
+                      class="flex items-start justify-between gap-3"
+                    >
                       <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
-                          <span class="inline-flex h-2.5 w-2.5 rounded-full" [ngClass]="fraudSeverityDotClass(sig.severity)"></span>
-                          <span class="font-medium text-slate-900 dark:text-slate-50">{{ fraudSignalTitle(sig) }}</span>
+                          <span
+                            class="inline-flex h-2.5 w-2.5 rounded-full"
+                            [ngClass]="fraudSeverityDotClass(sig.severity)"
+                          ></span>
+                          <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                            fraudSignalTitle(sig)
+                          }}</span>
                           <span
                             class="ml-auto inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
                             [ngClass]="fraudSeverityBadgeClass(sig.severity)"
@@ -317,16 +414,25 @@ type OrderAction =
                             {{ fraudSeverityLabel(sig.severity) }}
                           </span>
                         </div>
-                        <div *ngIf="fraudSignalDescription(sig) as desc" class="mt-0.5 text-xs text-slate-600 dark:text-slate-300">
+                        <div
+                          *ngIf="fraudSignalDescription(sig) as desc"
+                          class="mt-0.5 text-xs text-slate-600 dark:text-slate-300"
+                        >
                           {{ desc }}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-                <div *ngIf="(order()!.fraud_signals || []).length" class="flex flex-col items-end gap-2">
-                  <div *ngIf="fraudReviewStatus() as status" class="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    {{ ('adminUi.orders.fraudReview.status.' + status) | translate }}
+                <div
+                  *ngIf="(order()!.fraud_signals || []).length"
+                  class="flex flex-col items-end gap-2"
+                >
+                  <div
+                    *ngIf="fraudReviewStatus() as status"
+                    class="text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  >
+                    {{ 'adminUi.orders.fraudReview.status.' + status | translate }}
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
                     <app-button
@@ -350,7 +456,9 @@ type OrderAction =
             <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
               <div class="flex items-start justify-between gap-3 flex-wrap">
                 <div class="grid gap-2">
-                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  <div
+                    class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
                     {{ 'adminUi.orders.table.tags' | translate }}
                   </div>
                   <div class="flex flex-wrap gap-2">
@@ -365,7 +473,10 @@ type OrderAction =
                           class="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                           [disabled]="action() !== null"
                           (click)="removeTag(tagValue)"
-                          [attr.aria-label]="'adminUi.orders.tags.removeLabel' | translate: { tag: tagLabel(tagValue) }"
+                          [attr.aria-label]="
+                            'adminUi.orders.tags.removeLabel'
+                              | translate: { tag: tagLabel(tagValue) }
+                          "
                         >
                           ×
                         </button>
@@ -377,7 +488,9 @@ type OrderAction =
                   </div>
                 </div>
                 <div class="flex items-end gap-2">
-                  <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  <label
+                    class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200"
+                  >
                     {{ 'adminUi.orders.tags.addLabel' | translate }}
                     <select
                       class="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -386,7 +499,9 @@ type OrderAction =
                     >
                       <option value="">{{ 'adminUi.orders.tags.select' | translate }}</option>
                       <option value="vip">{{ 'adminUi.orders.tags.vip' | translate }}</option>
-                      <option value="fraud_risk">{{ 'adminUi.orders.tags.fraud_risk' | translate }}</option>
+                      <option value="fraud_risk">
+                        {{ 'adminUi.orders.tags.fraud_risk' | translate }}
+                      </option>
                       <option value="gift">{{ 'adminUi.orders.tags.gift' | translate }}</option>
                       <option value="test">{{ 'adminUi.orders.tags.test' | translate }}</option>
                     </select>
@@ -401,7 +516,12 @@ type OrderAction =
                   <app-button
                     size="sm"
                     variant="ghost"
-                    [label]="(isTestOrder() ? 'adminUi.orders.tags.unmarkTest' : 'adminUi.orders.tags.markTest') | translate"
+                    [label]="
+                      (isTestOrder()
+                        ? 'adminUi.orders.tags.unmarkTest'
+                        : 'adminUi.orders.tags.markTest'
+                      ) | translate
+                    "
                     [disabled]="action() !== null"
                     (action)="toggleTestTag()"
                   ></app-button>
@@ -409,142 +529,190 @@ type OrderAction =
               </div>
             </div>
 
-            <app-form-section [titleKey]="'adminUi.orders.workflow.title'" [descriptionKey]="'adminUi.orders.workflow.hint'">
-	            <div class="grid gap-3 md:grid-cols-2">
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.orders.updateStatus' | translate }}
-	                <select
-	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  [(ngModel)]="statusValue"
-	                  (ngModelChange)="onStatusValueChange($event)"
-	                >
-	                  <option *ngFor="let opt of statusOptions()" [value]="opt.value" [disabled]="opt.disabled">
-	                    {{ ('adminUi.orders.' + opt.value) | translate }}
-	                  </option>
-	                </select>
-	                <span
-	                  *ngIf="paymentCaptureBlocked()"
-	                  class="text-xs font-normal text-amber-700 dark:text-amber-300"
-	                >
-	                  {{ 'adminUi.orders.paymentNotCapturedHint' | translate }}
-	                </span>
-	              </label>
-
-              <app-input [label]="'adminUi.orders.trackingNumber' | translate" [(value)]="trackingNumber"></app-input>
-            </div>
-
-            <label *ngIf="statusValue === 'cancelled'" class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'adminUi.orders.cancelReason' | translate }}
-              <textarea
-                class="min-h-[92px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
-                [placeholder]="'adminUi.orders.cancelReasonPlaceholder' | translate"
-                [(ngModel)]="cancelReason"
-              ></textarea>
-              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.cancelReasonHint' | translate }}</span>
-            </label>
-
-            <app-input
-              [label]="'adminUi.orders.trackingUrl' | translate"
-              [placeholder]="'adminUi.orders.trackingUrlPlaceholder' | translate"
-              [(value)]="trackingUrl"
-            ></app-input>
-
-            <div class="grid gap-2">
-              <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.orders.shippingLabel' | translate }}
-              </div>
-
-              <div
-                *ngIf="shippingLabelError()"
-                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-xs dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-              >
-                {{ shippingLabelError() }}
-              </div>
-
-              <div class="flex flex-wrap items-center gap-2">
-                <label class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
-                  <input type="file" class="hidden" (change)="onShippingLabelSelected($event)" />
-                  <span class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.shippingLabelChoose' | translate }}</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-300 truncate max-w-[220px]">
-                    {{ shippingLabelFileName() }}
+            <app-form-section
+              [titleKey]="'adminUi.orders.workflow.title'"
+              [descriptionKey]="'adminUi.orders.workflow.hint'"
+            >
+              <div class="grid gap-3 md:grid-cols-2">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.orders.updateStatus' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="statusValue"
+                    (ngModelChange)="onStatusValueChange($event)"
+                  >
+                    <option
+                      *ngFor="let opt of statusOptions()"
+                      [value]="opt.value"
+                      [disabled]="opt.disabled"
+                    >
+                      {{ 'adminUi.orders.' + opt.value | translate }}
+                    </option>
+                  </select>
+                  <span
+                    *ngIf="paymentCaptureBlocked()"
+                    class="text-xs font-normal text-amber-700 dark:text-amber-300"
+                  >
+                    {{ 'adminUi.orders.paymentNotCapturedHint' | translate }}
                   </span>
                 </label>
 
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.orders.shippingLabelUpload' | translate"
-                  [disabled]="action() !== null || !shippingLabelFile"
-                  (action)="uploadShippingLabel()"
-                ></app-button>
-
-                <app-button
-                  *ngIf="order()!.has_shipping_label"
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.orders.shippingLabelDownload' | translate"
-                  [disabled]="action() !== null"
-                  (action)="downloadShippingLabel()"
-                ></app-button>
-
-                <app-button
-                  *ngIf="order()!.has_shipping_label"
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.orders.shippingLabelPrint' | translate"
-                  [disabled]="action() !== null"
-                  (action)="printShippingLabel()"
-                ></app-button>
-
-                <app-button
-                  *ngIf="order()!.has_shipping_label"
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.orders.shippingLabelDelete' | translate"
-                  [disabled]="action() !== null"
-                  (action)="deleteShippingLabel()"
-                ></app-button>
+                <app-input
+                  [label]="'adminUi.orders.trackingNumber' | translate"
+                  [(value)]="trackingNumber"
+                ></app-input>
               </div>
 
-              <div *ngIf="order()!.has_shipping_label" class="text-xs text-slate-600 dark:text-slate-300">
-                {{ order()!.shipping_label_filename }} · {{ order()!.shipping_label_uploaded_at | date: 'short' }}
-              </div>
-              <div *ngIf="shippingLabelHistory().length" class="mt-2 grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
-                <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.orders.shippingLabelHistory' | translate }}
+              <label
+                *ngIf="statusValue === 'cancelled'"
+                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+              >
+                {{ 'adminUi.orders.cancelReason' | translate }}
+                <textarea
+                  class="min-h-[92px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                  [placeholder]="'adminUi.orders.cancelReasonPlaceholder' | translate"
+                  [(ngModel)]="cancelReason"
+                ></textarea>
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{
+                  'adminUi.orders.cancelReasonHint' | translate
+                }}</span>
+              </label>
+
+              <app-input
+                [label]="'adminUi.orders.trackingUrl' | translate"
+                [placeholder]="'adminUi.orders.trackingUrlPlaceholder' | translate"
+                [(value)]="trackingUrl"
+              ></app-input>
+
+              <div class="grid gap-2">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.orders.shippingLabel' | translate }}
                 </div>
-                <div *ngFor="let evt of shippingLabelHistory()" class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ shippingLabelEventLabel(evt.event) }}</div>
-                    <div *ngIf="evt.note" class="text-slate-600 dark:text-slate-300 truncate">{{ evt.note }}</div>
+
+                <div
+                  *ngIf="shippingLabelError()"
+                  class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-xs dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                >
+                  {{ shippingLabelError() }}
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                  <label
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    <input type="file" class="hidden" (change)="onShippingLabelSelected($event)" />
+                    <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                      'adminUi.orders.shippingLabelChoose' | translate
+                    }}</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-300 truncate max-w-[220px]">
+                      {{ shippingLabelFileName() }}
+                    </span>
+                  </label>
+
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.shippingLabelUpload' | translate"
+                    [disabled]="action() !== null || !shippingLabelFile"
+                    (action)="uploadShippingLabel()"
+                  ></app-button>
+
+                  <app-button
+                    *ngIf="order()!.has_shipping_label"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.shippingLabelDownload' | translate"
+                    [disabled]="action() !== null"
+                    (action)="downloadShippingLabel()"
+                  ></app-button>
+
+                  <app-button
+                    *ngIf="order()!.has_shipping_label"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.shippingLabelPrint' | translate"
+                    [disabled]="action() !== null"
+                    (action)="printShippingLabel()"
+                  ></app-button>
+
+                  <app-button
+                    *ngIf="order()!.has_shipping_label"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.orders.shippingLabelDelete' | translate"
+                    [disabled]="action() !== null"
+                    (action)="deleteShippingLabel()"
+                  ></app-button>
+                </div>
+
+                <div
+                  *ngIf="order()!.has_shipping_label"
+                  class="text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ order()!.shipping_label_filename }} ·
+                  {{ order()!.shipping_label_uploaded_at | date: 'short' }}
+                </div>
+                <div
+                  *ngIf="shippingLabelHistory().length"
+                  class="mt-2 grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+                >
+                  <div
+                    class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.orders.shippingLabelHistory' | translate }}
                   </div>
-                  <div class="shrink-0 text-slate-500 dark:text-slate-400">{{ evt.created_at | date: 'short' }}</div>
+                  <div
+                    *ngFor="let evt of shippingLabelHistory()"
+                    class="flex items-start justify-between gap-3"
+                  >
+                    <div class="min-w-0">
+                      <div class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                        {{ shippingLabelEventLabel(evt.event) }}
+                      </div>
+                      <div *ngIf="evt.note" class="text-slate-600 dark:text-slate-300 truncate">
+                        {{ evt.note }}
+                      </div>
+                    </div>
+                    <div class="shrink-0 text-slate-500 dark:text-slate-400">
+                      {{ evt.created_at | date: 'short' }}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  *ngIf="!order()!.has_shipping_label"
+                  class="text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ 'adminUi.orders.shippingLabelNone' | translate }}
                 </div>
               </div>
-              <div *ngIf="!order()!.has_shipping_label" class="text-xs text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.orders.shippingLabelNone' | translate }}
-              </div>
-            </div>
 
-            <app-action-bar [stickyOnMobile]="true">
-              <app-button
-                size="sm"
-                [label]="'adminUi.orders.save' | translate"
-                [disabled]="action() !== null"
-                (action)="save()"
-              ></app-button>
-              <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.saveHint' | translate }}</span>
-            </app-action-bar>
+              <app-action-bar [stickyOnMobile]="true">
+                <app-button
+                  size="sm"
+                  [label]="'adminUi.orders.save' | translate"
+                  [disabled]="action() !== null"
+                  (action)="save()"
+                ></app-button>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                  'adminUi.orders.saveHint' | translate
+                }}</span>
+              </app-action-bar>
             </app-form-section>
 
             <div class="grid gap-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.actionsTitle' | translate }}</div>
+              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.orders.actionsTitle' | translate }}
+              </div>
 
-	              <div class="grid gap-3 md:grid-cols-2">
-	                <div class="grid gap-2">
-	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.orders.paymentTitle' | translate }}
-	                  </div>
+              <div class="grid gap-3 md:grid-cols-2">
+                <div class="grid gap-2">
+                  <div
+                    class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.orders.paymentTitle' | translate }}
+                  </div>
                   <div class="flex flex-wrap items-center gap-2">
                     <app-button
                       size="sm"
@@ -561,15 +729,21 @@ type OrderAction =
                       (action)="voidPayment()"
                     ></app-button>
                   </div>
-                  <div *ngIf="order()!.stripe_payment_intent_id" class="text-xs text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.orders.paymentIntent' | translate }}: {{ order()!.stripe_payment_intent_id }}
+                  <div
+                    *ngIf="order()!.stripe_payment_intent_id"
+                    class="text-xs text-slate-600 dark:text-slate-300"
+                  >
+                    {{ 'adminUi.orders.paymentIntent' | translate }}:
+                    {{ order()!.stripe_payment_intent_id }}
                   </div>
                 </div>
 
-	                <div class="grid gap-2">
-	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.orders.customerCommsTitle' | translate }}
-	                  </div>
+                <div class="grid gap-2">
+                  <div
+                    class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.orders.customerCommsTitle' | translate }}
+                  </div>
                   <div class="flex flex-wrap items-center gap-2">
                     <app-button
                       size="sm"
@@ -592,34 +766,40 @@ type OrderAction =
                       [disabled]="action() !== null"
                       (action)="downloadReceiptPdf()"
                     ></app-button>
-	                  </div>
-	                </div>
+                  </div>
+                </div>
 
-	                <div class="grid gap-2">
-	                  <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.orders.receiptLinks.title' | translate }}
-	                  </div>
-	                  <div class="flex flex-wrap items-center gap-2">
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="'adminUi.orders.receiptLinks.share' | translate"
-	                      [disabled]="action() !== null"
-	                      (action)="shareReceipt()"
-	                    ></app-button>
-	                    <app-button
-	                      size="sm"
-	                      variant="ghost"
-	                      [label]="'adminUi.orders.receiptLinks.revoke' | translate"
-	                      [disabled]="action() !== null"
-	                      (action)="revokeReceiptShare()"
-	                    ></app-button>
-	                  </div>
-	                  <div *ngIf="receiptShare() as share" class="text-xs text-slate-600 dark:text-slate-300">
-	                    {{ 'adminUi.orders.receiptLinks.expires' | translate }}: {{ share.expires_at | date: 'short' }}
-	                  </div>
-	                </div>
-	              </div>
+                <div class="grid gap-2">
+                  <div
+                    class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.orders.receiptLinks.title' | translate }}
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.receiptLinks.share' | translate"
+                      [disabled]="action() !== null"
+                      (action)="shareReceipt()"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.orders.receiptLinks.revoke' | translate"
+                      [disabled]="action() !== null"
+                      (action)="revokeReceiptShare()"
+                    ></app-button>
+                  </div>
+                  <div
+                    *ngIf="receiptShare() as share"
+                    class="text-xs text-slate-600 dark:text-slate-300"
+                  >
+                    {{ 'adminUi.orders.receiptLinks.expires' | translate }}:
+                    {{ share.expires_at | date: 'short' }}
+                  </div>
+                </div>
+              </div>
 
               <div class="flex flex-wrap items-center justify-end gap-2">
                 <app-button
@@ -637,16 +817,24 @@ type OrderAction =
                   (action)="openRefundWizard()"
                 ></app-button>
               </div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.refundHint' | translate }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.orders.refundHint' | translate }}
+              </div>
             </div>
           </section>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.addressesTitle' | translate }}</h2>
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.orders.addressesTitle' | translate }}
+            </h2>
             <div class="grid gap-3 md:grid-cols-2">
               <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
                 <div class="flex items-center justify-between gap-3">
-                  <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                  <div
+                    class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
                     <span>{{ 'adminUi.orders.shippingAddress' | translate }}</span>
                     <span
                       *ngIf="addressNeedsAttention(order()!.shipping_address, 'shipping')"
@@ -664,164 +852,244 @@ type OrderAction =
                     {{ 'adminUi.actions.edit' | translate }}
                   </button>
                 </div>
-	                <div *ngIf="order()!.shipping_address; else noShipping" class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-	                  <div class="font-semibold text-slate-900 dark:text-slate-50" *ngIf="order()!.shipping_address?.label">
-	                    {{ order()!.shipping_address?.label }}
-	                  </div>
-                    <div *ngIf="order()!.shipping_address!.phone">{{ order()!.shipping_address!.phone }}</div>
-	                  <div>{{ order()!.shipping_address!.line1 }}</div>
-	                  <div *ngIf="order()!.shipping_address!.line2">{{ order()!.shipping_address!.line2 }}</div>
-	                  <div>
-	                    {{ order()!.shipping_address!.city }}{{ order()!.shipping_address!.region ? ', ' + order()!.shipping_address!.region : '' }}
-	                    {{ order()!.shipping_address!.postal_code }}
-	                  </div>
-	                  <div>{{ order()!.shipping_address!.country }}</div>
-                    <ng-container *ngIf="addressIssueKeys(order()!.shipping_address, 'shipping') as issues">
-                      <div *ngIf="issues.length" class="mt-2 grid gap-1 text-xs text-amber-700 dark:text-amber-200">
-                        <div *ngFor="let key of issues">{{ key | translate }}</div>
-                      </div>
-                    </ng-container>
-	                </div>
-	                <ng-template #noShipping>
-	                  <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.noAddress' | translate }}</div>
-	                </ng-template>
-	              </div>
-
-	              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-	                <div class="flex items-center justify-between gap-3">
-	                  <div class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                      <span>{{ 'adminUi.orders.billingAddress' | translate }}</span>
-                      <span
-                        *ngIf="addressNeedsAttention(order()!.billing_address, 'billing')"
-                        class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
-                      >
-                        {{ 'adminUi.orders.addressValidate.badge' | translate }}
-                      </span>
-                    </div>
-	                  <button
-	                    type="button"
-	                    class="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-40 dark:text-indigo-300"
-	                    [disabled]="action() !== null || !order()!.billing_address"
-	                    (click)="openAddressEditor('billing')"
-	                  >
-	                    {{ 'adminUi.actions.edit' | translate }}
-	                  </button>
-	                </div>
-	                <div *ngIf="order()!.billing_address; else noBilling" class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-	                  <div class="font-semibold text-slate-900 dark:text-slate-50" *ngIf="order()!.billing_address?.label">
-	                    {{ order()!.billing_address?.label }}
-	                  </div>
-                    <div *ngIf="order()!.billing_address!.phone">{{ order()!.billing_address!.phone }}</div>
-	                  <div>{{ order()!.billing_address!.line1 }}</div>
-	                  <div *ngIf="order()!.billing_address!.line2">{{ order()!.billing_address!.line2 }}</div>
-	                  <div>
-	                    {{ order()!.billing_address!.city }}{{ order()!.billing_address!.region ? ', ' + order()!.billing_address!.region : '' }}
-	                    {{ order()!.billing_address!.postal_code }}
-	                  </div>
-	                  <div>{{ order()!.billing_address!.country }}</div>
-                    <ng-container *ngIf="addressIssueKeys(order()!.billing_address, 'billing') as issues">
-                      <div *ngIf="issues.length" class="mt-2 grid gap-1 text-xs text-amber-700 dark:text-amber-200">
-                        <div *ngFor="let key of issues">{{ key | translate }}</div>
-                      </div>
-                    </ng-container>
-	                </div>
-	                <ng-template #noBilling>
-	                  <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.noAddress' | translate }}</div>
-	                </ng-template>
-
-                  <div class="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200">
-                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.orders.invoiceTitle' | translate }}
-                    </div>
-                    <div class="mt-2 grid gap-1">
-                      <div>
-                        <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.invoiceCompany' | translate }}:</span>
-                        <span class="ml-1">{{ order()!.invoice_company || '—' }}</span>
-                      </div>
-                      <div>
-                        <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.invoiceVatId' | translate }}:</span>
-                        <span class="ml-1">{{ order()!.invoice_vat_id || '—' }}</span>
-                      </div>
-                    </div>
-                  </div>
-		              </div>
-		            </div>
-		          </section>
-
-            <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-              <div class="flex items-center justify-between gap-3">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.shipments.title' | translate }}</h2>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.orders.shipments.add' | translate"
-                  [disabled]="action() !== null"
-                  (action)="openShipmentEditor()"
-                ></app-button>
-              </div>
-
-              <div *ngIf="(order()!.shipments || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.orders.shipments.empty' | translate }}
-              </div>
-
-              <div *ngIf="(order()!.shipments || []).length" class="grid gap-2">
                 <div
-                  *ngFor="let s of order()!.shipments || []"
-                  class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+                  *ngIf="order()!.shipping_address; else noShipping"
+                  class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200"
                 >
-                  <div class="flex flex-wrap items-start justify-between gap-3">
-                    <div class="min-w-0 grid gap-1">
-                      <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
-                        {{ s.tracking_number }}
-                      </div>
-                      <div *ngIf="s.courier" class="text-xs text-slate-600 dark:text-slate-300">
-                        {{ 'adminUi.orders.shipments.courier' | translate }}: {{ courierName(s.courier) }}
-                      </div>
-                      <a
-                        *ngIf="s.tracking_url"
-                        class="text-xs text-indigo-600 hover:underline dark:text-indigo-300"
-                        [href]="s.tracking_url"
-                        target="_blank"
-                        rel="noopener"
-                      >
-                        {{ 'adminUi.orders.shipments.openTracking' | translate }}
-                      </a>
-                      <div class="text-xs text-slate-500 dark:text-slate-400">{{ s.created_at | date: 'short' }}</div>
+                  <div
+                    class="font-semibold text-slate-900 dark:text-slate-50"
+                    *ngIf="order()!.shipping_address?.label"
+                  >
+                    {{ order()!.shipping_address?.label }}
+                  </div>
+                  <div *ngIf="order()!.shipping_address!.phone">
+                    {{ order()!.shipping_address!.phone }}
+                  </div>
+                  <div>{{ order()!.shipping_address!.line1 }}</div>
+                  <div *ngIf="order()!.shipping_address!.line2">
+                    {{ order()!.shipping_address!.line2 }}
+                  </div>
+                  <div>
+                    {{ order()!.shipping_address!.city
+                    }}{{
+                      order()!.shipping_address!.region
+                        ? ', ' + order()!.shipping_address!.region
+                        : ''
+                    }}
+                    {{ order()!.shipping_address!.postal_code }}
+                  </div>
+                  <div>{{ order()!.shipping_address!.country }}</div>
+                  <ng-container
+                    *ngIf="addressIssueKeys(order()!.shipping_address, 'shipping') as issues"
+                  >
+                    <div
+                      *ngIf="issues.length"
+                      class="mt-2 grid gap-1 text-xs text-amber-700 dark:text-amber-200"
+                    >
+                      <div *ngFor="let key of issues">{{ key | translate }}</div>
                     </div>
+                  </ng-container>
+                </div>
+                <ng-template #noShipping>
+                  <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.noAddress' | translate }}
+                  </div>
+                </ng-template>
+              </div>
 
-                    <div class="flex items-center gap-2">
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.actions.edit' | translate"
-                        [disabled]="action() !== null"
-                        (action)="openShipmentEditor(s)"
-                      ></app-button>
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.actions.delete' | translate"
-                        [disabled]="action() !== null"
-                        (action)="deleteShipment(s.id)"
-                      ></app-button>
+              <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+                <div class="flex items-center justify-between gap-3">
+                  <div
+                    class="flex items-center gap-2 text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
+                    <span>{{ 'adminUi.orders.billingAddress' | translate }}</span>
+                    <span
+                      *ngIf="addressNeedsAttention(order()!.billing_address, 'billing')"
+                      class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+                    >
+                      {{ 'adminUi.orders.addressValidate.badge' | translate }}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    class="text-xs font-semibold text-indigo-600 hover:underline disabled:opacity-40 dark:text-indigo-300"
+                    [disabled]="action() !== null || !order()!.billing_address"
+                    (click)="openAddressEditor('billing')"
+                  >
+                    {{ 'adminUi.actions.edit' | translate }}
+                  </button>
+                </div>
+                <div
+                  *ngIf="order()!.billing_address; else noBilling"
+                  class="mt-2 grid gap-1 text-sm text-slate-700 dark:text-slate-200"
+                >
+                  <div
+                    class="font-semibold text-slate-900 dark:text-slate-50"
+                    *ngIf="order()!.billing_address?.label"
+                  >
+                    {{ order()!.billing_address?.label }}
+                  </div>
+                  <div *ngIf="order()!.billing_address!.phone">
+                    {{ order()!.billing_address!.phone }}
+                  </div>
+                  <div>{{ order()!.billing_address!.line1 }}</div>
+                  <div *ngIf="order()!.billing_address!.line2">
+                    {{ order()!.billing_address!.line2 }}
+                  </div>
+                  <div>
+                    {{ order()!.billing_address!.city
+                    }}{{
+                      order()!.billing_address!.region
+                        ? ', ' + order()!.billing_address!.region
+                        : ''
+                    }}
+                    {{ order()!.billing_address!.postal_code }}
+                  </div>
+                  <div>{{ order()!.billing_address!.country }}</div>
+                  <ng-container
+                    *ngIf="addressIssueKeys(order()!.billing_address, 'billing') as issues"
+                  >
+                    <div
+                      *ngIf="issues.length"
+                      class="mt-2 grid gap-1 text-xs text-amber-700 dark:text-amber-200"
+                    >
+                      <div *ngFor="let key of issues">{{ key | translate }}</div>
+                    </div>
+                  </ng-container>
+                </div>
+                <ng-template #noBilling>
+                  <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.orders.noAddress' | translate }}
+                  </div>
+                </ng-template>
+
+                <div
+                  class="mt-3 border-t border-slate-200 pt-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+                >
+                  <div
+                    class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.orders.invoiceTitle' | translate }}
+                  </div>
+                  <div class="mt-2 grid gap-1">
+                    <div>
+                      <span class="text-slate-500 dark:text-slate-400"
+                        >{{ 'adminUi.orders.invoiceCompany' | translate }}:</span
+                      >
+                      <span class="ml-1">{{ order()!.invoice_company || '—' }}</span>
+                    </div>
+                    <div>
+                      <span class="text-slate-500 dark:text-slate-400"
+                        >{{ 'adminUi.orders.invoiceVatId' | translate }}:</span
+                      >
+                      <span class="ml-1">{{ order()!.invoice_vat_id || '—' }}</span>
                     </div>
                   </div>
                 </div>
               </div>
-            </section>
+            </div>
+          </section>
 
-	          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-	            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.itemsTitle' | translate }}</h2>
-		            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-		              <table class="min-w-[920px] w-full text-sm">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.orders.shipments.title' | translate }}
+              </h2>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.orders.shipments.add' | translate"
+                [disabled]="action() !== null"
+                (action)="openShipmentEditor()"
+              ></app-button>
+            </div>
+
+            <div
+              *ngIf="(order()!.shipments || []).length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
+              {{ 'adminUi.orders.shipments.empty' | translate }}
+            </div>
+
+            <div *ngIf="(order()!.shipments || []).length" class="grid gap-2">
+              <div
+                *ngFor="let s of order()!.shipments || []"
+                class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div class="min-w-0 grid gap-1">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                      {{ s.tracking_number }}
+                    </div>
+                    <div *ngIf="s.courier" class="text-xs text-slate-600 dark:text-slate-300">
+                      {{ 'adminUi.orders.shipments.courier' | translate }}:
+                      {{ courierName(s.courier) }}
+                    </div>
+                    <a
+                      *ngIf="s.tracking_url"
+                      class="text-xs text-indigo-600 hover:underline dark:text-indigo-300"
+                      [href]="s.tracking_url"
+                      target="_blank"
+                      rel="noopener"
+                    >
+                      {{ 'adminUi.orders.shipments.openTracking' | translate }}
+                    </a>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ s.created_at | date: 'short' }}
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.edit' | translate"
+                      [disabled]="action() !== null"
+                      (action)="openShipmentEditor(s)"
+                    ></app-button>
+                    <app-button
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.delete' | translate"
+                      [disabled]="action() !== null"
+                      (action)="deleteShipment(s.id)"
+                    ></app-button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.orders.itemsTitle' | translate }}
+            </h2>
+            <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+              <table class="min-w-[920px] w-full text-sm">
                 <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                   <tr>
-                    <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.orders.items.product' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.qty' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.shipped' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.unit' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.subtotal' | translate }}</th>
-                    <th class="text-right font-semibold px-3 py-2">{{ 'adminUi.orders.items.fulfill' | translate }}</th>
+                    <th class="text-left font-semibold px-3 py-2">
+                      {{ 'adminUi.orders.items.product' | translate }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">
+                      {{ 'adminUi.orders.items.qty' | translate }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">
+                      {{ 'adminUi.orders.items.shipped' | translate }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">
+                      {{ 'adminUi.orders.items.unit' | translate }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">
+                      {{ 'adminUi.orders.items.subtotal' | translate }}
+                    </th>
+                    <th class="text-right font-semibold px-3 py-2">
+                      {{ 'adminUi.orders.items.fulfill' | translate }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -832,15 +1100,17 @@ type OrderAction =
                     <td class="px-3 py-2 text-slate-900 dark:text-slate-50">
                       {{ item.product?.name || item.product_id }}
                     </td>
-                    <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">{{ item.quantity }}</td>
+                    <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">
+                      {{ item.quantity }}
+                    </td>
                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">
                       {{ item.shipped_quantity || 0 }} / {{ item.quantity }}
                     </td>
                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">
-                      {{ item.unit_price | localizedCurrency : order()!.currency }}
+                      {{ item.unit_price | localizedCurrency: order()!.currency }}
                     </td>
                     <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-200">
-                      {{ item.subtotal | localizedCurrency : order()!.currency }}
+                      {{ item.subtotal | localizedCurrency: order()!.currency }}
                     </td>
                     <td class="px-3 py-2 text-right">
                       <div class="flex items-center justify-end gap-2">
@@ -866,25 +1136,42 @@ type OrderAction =
             </div>
           </section>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+          >
             <div class="flex items-center justify-between gap-3">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.returns.title' | translate }}</h2>
+              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                {{ 'adminUi.returns.title' | translate }}
+              </h2>
               <app-button
                 size="sm"
-                [label]="showReturnCreate() ? ('adminUi.actions.cancel' | translate) : ('adminUi.returns.create.open' | translate)"
+                [label]="
+                  showReturnCreate()
+                    ? ('adminUi.actions.cancel' | translate)
+                    : ('adminUi.returns.create.open' | translate)
+                "
                 (action)="toggleReturnCreate()"
               ></app-button>
             </div>
 
-            <div *ngIf="returnsLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <div
+              *ngIf="returnsLoading()"
+              class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+            >
               <app-skeleton [rows]="4"></app-skeleton>
             </div>
 
-            <div *ngIf="!returnsLoading() && returnsError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+            <div
+              *ngIf="!returnsLoading() && returnsError()"
+              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
               {{ returnsError() }}
             </div>
 
-            <div *ngIf="!returnsLoading() && !returnsError() && returnRequests().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+            <div
+              *ngIf="!returnsLoading() && !returnsError() && returnRequests().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.returns.empty' | translate }}
             </div>
 
@@ -895,11 +1182,16 @@ type OrderAction =
               >
                 <div class="flex items-center justify-between gap-3">
                   <div class="font-semibold text-slate-900 dark:text-slate-50">
-                    {{ 'adminUi.returns.detail.title' | translate }} · {{ ('adminUi.returns.status.' + rr.status) | translate }}
+                    {{ 'adminUi.returns.detail.title' | translate }} ·
+                    {{ 'adminUi.returns.status.' + rr.status | translate }}
                   </div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ rr.created_at | date: 'short' }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ rr.created_at | date: 'short' }}
+                  </div>
                 </div>
-                <div class="mt-1 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ rr.reason }}</div>
+                <div class="mt-1 text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
+                  {{ rr.reason }}
+                </div>
                 <a
                   class="mt-2 inline-flex text-xs text-indigo-600 hover:underline dark:text-indigo-300"
                   [routerLink]="['/admin/returns']"
@@ -910,10 +1202,17 @@ type OrderAction =
               </div>
             </div>
 
-            <div *ngIf="showReturnCreate()" class="rounded-2xl border border-slate-200 bg-slate-50 p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-800/40">
+            <div
+              *ngIf="showReturnCreate()"
+              class="rounded-2xl border border-slate-200 bg-slate-50 p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-800/40"
+            >
               <div class="grid gap-1">
-                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.returns.create.title' | translate }}</div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.returns.create.hint' | translate }}</div>
+                <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.returns.create.title' | translate }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.returns.create.hint' | translate }}
+                </div>
               </div>
 
               <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -935,7 +1234,9 @@ type OrderAction =
               </label>
 
               <div class="grid gap-2">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.returns.detail.items' | translate }}
                 </div>
                 <div class="grid gap-2">
@@ -944,8 +1245,12 @@ type OrderAction =
                     class="grid grid-cols-[1fr_120px] gap-3 items-center rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
                   >
                     <div class="min-w-0">
-                      <div class="font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.product?.name || item.product_id }}</div>
-                      <div class="text-xs text-slate-500 dark:text-slate-400">×{{ item.quantity }}</div>
+                      <div class="font-medium text-slate-900 dark:text-slate-50 truncate">
+                        {{ item.product?.name || item.product_id }}
+                      </div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">
+                        ×{{ item.quantity }}
+                      </div>
                     </div>
                     <input
                       class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -960,7 +1265,10 @@ type OrderAction =
                 </div>
               </div>
 
-              <div *ngIf="returnCreateError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+              <div
+                *ngIf="returnCreateError()"
+                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+              >
                 {{ returnCreateError() }}
               </div>
 
@@ -975,9 +1283,16 @@ type OrderAction =
             </div>
           </section>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.notesTitle' | translate }}</h2>
-            <div *ngIf="(order()!.admin_notes || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.orders.notesTitle' | translate }}
+            </h2>
+            <div
+              *ngIf="(order()!.admin_notes || []).length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.orders.notesEmpty' | translate }}
             </div>
             <div *ngIf="(order()!.admin_notes || []).length > 0" class="grid gap-2">
@@ -990,9 +1305,15 @@ type OrderAction =
                     <div class="text-xs font-semibold text-slate-900 dark:text-slate-50">
                       {{ note.actor?.email || note.actor?.username || '—' }}
                     </div>
-                    <div class="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">{{ note.note }}</div>
+                    <div
+                      class="whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200"
+                    >
+                      {{ note.note }}
+                    </div>
                   </div>
-                  <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">{{ note.created_at | date: 'short' }}</div>
+                  <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                    {{ note.created_at | date: 'short' }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1005,7 +1326,9 @@ type OrderAction =
                 [placeholder]="'adminUi.orders.notesPlaceholder' | translate"
               ></textarea>
             </label>
-            <div *ngIf="adminNoteError()" class="text-sm text-rose-700 dark:text-rose-300">{{ adminNoteError() }}</div>
+            <div *ngIf="adminNoteError()" class="text-sm text-rose-700 dark:text-rose-300">
+              {{ adminNoteError() }}
+            </div>
 
             <div class="flex items-center justify-end">
               <app-button
@@ -1017,7 +1340,9 @@ type OrderAction =
             </div>
           </section>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
             <app-customer-timeline
               [userId]="order()!.user_id"
               [customerEmail]="order()!.customer_email"
@@ -1026,11 +1351,17 @@ type OrderAction =
             ></app-customer-timeline>
           </section>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div class="grid gap-1">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.comms.title' | translate }}</h2>
-                <div class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.comms.hint' | translate }}</div>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.orders.comms.title' | translate }}
+                </h2>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.orders.comms.hint' | translate }}
+                </div>
               </div>
               <app-button
                 size="sm"
@@ -1041,7 +1372,10 @@ type OrderAction =
               ></app-button>
             </div>
 
-            <div *ngIf="commsLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <div
+              *ngIf="commsLoading()"
+              class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+            >
               <app-skeleton [rows]="3"></app-skeleton>
             </div>
 
@@ -1052,19 +1386,29 @@ type OrderAction =
               {{ commsError() }}
             </div>
 
-            <div *ngIf="!commsLoading() && !commsError() && commsEvents().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+            <div
+              *ngIf="!commsLoading() && !commsError() && commsEvents().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.orders.comms.empty' | translate }}
             </div>
 
-            <div *ngIf="!commsLoading() && !commsError() && commsEvents().length" class="grid gap-2">
+            <div
+              *ngIf="!commsLoading() && !commsError() && commsEvents().length"
+              class="grid gap-2"
+            >
               <div
                 *ngFor="let row of commsEvents()"
                 class="rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-800 dark:text-slate-200"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0 grid gap-1">
-                    <div class="font-semibold text-slate-900 dark:text-slate-50 break-words">{{ row.subject }}</div>
-                    <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                    <div class="font-semibold text-slate-900 dark:text-slate-50 break-words">
+                      {{ row.subject }}
+                    </div>
+                    <div
+                      class="flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
+                    >
                       <span
                         class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
                         [ngClass]="emailStatusChipClass(row.status)"
@@ -1073,17 +1417,31 @@ type OrderAction =
                       </span>
                       <span class="truncate">{{ row.to_email }}</span>
                     </div>
-                    <div *ngIf="row.error_message" class="text-xs text-rose-700 dark:text-rose-300 break-words">{{ row.error_message }}</div>
+                    <div
+                      *ngIf="row.error_message"
+                      class="text-xs text-rose-700 dark:text-rose-300 break-words"
+                    >
+                      {{ row.error_message }}
+                    </div>
                   </div>
-                  <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">{{ row.created_at | date: 'short' }}</div>
+                  <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                    {{ row.created_at | date: 'short' }}
+                  </div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.timelineTitle' | translate }}</h2>
-            <div *ngIf="(order()!.events || []).length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+          <section
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.orders.timelineTitle' | translate }}
+            </h2>
+            <div
+              *ngIf="(order()!.events || []).length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.orders.timelineEmpty' | translate }}
             </div>
             <div *ngIf="(order()!.events || []).length > 0" class="grid gap-2">
@@ -1093,12 +1451,22 @@ type OrderAction =
               >
                 <div class="flex items-center justify-between gap-3">
                   <div class="font-semibold text-slate-900 dark:text-slate-50">{{ evt.event }}</div>
-                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ evt.created_at | date: 'short' }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ evt.created_at | date: 'short' }}
+                  </div>
                 </div>
                 <ng-container *ngIf="eventDiffRows(evt) as diffs">
-                  <div *ngIf="diffs.length" class="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
-                    <div *ngFor="let diff of diffs" class="flex flex-wrap items-center gap-x-1 gap-y-1">
-                      <span class="font-semibold text-slate-700 dark:text-slate-200">{{ diff.label }}:</span>
+                  <div
+                    *ngIf="diffs.length"
+                    class="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300"
+                  >
+                    <div
+                      *ngFor="let diff of diffs"
+                      class="flex flex-wrap items-center gap-x-1 gap-y-1"
+                    >
+                      <span class="font-semibold text-slate-700 dark:text-slate-200"
+                        >{{ diff.label }}:</span
+                      >
                       <span class="break-all font-mono">{{ diff.from }}</span>
                       <span class="text-slate-400">→</span>
                       <span class="break-all font-mono">{{ diff.to }}</span>
@@ -1108,20 +1476,30 @@ type OrderAction =
                 <ng-container *ngIf="eventAddressDiff(evt) as addrDiff">
                   <div class="mt-2 grid gap-3">
                     <div *ngIf="addrDiff.shipping" class="grid gap-2">
-                      <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      <div
+                        class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                      >
                         {{ 'adminUi.orders.shippingAddress' | translate }}
                       </div>
                       <div class="grid gap-2 md:grid-cols-2">
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
-                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        <div
+                          class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40"
+                        >
+                          <div
+                            class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                          >
                             {{ 'adminUi.orders.diff.before' | translate }}
                           </div>
                           <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
                             {{ formatAddressSnapshot(addrDiff.shipping.from) }}
                           </div>
                         </div>
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
-                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        <div
+                          class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40"
+                        >
+                          <div
+                            class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                          >
                             {{ 'adminUi.orders.diff.after' | translate }}
                           </div>
                           <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
@@ -1132,20 +1510,30 @@ type OrderAction =
                     </div>
 
                     <div *ngIf="addrDiff.billing" class="grid gap-2">
-                      <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                      <div
+                        class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                      >
                         {{ 'adminUi.orders.billingAddress' | translate }}
                       </div>
                       <div class="grid gap-2 md:grid-cols-2">
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
-                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        <div
+                          class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40"
+                        >
+                          <div
+                            class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                          >
                             {{ 'adminUi.orders.diff.before' | translate }}
                           </div>
                           <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
                             {{ formatAddressSnapshot(addrDiff.billing.from) }}
                           </div>
                         </div>
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40">
-                          <div class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                        <div
+                          class="rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs dark:border-slate-800 dark:bg-slate-950/40"
+                        >
+                          <div
+                            class="text-[11px] font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                          >
                             {{ 'adminUi.orders.diff.after' | translate }}
                           </div>
                           <div class="mt-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
@@ -1156,14 +1544,18 @@ type OrderAction =
                     </div>
                   </div>
                 </ng-container>
-                <div *ngIf="evt.note" class="mt-1 text-slate-600 dark:text-slate-300">{{ evt.note }}</div>
+                <div *ngIf="evt.note" class="mt-1 text-slate-600 dark:text-slate-300">
+                  {{ evt.note }}
+                </div>
               </div>
             </div>
           </section>
         </div>
 
         <ng-template #notFoundTpl>
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+          <div
+            class="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          >
             {{ 'adminUi.orders.notFound' | translate }}
           </div>
         </ng-template>
@@ -1171,7 +1563,10 @@ type OrderAction =
     </div>
 
     <ng-container *ngIf="addressEditorOpen()">
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeAddressEditor()">
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        (click)="closeAddressEditor()"
+      >
         <div
           class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
           (click)="$event.stopPropagation()"
@@ -1182,7 +1577,8 @@ type OrderAction =
                 {{
                   (addressEditorKind() === 'shipping'
                     ? 'adminUi.orders.addressEdit.titleShipping'
-                    : 'adminUi.orders.addressEdit.titleBilling') | translate
+                    : 'adminUi.orders.addressEdit.titleBilling'
+                  ) | translate
                 }}
               </h3>
               <div class="text-xs text-slate-600 dark:text-slate-300">
@@ -1199,7 +1595,7 @@ type OrderAction =
             </button>
           </div>
 
-            <div class="mt-4 grid gap-3">
+          <div class="mt-4 grid gap-3">
             <div class="grid gap-3 md:grid-cols-2">
               <app-input
                 [label]="'addressForm.label' | translate"
@@ -1217,7 +1613,9 @@ type OrderAction =
                   *ngIf="addressPhoneSuggestion() as suggestion"
                   class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
                 >
-                  <span class="break-words">{{ 'adminUi.orders.addressValidate.suggestPhone' | translate: { value: suggestion } }}</span>
+                  <span class="break-words">{{
+                    'adminUi.orders.addressValidate.suggestPhone' | translate: { value: suggestion }
+                  }}</span>
                   <button
                     type="button"
                     class="shrink-0 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
@@ -1228,20 +1626,36 @@ type OrderAction =
                 </div>
               </div>
             </div>
-            <app-input [label]="'addressForm.line1' | translate" [(value)]="addressLine1"></app-input>
-            <app-input [label]="'addressForm.line2' | translate" [(value)]="addressLine2"></app-input>
+            <app-input
+              [label]="'addressForm.line1' | translate"
+              [(value)]="addressLine1"
+            ></app-input>
+            <app-input
+              [label]="'addressForm.line2' | translate"
+              [(value)]="addressLine2"
+            ></app-input>
             <div class="grid gap-3 md:grid-cols-2">
               <app-input [label]="'checkout.city' | translate" [(value)]="addressCity"></app-input>
-              <app-input [label]="'checkout.region' | translate" [(value)]="addressRegion"></app-input>
+              <app-input
+                [label]="'checkout.region' | translate"
+                [(value)]="addressRegion"
+              ></app-input>
             </div>
             <div class="grid gap-3 md:grid-cols-2">
               <div class="grid gap-1">
-                <app-input [label]="'checkout.postal' | translate" [hint]="addressPostalHint()" [(value)]="addressPostalCode"></app-input>
+                <app-input
+                  [label]="'checkout.postal' | translate"
+                  [hint]="addressPostalHint()"
+                  [(value)]="addressPostalCode"
+                ></app-input>
                 <div
                   *ngIf="addressPostalSuggestion() as suggestion"
                   class="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
                 >
-                  <span class="break-words">{{ 'adminUi.orders.addressValidate.suggestPostal' | translate: { value: suggestion } }}</span>
+                  <span class="break-words">{{
+                    'adminUi.orders.addressValidate.suggestPostal'
+                      | translate: { value: suggestion }
+                  }}</span>
                   <button
                     type="button"
                     class="shrink-0 text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300"
@@ -1251,7 +1665,11 @@ type OrderAction =
                   </button>
                 </div>
               </div>
-              <app-input [label]="'checkout.country' | translate" [placeholder]="'RO'" [(value)]="addressCountry"></app-input>
+              <app-input
+                [label]="'checkout.country' | translate"
+                [placeholder]="'RO'"
+                [(value)]="addressCountry"
+              ></app-input>
             </div>
 
             <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -1269,8 +1687,12 @@ type OrderAction =
             >
               <input type="checkbox" class="mt-0.5" [(ngModel)]="addressRerateShipping" />
               <span class="grid gap-1">
-                <span class="font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.addressEdit.rerate' | translate }}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.orders.addressEdit.rerateHint' | translate }}</span>
+                <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                  'adminUi.orders.addressEdit.rerate' | translate
+                }}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">{{
+                  'adminUi.orders.addressEdit.rerateHint' | translate
+                }}</span>
               </span>
             </label>
 
@@ -1299,90 +1721,98 @@ type OrderAction =
           </div>
         </div>
       </div>
-	    </ng-container>
+    </ng-container>
 
-      <ng-container *ngIf="shipmentEditorOpen()">
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeShipmentEditor()">
-          <div
-            class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
-            (click)="$event.stopPropagation()"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div class="grid gap-1">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
-                  {{
-                    (shipmentEditingId ? 'adminUi.orders.shipments.editTitle' : 'adminUi.orders.shipments.addTitle')
-                      | translate
-                  }}
-                </h3>
-                <div class="text-xs text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.orders.detailTitle' | translate }}: {{ orderRef() }}
-                </div>
+    <ng-container *ngIf="shipmentEditorOpen()">
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        (click)="closeShipmentEditor()"
+      >
+        <div
+          class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+          (click)="$event.stopPropagation()"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="grid gap-1">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-slate-50">
+                {{
+                  (shipmentEditingId
+                    ? 'adminUi.orders.shipments.editTitle'
+                    : 'adminUi.orders.shipments.addTitle'
+                  ) | translate
+                }}
+              </h3>
+              <div class="text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.orders.detailTitle' | translate }}: {{ orderRef() }}
               </div>
-              <button
-                type="button"
-                class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
-                (click)="closeShipmentEditor()"
-                [attr.aria-label]="'adminUi.actions.cancel' | translate"
+            </div>
+            <button
+              type="button"
+              class="rounded-md px-2 py-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-50"
+              (click)="closeShipmentEditor()"
+              [attr.aria-label]="'adminUi.actions.cancel' | translate"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="mt-4 grid gap-3">
+            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              {{ 'adminUi.orders.shipments.courier' | translate }}
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="shipmentCourier"
               >
-                ✕
-              </button>
+                <option value="">{{ 'adminUi.orders.shipments.courierNone' | translate }}</option>
+                <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
+                <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
+              </select>
+            </label>
+
+            <app-input
+              [label]="'adminUi.orders.shipments.trackingNumber' | translate"
+              [(value)]="shipmentTrackingNumber"
+            ></app-input>
+
+            <app-input
+              [label]="'adminUi.orders.shipments.trackingUrl' | translate"
+              [placeholder]="'https://...'"
+              [(value)]="shipmentTrackingUrl"
+            ></app-input>
+
+            <div
+              *ngIf="shipmentEditorError()"
+              class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ shipmentEditorError() }}
             </div>
 
-            <div class="mt-4 grid gap-3">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.orders.shipments.courier' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="shipmentCourier"
-                >
-                  <option value="">{{ 'adminUi.orders.shipments.courierNone' | translate }}</option>
-                  <option value="sameday">{{ 'checkout.courierSameday' | translate }}</option>
-                  <option value="fan_courier">{{ 'checkout.courierFanCourier' | translate }}</option>
-                </select>
-              </label>
-
-              <app-input
-                [label]="'adminUi.orders.shipments.trackingNumber' | translate"
-                [(value)]="shipmentTrackingNumber"
-              ></app-input>
-
-              <app-input
-                [label]="'adminUi.orders.shipments.trackingUrl' | translate"
-                [placeholder]="'https://...'"
-                [(value)]="shipmentTrackingUrl"
-              ></app-input>
-
-              <div
-                *ngIf="shipmentEditorError()"
-                class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-              >
-                {{ shipmentEditorError() }}
-              </div>
-
-              <div class="flex justify-end gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.cancel' | translate"
-                  [disabled]="action() !== null"
-                  (action)="closeShipmentEditor()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  [label]="'adminUi.actions.save' | translate"
-                  [disabled]="action() !== null"
-                  (action)="saveShipmentEditor()"
-                ></app-button>
-              </div>
+            <div class="flex justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.cancel' | translate"
+                [disabled]="action() !== null"
+                (action)="closeShipmentEditor()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.actions.save' | translate"
+                [disabled]="action() !== null"
+                (action)="saveShipmentEditor()"
+              ></app-button>
             </div>
           </div>
         </div>
-      </ng-container>
+      </div>
+    </ng-container>
 
-	    <ng-container *ngIf="refundWizardOpen() && order() as o">
-	      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closeRefundWizard()">
-	        <div
+    <ng-container *ngIf="refundWizardOpen() && order() as o">
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        (click)="closeRefundWizard()"
+      >
+        <div
           class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
           (click)="$event.stopPropagation()"
         >
@@ -1406,26 +1836,50 @@ type OrderAction =
           </div>
 
           <ng-container *ngIf="refundBreakdown() as bd">
-            <div class="mt-4 grid gap-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+            <div
+              class="mt-4 grid gap-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
+            >
               <div class="flex items-center justify-between gap-3">
-                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.subtotal' | translate }}</span>
-                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.subtotal | localizedCurrency : o.currency }}</span>
+                <span class="text-slate-600 dark:text-slate-300">{{
+                  'adminUi.orders.refundWizard.subtotal' | translate
+                }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                  bd.subtotal | localizedCurrency: o.currency
+                }}</span>
               </div>
               <div class="flex items-center justify-between gap-3">
-                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.shipping' | translate }}</span>
-                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.shipping | localizedCurrency : o.currency }}</span>
+                <span class="text-slate-600 dark:text-slate-300">{{
+                  'adminUi.orders.refundWizard.shipping' | translate
+                }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                  bd.shipping | localizedCurrency: o.currency
+                }}</span>
               </div>
               <div class="flex items-center justify-between gap-3">
-                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.vat' | translate }}</span>
-                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.vat | localizedCurrency : o.currency }}</span>
+                <span class="text-slate-600 dark:text-slate-300">{{
+                  'adminUi.orders.refundWizard.vat' | translate
+                }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                  bd.vat | localizedCurrency: o.currency
+                }}</span>
               </div>
               <div *ngIf="bd.fee !== 0" class="flex items-center justify-between gap-3">
-                <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.refundWizard.fee' | translate }}</span>
-                <span class="font-medium text-slate-900 dark:text-slate-50">{{ bd.fee | localizedCurrency : o.currency }}</span>
+                <span class="text-slate-600 dark:text-slate-300">{{
+                  'adminUi.orders.refundWizard.fee' | translate
+                }}</span>
+                <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                  bd.fee | localizedCurrency: o.currency
+                }}</span>
               </div>
-              <div class="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-2 font-semibold dark:border-slate-800">
-                <span class="text-slate-900 dark:text-slate-50">{{ 'adminUi.orders.refundWizard.total' | translate }}</span>
-                <span class="text-slate-900 dark:text-slate-50">{{ bd.total | localizedCurrency : o.currency }}</span>
+              <div
+                class="mt-2 flex items-center justify-between gap-3 border-t border-slate-200 pt-2 font-semibold dark:border-slate-800"
+              >
+                <span class="text-slate-900 dark:text-slate-50">{{
+                  'adminUi.orders.refundWizard.total' | translate
+                }}</span>
+                <span class="text-slate-900 dark:text-slate-50">{{
+                  bd.total | localizedCurrency: o.currency
+                }}</span>
               </div>
             </div>
           </ng-container>
@@ -1439,7 +1893,9 @@ type OrderAction =
             ></textarea>
           </label>
 
-          <div *ngIf="refundWizardError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">{{ refundWizardError() }}</div>
+          <div *ngIf="refundWizardError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+            {{ refundWizardError() }}
+          </div>
 
           <div class="mt-4 flex justify-end gap-2">
             <app-button
@@ -1461,7 +1917,10 @@ type OrderAction =
     </ng-container>
 
     <ng-container *ngIf="partialRefundWizardOpen() && order() as o">
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" (click)="closePartialRefundWizard()">
+      <div
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+        (click)="closePartialRefundWizard()"
+      >
         <div
           class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900"
           (click)="$event.stopPropagation()"
@@ -1485,19 +1944,27 @@ type OrderAction =
             </button>
           </div>
 
-          <div class="mt-4 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+          <div
+            class="mt-4 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
+          >
             <div class="flex items-center justify-between gap-3">
-              <span class="text-slate-600 dark:text-slate-300">{{ 'adminUi.orders.partialRefundWizard.remaining' | translate }}</span>
-              <span class="font-semibold text-slate-900 dark:text-slate-50">{{ refundableRemaining() | localizedCurrency : o.currency }}</span>
+              <span class="text-slate-600 dark:text-slate-300">{{
+                'adminUi.orders.partialRefundWizard.remaining' | translate
+              }}</span>
+              <span class="font-semibold text-slate-900 dark:text-slate-50">{{
+                refundableRemaining() | localizedCurrency: o.currency
+              }}</span>
             </div>
             <div *ngIf="refundsTotal() > 0" class="text-xs text-slate-500 dark:text-slate-400">
               {{ 'adminUi.orders.partialRefundWizard.alreadyRefunded' | translate }}:
-              {{ refundsTotal() | localizedCurrency : o.currency }}
+              {{ refundsTotal() | localizedCurrency: o.currency }}
             </div>
           </div>
 
           <div class="mt-4 grid gap-2">
-            <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <div
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               {{ 'adminUi.orders.partialRefundWizard.itemsTitle' | translate }}
             </div>
             <div
@@ -1510,8 +1977,8 @@ type OrderAction =
                     {{ it.product?.name || it.product_id }}
                   </div>
                   <div class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.orders.partialRefundWizard.purchasedQty' | translate }}: {{ it.quantity }}
-                    · {{ it.unit_price | localizedCurrency : o.currency }}
+                    {{ 'adminUi.orders.partialRefundWizard.purchasedQty' | translate }}:
+                    {{ it.quantity }} · {{ it.unit_price | localizedCurrency: o.currency }}
                   </div>
                 </div>
                 <div class="flex items-center gap-2">
@@ -1541,8 +2008,11 @@ type OrderAction =
                   </button>
                 </div>
               </div>
-              <div *ngIf="partialRefundQtyFor(it.id) > 0" class="mt-2 flex items-center justify-end text-xs text-slate-600 dark:text-slate-300">
-                {{ partialRefundLineTotal(it) | localizedCurrency : o.currency }}
+              <div
+                *ngIf="partialRefundQtyFor(it.id) > 0"
+                class="mt-2 flex items-center justify-end text-xs text-slate-600 dark:text-slate-300"
+              >
+                {{ partialRefundLineTotal(it) | localizedCurrency: o.currency }}
               </div>
             </div>
           </div>
@@ -1558,7 +2028,7 @@ type OrderAction =
             />
             <div class="text-xs text-slate-500 dark:text-slate-400">
               {{ 'adminUi.orders.partialRefundWizard.amountHint' | translate }}:
-              {{ partialRefundSelectionTotal(o) | localizedCurrency : o.currency }}
+              {{ partialRefundSelectionTotal(o) | localizedCurrency: o.currency }}
             </div>
           </label>
 
@@ -1579,14 +2049,19 @@ type OrderAction =
               [disabled]="!canProcessPartialRefund()"
             />
             <span class="grid gap-1">
-              <span class="font-medium">{{ 'adminUi.orders.partialRefundWizard.processPaymentLabel' | translate }}</span>
+              <span class="font-medium">{{
+                'adminUi.orders.partialRefundWizard.processPaymentLabel' | translate
+              }}</span>
               <span class="text-xs text-slate-500 dark:text-slate-400">
                 {{ processPartialRefundHint() }}
               </span>
             </span>
           </label>
 
-          <div *ngIf="partialRefundWizardError()" class="mt-2 text-sm text-rose-700 dark:text-rose-300">
+          <div
+            *ngIf="partialRefundWizardError()"
+            class="mt-2 text-sm text-rose-700 dark:text-rose-300"
+          >
             {{ partialRefundWizardError() }}
           </div>
 
@@ -1607,7 +2082,9 @@ type OrderAction =
           </div>
 
           <div *ngIf="(o.refunds || []).length > 0" class="mt-4 grid gap-2">
-            <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+            <div
+              class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+            >
               {{ 'adminUi.orders.partialRefundWizard.historyTitle' | translate }}
             </div>
             <div
@@ -1616,20 +2093,28 @@ type OrderAction =
             >
               <div class="flex items-center justify-between gap-3">
                 <div class="font-semibold text-slate-900 dark:text-slate-50">
-                  {{ r.amount | localizedCurrency : o.currency }} · {{ r.provider }}
+                  {{ r.amount | localizedCurrency: o.currency }} · {{ r.provider }}
                 </div>
-                <div class="text-xs text-slate-500 dark:text-slate-400">{{ r.created_at | date: 'short' }}</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ r.created_at | date: 'short' }}
+                </div>
               </div>
-              <div *ngIf="r.note" class="mt-1 text-xs text-slate-600 dark:text-slate-300">{{ r.note }}</div>
-              <div *ngIf="r.provider_refund_id" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.orders.partialRefundWizard.providerRefundId' | translate }}: {{ r.provider_refund_id }}
+              <div *ngIf="r.note" class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {{ r.note }}
+              </div>
+              <div
+                *ngIf="r.provider_refund_id"
+                class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+              >
+                {{ 'adminUi.orders.partialRefundWizard.providerRefundId' | translate }}:
+                {{ r.provider_refund_id }}
               </div>
             </div>
           </div>
         </div>
       </div>
     </ng-container>
-  `
+  `,
 })
 export class AdminOrderDetailComponent implements OnInit {
   loading = signal(true);
@@ -1698,20 +2183,18 @@ export class AdminOrderDetailComponent implements OnInit {
   private readonly tagColorOverrides: Record<string, TagColor> = loadTagColorOverrides();
 
   private orderId: string | null = null;
-  private navContext:
-    | {
-        page: number;
-        limit: number;
-        q?: string;
-        status?: string;
-        sla?: string;
-        fraud?: string;
-        tag?: string;
-        from?: string;
-        to?: string;
-        include_test?: boolean;
-      }
-    | null = null;
+  private navContext: {
+    page: number;
+    limit: number;
+    q?: string;
+    status?: string;
+    sla?: string;
+    fraud?: string;
+    tag?: string;
+    from?: string;
+    to?: string;
+    include_test?: boolean;
+  } | null = null;
   private readonly e164PhoneRe = /^\+[1-9]\d{7,14}$/;
 
   constructor(
@@ -1721,7 +2204,7 @@ export class AdminOrderDetailComponent implements OnInit {
     private readonly returnsApi: AdminReturnsService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    private readonly recent: AdminRecentService
+    private readonly recent: AdminRecentService,
   ) {}
 
   private readonly statusOrder: OrderStatus[] = [
@@ -1731,7 +2214,7 @@ export class AdminOrderDetailComponent implements OnInit {
     'shipped',
     'delivered',
     'cancelled',
-    'refunded'
+    'refunded',
   ];
 
   statusChipClass(status: string): string {
@@ -1744,7 +2227,9 @@ export class AdminOrderDetailComponent implements OnInit {
       return Boolean((order?.paypal_capture_id || '').toString().trim());
     }
     if (method === 'stripe') {
-      return (order?.events || []).some((evt) => (evt?.event || '').toString().trim() === 'payment_captured');
+      return (order?.events || []).some(
+        (evt) => (evt?.event || '').toString().trim() === 'payment_captured',
+      );
     }
     return false;
   }
@@ -1759,7 +2244,11 @@ export class AdminOrderDetailComponent implements OnInit {
     return !this.hasPaymentCaptured(o);
   }
 
-  private allowedNextStatuses(current: OrderStatus, method: string, order: AdminOrderDetail | null): Set<OrderStatus> {
+  private allowedNextStatuses(
+    current: OrderStatus,
+    method: string,
+    order: AdminOrderDetail | null,
+  ): Set<OrderStatus> {
     const transitions: Record<OrderStatus, OrderStatus[]> = {
       pending: ['pending_payment', 'pending_acceptance', 'cancelled'],
       pending_payment: ['pending_acceptance', 'cancelled'],
@@ -1768,7 +2257,7 @@ export class AdminOrderDetailComponent implements OnInit {
       shipped: ['delivered', 'refunded'],
       delivered: ['refunded'],
       cancelled: [],
-      refunded: []
+      refunded: [],
     };
 
     const allowed = new Set<OrderStatus>([current, ...(transitions[current] ?? [])]);
@@ -1869,7 +2358,7 @@ export class AdminOrderDetailComponent implements OnInit {
     const params: Parameters<AdminOrdersService['search']>[0] = {
       page: ctx.page,
       limit: ctx.limit,
-      include_pii: false
+      include_pii: false,
     };
     if (ctx.q) params.q = ctx.q;
     if (ctx.status) params.status = ctx.status;
@@ -1898,7 +2387,7 @@ export class AdminOrderDetailComponent implements OnInit {
             },
             error: () => {
               // ignore
-            }
+            },
           });
         }
 
@@ -1910,14 +2399,14 @@ export class AdminOrderDetailComponent implements OnInit {
             },
             error: () => {
               // ignore
-            }
+            },
           });
         }
       },
       error: () => {
         this.navPrev.set(null);
         this.navNext.set(null);
-      }
+      },
     });
   }
 
@@ -1943,7 +2432,7 @@ export class AdminOrderDetailComponent implements OnInit {
     const queryParams: Record<string, string | number | boolean> = {
       nav: 1,
       nav_page: page,
-      nav_limit: ctx.limit
+      nav_limit: ctx.limit,
     };
     if (ctx.q) queryParams['nav_q'] = ctx.q;
     if (ctx.status) queryParams['nav_status'] = ctx.status;
@@ -1998,7 +2487,11 @@ export class AdminOrderDetailComponent implements OnInit {
       { label: 'nav.home', url: '/' },
       { label: 'nav.admin', url: '/admin/dashboard' },
       { label: 'adminUi.orders.title', url: '/admin/orders' },
-      { label: ref ? `${this.translate.instant('adminUi.orders.detailTitle')}: ${ref}` : this.translate.instant('adminUi.orders.detailTitle') }
+      {
+        label: ref
+          ? `${this.translate.instant('adminUi.orders.detailTitle')}: ${ref}`
+          : this.translate.instant('adminUi.orders.detailTitle'),
+      },
     ];
   }
 
@@ -2034,7 +2527,7 @@ export class AdminOrderDetailComponent implements OnInit {
   private phoneState(
     country: string,
     phone: string | null | undefined,
-    kind: 'shipping' | 'billing'
+    kind: 'shipping' | 'billing',
   ): { state: 'ok' | 'warn' | 'missing' | 'invalid'; suggestion?: string } {
     const raw = (phone || '').toString().trim();
     if (!raw) return { state: kind === 'shipping' ? 'missing' : 'ok' };
@@ -2050,22 +2543,31 @@ export class AdminOrderDetailComponent implements OnInit {
     if (country === 'RO') {
       if (digits.length === 10 && digits.startsWith('0')) {
         const suggestion = `+40${digits.slice(1)}`;
-        return this.e164PhoneRe.test(suggestion) ? { state: 'warn', suggestion } : { state: 'invalid' };
+        return this.e164PhoneRe.test(suggestion)
+          ? { state: 'warn', suggestion }
+          : { state: 'invalid' };
       }
       if (digits.length === 9) {
         const suggestion = `+40${digits}`;
-        return this.e164PhoneRe.test(suggestion) ? { state: 'warn', suggestion } : { state: 'invalid' };
+        return this.e164PhoneRe.test(suggestion)
+          ? { state: 'warn', suggestion }
+          : { state: 'invalid' };
       }
       if (digits.length === 11 && digits.startsWith('40')) {
         const suggestion = `+${digits}`;
-        return this.e164PhoneRe.test(suggestion) ? { state: 'warn', suggestion } : { state: 'invalid' };
+        return this.e164PhoneRe.test(suggestion)
+          ? { state: 'warn', suggestion }
+          : { state: 'invalid' };
       }
     }
 
     return { state: 'invalid' };
   }
 
-  private postalState(country: string, postal: string | null | undefined): { state: 'ok' | 'warn' | 'invalid'; suggestion?: string } {
+  private postalState(
+    country: string,
+    postal: string | null | undefined,
+  ): { state: 'ok' | 'warn' | 'invalid'; suggestion?: string } {
     const raw = (postal || '').toString().trim();
     if (!raw) return { state: 'invalid' };
 
@@ -2092,7 +2594,8 @@ export class AdminOrderDetailComponent implements OnInit {
 
     if (country === 'RO') {
       if (postal.state === 'invalid') issues.push('adminUi.orders.addressValidate.postalInvalidRo');
-      else if (postal.state === 'warn') issues.push('adminUi.orders.addressValidate.postalNonStandardRo');
+      else if (postal.state === 'warn')
+        issues.push('adminUi.orders.addressValidate.postalNonStandardRo');
     } else if (postal.state === 'invalid') {
       issues.push('adminUi.orders.addressValidate.postalInvalid');
     }
@@ -2108,9 +2611,12 @@ export class AdminOrderDetailComponent implements OnInit {
     const kind = this.addressEditorKind();
     const country = this.normalizeCountry(this.addressCountry);
     const state = this.phoneState(country, this.addressPhone, kind);
-    if (state.state === 'missing') return this.translate.instant('adminUi.orders.addressValidate.phoneMissing');
-    if (state.state === 'warn') return this.translate.instant('adminUi.orders.addressValidate.phoneNonE164');
-    if (state.state === 'invalid') return this.translate.instant('adminUi.orders.addressValidate.phoneInvalid');
+    if (state.state === 'missing')
+      return this.translate.instant('adminUi.orders.addressValidate.phoneMissing');
+    if (state.state === 'warn')
+      return this.translate.instant('adminUi.orders.addressValidate.phoneNonE164');
+    if (state.state === 'invalid')
+      return this.translate.instant('adminUi.orders.addressValidate.phoneInvalid');
     return '';
   }
 
@@ -2129,11 +2635,14 @@ export class AdminOrderDetailComponent implements OnInit {
     const country = this.normalizeCountry(this.addressCountry);
     const state = this.postalState(country, this.addressPostalCode);
     if (country === 'RO') {
-      if (state.state === 'invalid') return this.translate.instant('adminUi.orders.addressValidate.postalInvalidRo');
-      if (state.state === 'warn') return this.translate.instant('adminUi.orders.addressValidate.postalNonStandardRo');
+      if (state.state === 'invalid')
+        return this.translate.instant('adminUi.orders.addressValidate.postalInvalidRo');
+      if (state.state === 'warn')
+        return this.translate.instant('adminUi.orders.addressValidate.postalNonStandardRo');
       return '';
     }
-    if (state.state === 'invalid') return this.translate.instant('adminUi.orders.addressValidate.postalInvalid');
+    if (state.state === 'invalid')
+      return this.translate.instant('adminUi.orders.addressValidate.postalInvalid');
     return '';
   }
 
@@ -2172,8 +2681,10 @@ export class AdminOrderDetailComponent implements OnInit {
 
   emailStatusChipClass(status: string): string {
     const normalized = (status || '').toLowerCase();
-    if (normalized === 'sent') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100';
-    if (normalized === 'failed') return 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-100';
+    if (normalized === 'sent')
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100';
+    if (normalized === 'failed')
+      return 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-100';
     return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
   }
 
@@ -2204,10 +2715,12 @@ export class AdminOrderDetailComponent implements OnInit {
   }
 
   fraudSeverityBadgeClass(severity: AdminOrderFraudSignal['severity']): string {
-    if (severity === 'high') return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200';
+    if (severity === 'high')
+      return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200';
     if (severity === 'medium')
       return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200';
-    if (severity === 'low') return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200';
+    if (severity === 'low')
+      return 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-900/40 dark:bg-sky-950/30 dark:text-sky-200';
     return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-200';
   }
 
@@ -2247,7 +2760,7 @@ export class AdminOrderDetailComponent implements OnInit {
 
     const payload: any = {
       rerate_shipping: kind === 'shipping' ? !!this.addressRerateShipping : false,
-      note: this.addressNote.trim() || null
+      note: this.addressNote.trim() || null,
     };
 
     const address = {
@@ -2258,7 +2771,7 @@ export class AdminOrderDetailComponent implements OnInit {
       city: this.addressCity.trim(),
       region: this.addressRegion.trim() || null,
       postal_code: this.addressPostalCode.trim(),
-      country: this.addressCountry.trim().toUpperCase()
+      country: this.addressCountry.trim().toUpperCase(),
     };
 
     if (kind === 'shipping') payload.shipping_address = address;
@@ -2272,11 +2785,12 @@ export class AdminOrderDetailComponent implements OnInit {
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.addressEdit.errors.update');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.addressEdit.errors.update');
         this.addressEditorError.set(msg);
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2291,7 +2805,7 @@ export class AdminOrderDetailComponent implements OnInit {
   private validateTrackingFields(
     courier: string | null | undefined,
     trackingNumber: string,
-    trackingUrl: string
+    trackingUrl: string,
   ): string | null {
     const number = (trackingNumber ?? '').trim();
     const url = (trackingUrl ?? '').trim();
@@ -2353,7 +2867,11 @@ export class AdminOrderDetailComponent implements OnInit {
       return;
     }
 
-    const validationError = this.validateTrackingFields(this.shipmentCourier, trackingNumber, this.shipmentTrackingUrl);
+    const validationError = this.validateTrackingFields(
+      this.shipmentCourier,
+      trackingNumber,
+      this.shipmentTrackingUrl,
+    );
     if (validationError) {
       this.shipmentEditorError.set(validationError);
       this.toast.error(validationError);
@@ -2363,12 +2881,14 @@ export class AdminOrderDetailComponent implements OnInit {
     const payload: any = {
       courier: this.shipmentCourier.trim() || null,
       tracking_number: trackingNumber,
-      tracking_url: this.shipmentTrackingUrl.trim() || null
+      tracking_url: this.shipmentTrackingUrl.trim() || null,
     };
 
     this.action.set('shipmentSave');
     const req = this.shipmentEditingId
-      ? this.api.updateShipment(orderId, this.shipmentEditingId, payload, { include_pii: this.piiReveal() })
+      ? this.api.updateShipment(orderId, this.shipmentEditingId, payload, {
+          include_pii: this.piiReveal(),
+        })
       : this.api.createShipment(orderId, payload, { include_pii: this.piiReveal() });
 
     req.subscribe({
@@ -2379,11 +2899,12 @@ export class AdminOrderDetailComponent implements OnInit {
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.shipments.errors.save');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.shipments.errors.save');
         this.shipmentEditorError.set(msg);
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2398,10 +2919,11 @@ export class AdminOrderDetailComponent implements OnInit {
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.shipments.errors.delete');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.shipments.errors.delete');
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2409,21 +2931,27 @@ export class AdminOrderDetailComponent implements OnInit {
     const orderId = this.orderId;
     if (!orderId) return;
     const rawQty = Number(this.fulfillmentQty[itemId] ?? 0);
-    const qty = Math.max(0, Math.min(Math.trunc(Number.isFinite(rawQty) ? rawQty : 0), Number(maxQty ?? 0)));
+    const qty = Math.max(
+      0,
+      Math.min(Math.trunc(Number.isFinite(rawQty) ? rawQty : 0), Number(maxQty ?? 0)),
+    );
     this.action.set('fulfill');
     this.api.fulfillItem(orderId, itemId, qty, { include_pii: this.piiReveal() }).subscribe({
       next: (o) => {
         this.order.set(o);
         this.fulfillmentQty = {};
-        (o.items || []).forEach((it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)));
+        (o.items || []).forEach(
+          (it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)),
+        );
         this.toast.success(this.translate.instant('adminUi.orders.items.fulfillSuccess'));
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.items.fulfillError');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.items.fulfillError');
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2442,13 +2970,13 @@ export class AdminOrderDetailComponent implements OnInit {
     if (signal.code === 'velocity_email' || signal.code === 'velocity_user') {
       return {
         count: data['count'],
-        window_minutes: data['window_minutes']
+        window_minutes: data['window_minutes'],
       };
     }
     if (signal.code === 'country_mismatch') {
       return {
         shipping_country: data['shipping_country'],
-        billing_country: data['billing_country']
+        billing_country: data['billing_country'],
       };
     }
     if (signal.code === 'payment_retries') {
@@ -2475,31 +3003,35 @@ export class AdminOrderDetailComponent implements OnInit {
           {
             label: this.diffLabel('status'),
             from: this.diffValue('status', parts[0]),
-            to: this.diffValue('status', parts[1])
-          }
+            to: this.diffValue('status', parts[1]),
+          },
         ];
       }
     }
     return [];
   }
 
-  eventAddressDiff(
-    evt: AdminOrderEvent
-  ): { shipping?: { from: unknown; to: unknown }; billing?: { from: unknown; to: unknown } } | null {
+  eventAddressDiff(evt: AdminOrderEvent): {
+    shipping?: { from: unknown; to: unknown };
+    billing?: { from: unknown; to: unknown };
+  } | null {
     const data = evt?.data;
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
     const rawChanges = (data as any).changes;
     if (!rawChanges || typeof rawChanges !== 'object' || Array.isArray(rawChanges)) return null;
 
-    const shipping = (rawChanges).shipping_address;
-    const billing = (rawChanges).billing_address;
-    const result: { shipping?: { from: unknown; to: unknown }; billing?: { from: unknown; to: unknown } } = {};
+    const shipping = rawChanges.shipping_address;
+    const billing = rawChanges.billing_address;
+    const result: {
+      shipping?: { from: unknown; to: unknown };
+      billing?: { from: unknown; to: unknown };
+    } = {};
 
     if (shipping && typeof shipping === 'object' && !Array.isArray(shipping)) {
-      result.shipping = { from: (shipping).from ?? null, to: (shipping).to ?? null };
+      result.shipping = { from: shipping.from ?? null, to: shipping.to ?? null };
     }
     if (billing && typeof billing === 'object' && !Array.isArray(billing)) {
-      result.billing = { from: (billing).from ?? null, to: (billing).to ?? null };
+      result.billing = { from: billing.from ?? null, to: billing.to ?? null };
     }
 
     return result.shipping || result.billing ? result : null;
@@ -2531,7 +3063,9 @@ export class AdminOrderDetailComponent implements OnInit {
     return lines.join('\n') || '—';
   }
 
-  private eventChanges(evt: AdminOrderEvent): Array<{ label: string; from: string; to: string }> | null {
+  private eventChanges(
+    evt: AdminOrderEvent,
+  ): Array<{ label: string; from: string; to: string }> | null {
     const data = evt?.data;
     if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
     const rawChanges = (data as any).changes;
@@ -2539,10 +3073,10 @@ export class AdminOrderDetailComponent implements OnInit {
 
     const rows: Array<{ label: string; from: string; to: string }> = [];
     for (const field of Object.keys(rawChanges)) {
-      const change = (rawChanges)[field];
+      const change = rawChanges[field];
       if (!change || typeof change !== 'object') continue;
-      const from = this.diffValue(field, (change).from);
-      const to = this.diffValue(field, (change).to);
+      const from = this.diffValue(field, change.from);
+      const to = this.diffValue(field, change.to);
       if (from === to) continue;
       rows.push({ label: this.diffLabel(field), from, to });
     }
@@ -2574,7 +3108,8 @@ export class AdminOrderDetailComponent implements OnInit {
     if (value === null || value === undefined) return '—';
     let raw = '';
     if (typeof value === 'string') raw = value.trim();
-    else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') raw = String(value);
+    else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint')
+      raw = String(value);
     else return '—';
     if (!raw) return '—';
     if (field === 'status') {
@@ -2585,7 +3120,13 @@ export class AdminOrderDetailComponent implements OnInit {
     return raw;
   }
 
-  refundBreakdown(): { subtotal: number; shipping: number; vat: number; fee: number; total: number } | null {
+  refundBreakdown(): {
+    subtotal: number;
+    shipping: number;
+    vat: number;
+    fee: number;
+    total: number;
+  } | null {
     const o = this.order();
     if (!o) return null;
     const total = Number(o.total_amount ?? 0);
@@ -2617,7 +3158,9 @@ export class AdminOrderDetailComponent implements OnInit {
 
     const note = this.refundNote.trim();
     if (!note) {
-      this.refundWizardError.set(this.translate.instant('adminUi.orders.refundWizard.noteRequired'));
+      this.refundWizardError.set(
+        this.translate.instant('adminUi.orders.refundWizard.noteRequired'),
+      );
       return;
     }
 
@@ -2636,7 +3179,7 @@ export class AdminOrderDetailComponent implements OnInit {
         this.refundWizardError.set(msg);
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2664,7 +3207,7 @@ export class AdminOrderDetailComponent implements OnInit {
         this.adminNoteError.set(msg);
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2687,7 +3230,7 @@ export class AdminOrderDetailComponent implements OnInit {
         const msg = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.add');
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2710,16 +3253,20 @@ export class AdminOrderDetailComponent implements OnInit {
         this.order.set(updated);
         this.toast.success(
           this.translate.instant(
-            isTest ? 'adminUi.orders.tags.success.remove' : 'adminUi.orders.tags.success.add'
-          )
+            isTest ? 'adminUi.orders.tags.success.remove' : 'adminUi.orders.tags.success.add',
+          ),
         );
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant(isTest ? 'adminUi.orders.tags.errors.remove' : 'adminUi.orders.tags.errors.add');
+        const msg =
+          err?.error?.detail ||
+          this.translate.instant(
+            isTest ? 'adminUi.orders.tags.errors.remove' : 'adminUi.orders.tags.errors.add',
+          );
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -2737,15 +3284,20 @@ export class AdminOrderDetailComponent implements OnInit {
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.remove');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.tags.errors.remove');
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
   fraudReviewStatus(): 'approved' | 'denied' | null {
-    const tags = (this.order()?.tags ?? []).map((t) => String(t ?? '').trim().toLowerCase());
+    const tags = (this.order()?.tags ?? []).map((t) =>
+      String(t ?? '')
+        .trim()
+        .toLowerCase(),
+    );
     if (tags.includes('fraud_approved')) return 'approved';
     if (tags.includes('fraud_denied')) return 'denied';
     return null;
@@ -2757,24 +3309,32 @@ export class AdminOrderDetailComponent implements OnInit {
     if (!this.order()) return;
     if (this.action() !== null) return;
 
-    const note = (window.prompt(this.translate.instant('adminUi.orders.fraudReview.notePrompt')) ?? '').trim();
+    const note = (
+      window.prompt(this.translate.instant('adminUi.orders.fraudReview.notePrompt')) ?? ''
+    ).trim();
     this.action.set('fraudReview');
-    this.api.reviewFraud(orderId, { decision, note: note || null }, { include_pii: this.piiReveal() }).subscribe({
-      next: (updated) => {
-        this.order.set(updated);
-        this.toast.success(
-          this.translate.instant(
-            decision === 'approve' ? 'adminUi.orders.fraudReview.success.approved' : 'adminUi.orders.fraudReview.success.denied'
-          )
-        );
-        this.action.set(null);
-      },
-      error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.fraudReview.errors.failed');
-        this.toast.error(msg);
-        this.action.set(null);
-      }
-    });
+    this.api
+      .reviewFraud(orderId, { decision, note: note || null }, { include_pii: this.piiReveal() })
+      .subscribe({
+        next: (updated) => {
+          this.order.set(updated);
+          this.toast.success(
+            this.translate.instant(
+              decision === 'approve'
+                ? 'adminUi.orders.fraudReview.success.approved'
+                : 'adminUi.orders.fraudReview.success.denied',
+            ),
+          );
+          this.action.set(null);
+        },
+        error: (err) => {
+          const msg =
+            err?.error?.detail ||
+            this.translate.instant('adminUi.orders.fraudReview.errors.failed');
+          this.toast.error(msg);
+          this.action.set(null);
+        },
+      });
   }
 
   refundsTotal(): number {
@@ -2807,8 +3367,8 @@ export class AdminOrderDetailComponent implements OnInit {
       if (!Array.isArray(items)) continue;
       for (const row of items) {
         if (!row) continue;
-        if (String((row).order_item_id ?? '') !== orderItemId) continue;
-        const q = Number((row).quantity ?? 0);
+        if (String(row.order_item_id ?? '') !== orderItemId) continue;
+        const q = Number(row.quantity ?? 0);
         if (Number.isFinite(q) && q > 0) qty += Math.trunc(q);
       }
     }
@@ -2840,15 +3400,23 @@ export class AdminOrderDetailComponent implements OnInit {
     const method = (o.payment_method ?? '').trim().toLowerCase();
 
     if (this.canProcessPartialRefund()) {
-      return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintSupported');
+      return this.translate.instant(
+        'adminUi.orders.partialRefundWizard.processPaymentHintSupported',
+      );
     }
     if (method === 'stripe') {
-      return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintMissingStripe');
+      return this.translate.instant(
+        'adminUi.orders.partialRefundWizard.processPaymentHintMissingStripe',
+      );
     }
     if (method === 'paypal') {
-      return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintMissingPaypal');
+      return this.translate.instant(
+        'adminUi.orders.partialRefundWizard.processPaymentHintMissingPaypal',
+      );
     }
-    return this.translate.instant('adminUi.orders.partialRefundWizard.processPaymentHintUnsupported');
+    return this.translate.instant(
+      'adminUi.orders.partialRefundWizard.processPaymentHintUnsupported',
+    );
   }
 
   openPartialRefundWizard(): void {
@@ -2893,7 +3461,9 @@ export class AdminOrderDetailComponent implements OnInit {
 
     const note = this.partialRefundNote.trim();
     if (!note) {
-      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.noteRequired'));
+      this.partialRefundWizardError.set(
+        this.translate.instant('adminUi.orders.partialRefundWizard.noteRequired'),
+      );
       return;
     }
 
@@ -2901,22 +3471,28 @@ export class AdminOrderDetailComponent implements OnInit {
       .filter(([, qty]) => qty > 0)
       .map(([orderItemId, qty]) => ({
         order_item_id: orderItemId,
-        quantity: qty
+        quantity: qty,
       }));
     if (!items.length) {
-      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.itemsRequired'));
+      this.partialRefundWizardError.set(
+        this.translate.instant('adminUi.orders.partialRefundWizard.itemsRequired'),
+      );
       return;
     }
 
     const amount = Number(this.partialRefundAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.amountRequired'));
+      this.partialRefundWizardError.set(
+        this.translate.instant('adminUi.orders.partialRefundWizard.amountRequired'),
+      );
       return;
     }
 
     const remaining = this.refundableRemaining();
     if (amount > remaining + 0.00001) {
-      this.partialRefundWizardError.set(this.translate.instant('adminUi.orders.partialRefundWizard.amountTooHigh'));
+      this.partialRefundWizardError.set(
+        this.translate.instant('adminUi.orders.partialRefundWizard.amountTooHigh'),
+      );
       return;
     }
 
@@ -2929,7 +3505,7 @@ export class AdminOrderDetailComponent implements OnInit {
         amount: amount.toFixed(2),
         note,
         items,
-        process_payment: processPayment
+        process_payment: processPayment,
       })
       .subscribe({
         next: () => {
@@ -2943,11 +3519,12 @@ export class AdminOrderDetailComponent implements OnInit {
           this.action.set(null);
         },
         error: (err) => {
-          const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.partialRefund');
+          const msg =
+            err?.error?.detail || this.translate.instant('adminUi.orders.errors.partialRefund');
           this.partialRefundWizardError.set(msg);
           this.toast.error(msg);
           this.action.set(null);
-        }
+        },
       });
   }
 
@@ -2963,7 +3540,8 @@ export class AdminOrderDetailComponent implements OnInit {
   save(): void {
     const orderId = this.order()?.id;
     if (!orderId) return;
-    const currentStatus = ((this.order()?.status as OrderStatus) || 'pending_acceptance') as OrderStatus;
+    const currentStatus = ((this.order()?.status as OrderStatus) ||
+      'pending_acceptance') as OrderStatus;
     const statusChanged = this.statusValue !== currentStatus;
     const isCancelling = statusChanged && this.statusValue === 'cancelled';
     const cancelReasonValue = this.cancelReason.trim();
@@ -2979,7 +3557,11 @@ export class AdminOrderDetailComponent implements OnInit {
     const trackingNumberChanged = nextTrackingNumber !== currentTrackingNumber;
     const trackingUrlChanged = nextTrackingUrl !== currentTrackingUrl;
     if (trackingNumberChanged || trackingUrlChanged) {
-      const validationError = this.validateTrackingFields(this.order()?.courier ?? null, nextTrackingNumber, nextTrackingUrl);
+      const validationError = this.validateTrackingFields(
+        this.order()?.courier ?? null,
+        nextTrackingNumber,
+        nextTrackingUrl,
+      );
       if (validationError) {
         this.toast.error(validationError);
         return;
@@ -2988,12 +3570,17 @@ export class AdminOrderDetailComponent implements OnInit {
 
     this.action.set('save');
     this.api
-      .update(orderId, {
-        status: statusChanged ? this.statusValue : undefined,
-        cancel_reason: this.statusValue === 'cancelled' && cancelReasonValue ? cancelReasonValue : undefined,
-        tracking_number: trackingNumberChanged ? (nextTrackingNumber || null) : undefined,
-        tracking_url: trackingUrlChanged ? (nextTrackingUrl || null) : undefined
-      }, { include_pii: this.piiReveal() })
+      .update(
+        orderId,
+        {
+          status: statusChanged ? this.statusValue : undefined,
+          cancel_reason:
+            this.statusValue === 'cancelled' && cancelReasonValue ? cancelReasonValue : undefined,
+          tracking_number: trackingNumberChanged ? nextTrackingNumber || null : undefined,
+          tracking_url: trackingUrlChanged ? nextTrackingUrl || null : undefined,
+        },
+        { include_pii: this.piiReveal() },
+      )
       .subscribe({
         next: (o) => {
           this.order.set(o);
@@ -3004,16 +3591,17 @@ export class AdminOrderDetailComponent implements OnInit {
           this.action.set(null);
           this.toast.success(this.translate.instant('adminUi.orders.success.status'));
         },
-	        error: (err) => {
-	          this.action.set(null);
-	          const detail = err?.error?.detail;
-	          const message = typeof detail === 'string' && detail.trim()
-	            ? detail
-	            : this.translate.instant('adminUi.orders.errors.status');
-	          this.toast.error(message);
-	        }
-	    });
-	  }
+        error: (err) => {
+          this.action.set(null);
+          const detail = err?.error?.detail;
+          const message =
+            typeof detail === 'string' && detail.trim()
+              ? detail
+              : this.translate.instant('adminUi.orders.errors.status');
+          this.toast.error(message);
+        },
+      });
+  }
 
   onStatusValueChange(next: OrderStatus): void {
     if (next !== 'cancelled') {
@@ -3039,18 +3627,22 @@ export class AdminOrderDetailComponent implements OnInit {
     if (!orderId || !this.shippingLabelFile) return;
     this.shippingLabelError.set(null);
     this.action.set('labelUpload');
-    this.api.uploadShippingLabel(orderId, this.shippingLabelFile, { include_pii: this.piiReveal() }).subscribe({
-      next: (o) => {
-        this.order.set(o);
-        this.shippingLabelFile = null;
-        this.toast.success(this.translate.instant('adminUi.orders.success.shippingLabelUpload'));
-        this.action.set(null);
-      },
-      error: () => {
-        this.shippingLabelError.set(this.translate.instant('adminUi.orders.errors.shippingLabelUpload'));
-        this.action.set(null);
-      }
-    });
+    this.api
+      .uploadShippingLabel(orderId, this.shippingLabelFile, { include_pii: this.piiReveal() })
+      .subscribe({
+        next: (o) => {
+          this.order.set(o);
+          this.shippingLabelFile = null;
+          this.toast.success(this.translate.instant('adminUi.orders.success.shippingLabelUpload'));
+          this.action.set(null);
+        },
+        error: () => {
+          this.shippingLabelError.set(
+            this.translate.instant('adminUi.orders.errors.shippingLabelUpload'),
+          );
+          this.action.set(null);
+        },
+      });
   }
 
   downloadShippingLabel(): void {
@@ -3062,7 +3654,8 @@ export class AdminOrderDetailComponent implements OnInit {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
+        a.download =
+          this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
         a.click();
         URL.revokeObjectURL(url);
         this.load(orderId);
@@ -3071,7 +3664,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.shippingLabelDownload'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3084,7 +3677,8 @@ export class AdminOrderDetailComponent implements OnInit {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
+        a.download =
+          this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
         a.click();
         URL.revokeObjectURL(url);
         this.load(orderId);
@@ -3093,7 +3687,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.shippingLabelDownload'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3111,7 +3705,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.shippingLabelDelete'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3121,7 +3715,7 @@ export class AdminOrderDetailComponent implements OnInit {
       'shipping_label_uploaded',
       'shipping_label_downloaded',
       'shipping_label_printed',
-      'shipping_label_deleted'
+      'shipping_label_deleted',
     ]);
     return events
       .filter((evt) => shippingEvents.has((evt.event || '').trim()))
@@ -3157,7 +3751,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.retry'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3174,7 +3768,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.void'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3194,7 +3788,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.deliveryEmail'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3215,7 +3809,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.packingSlip'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3236,7 +3830,7 @@ export class AdminOrderDetailComponent implements OnInit {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.orders.errors.receiptPdf'));
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3248,7 +3842,9 @@ export class AdminOrderDetailComponent implements OnInit {
     if (cached?.receipt_url && expiresAt && expiresAt.getTime() > Date.now() + 30_000) {
       void this.copyToClipboard(cached.receipt_url).then((ok) => {
         this.toast.success(
-          ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
+          ok
+            ? this.translate.instant('adminUi.orders.receiptLinks.copied')
+            : this.translate.instant('adminUi.orders.receiptLinks.ready'),
         );
       });
       return;
@@ -3259,16 +3855,19 @@ export class AdminOrderDetailComponent implements OnInit {
         this.receiptShare.set(token);
         void this.copyToClipboard(token.receipt_url).then((ok) => {
           this.toast.success(
-            ok ? this.translate.instant('adminUi.orders.receiptLinks.copied') : this.translate.instant('adminUi.orders.receiptLinks.ready')
+            ok
+              ? this.translate.instant('adminUi.orders.receiptLinks.copied')
+              : this.translate.instant('adminUi.orders.receiptLinks.ready'),
           );
         });
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptShare');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptShare');
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3284,10 +3883,11 @@ export class AdminOrderDetailComponent implements OnInit {
         this.action.set(null);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptRevoke');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.errors.receiptRevoke');
         this.toast.error(msg);
         this.action.set(null);
-      }
+      },
     });
   }
 
@@ -3311,7 +3911,7 @@ export class AdminOrderDetailComponent implements OnInit {
           label: ref,
           subtitle: email,
           url: `/admin/orders/${o.id}`,
-          state: null
+          state: null,
         });
         this.statusValue = (o.status as OrderStatus) || 'pending_acceptance';
         this.trackingNumber = o.tracking_number ?? '';
@@ -3320,7 +3920,9 @@ export class AdminOrderDetailComponent implements OnInit {
         this.returnQty = {};
         this.fulfillmentQty = {};
         (o.items || []).forEach((it) => (this.returnQty[it.id] = 0));
-        (o.items || []).forEach((it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)));
+        (o.items || []).forEach(
+          (it) => (this.fulfillmentQty[it.id] = Number(it.shipped_quantity ?? 0)),
+        );
         this.loadReturns(o.id);
         this.loadComms(o.id);
         this.loading.set(false);
@@ -3330,7 +3932,7 @@ export class AdminOrderDetailComponent implements OnInit {
         this.errorRequestId.set(extractRequestId(err));
         this.commsLoading.set(false);
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -3379,7 +3981,10 @@ export class AdminOrderDetailComponent implements OnInit {
     const items = (o.items || [])
       .map((it) => ({
         order_item_id: it.id,
-        quantity: Math.max(0, Math.min(Number(this.returnQty[it.id] ?? 0), Number(it.quantity ?? 0)))
+        quantity: Math.max(
+          0,
+          Math.min(Number(this.returnQty[it.id] ?? 0), Number(it.quantity ?? 0)),
+        ),
       }))
       .filter((row) => row.quantity > 0);
 
@@ -3393,8 +3998,10 @@ export class AdminOrderDetailComponent implements OnInit {
       .create({
         order_id: o.id,
         reason,
-        customer_message: this.returnCustomerMessage.trim() ? this.returnCustomerMessage.trim() : null,
-        items
+        customer_message: this.returnCustomerMessage.trim()
+          ? this.returnCustomerMessage.trim()
+          : null,
+        items,
       })
       .subscribe({
         next: () => {
@@ -3405,9 +4012,11 @@ export class AdminOrderDetailComponent implements OnInit {
           this.loadReturns(o.id);
         },
         error: (err) => {
-          this.returnCreateError.set(err?.error?.detail || this.translate.instant('adminUi.returns.create.errors.create'));
+          this.returnCreateError.set(
+            err?.error?.detail || this.translate.instant('adminUi.returns.create.errors.create'),
+          );
         },
-        complete: () => this.creatingReturn.set(false)
+        complete: () => this.creatingReturn.set(false),
       });
   }
 
@@ -3417,7 +4026,7 @@ export class AdminOrderDetailComponent implements OnInit {
     this.returnsApi.listByOrder(orderId).subscribe({
       next: (rows) => this.returnRequests.set(rows || []),
       error: () => this.returnsError.set(this.translate.instant('adminUi.returns.errors.load')),
-      complete: () => this.returnsLoading.set(false)
+      complete: () => this.returnsLoading.set(false),
     });
   }
 
@@ -3436,11 +4045,11 @@ export class AdminOrderDetailComponent implements OnInit {
         this.commsLoading.set(false);
       },
       error: (err) => {
-        const msg = err?.error?.detail || this.translate.instant('adminUi.orders.comms.errors.load');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.orders.comms.errors.load');
         this.commsError.set(msg);
         this.commsLoading.set(false);
-      }
+      },
     });
   }
 }
-

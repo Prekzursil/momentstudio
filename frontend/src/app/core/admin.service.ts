@@ -752,7 +752,14 @@ export interface ContentBlock {
   published_until?: string | null;
   needs_translation_en?: boolean;
   needs_translation_ro?: boolean;
-  images?: { id: string; url: string; alt_text?: string | null; sort_order?: number; focal_x?: number; focal_y?: number }[];
+  images?: {
+    id: string;
+    url: string;
+    alt_text?: string | null;
+    sort_order?: number;
+    focal_x?: number;
+    focal_y?: number;
+  }[];
 }
 
 export interface ContentPreviewTokenResponse {
@@ -893,7 +900,13 @@ export interface ContentImageAssetUsageResponse {
 export type MediaAssetType = 'image' | 'video' | 'document';
 export type MediaAssetStatus = 'draft' | 'approved' | 'rejected' | 'archived' | 'trashed';
 export type MediaAssetVisibility = 'public' | 'private';
-export type MediaJobType = 'ingest' | 'variant' | 'edit' | 'ai_tag' | 'duplicate_scan' | 'usage_reconcile';
+export type MediaJobType =
+  | 'ingest'
+  | 'variant'
+  | 'edit'
+  | 'ai_tag'
+  | 'duplicate_scan'
+  | 'usage_reconcile';
 export type MediaJobStatus = 'queued' | 'processing' | 'completed' | 'failed' | 'dead_letter';
 export type MediaJobTriageState = 'open' | 'retrying' | 'ignored' | 'resolved';
 
@@ -1249,41 +1262,84 @@ export interface OwnerTransferResponse {
 export class AdminService {
   constructor(private readonly api: ApiService) {}
 
-  summary(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminSummary> {
+  summary(params?: {
+    range_days?: number;
+    range_from?: string;
+    range_to?: string;
+  }): Observable<AdminSummary> {
     return this.api.get<AdminSummary>('/admin/dashboard/summary', params);
   }
 
-  paymentsHealth(params?: { since_hours?: number }): Observable<AdminDashboardPaymentsHealthResponse> {
-    return this.api.get<AdminDashboardPaymentsHealthResponse>('/admin/dashboard/payments-health', params as any);
+  paymentsHealth(params?: {
+    since_hours?: number;
+  }): Observable<AdminDashboardPaymentsHealthResponse> {
+    return this.api.get<AdminDashboardPaymentsHealthResponse>(
+      '/admin/dashboard/payments-health',
+      params as any,
+    );
   }
 
   refundsBreakdown(params?: { window_days?: number }): Observable<AdminRefundsBreakdownResponse> {
-    return this.api.get<AdminRefundsBreakdownResponse>('/admin/dashboard/refunds-breakdown', params as any);
+    return this.api.get<AdminRefundsBreakdownResponse>(
+      '/admin/dashboard/refunds-breakdown',
+      params as any,
+    );
   }
 
-  shippingPerformance(params?: { window_days?: number }): Observable<AdminShippingPerformanceResponse> {
-    return this.api.get<AdminShippingPerformanceResponse>('/admin/dashboard/shipping-performance', params as any);
+  shippingPerformance(params?: {
+    window_days?: number;
+  }): Observable<AdminShippingPerformanceResponse> {
+    return this.api.get<AdminShippingPerformanceResponse>(
+      '/admin/dashboard/shipping-performance',
+      params as any,
+    );
   }
 
-  stockoutImpact(params?: { window_days?: number; limit?: number }): Observable<AdminStockoutImpactResponse> {
-    return this.api.get<AdminStockoutImpactResponse>('/admin/dashboard/stockout-impact', params as any);
+  stockoutImpact(params?: {
+    window_days?: number;
+    limit?: number;
+  }): Observable<AdminStockoutImpactResponse> {
+    return this.api.get<AdminStockoutImpactResponse>(
+      '/admin/dashboard/stockout-impact',
+      params as any,
+    );
   }
 
-  channelAttribution(
-    params?: { range_days?: number; range_from?: string; range_to?: string; limit?: number }
-  ): Observable<AdminChannelAttributionResponse> {
-    return this.api.get<AdminChannelAttributionResponse>('/admin/dashboard/channel-attribution', params as any);
+  channelAttribution(params?: {
+    range_days?: number;
+    range_from?: string;
+    range_to?: string;
+    limit?: number;
+  }): Observable<AdminChannelAttributionResponse> {
+    return this.api.get<AdminChannelAttributionResponse>(
+      '/admin/dashboard/channel-attribution',
+      params as any,
+    );
   }
 
-  funnel(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminFunnelMetricsResponse> {
+  funnel(params?: {
+    range_days?: number;
+    range_from?: string;
+    range_to?: string;
+  }): Observable<AdminFunnelMetricsResponse> {
     return this.api.get<AdminFunnelMetricsResponse>('/admin/dashboard/funnel', params);
   }
 
-  channelBreakdown(params?: { range_days?: number; range_from?: string; range_to?: string }): Observable<AdminChannelBreakdownResponse> {
-    return this.api.get<AdminChannelBreakdownResponse>('/admin/dashboard/channel-breakdown', params);
+  channelBreakdown(params?: {
+    range_days?: number;
+    range_from?: string;
+    range_to?: string;
+  }): Observable<AdminChannelBreakdownResponse> {
+    return this.api.get<AdminChannelBreakdownResponse>(
+      '/admin/dashboard/channel-breakdown',
+      params,
+    );
   }
 
-  globalSearch(q: string, opts?: { include_pii?: boolean }): Observable<AdminDashboardSearchResponse> {
+  globalSearch(
+    q: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminDashboardSearchResponse> {
     const params: any = { q, include_pii: opts?.include_pii ?? true };
     return this.api.get<AdminDashboardSearchResponse>('/admin/dashboard/search', params);
   }
@@ -1310,16 +1366,27 @@ export class AdminService {
     return this.api.get<AdminUser[]>('/admin/dashboard/users', params as any);
   }
 
-  userAliases(userId: string, opts?: { include_pii?: boolean }): Observable<AdminUserAliasesResponse> {
+  userAliases(
+    userId: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminUserAliasesResponse> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.get<AdminUserAliasesResponse>(`/admin/dashboard/users/${userId}/aliases`, params as any);
+    return this.api.get<AdminUserAliasesResponse>(
+      `/admin/dashboard/users/${userId}/aliases`,
+      params as any,
+    );
   }
 
   content(): Observable<AdminContent[]> {
     return this.api.get<AdminContent[]>('/admin/dashboard/content');
   }
 
-  contentScheduling(params?: { window_days?: number; window_start?: string; page?: number; limit?: number }): Observable<ContentSchedulingListResponse> {
+  contentScheduling(params?: {
+    window_days?: number;
+    window_start?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<ContentSchedulingListResponse> {
     return this.api.get<ContentSchedulingListResponse>('/content/admin/scheduling', params as any);
   }
 
@@ -1345,7 +1412,12 @@ export class AdminService {
     return this.api.get<AdminAuditEntriesResponse>('/admin/dashboard/audit/entries', params);
   }
 
-  exportAuditCsv(params: { entity?: AdminAuditEntity; action?: string; user?: string; redact?: boolean }): Observable<Blob> {
+  exportAuditCsv(params: {
+    entity?: AdminAuditEntity;
+    action?: string;
+    user?: string;
+    redact?: boolean;
+  }): Observable<Blob> {
     return this.api.getBlob('/admin/dashboard/audit/export.csv', params);
   }
 
@@ -1353,11 +1425,21 @@ export class AdminService {
     return this.api.get<AdminAuditRetentionResponse>('/admin/dashboard/audit/retention');
   }
 
-  purgeAuditRetention(payload: { confirm: string; dry_run?: boolean }): Observable<AdminAuditRetentionPurgeResponse> {
-    return this.api.post<AdminAuditRetentionPurgeResponse>('/admin/dashboard/audit/retention/purge', payload);
+  purgeAuditRetention(payload: {
+    confirm: string;
+    dry_run?: boolean;
+  }): Observable<AdminAuditRetentionPurgeResponse> {
+    return this.api.post<AdminAuditRetentionPurgeResponse>(
+      '/admin/dashboard/audit/retention/purge',
+      payload,
+    );
   }
 
-  transferOwner(payload: { identifier: string; confirm: string; password: string }): Observable<OwnerTransferResponse> {
+  transferOwner(payload: {
+    identifier: string;
+    confirm: string;
+    password: string;
+  }): Observable<OwnerTransferResponse> {
     return this.api.post<OwnerTransferResponse>('/admin/dashboard/owner/transfer', payload);
   }
 
@@ -1383,10 +1465,16 @@ export class AdminService {
     include_variants?: boolean;
     default_threshold?: number;
   }): Observable<RestockListResponse> {
-    return this.api.get<RestockListResponse>('/admin/dashboard/inventory/restock-list', params as any);
+    return this.api.get<RestockListResponse>(
+      '/admin/dashboard/inventory/restock-list',
+      params as any,
+    );
   }
 
-  exportRestockListCsv(params: { include_variants?: boolean; default_threshold?: number }): Observable<Blob> {
+  exportRestockListCsv(params: {
+    include_variants?: boolean;
+    default_threshold?: number;
+  }): Observable<Blob> {
     return this.api.getBlob('/admin/dashboard/inventory/restock-list/export', params as any);
   }
 
@@ -1397,7 +1485,10 @@ export class AdminService {
     limit?: number;
     offset?: number;
   }): Observable<CartReservationsResponse> {
-    return this.api.get<CartReservationsResponse>('/admin/dashboard/inventory/reservations/carts', params as any);
+    return this.api.get<CartReservationsResponse>(
+      '/admin/dashboard/inventory/reservations/carts',
+      params as any,
+    );
   }
 
   reservedOrders(params: {
@@ -1407,87 +1498,178 @@ export class AdminService {
     limit?: number;
     offset?: number;
   }): Observable<OrderReservationsResponse> {
-    return this.api.get<OrderReservationsResponse>('/admin/dashboard/inventory/reservations/orders', params as any);
+    return this.api.get<OrderReservationsResponse>(
+      '/admin/dashboard/inventory/reservations/orders',
+      params as any,
+    );
   }
 
   upsertRestockNote(payload: RestockNoteUpsert): Observable<RestockNoteRead | null> {
-    return this.api.put<RestockNoteRead | null>('/admin/dashboard/inventory/restock-notes', payload);
+    return this.api.put<RestockNoteRead | null>(
+      '/admin/dashboard/inventory/restock-notes',
+      payload,
+    );
   }
 
   updateOrderStatus(orderId: string, status: string): Observable<AdminOrder> {
     return this.api.patch<AdminOrder>(`/orders/admin/${orderId}`, { status });
   }
 
-  bulkUpdateProducts(payload: {
-    product_id: string;
-    base_price?: number | null;
-    sale_type?: 'percent' | 'amount' | null;
-    sale_value?: number | null;
-    stock_quantity?: number | null;
-    is_featured?: boolean | null;
-    sort_order?: number | null;
-    category_id?: string | null;
-    publish_scheduled_for?: string | null;
-    unpublish_scheduled_for?: string | null;
-    status?: string | null;
-  }[], opts?: AdminRequestOptions): Observable<any[]> {
-    return this.api.post<any[]>('/catalog/products/bulk-update', payload, undefined, opts?.source ? { source: opts.source } : undefined);
+  bulkUpdateProducts(
+    payload: {
+      product_id: string;
+      base_price?: number | null;
+      sale_type?: 'percent' | 'amount' | null;
+      sale_value?: number | null;
+      stock_quantity?: number | null;
+      is_featured?: boolean | null;
+      sort_order?: number | null;
+      category_id?: string | null;
+      publish_scheduled_for?: string | null;
+      unpublish_scheduled_for?: string | null;
+      status?: string | null;
+    }[],
+    opts?: AdminRequestOptions,
+  ): Observable<any[]> {
+    return this.api.post<any[]>(
+      '/catalog/products/bulk-update',
+      payload,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
   getCategories(): Observable<AdminCategory[]> {
     return this.api.get<AdminCategory[]>('/catalog/categories');
   }
 
-  createCategory(payload: Partial<AdminCategory>, opts?: AdminRequestOptions): Observable<AdminCategory> {
-    return this.api.post<AdminCategory>('/catalog/categories', payload, undefined, opts?.source ? { source: opts.source } : undefined);
+  createCategory(
+    payload: Partial<AdminCategory>,
+    opts?: AdminRequestOptions,
+  ): Observable<AdminCategory> {
+    return this.api.post<AdminCategory>(
+      '/catalog/categories',
+      payload,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
-  updateCategory(slug: string, payload: Partial<AdminCategory>, opts?: AdminRequestOptions): Observable<AdminCategory> {
-    return this.api.patch<AdminCategory>(`/catalog/categories/${slug}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
+  updateCategory(
+    slug: string,
+    payload: Partial<AdminCategory>,
+    opts?: AdminRequestOptions,
+  ): Observable<AdminCategory> {
+    return this.api.patch<AdminCategory>(
+      `/catalog/categories/${slug}`,
+      payload,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
-  uploadCategoryImage(slug: string, kind: 'thumbnail' | 'banner', file: File, opts?: AdminRequestOptions): Observable<AdminCategory> {
+  uploadCategoryImage(
+    slug: string,
+    kind: 'thumbnail' | 'banner',
+    file: File,
+    opts?: AdminRequestOptions,
+  ): Observable<AdminCategory> {
     const form = new FormData();
     form.append('file', file);
-    return this.api.post<AdminCategory>(`/catalog/categories/${slug}/images/${kind}`, form, undefined, opts?.source ? { source: opts.source } : undefined);
+    return this.api.post<AdminCategory>(
+      `/catalog/categories/${slug}/images/${kind}`,
+      form,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
   previewDeleteCategory(slug: string): Observable<AdminCategoryDeletePreview> {
     return this.api.get<AdminCategoryDeletePreview>(`/catalog/categories/${slug}/delete/preview`);
   }
 
-  previewMergeCategory(sourceSlug: string, targetSlug: string): Observable<AdminCategoryMergePreview> {
-    return this.api.get<AdminCategoryMergePreview>(`/catalog/categories/${sourceSlug}/merge/preview`, { target_slug: targetSlug });
+  previewMergeCategory(
+    sourceSlug: string,
+    targetSlug: string,
+  ): Observable<AdminCategoryMergePreview> {
+    return this.api.get<AdminCategoryMergePreview>(
+      `/catalog/categories/${sourceSlug}/merge/preview`,
+      { target_slug: targetSlug },
+    );
   }
 
-  mergeCategory(sourceSlug: string, targetSlug: string, opts?: AdminRequestOptions): Observable<AdminCategoryMergeResult> {
-    return this.api.post<AdminCategoryMergeResult>(`/catalog/categories/${sourceSlug}/merge`, { target_slug: targetSlug }, undefined, opts?.source ? { source: opts.source } : undefined);
+  mergeCategory(
+    sourceSlug: string,
+    targetSlug: string,
+    opts?: AdminRequestOptions,
+  ): Observable<AdminCategoryMergeResult> {
+    return this.api.post<AdminCategoryMergeResult>(
+      `/catalog/categories/${sourceSlug}/merge`,
+      { target_slug: targetSlug },
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
   getCategoryTranslations(slug: string): Observable<AdminCategoryTranslation[]> {
     return this.api.get<AdminCategoryTranslation[]>(`/catalog/categories/${slug}/translations`);
   }
 
-  upsertCategoryTranslation(slug: string, lang: 'en' | 'ro', payload: { name: string; description?: string | null }, opts?: AdminRequestOptions): Observable<AdminCategoryTranslation> {
-    return this.api.put<AdminCategoryTranslation>(`/catalog/categories/${slug}/translations/${lang}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
+  upsertCategoryTranslation(
+    slug: string,
+    lang: 'en' | 'ro',
+    payload: { name: string; description?: string | null },
+    opts?: AdminRequestOptions,
+  ): Observable<AdminCategoryTranslation> {
+    return this.api.put<AdminCategoryTranslation>(
+      `/catalog/categories/${slug}/translations/${lang}`,
+      payload,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
-  deleteCategoryTranslation(slug: string, lang: 'en' | 'ro', opts?: AdminRequestOptions): Observable<void> {
-    return this.api.delete<void>(`/catalog/categories/${slug}/translations/${lang}`, undefined, opts?.source ? { source: opts.source } : undefined);
+  deleteCategoryTranslation(
+    slug: string,
+    lang: 'en' | 'ro',
+    opts?: AdminRequestOptions,
+  ): Observable<void> {
+    return this.api.delete<void>(
+      `/catalog/categories/${slug}/translations/${lang}`,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
   deleteCategory(slug: string, opts?: AdminRequestOptions): Observable<AdminCategory> {
-    return this.api.delete<AdminCategory>(`/catalog/categories/${slug}`, undefined, opts?.source ? { source: opts.source } : undefined);
+    return this.api.delete<AdminCategory>(
+      `/catalog/categories/${slug}`,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
-  reorderCategories(items: { slug: string; sort_order: number }[], opts?: AdminRequestOptions): Observable<AdminCategory[]> {
-    return this.api.post<AdminCategory[]>('/catalog/categories/reorder', items, undefined, opts?.source ? { source: opts.source } : undefined);
+  reorderCategories(
+    items: { slug: string; sort_order: number }[],
+    opts?: AdminRequestOptions,
+  ): Observable<AdminCategory[]> {
+    return this.api.post<AdminCategory[]>(
+      '/catalog/categories/reorder',
+      items,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
   importCategoriesCsv(file: File, dryRun = true): Observable<AdminCategoriesImportResult> {
     const form = new FormData();
     form.append('file', file);
-    return this.api.post<AdminCategoriesImportResult>('/catalog/categories/import', form, undefined, { dry_run: dryRun });
+    return this.api.post<AdminCategoriesImportResult>(
+      '/catalog/categories/import',
+      form,
+      undefined,
+      { dry_run: dryRun },
+    );
   }
 
   getProduct(slug: string): Observable<AdminProductDetail> {
@@ -1505,19 +1687,29 @@ export class AdminService {
   importProductsCsv(file: File, dryRun = true): Observable<AdminProductsImportResult> {
     const form = new FormData();
     form.append('file', file);
-    return this.api.post<AdminProductsImportResult>('/catalog/products/import', form, undefined, { dry_run: dryRun });
+    return this.api.post<AdminProductsImportResult>('/catalog/products/import', form, undefined, {
+      dry_run: dryRun,
+    });
   }
 
   getProductAudit(slug: string, limit = 50): Observable<AdminProductAuditEntry[]> {
-    return this.api.get<AdminProductAuditEntry[]>(`/catalog/products/${slug}/audit`, { limit } as any);
+    return this.api.get<AdminProductAuditEntry[]>(`/catalog/products/${slug}/audit`, {
+      limit,
+    } as any);
   }
 
   getProductRelationships(slug: string): Observable<AdminProductRelationships> {
     return this.api.get<AdminProductRelationships>(`/catalog/products/${slug}/relationships`);
   }
 
-  updateProductRelationships(slug: string, payload: AdminProductRelationships): Observable<AdminProductRelationships> {
-    return this.api.put<AdminProductRelationships>(`/catalog/products/${slug}/relationships`, payload);
+  updateProductRelationships(
+    slug: string,
+    payload: AdminProductRelationships,
+  ): Observable<AdminProductRelationships> {
+    return this.api.put<AdminProductRelationships>(
+      `/catalog/products/${slug}/relationships`,
+      payload,
+    );
   }
 
   getProductTranslations(slug: string): Observable<AdminProductTranslation[]> {
@@ -1533,9 +1725,12 @@ export class AdminService {
       long_description?: string | null;
       meta_title?: string | null;
       meta_description?: string | null;
-    }
+    },
   ): Observable<AdminProductTranslation> {
-    return this.api.put<AdminProductTranslation>(`/catalog/products/${slug}/translations/${lang}`, payload);
+    return this.api.put<AdminProductTranslation>(
+      `/catalog/products/${slug}/translations/${lang}`,
+      payload,
+    );
   }
 
   deleteProductTranslation(slug: string, lang: 'en' | 'ro'): Observable<void> {
@@ -1546,12 +1741,26 @@ export class AdminService {
     return this.api.post<AdminProductDetail>('/catalog/products', payload);
   }
 
-  updateProduct(slug: string, payload: Partial<AdminProductDetail>, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
-    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}`, payload, undefined, opts?.source ? { source: opts.source } : undefined);
+  updateProduct(
+    slug: string,
+    payload: Partial<AdminProductDetail>,
+    opts?: AdminRequestOptions,
+  ): Observable<AdminProductDetail> {
+    return this.api.patch<AdminProductDetail>(
+      `/catalog/products/${slug}`,
+      payload,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
   duplicateProduct(slug: string, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
-    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/duplicate`, {}, undefined, opts?.source ? { source: opts.source } : undefined);
+    return this.api.post<AdminProductDetail>(
+      `/catalog/products/${slug}/duplicate`,
+      {},
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
   deleteProduct(slug: string): Observable<void> {
@@ -1567,7 +1776,10 @@ export class AdminService {
   }
 
   invalidateCouponStripeMappings(id: string): Observable<AdminCouponStripeInvalidationResult> {
-    return this.api.post<AdminCouponStripeInvalidationResult>(`/admin/dashboard/coupons/${id}/stripe/invalidate`, {});
+    return this.api.post<AdminCouponStripeInvalidationResult>(
+      `/admin/dashboard/coupons/${id}/stripe/invalidate`,
+      {},
+    );
   }
 
   uploadProductImage(slug: string, file: File): Observable<AdminProductDetail> {
@@ -1576,7 +1788,10 @@ export class AdminService {
     return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images`, form);
   }
 
-  uploadProductImageWithProgress(slug: string, file: File): Observable<HttpEvent<AdminProductDetail>> {
+  uploadProductImageWithProgress(
+    slug: string,
+    file: File,
+  ): Observable<HttpEvent<AdminProductDetail>> {
     const form = new FormData();
     form.append('file', file);
     return this.api.postWithProgress<AdminProductDetail>(`/catalog/products/${slug}/images`, form);
@@ -1591,27 +1806,50 @@ export class AdminService {
   }
 
   restoreProductImage(slug: string, imageId: string): Observable<AdminProductDetail> {
-    return this.api.post<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/restore`, {});
+    return this.api.post<AdminProductDetail>(
+      `/catalog/products/${slug}/images/${imageId}/restore`,
+      {},
+    );
   }
 
-  reorderProductImage(slug: string, imageId: string, sortOrder: number, opts?: AdminRequestOptions): Observable<AdminProductDetail> {
+  reorderProductImage(
+    slug: string,
+    imageId: string,
+    sortOrder: number,
+    opts?: AdminRequestOptions,
+  ): Observable<AdminProductDetail> {
     const params: Record<string, string | number> = { sort_order: sortOrder };
     if (opts?.source) params['source'] = opts.source;
-    return this.api.patch<AdminProductDetail>(`/catalog/products/${slug}/images/${imageId}/sort`, {}, undefined, params);
+    return this.api.patch<AdminProductDetail>(
+      `/catalog/products/${slug}/images/${imageId}/sort`,
+      {},
+      undefined,
+      params,
+    );
   }
 
   updateProductVariants(
     slug: string,
     payload: {
-      variants: Array<{ id?: string | null; name: string; additional_price_delta: number; stock_quantity: number }>;
+      variants: Array<{
+        id?: string | null;
+        name: string;
+        additional_price_delta: number;
+        stock_quantity: number;
+      }>;
       delete_variant_ids?: string[];
-    }
+    },
   ): Observable<AdminProductVariant[]> {
     return this.api.put<AdminProductVariant[]>(`/catalog/products/${slug}/variants`, payload);
   }
 
-  getProductImageTranslations(slug: string, imageId: string): Observable<AdminProductImageTranslation[]> {
-    return this.api.get<AdminProductImageTranslation[]>(`/catalog/products/${slug}/images/${imageId}/translations`);
+  getProductImageTranslations(
+    slug: string,
+    imageId: string,
+  ): Observable<AdminProductImageTranslation[]> {
+    return this.api.get<AdminProductImageTranslation[]>(
+      `/catalog/products/${slug}/images/${imageId}/translations`,
+    );
   }
 
   upsertProductImageTranslation(
@@ -1619,29 +1857,53 @@ export class AdminService {
     imageId: string,
     lang: 'en' | 'ro',
     payload: { alt_text?: string | null; caption?: string | null },
-    opts?: AdminRequestOptions
+    opts?: AdminRequestOptions,
   ): Observable<AdminProductImageTranslation> {
     return this.api.put<AdminProductImageTranslation>(
       `/catalog/products/${slug}/images/${imageId}/translations/${lang}`,
       payload,
       undefined,
-      opts?.source ? { source: opts.source } : undefined
+      opts?.source ? { source: opts.source } : undefined,
     );
   }
 
-  deleteProductImageTranslation(slug: string, imageId: string, lang: 'en' | 'ro', opts?: AdminRequestOptions): Observable<void> {
-    return this.api.delete<void>(`/catalog/products/${slug}/images/${imageId}/translations/${lang}`, undefined, opts?.source ? { source: opts.source } : undefined);
+  deleteProductImageTranslation(
+    slug: string,
+    imageId: string,
+    lang: 'en' | 'ro',
+    opts?: AdminRequestOptions,
+  ): Observable<void> {
+    return this.api.delete<void>(
+      `/catalog/products/${slug}/images/${imageId}/translations/${lang}`,
+      undefined,
+      opts?.source ? { source: opts.source } : undefined,
+    );
   }
 
-  getProductImageStats(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
-    return this.api.get<AdminProductImageOptimizationStats>(`/catalog/products/${slug}/images/${imageId}/stats`);
+  getProductImageStats(
+    slug: string,
+    imageId: string,
+  ): Observable<AdminProductImageOptimizationStats> {
+    return this.api.get<AdminProductImageOptimizationStats>(
+      `/catalog/products/${slug}/images/${imageId}/stats`,
+    );
   }
 
-  reprocessProductImage(slug: string, imageId: string): Observable<AdminProductImageOptimizationStats> {
-    return this.api.post<AdminProductImageOptimizationStats>(`/catalog/products/${slug}/images/${imageId}/reprocess`, {});
+  reprocessProductImage(
+    slug: string,
+    imageId: string,
+  ): Observable<AdminProductImageOptimizationStats> {
+    return this.api.post<AdminProductImageOptimizationStats>(
+      `/catalog/products/${slug}/images/${imageId}/reprocess`,
+      {},
+    );
   }
 
-  listStockAdjustments(params: { product_id: string; limit?: number; offset?: number }): Observable<StockAdjustment[]> {
+  listStockAdjustments(params: {
+    product_id: string;
+    limit?: number;
+    offset?: number;
+  }): Observable<StockAdjustment[]> {
     return this.api.get<StockAdjustment[]>('/admin/dashboard/stock-adjustments', params as any);
   }
 
@@ -1681,23 +1943,41 @@ export class AdminService {
     return this.api.get<FeaturedCollection[]>('/catalog/collections/featured');
   }
 
-  sendScheduledReport(payload: { kind: AdminScheduledReportKind; force?: boolean }): Observable<AdminScheduledReportSendResponse> {
-    return this.api.post<AdminScheduledReportSendResponse>('/admin/dashboard/reports/send', payload);
+  sendScheduledReport(payload: {
+    kind: AdminScheduledReportKind;
+    force?: boolean;
+  }): Observable<AdminScheduledReportSendResponse> {
+    return this.api.post<AdminScheduledReportSendResponse>(
+      '/admin/dashboard/reports/send',
+      payload,
+    );
   }
 
   getAlertThresholds(): Observable<AdminDashboardAlertThresholds> {
     return this.api.get<AdminDashboardAlertThresholds>('/admin/dashboard/alert-thresholds');
   }
 
-  updateAlertThresholds(payload: AdminDashboardAlertThresholdsUpdateRequest): Observable<AdminDashboardAlertThresholds> {
-    return this.api.put<AdminDashboardAlertThresholds>('/admin/dashboard/alert-thresholds', payload);
+  updateAlertThresholds(
+    payload: AdminDashboardAlertThresholdsUpdateRequest,
+  ): Observable<AdminDashboardAlertThresholds> {
+    return this.api.put<AdminDashboardAlertThresholds>(
+      '/admin/dashboard/alert-thresholds',
+      payload,
+    );
   }
 
-  createFeaturedCollection(payload: { name: string; description?: string | null; product_ids?: string[] }): Observable<FeaturedCollection> {
+  createFeaturedCollection(payload: {
+    name: string;
+    description?: string | null;
+    product_ids?: string[];
+  }): Observable<FeaturedCollection> {
     return this.api.post<FeaturedCollection>('/catalog/collections/featured', payload);
   }
 
-  updateFeaturedCollection(slug: string, payload: Partial<FeaturedCollection> & { product_ids?: string[] }): Observable<FeaturedCollection> {
+  updateFeaturedCollection(
+    slug: string,
+    payload: Partial<FeaturedCollection> & { product_ids?: string[] },
+  ): Observable<FeaturedCollection> {
     return this.api.patch<FeaturedCollection>(`/catalog/collections/featured/${slug}`, payload);
   }
 
@@ -1733,8 +2013,14 @@ export class AdminService {
     return this.api.post<ContentBlock>(`/content/admin/${key}/versions/${version}/rollback`, {});
   }
 
-  updateContentTranslationStatus(key: string, payload: { needs_translation_en?: boolean | null; needs_translation_ro?: boolean | null }): Observable<ContentBlock> {
-    return this.api.patch<ContentBlock>(`/content/admin/${encodeURIComponent(key)}/translation-status`, payload);
+  updateContentTranslationStatus(
+    key: string,
+    payload: { needs_translation_en?: boolean | null; needs_translation_ro?: boolean | null },
+  ): Observable<ContentBlock> {
+    return this.api.patch<ContentBlock>(
+      `/content/admin/${encodeURIComponent(key)}/translation-status`,
+      payload,
+    );
   }
 
   listContentImages(params?: {
@@ -1747,31 +2033,62 @@ export class AdminService {
     page?: number;
     limit?: number;
   }): Observable<ContentImageAssetListResponse> {
-    return this.api.get<ContentImageAssetListResponse>('/content/admin/assets/images', params as any);
+    return this.api.get<ContentImageAssetListResponse>(
+      '/content/admin/assets/images',
+      params as any,
+    );
   }
 
-  updateContentImage(imageId: string, payload: ContentImageAssetUpdateRequest): Observable<ContentImageAssetRead> {
-    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, payload);
+  updateContentImage(
+    imageId: string,
+    payload: ContentImageAssetUpdateRequest,
+  ): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(
+      `/content/admin/assets/images/${encodeURIComponent(imageId)}`,
+      payload,
+    );
   }
 
   updateContentImageTags(imageId: string, tags: string[]): Observable<ContentImageAssetRead> {
-    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/tags`, { tags });
+    return this.api.patch<ContentImageAssetRead>(
+      `/content/admin/assets/images/${encodeURIComponent(imageId)}/tags`,
+      { tags },
+    );
   }
 
-  updateContentImageFocalPoint(imageId: string, focal_x: number, focal_y: number): Observable<ContentImageAssetRead> {
-    return this.api.patch<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/focal`, { focal_x, focal_y });
+  updateContentImageFocalPoint(
+    imageId: string,
+    focal_x: number,
+    focal_y: number,
+  ): Observable<ContentImageAssetRead> {
+    return this.api.patch<ContentImageAssetRead>(
+      `/content/admin/assets/images/${encodeURIComponent(imageId)}/focal`,
+      { focal_x, focal_y },
+    );
   }
 
-  editContentImage(imageId: string, payload: ContentImageEditRequest): Observable<ContentImageAssetRead> {
-    return this.api.post<ContentImageAssetRead>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/edit`, payload);
+  editContentImage(
+    imageId: string,
+    payload: ContentImageEditRequest,
+  ): Observable<ContentImageAssetRead> {
+    return this.api.post<ContentImageAssetRead>(
+      `/content/admin/assets/images/${encodeURIComponent(imageId)}/edit`,
+      payload,
+    );
   }
 
   getContentImageUsage(imageId: string): Observable<ContentImageAssetUsageResponse> {
-    return this.api.get<ContentImageAssetUsageResponse>(`/content/admin/assets/images/${encodeURIComponent(imageId)}/usage`);
+    return this.api.get<ContentImageAssetUsageResponse>(
+      `/content/admin/assets/images/${encodeURIComponent(imageId)}/usage`,
+    );
   }
 
   deleteContentImage(imageId: string, params?: { delete_versions?: boolean }): Observable<void> {
-    return this.api.delete<void>(`/content/admin/assets/images/${encodeURIComponent(imageId)}`, undefined, params as any);
+    return this.api.delete<void>(
+      `/content/admin/assets/images/${encodeURIComponent(imageId)}`,
+      undefined,
+      params as any,
+    );
   }
 
   listMediaAssets(params?: {
@@ -1792,27 +2109,44 @@ export class AdminService {
 
   uploadMediaAsset(
     file: File,
-    params?: { visibility?: MediaAssetVisibility; auto_finalize?: boolean }
+    params?: { visibility?: MediaAssetVisibility; auto_finalize?: boolean },
   ): Observable<MediaAsset> {
     const form = new FormData();
     form.append('file', file);
-    return this.api.post<MediaAsset>('/content/admin/media/assets/upload', form, undefined, params as any);
+    return this.api.post<MediaAsset>(
+      '/content/admin/media/assets/upload',
+      form,
+      undefined,
+      params as any,
+    );
   }
 
   finalizeMediaAsset(assetId: string, payload?: MediaFinalizeRequest): Observable<MediaJob> {
-    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/finalize`, payload || {});
+    return this.api.post<MediaJob>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/finalize`,
+      payload || {},
+    );
   }
 
   updateMediaAsset(assetId: string, payload: MediaAssetUpdateRequest): Observable<MediaAsset> {
-    return this.api.patch<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}`, payload);
+    return this.api.patch<MediaAsset>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}`,
+      payload,
+    );
   }
 
   approveMediaAsset(assetId: string, note?: string): Observable<MediaAsset> {
-    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/approve`, { note: note || null });
+    return this.api.post<MediaAsset>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/approve`,
+      { note: note || null },
+    );
   }
 
   rejectMediaAsset(assetId: string, note?: string): Observable<MediaAsset> {
-    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/reject`, { note: note || null });
+    return this.api.post<MediaAsset>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/reject`,
+      { note: note || null },
+    );
   }
 
   softDeleteMediaAsset(assetId: string): Observable<void> {
@@ -1820,23 +2154,37 @@ export class AdminService {
   }
 
   restoreMediaAsset(assetId: string): Observable<MediaAsset> {
-    return this.api.post<MediaAsset>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/restore`, {});
+    return this.api.post<MediaAsset>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/restore`,
+      {},
+    );
   }
 
   purgeMediaAsset(assetId: string): Observable<void> {
-    return this.api.post<void>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/purge`, {});
+    return this.api.post<void>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/purge`,
+      {},
+    );
   }
 
   getMediaAssetUsage(assetId: string): Observable<MediaUsageResponse> {
-    return this.api.get<MediaUsageResponse>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/usage`);
+    return this.api.get<MediaUsageResponse>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/usage`,
+    );
   }
 
   requestMediaVariant(assetId: string, profile: string): Observable<MediaJob> {
-    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/variants`, { profile });
+    return this.api.post<MediaJob>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/variants`,
+      { profile },
+    );
   }
 
   editMediaAsset(assetId: string, payload: MediaEditRequest): Observable<MediaJob> {
-    return this.api.post<MediaJob>(`/content/admin/media/assets/${encodeURIComponent(assetId)}/edit`, payload);
+    return this.api.post<MediaJob>(
+      `/content/admin/media/assets/${encodeURIComponent(assetId)}/edit`,
+      payload,
+    );
   }
 
   getMediaJob(jobId: string): Observable<MediaJob> {
@@ -1861,19 +2209,33 @@ export class AdminService {
   }
 
   retryMediaJob(jobId: string): Observable<MediaJob> {
-    return this.api.post<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/retry`, {});
+    return this.api.post<MediaJob>(
+      `/content/admin/media/jobs/${encodeURIComponent(jobId)}/retry`,
+      {},
+    );
   }
 
   retryMediaJobsBulk(jobIds: string[]): Observable<MediaJobListResponse> {
-    return this.api.post<MediaJobListResponse>('/content/admin/media/jobs/retry-bulk', { job_ids: jobIds });
+    return this.api.post<MediaJobListResponse>('/content/admin/media/jobs/retry-bulk', {
+      job_ids: jobIds,
+    });
   }
 
   updateMediaJobTriage(jobId: string, payload: MediaJobTriageUpdateRequest): Observable<MediaJob> {
-    return this.api.patch<MediaJob>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/triage`, payload);
+    return this.api.patch<MediaJob>(
+      `/content/admin/media/jobs/${encodeURIComponent(jobId)}/triage`,
+      payload,
+    );
   }
 
-  listMediaJobEvents(jobId: string, params?: { limit?: number }): Observable<MediaJobEventsResponse> {
-    return this.api.get<MediaJobEventsResponse>(`/content/admin/media/jobs/${encodeURIComponent(jobId)}/events`, params as any);
+  listMediaJobEvents(
+    jobId: string,
+    params?: { limit?: number },
+  ): Observable<MediaJobEventsResponse> {
+    return this.api.get<MediaJobEventsResponse>(
+      `/content/admin/media/jobs/${encodeURIComponent(jobId)}/events`,
+      params as any,
+    );
   }
 
   getMediaTelemetry(): Observable<MediaTelemetryResponse> {
@@ -1889,41 +2251,62 @@ export class AdminService {
     page?: number;
     limit?: number;
   }): Observable<MediaRetryPolicyHistoryResponse> {
-    return this.api.get<MediaRetryPolicyHistoryResponse>('/content/admin/media/retry-policies/history', params as any);
+    return this.api.get<MediaRetryPolicyHistoryResponse>(
+      '/content/admin/media/retry-policies/history',
+      params as any,
+    );
   }
 
   getMediaRetryPolicyPresets(jobType: MediaJobType): Observable<MediaRetryPolicyPresetsResponse> {
     return this.api.get<MediaRetryPolicyPresetsResponse>(
-      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/presets`
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/presets`,
     );
   }
 
-  updateMediaRetryPolicy(jobType: MediaJobType, payload: MediaRetryPolicyUpdateRequest): Observable<MediaRetryPolicy> {
-    return this.api.patch<MediaRetryPolicy>(`/content/admin/media/retry-policies/${encodeURIComponent(jobType)}`, payload);
+  updateMediaRetryPolicy(
+    jobType: MediaJobType,
+    payload: MediaRetryPolicyUpdateRequest,
+  ): Observable<MediaRetryPolicy> {
+    return this.api.patch<MediaRetryPolicy>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}`,
+      payload,
+    );
   }
 
-  rollbackMediaRetryPolicy(jobType: MediaJobType, payload: MediaRetryPolicyRollbackRequest): Observable<MediaRetryPolicy> {
+  rollbackMediaRetryPolicy(
+    jobType: MediaJobType,
+    payload: MediaRetryPolicyRollbackRequest,
+  ): Observable<MediaRetryPolicy> {
     return this.api.post<MediaRetryPolicy>(
       `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/rollback`,
-      payload
+      payload,
     );
   }
 
-  markMediaRetryPolicyKnownGood(jobType: MediaJobType, params?: { note?: string }): Observable<MediaRetryPolicyEvent> {
+  markMediaRetryPolicyKnownGood(
+    jobType: MediaJobType,
+    params?: { note?: string },
+  ): Observable<MediaRetryPolicyEvent> {
     return this.api.post<MediaRetryPolicyEvent>(
       `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/mark-known-good`,
       {},
       undefined,
-      params as any
+      params as any,
     );
   }
 
   resetMediaRetryPolicy(jobType: MediaJobType): Observable<MediaRetryPolicy> {
-    return this.api.post<MediaRetryPolicy>(`/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/reset`, {});
+    return this.api.post<MediaRetryPolicy>(
+      `/content/admin/media/retry-policies/${encodeURIComponent(jobType)}/reset`,
+      {},
+    );
   }
 
   resetAllMediaRetryPolicies(): Observable<MediaRetryPolicyListResponse> {
-    return this.api.post<MediaRetryPolicyListResponse>('/content/admin/media/retry-policies/reset-all', {});
+    return this.api.post<MediaRetryPolicyListResponse>(
+      '/content/admin/media/retry-policies/reset-all',
+      {},
+    );
   }
 
   requestMediaUsageReconcile(): Observable<MediaJob> {
@@ -1934,37 +2317,62 @@ export class AdminService {
     return this.api.get<MediaCollection[]>('/content/admin/media/collections');
   }
 
-  createMediaCollection(payload: { name: string; slug: string; visibility?: MediaAssetVisibility }): Observable<MediaCollection> {
+  createMediaCollection(payload: {
+    name: string;
+    slug: string;
+    visibility?: MediaAssetVisibility;
+  }): Observable<MediaCollection> {
     return this.api.post<MediaCollection>('/content/admin/media/collections', payload);
   }
 
   updateMediaCollection(
     collectionId: string,
-    payload: { name: string; slug: string; visibility?: MediaAssetVisibility }
+    payload: { name: string; slug: string; visibility?: MediaAssetVisibility },
   ): Observable<MediaCollection> {
-    return this.api.patch<MediaCollection>(`/content/admin/media/collections/${encodeURIComponent(collectionId)}`, payload);
+    return this.api.patch<MediaCollection>(
+      `/content/admin/media/collections/${encodeURIComponent(collectionId)}`,
+      payload,
+    );
   }
 
   replaceMediaCollectionItems(collectionId: string, assetIds: string[]): Observable<void> {
-    return this.api.post<void>(`/content/admin/media/collections/${encodeURIComponent(collectionId)}/items`, {
-      asset_ids: assetIds
-    });
+    return this.api.post<void>(
+      `/content/admin/media/collections/${encodeURIComponent(collectionId)}/items`,
+      {
+        asset_ids: assetIds,
+      },
+    );
   }
 
   linkCheckContent(key: string): Observable<ContentLinkCheckResponse> {
     return this.api.get<ContentLinkCheckResponse>('/content/admin/tools/link-check', { key });
   }
 
-  linkCheckContentPreview(payload: ContentLinkCheckPreviewRequest): Observable<ContentLinkCheckResponse> {
-    return this.api.post<ContentLinkCheckResponse>('/content/admin/tools/link-check/preview', payload);
+  linkCheckContentPreview(
+    payload: ContentLinkCheckPreviewRequest,
+  ): Observable<ContentLinkCheckResponse> {
+    return this.api.post<ContentLinkCheckResponse>(
+      '/content/admin/tools/link-check/preview',
+      payload,
+    );
   }
 
-  previewFindReplaceContent(payload: ContentFindReplacePreviewRequest): Observable<ContentFindReplacePreviewResponse> {
-    return this.api.post<ContentFindReplacePreviewResponse>('/content/admin/tools/find-replace/preview', payload);
+  previewFindReplaceContent(
+    payload: ContentFindReplacePreviewRequest,
+  ): Observable<ContentFindReplacePreviewResponse> {
+    return this.api.post<ContentFindReplacePreviewResponse>(
+      '/content/admin/tools/find-replace/preview',
+      payload,
+    );
   }
 
-  applyFindReplaceContent(payload: ContentFindReplaceApplyRequest): Observable<ContentFindReplaceApplyResponse> {
-    return this.api.post<ContentFindReplaceApplyResponse>('/content/admin/tools/find-replace/apply', payload);
+  applyFindReplaceContent(
+    payload: ContentFindReplaceApplyRequest,
+  ): Observable<ContentFindReplaceApplyResponse> {
+    return this.api.post<ContentFindReplaceApplyResponse>(
+      '/content/admin/tools/find-replace/apply',
+      payload,
+    );
   }
 
   fetchSocialThumbnail(url: string): Observable<SocialThumbnailResponse> {
@@ -1976,14 +2384,24 @@ export class AdminService {
   }
 
   renameContentPage(slug: string, newSlug: string): Observable<ContentPageRenameResponse> {
-    return this.api.post<ContentPageRenameResponse>(`/content/admin/pages/${encodeURIComponent(slug)}/rename`, { new_slug: newSlug });
+    return this.api.post<ContentPageRenameResponse>(
+      `/content/admin/pages/${encodeURIComponent(slug)}/rename`,
+      { new_slug: newSlug },
+    );
   }
 
-  upsertContentRedirect(payload: { from_key: string; to_key: string }): Observable<ContentRedirectRead> {
+  upsertContentRedirect(payload: {
+    from_key: string;
+    to_key: string;
+  }): Observable<ContentRedirectRead> {
     return this.api.post<ContentRedirectRead>('/content/admin/redirects', payload);
   }
 
-  listContentRedirects(params?: { q?: string; page?: number; limit?: number }): Observable<ContentRedirectListResponse> {
+  listContentRedirects(params?: {
+    q?: string;
+    page?: number;
+    limit?: number;
+  }): Observable<ContentRedirectListResponse> {
     return this.api.get<ContentRedirectListResponse>('/content/admin/redirects', params as any);
   }
 
@@ -2006,21 +2424,28 @@ export class AdminService {
   }
 
   validateStructuredData(): Observable<StructuredDataValidationResponse> {
-    return this.api.get<StructuredDataValidationResponse>('/content/admin/seo/structured-data/validate');
+    return this.api.get<StructuredDataValidationResponse>(
+      '/content/admin/seo/structured-data/validate',
+    );
   }
 
   createPagePreviewToken(
     slug: string,
-    params: { lang?: string; expires_minutes?: number } = {}
+    params: { lang?: string; expires_minutes?: number } = {},
   ): Observable<ContentPreviewTokenResponse> {
     const qs = new URLSearchParams();
     if (params.lang) qs.set('lang', params.lang);
     if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));
     const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return this.api.post<ContentPreviewTokenResponse>(`/content/pages/${encodeURIComponent(slug)}/preview-token${suffix}`, {});
+    return this.api.post<ContentPreviewTokenResponse>(
+      `/content/pages/${encodeURIComponent(slug)}/preview-token${suffix}`,
+      {},
+    );
   }
 
-  createHomePreviewToken(params: { lang?: string; expires_minutes?: number } = {}): Observable<ContentPreviewTokenResponse> {
+  createHomePreviewToken(
+    params: { lang?: string; expires_minutes?: number } = {},
+  ): Observable<ContentPreviewTokenResponse> {
     const qs = new URLSearchParams();
     if (params.lang) qs.set('lang', params.lang);
     if (params.expires_minutes) qs.set('expires_minutes', String(params.expires_minutes));

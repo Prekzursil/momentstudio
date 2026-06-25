@@ -3,7 +3,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Response,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import require_admin_section
@@ -31,8 +39,14 @@ from app.services import audit_chain as audit_chain_service
 router = APIRouter(prefix="/ops", tags=["ops"])
 
 
-@router.get("/banner", response_model=MaintenanceBannerPublic, responses={204: {"description": "No banner"}})
-async def get_active_banner(session: AsyncSession = Depends(get_session)) -> MaintenanceBannerPublic | Response:
+@router.get(
+    "/banner",
+    response_model=MaintenanceBannerPublic,
+    responses={204: {"description": "No banner"}},
+)
+async def get_active_banner(
+    session: AsyncSession = Depends(get_session),
+) -> MaintenanceBannerPublic | Response:
     banner = await ops_service.get_active_maintenance_banner(session)
     if not banner:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -49,11 +63,17 @@ async def admin_list_banners(
 
 
 @router.get("/admin/diagnostics", response_model=OpsDiagnosticsRead)
-async def admin_diagnostics(_: User = Depends(require_admin_section("ops"))) -> OpsDiagnosticsRead:
+async def admin_diagnostics(
+    _: User = Depends(require_admin_section("ops")),
+) -> OpsDiagnosticsRead:
     return await ops_service.get_diagnostics()
 
 
-@router.post("/admin/banners", response_model=MaintenanceBannerRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/admin/banners",
+    response_model=MaintenanceBannerRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def admin_create_banner(
     payload: MaintenanceBannerCreate,
     session: AsyncSession = Depends(get_session),
@@ -61,9 +81,15 @@ async def admin_create_banner(
 ) -> MaintenanceBannerRead:
     now = datetime.now(timezone.utc)
     if payload.ends_at and payload.ends_at <= payload.starts_at:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End time must be after start time")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="End time must be after start time",
+        )
     if payload.starts_at < now.replace(year=now.year - 5):  # soft sanity check
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start time is too far in the past")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Start time is too far in the past",
+        )
     banner = MaintenanceBanner(**payload.model_dump())
     created = await ops_service.create_maintenance_banner(session, banner)
     await audit_chain_service.add_admin_audit_log(
@@ -92,12 +118,17 @@ async def admin_update_banner(
 ) -> MaintenanceBannerRead:
     banner = await session.get(MaintenanceBanner, banner_id)
     if not banner:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found"
+        )
     data = payload.model_dump(exclude_unset=True)
     next_starts = data.get("starts_at", getattr(banner, "starts_at", None))
     next_ends = data.get("ends_at", getattr(banner, "ends_at", None))
     if next_ends and next_starts and next_ends <= next_starts:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="End time must be after start time")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="End time must be after start time",
+        )
     before = {
         key: (value.isoformat() if isinstance(value, datetime) else value)
         for key, value in ((field, getattr(banner, field)) for field in data)
@@ -124,7 +155,11 @@ async def admin_update_banner(
     return MaintenanceBannerRead.model_validate(updated)
 
 
-@router.delete("/admin/banners/{banner_id}", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
+@router.delete(
+    "/admin/banners/{banner_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+)
 async def admin_delete_banner(
     banner_id: UUID,
     session: AsyncSession = Depends(get_session),
@@ -132,7 +167,9 @@ async def admin_delete_banner(
 ) -> None:
     banner = await session.get(MaintenanceBanner, banner_id)
     if not banner:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Banner not found"
+        )
     deleted_snapshot = {
         "banner_id": str(banner.id),
         "is_active": bool(banner.is_active),
@@ -193,8 +230,12 @@ async def admin_webhook_backlog_stats(
     since_hours: int = Query(default=24, ge=1, le=168),
 ) -> WebhookBacklogCount:
     pending = await ops_service.count_webhook_backlog(session, since_hours=since_hours)
-    pending_recent = await ops_service.count_recent_webhook_backlog(session, since_hours=since_hours)
-    return WebhookBacklogCount(pending=pending, pending_recent=pending_recent, since_hours=int(since_hours))
+    pending_recent = await ops_service.count_recent_webhook_backlog(
+        session, since_hours=since_hours
+    )
+    return WebhookBacklogCount(
+        pending=pending, pending_recent=pending_recent, since_hours=int(since_hours)
+    )
 
 
 @router.get("/admin/webhooks/{provider}/{event_id}", response_model=WebhookEventDetail)
@@ -204,10 +245,14 @@ async def admin_webhook_detail(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("ops")),
 ) -> WebhookEventDetail:
-    return await ops_service.get_webhook_detail(session, provider=provider, event_id=event_id)
+    return await ops_service.get_webhook_detail(
+        session, provider=provider, event_id=event_id
+    )
 
 
-@router.post("/admin/webhooks/{provider}/{event_id}/retry", response_model=WebhookEventRead)
+@router.post(
+    "/admin/webhooks/{provider}/{event_id}/retry", response_model=WebhookEventRead
+)
 async def admin_retry_webhook(
     provider: str,
     event_id: str,
@@ -215,7 +260,9 @@ async def admin_retry_webhook(
     session: AsyncSession = Depends(get_session),
     admin: User = Depends(require_admin_section("ops")),
 ) -> WebhookEventRead:
-    retried = await ops_service.retry_webhook(session, background_tasks, provider=provider, event_id=event_id)
+    retried = await ops_service.retry_webhook(
+        session, background_tasks, provider=provider, event_id=event_id
+    )
     await audit_chain_service.add_admin_audit_log(
         session,
         action="ops.webhook.retry",
@@ -250,7 +297,9 @@ async def admin_list_email_failures(
     since_hours: int = Query(default=24, ge=1, le=168),
     to_email: str | None = Query(default=None, max_length=255),
 ) -> list[EmailFailureRead]:
-    rows = await ops_service.list_email_failures(session, limit=limit, since_hours=since_hours, to_email=to_email)
+    rows = await ops_service.list_email_failures(
+        session, limit=limit, since_hours=since_hours, to_email=to_email
+    )
     return [EmailFailureRead.model_validate(row) for row in rows]
 
 

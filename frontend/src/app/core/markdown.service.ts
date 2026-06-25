@@ -4,7 +4,9 @@ import createDOMPurify from 'dompurify';
 
 @Injectable({ providedIn: 'root' })
 export class MarkdownService {
-  private readonly purify = typeof window !== 'undefined' ? createDOMPurify(window) : null;
+  private readonly purify =
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
+    typeof window !== 'undefined' ? createDOMPurify(window) : null;
 
   render(markdown: string): string {
     const raw = marked.parse(markdown || '', { breaks: true }) as string;

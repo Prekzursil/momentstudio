@@ -20,7 +20,7 @@ To enable `1` required approval, all must be true:
 2. At least `25` non-bot merged PRs in `60` days.
 3. Condition must hold for **2 consecutive monthly evaluations**.
 
-Result: **HOLD**  
+Result: **HOLD**
 Trigger not met. Keep checks-only branch protection.
 
 ## Top non-bot contributors in window

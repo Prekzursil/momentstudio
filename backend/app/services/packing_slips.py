@@ -9,7 +9,15 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Flowable,
+    PageBreak,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 
 _DEFAULT_TITLE: Final[str] = "Packing slips"
@@ -17,7 +25,11 @@ _REPORTLAB_FONTS: tuple[str, str] | None = None
 
 
 def _order_locale(order: object) -> str:
-    preferred = (getattr(getattr(order, "user", None), "preferred_language", None) or "").strip().lower()
+    preferred = (
+        (getattr(getattr(order, "user", None), "preferred_language", None) or "")
+        .strip()
+        .lower()
+    )
     if preferred in {"en", "ro"}:
         return preferred
 
@@ -25,7 +37,11 @@ def _order_locale(order: object) -> str:
     if currency == "RON":
         return "ro"
 
-    country = (getattr(getattr(order, "shipping_address", None), "country", None) or "").strip().upper()
+    country = (
+        (getattr(getattr(order, "shipping_address", None), "country", None) or "")
+        .strip()
+        .upper()
+    )
     if country == "RO":
         return "ro"
 
@@ -47,7 +63,9 @@ def _register_reportlab_fonts() -> tuple[str, str]:
     ]
 
     regular_path = next((p for p in regular_candidates if Path(p).exists()), None)
-    bold_path = next((p for p in bold_candidates if Path(p).exists()), None) or regular_path
+    bold_path = (
+        next((p for p in bold_candidates if Path(p).exists()), None) or regular_path
+    )
     if regular_path is None and bold_path is not None:
         regular_path = bold_path
 
@@ -105,7 +123,9 @@ def _addr_lines(addr) -> list[str]:
     return parts
 
 
-def render_batch_packing_slips_pdf(orders: Sequence[object], *, title: str | None = None) -> bytes:
+def render_batch_packing_slips_pdf(
+    orders: Sequence[object], *, title: str | None = None
+) -> bytes:
     font_regular, font_bold = _register_reportlab_fonts()
     styles = getSampleStyleSheet()
     base = ParagraphStyle(
@@ -152,13 +172,15 @@ def render_batch_packing_slips_pdf(orders: Sequence[object], *, title: str | Non
         title=title or _DEFAULT_TITLE,
     )
 
-    story: list[object] = []
+    story: list[Flowable] = []
     for idx, order in enumerate(orders):
         if idx:
             story.append(PageBreak())
 
         ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
-        created_at = _fmt_dt(getattr(order, "created_at", None), locale=_order_locale(order))
+        created_at = _fmt_dt(
+            getattr(order, "created_at", None), locale=_order_locale(order)
+        )
         customer_name = (getattr(order, "customer_name", None) or "").strip()
         customer_email = (getattr(order, "customer_email", None) or "").strip()
 
@@ -208,17 +230,27 @@ def render_batch_packing_slips_pdf(orders: Sequence[object], *, title: str | Non
         story.append(Paragraph("Items / Produse", h2))
 
         rows: list[list[object]] = [
-            [Paragraph("Product / Produs", base), Paragraph("Qty", base), Paragraph("SKU", base)]
+            [
+                Paragraph("Product / Produs", base),
+                Paragraph("Qty", base),
+                Paragraph("SKU", base),
+            ]
         ]
         for item in items:
             product = getattr(item, "product", None)
-            name = (getattr(product, "name", None) or str(getattr(item, "product_id", ""))).strip() or "—"
+            name = (
+                getattr(product, "name", None) or str(getattr(item, "product_id", ""))
+            ).strip() or "—"
             sku = (getattr(product, "sku", None) or "").strip() or "—"
             qty = int(getattr(item, "quantity", 0) or 0)
-            rows.append([Paragraph(name, base), Paragraph(str(qty), base), Paragraph(sku, base)])
+            rows.append(
+                [Paragraph(name, base), Paragraph(str(qty), base), Paragraph(sku, base)]
+            )
 
         if len(rows) == 1:
-            rows.append([Paragraph("—", base), Paragraph("0", base), Paragraph("—", base)])
+            rows.append(
+                [Paragraph("—", base), Paragraph("0", base), Paragraph("—", base)]
+            )
 
         table = Table(rows, colWidths=[120 * mm, 20 * mm, 40 * mm], hAlign="LEFT")
         table.setStyle(

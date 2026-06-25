@@ -48,9 +48,17 @@ def upgrade() -> None:
 
     dialect = conn.dialect.name
     if dialect == "sqlite":
-        conn.execute(sa.text("CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_nocase ON users (email COLLATE NOCASE)"))
+        conn.execute(
+            sa.text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_nocase ON users (email COLLATE NOCASE)"
+            )
+        )
     else:
-        conn.execute(sa.text("CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower ON users (lower(email))"))
+        conn.execute(
+            sa.text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_users_email_lower ON users (lower(email))"
+            )
+        )
 
 
 def downgrade() -> None:

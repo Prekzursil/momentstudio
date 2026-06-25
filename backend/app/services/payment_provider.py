@@ -19,4 +19,3 @@ def payments_provider() -> PaymentsProvider:
 
 def is_mock_payments() -> bool:
     return payments_provider() == "mock"
-

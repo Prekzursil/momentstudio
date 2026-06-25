@@ -37,7 +37,9 @@ def _looks_configured(value: str | None) -> bool:
 
 def stripe_secret_key() -> str:
     if _stripe_env() == "live":
-        return (settings.stripe_secret_key_live or settings.stripe_secret_key or "").strip()
+        return (
+            settings.stripe_secret_key_live or settings.stripe_secret_key or ""
+        ).strip()
     return (
         settings.stripe_secret_key_sandbox
         or settings.stripe_secret_key_test
@@ -48,7 +50,9 @@ def stripe_secret_key() -> str:
 
 def stripe_webhook_secret() -> str:
     if _stripe_env() == "live":
-        return (settings.stripe_webhook_secret_live or settings.stripe_webhook_secret or "").strip()
+        return (
+            settings.stripe_webhook_secret_live or settings.stripe_webhook_secret or ""
+        ).strip()
     return (
         settings.stripe_webhook_secret_sandbox
         or settings.stripe_webhook_secret_test
@@ -82,12 +86,16 @@ async def _get_or_create_cached_amount_off_coupon(
     if discount_cents <= 0:
         return None
 
-    promo_res = await session.execute(select(PromoCode).where(PromoCode.code == cleaned_code))
+    promo_res = await session.execute(
+        select(PromoCode).where(PromoCode.code == cleaned_code)
+    )
     promo = promo_res.scalar_one_or_none()
     if not promo:
         return None
 
-    currency_clean = (getattr(promo, "currency", None) or currency or "RON").strip().upper() or "RON"
+    currency_clean = (
+        getattr(promo, "currency", None) or currency or "RON"
+    ).strip().upper() or "RON"
     map_res = await session.execute(
         select(StripeCouponMapping).where(
             StripeCouponMapping.promo_code_id == promo.id,
@@ -104,12 +112,15 @@ async def _get_or_create_cached_amount_off_coupon(
             duration="once",
             amount_off=int(discount_cents),
             currency=currency_clean.lower(),
-            metadata={"promo_code": cleaned_code, "discount_cents": str(int(discount_cents))},
+            metadata={
+                "promo_code": cleaned_code,
+                "discount_cents": str(int(discount_cents)),
+            },
         )
     except Exception:
         return None
 
-    coupon_id = getattr(coupon_obj, "id", None) or (coupon_obj.get("id") if hasattr(coupon_obj, "get") else None)
+    coupon_id = getattr(coupon_obj, "id", None)
     if not coupon_id:
         return None
 
@@ -137,16 +148,26 @@ async def _get_or_create_cached_amount_off_coupon(
     return str(coupon_id)
 
 
-async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents: int | None = None) -> dict:
+async def create_payment_intent(
+    session: AsyncSession, cart: Cart, amount_cents: int | None = None
+) -> dict:
     if not is_stripe_configured():
         metrics.record_payment_failure()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe not configured",
+        )
     if not cart.items:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cart is empty"
+        )
 
     init_stripe()
     subtotal = sum(
-        (Decimal(str(item.unit_price_at_add)) * int(item.quantity or 0) for item in cart.items),
+        (
+            Decimal(str(item.unit_price_at_add)) * int(item.quantity or 0)
+            for item in cart.items
+        ),
         start=Decimal("0.00"),
     )
     subtotal = subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -157,16 +178,24 @@ async def create_payment_intent(session: AsyncSession, cart: Cart, amount_cents:
         intent = stripe.PaymentIntent.create(
             amount=amount_cents,
             currency="ron",
-            metadata={"cart_id": str(cart.id), "user_id": str(cart.user_id) if cart.user_id else ""},
+            metadata={
+                "cart_id": str(cart.id),
+                "user_id": str(cart.user_id) if cart.user_id else "",
+            },
         )
     except Exception as exc:
         metrics.record_payment_failure()
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
 
     client_secret = getattr(intent, "client_secret", None)
     intent_id = getattr(intent, "id", None)
     if not client_secret or not intent_id:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe client secret missing")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Stripe client secret missing",
+        )
     return {"client_secret": str(client_secret), "intent_id": str(intent_id)}
 
 
@@ -197,13 +226,20 @@ async def create_checkout_session(
 
     if not is_stripe_configured():
         metrics.record_payment_failure()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe not configured",
+        )
     if amount_cents <= 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid amount")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid amount"
+        )
 
     init_stripe()
     locale: Literal["en", "ro"] = "ro" if (lang or "").strip().lower() == "ro" else "en"
-    safe_metadata = {str(k): str(v) for (k, v) in (metadata or {}).items() if k and v is not None}
+    safe_metadata = {
+        str(k): str(v) for (k, v) in (metadata or {}).items() if k and v is not None
+    }
     normalized_items = line_items or [
         {
             "price_data": {
@@ -216,23 +252,37 @@ async def create_checkout_session(
     ]
     discount_value = int(discount_cents or 0)
     if discount_value < 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid discount")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid discount"
+        )
     if line_items is not None:
         computed_total = 0
         for item in normalized_items:
             qty = item.get("quantity", 1)
             if not isinstance(qty, int):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid line item quantity")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid line item quantity",
+                )
             price_data = item.get("price_data")
             if not isinstance(price_data, dict):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid line item price")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid line item price",
+                )
             unit_amount = price_data.get("unit_amount")
             if not isinstance(unit_amount, int):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid line item amount")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid line item amount",
+                )
             computed_total += unit_amount * qty
         computed_total -= discount_value
         if computed_total != amount_cents:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Line items total mismatch")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Line items total mismatch",
+            )
 
     try:
         discounts_param = None
@@ -244,10 +294,10 @@ async def create_checkout_session(
                 currency="RON",
             )
             if not coupon_id:
-                coupon_obj = stripe.Coupon.create(duration="once", amount_off=discount_value, currency="ron")
-                coupon_id = getattr(coupon_obj, "id", None) or (
-                    coupon_obj.get("id") if hasattr(coupon_obj, "get") else None
+                coupon_obj = stripe.Coupon.create(
+                    duration="once", amount_off=discount_value, currency="ron"
                 )
+                coupon_id = getattr(coupon_obj, "id", None)
             if coupon_id:
                 discounts_param = [{"coupon": str(coupon_id)}]
 
@@ -263,19 +313,21 @@ async def create_checkout_session(
         }
         if discounts_param:
             session_kwargs["discounts"] = discounts_param
-        session_obj = stripe.checkout.Session.create(
-            **session_kwargs
-        )
+        session_obj = stripe.checkout.Session.create(**session_kwargs)
     except Exception as exc:
         metrics.record_payment_failure()
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe checkout session creation failed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Stripe checkout session creation failed",
+        ) from exc
 
-    session_id_raw = getattr(session_obj, "id", None) or (session_obj.get("id") if hasattr(session_obj, "get") else None)
-    checkout_url_raw = getattr(session_obj, "url", None) or (
-        session_obj.get("url") if hasattr(session_obj, "get") else None
-    )
+    session_id_raw = getattr(session_obj, "id", None)
+    checkout_url_raw = getattr(session_obj, "url", None)
     if not session_id_raw or not checkout_url_raw:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe checkout session missing url")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Stripe checkout session missing url",
+        )
     return {"session_id": str(session_id_raw), "checkout_url": str(checkout_url_raw)}
 
 
@@ -291,7 +343,16 @@ def _stripe_event_payload_summary(event: Any) -> dict[str, Any]:
     get = getattr(obj, "get", None)
     if callable(get):
         obj_summary: dict[str, Any] = {}
-        for key in ("id", "payment_intent", "payment_status", "charge", "amount", "currency", "reason", "status"):
+        for key in (
+            "id",
+            "payment_intent",
+            "payment_status",
+            "charge",
+            "amount",
+            "currency",
+            "reason",
+            "status",
+        ):
             value = get(key)
             if value is not None:
                 obj_summary[key] = value
@@ -300,19 +361,30 @@ def _stripe_event_payload_summary(event: Any) -> dict[str, Any]:
     return summary
 
 
-async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header: str | None) -> tuple[dict, StripeWebhookEvent]:
+async def handle_webhook_event(
+    session: AsyncSession, payload: bytes, sig_header: str | None
+) -> tuple[dict, StripeWebhookEvent]:
     secret = stripe_webhook_secret()
     if not _looks_configured(secret):
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Webhook secret not set")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Webhook secret not set",
+        )
     init_stripe()
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, secret)
+        event = cast(
+            dict[str, Any], stripe.Webhook.construct_event(payload, sig_header, secret)
+        )
     except Exception as exc:  # broad for Stripe signature errors
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload"
+        ) from exc
 
     event_id = str(event.get("id") or "").strip()
     if not event_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id"
+        )
 
     now = datetime.now(timezone.utc)
     event_type = str(event.get("type") or "").strip() or None
@@ -333,7 +405,13 @@ async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header
     except IntegrityError:
         await session.rollback()
 
-    existing = (await session.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_id))).scalar_one()
+    existing = (
+        await session.execute(
+            select(StripeWebhookEvent).where(
+                StripeWebhookEvent.stripe_event_id == event_id
+            )
+        )
+    ).scalar_one()
     existing.attempts = int(getattr(existing, "attempts", 0) or 0) + 1
     existing.last_attempt_at = now
     existing.event_type = event_type or existing.event_type
@@ -347,34 +425,51 @@ async def handle_webhook_event(session: AsyncSession, payload: bytes, sig_header
 async def capture_payment_intent(intent_id: str) -> dict:
     """Capture an authorized PaymentIntent."""
     if not is_stripe_configured():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe not configured",
+        )
     init_stripe()
     try:
-        return stripe.PaymentIntent.capture(intent_id)
+        return cast(dict[str, Any], stripe.PaymentIntent.capture(intent_id))
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
 
 
 async def void_payment_intent(intent_id: str) -> dict:
     """Cancel/void a PaymentIntent that has not been captured."""
     if not is_stripe_configured():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe not configured",
+        )
     init_stripe()
     try:
-        return stripe.PaymentIntent.cancel(intent_id)
+        return cast(dict[str, Any], stripe.PaymentIntent.cancel(intent_id))
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
 
 
-async def refund_payment_intent(intent_id: str, *, amount_cents: int | None = None) -> dict:
+async def refund_payment_intent(
+    intent_id: str, *, amount_cents: int | None = None
+) -> dict:
     """Refund a captured PaymentIntent (supports partial refunds via `amount_cents`)."""
     if not is_stripe_configured():
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Stripe not configured")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe not configured",
+        )
     init_stripe()
     try:
         payload: dict = {"payment_intent": intent_id}
         if amount_cents is not None:
             payload["amount"] = int(amount_cents)
-        return stripe.Refund.create(**payload)
+        return cast(dict[str, Any], stripe.Refund.create(**payload))
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc

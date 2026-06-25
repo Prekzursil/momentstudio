@@ -26,7 +26,12 @@ async function stabilizePage(page: Page): Promise<void> {
   });
 }
 
-async function captureRoute(eyes: Eyes, page: Page, routeName: string, path: string): Promise<void> {
+async function captureRoute(
+  eyes: Eyes,
+  page: Page,
+  routeName: string,
+  path: string,
+): Promise<void> {
   await page.goto(path, { waitUntil: 'networkidle' });
   await page.addStyleTag({
     content: `

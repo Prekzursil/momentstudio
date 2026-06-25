@@ -11,7 +11,10 @@ from app.services.font_utils import Font, load_font as _load_font
 OG_WIDTH = 1200
 OG_HEIGHT = 630
 
-def render_blog_post_og(*, title: str, subtitle: str | None = None, brand: str = "momentstudio") -> bytes:
+
+def render_blog_post_og(
+    *, title: str, subtitle: str | None = None, brand: str = "momentstudio"
+) -> bytes:
     title = (title or "").strip() or "Blog"
     subtitle = (subtitle or "").strip() or ""
 

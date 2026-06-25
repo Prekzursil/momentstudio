@@ -7,7 +7,7 @@ function ownerPassword(): string {
   const password = process.env.E2E_OWNER_PASSWORD;
   if (password) return password;
   throw new Error(
-    'E2E_OWNER_PASSWORD is required to run checkout Playwright tests. Set it to the owner password used by `bootstrap-owner`.'
+    'E2E_OWNER_PASSWORD is required to run checkout Playwright tests. Set it to the owner password used by `bootstrap-owner`.',
   );
 }
 
@@ -15,7 +15,11 @@ export function uniqueSessionId(prefix: string): string {
   return `${prefix}-${randomUUID()}`;
 }
 
-async function waitForConsentCheckboxReady(page: Page, checkbox: Locator, checkboxIndex: number): Promise<void> {
+async function waitForConsentCheckboxReady(
+  page: Page,
+  checkbox: Locator,
+  checkboxIndex: number,
+): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     if (await checkbox.isChecked()) return;
@@ -36,9 +40,12 @@ async function acceptConsentIfNeeded(page: Page, checkboxIndex: number): Promise
 
   const slug = checkboxIndex === 0 ? 'terms-and-conditions' : 'privacy-policy';
   const contentResponse = page
-    .waitForResponse((res) => res.url().includes(`/api/v1/content/pages/${slug}`) && res.status() === 200, {
-      timeout: 10_000
-    })
+    .waitForResponse(
+      (res) => res.url().includes(`/api/v1/content/pages/${slug}`) && res.status() === 200,
+      {
+        timeout: 10_000,
+      },
+    )
     .catch(() => null);
   await checkbox.click();
   await contentResponse;
@@ -74,7 +81,7 @@ export async function loginUi(page: Page): Promise<void> {
 
 export async function loginApi(request: APIRequestContext): Promise<string> {
   const res = await request.post('/api/v1/auth/login', {
-    data: { identifier: OWNER_IDENTIFIER, password: ownerPassword() }
+    data: { identifier: OWNER_IDENTIFIER, password: ownerPassword() },
   });
   expect(res.ok()).toBeTruthy();
   const payload = await res.json();
@@ -84,7 +91,7 @@ export async function loginApi(request: APIRequestContext): Promise<string> {
 export async function seedCartWithFirstProduct(
   request: APIRequestContext,
   sessionId: string,
-  options: { skipMessage?: string; token?: string } = {}
+  options: { skipMessage?: string; token?: string } = {},
 ): Promise<{ name: string } | null> {
   const listRes = await request.get('/api/v1/catalog/products?sort=newest&page=1&limit=25');
   expect(listRes.ok()).toBeTruthy();
@@ -118,10 +125,10 @@ export async function seedCartWithFirstProduct(
         {
           product_id: product.id,
           variant_id: null,
-          quantity: 1
-        }
-      ]
-    }
+          quantity: 1,
+        },
+      ],
+    },
   });
   expect(syncRes.ok()).toBeTruthy();
   return { name: String(product?.name ?? '').trim() || 'Item' };
@@ -150,7 +157,7 @@ export async function fillShippingAddress(page: Page, email: string): Promise<vo
 export async function openCheckoutWithSeededCart(
   page: Page,
   request: APIRequestContext,
-  sessionPrefix: string
+  sessionPrefix: string,
 ): Promise<{ product: { name: string }; sessionId: string } | null> {
   const sessionId = uniqueSessionId(sessionPrefix);
   await page.addInitScript((sid) => {
@@ -164,7 +171,10 @@ export async function openCheckoutWithSeededCart(
   await loginUi(page);
 
   const cartLoad = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/cart') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
   );
   await page.goto('/cart');
   await cartLoad;

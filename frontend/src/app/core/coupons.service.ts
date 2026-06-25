@@ -62,20 +62,31 @@ export interface CouponEligibilityResponse {
 
 @Injectable({ providedIn: 'root' })
 export class CouponsService {
-  constructor(private readonly api: ApiService, private cartApi: CartApi) {}
+  constructor(
+    private readonly api: ApiService,
+    private cartApi: CartApi,
+  ) {}
 
   eligibility(shippingMethodId?: string | null): Observable<CouponEligibilityResponse> {
     const params = shippingMethodId ? { shipping_method_id: shippingMethodId } : undefined;
-    return this.api.get<CouponEligibilityResponse>('/coupons/eligibility', params, this.cartApi.headers());
+    return this.api.get<CouponEligibilityResponse>(
+      '/coupons/eligibility',
+      params,
+      this.cartApi.headers(),
+    );
   }
 
   validate(code: string, shippingMethodId?: string | null): Observable<CouponOffer> {
     const params = shippingMethodId ? { shipping_method_id: shippingMethodId } : undefined;
-    return this.api.post<CouponOffer>('/coupons/validate', { code }, this.cartApi.headers(), params);
+    return this.api.post<CouponOffer>(
+      '/coupons/validate',
+      { code },
+      this.cartApi.headers(),
+      params,
+    );
   }
 
   myCoupons(): Observable<CouponRead[]> {
     return this.api.get<CouponRead[]>('/coupons/me');
   }
 }
-

@@ -80,7 +80,13 @@ def _parse_bool(value: object | None, *, fallback: bool) -> bool:
     return fallback
 
 
-def _parse_int(value: object | None, *, fallback: int, min_value: int | None = None, max_value: int | None = None) -> int:
+def _parse_int(
+    value: object | None,
+    *,
+    fallback: int,
+    min_value: int | None = None,
+    max_value: int | None = None,
+) -> int:
     raw: int | None = None
     if value is None:
         raw = None
@@ -184,10 +190,14 @@ def _monthly_period_end(now: datetime, *, day: int, hour_utc: int) -> datetime:
     now_utc = now.astimezone(timezone.utc)
     day = max(1, min(28, int(day)))
     hour_utc = max(0, min(23, int(hour_utc)))
-    candidate = datetime(now_utc.year, now_utc.month, day, hour_utc, 0, 0, tzinfo=timezone.utc)
+    candidate = datetime(
+        now_utc.year, now_utc.month, day, hour_utc, 0, 0, tzinfo=timezone.utc
+    )
     if candidate > now_utc:
         prev_year, prev_month = _previous_month(now_utc.year, now_utc.month)
-        candidate = datetime(prev_year, prev_month, day, hour_utc, 0, 0, tzinfo=timezone.utc)
+        candidate = datetime(
+            prev_year, prev_month, day, hour_utc, 0, 0, tzinfo=timezone.utc
+        )
     return candidate
 
 
@@ -214,18 +224,44 @@ def _cooldown_active(
 
 
 async def _load_settings_block(session: AsyncSession) -> ContentBlock | None:
-    return await content_service.get_published_by_key_following_redirects(session, REPORT_SETTINGS_KEY)
+    return await content_service.get_published_by_key_following_redirects(
+        session, REPORT_SETTINGS_KEY
+    )
 
 
 def _parse_settings(meta: dict | None) -> tuple[ReportSettings, ReportState]:
     meta = dict(meta or {})
     settings_obj = ReportSettings(
-        weekly_enabled=_parse_bool(meta.get("reports_weekly_enabled"), fallback=DEFAULT_WEEKLY_ENABLED),
-        weekly_weekday=_parse_int(meta.get("reports_weekly_weekday"), fallback=DEFAULT_WEEKLY_WEEKDAY, min_value=0, max_value=6),
-        weekly_hour_utc=_parse_int(meta.get("reports_weekly_hour_utc"), fallback=DEFAULT_WEEKLY_HOUR_UTC, min_value=0, max_value=23),
-        monthly_enabled=_parse_bool(meta.get("reports_monthly_enabled"), fallback=DEFAULT_MONTHLY_ENABLED),
-        monthly_day=_parse_int(meta.get("reports_monthly_day"), fallback=DEFAULT_MONTHLY_DAY, min_value=1, max_value=28),
-        monthly_hour_utc=_parse_int(meta.get("reports_monthly_hour_utc"), fallback=DEFAULT_MONTHLY_HOUR_UTC, min_value=0, max_value=23),
+        weekly_enabled=_parse_bool(
+            meta.get("reports_weekly_enabled"), fallback=DEFAULT_WEEKLY_ENABLED
+        ),
+        weekly_weekday=_parse_int(
+            meta.get("reports_weekly_weekday"),
+            fallback=DEFAULT_WEEKLY_WEEKDAY,
+            min_value=0,
+            max_value=6,
+        ),
+        weekly_hour_utc=_parse_int(
+            meta.get("reports_weekly_hour_utc"),
+            fallback=DEFAULT_WEEKLY_HOUR_UTC,
+            min_value=0,
+            max_value=23,
+        ),
+        monthly_enabled=_parse_bool(
+            meta.get("reports_monthly_enabled"), fallback=DEFAULT_MONTHLY_ENABLED
+        ),
+        monthly_day=_parse_int(
+            meta.get("reports_monthly_day"),
+            fallback=DEFAULT_MONTHLY_DAY,
+            min_value=1,
+            max_value=28,
+        ),
+        monthly_hour_utc=_parse_int(
+            meta.get("reports_monthly_hour_utc"),
+            fallback=DEFAULT_MONTHLY_HOUR_UTC,
+            min_value=0,
+            max_value=23,
+        ),
         recipients=_parse_recipients(meta.get("reports_recipients")) or None,
         top_products_limit=_parse_int(
             meta.get("reports_top_products_limit"),
@@ -247,19 +283,37 @@ def _parse_settings(meta: dict | None) -> tuple[ReportSettings, ReportState]:
         ),
     )
     state_obj = ReportState(
-        weekly_last_sent_period_end=_parse_iso_dt(meta.get("reports_weekly_last_sent_period_end")),
-        weekly_last_attempt_at=_parse_iso_dt(meta.get("reports_weekly_last_attempt_at")),
-        weekly_last_attempt_period_end=_parse_iso_dt(meta.get("reports_weekly_last_attempt_period_end")),
-        weekly_last_error=(str(meta.get("reports_weekly_last_error") or "").strip()[:500] or None),
-        monthly_last_sent_period_end=_parse_iso_dt(meta.get("reports_monthly_last_sent_period_end")),
-        monthly_last_attempt_at=_parse_iso_dt(meta.get("reports_monthly_last_attempt_at")),
-        monthly_last_attempt_period_end=_parse_iso_dt(meta.get("reports_monthly_last_attempt_period_end")),
-        monthly_last_error=(str(meta.get("reports_monthly_last_error") or "").strip()[:500] or None),
+        weekly_last_sent_period_end=_parse_iso_dt(
+            meta.get("reports_weekly_last_sent_period_end")
+        ),
+        weekly_last_attempt_at=_parse_iso_dt(
+            meta.get("reports_weekly_last_attempt_at")
+        ),
+        weekly_last_attempt_period_end=_parse_iso_dt(
+            meta.get("reports_weekly_last_attempt_period_end")
+        ),
+        weekly_last_error=(
+            str(meta.get("reports_weekly_last_error") or "").strip()[:500] or None
+        ),
+        monthly_last_sent_period_end=_parse_iso_dt(
+            meta.get("reports_monthly_last_sent_period_end")
+        ),
+        monthly_last_attempt_at=_parse_iso_dt(
+            meta.get("reports_monthly_last_attempt_at")
+        ),
+        monthly_last_attempt_period_end=_parse_iso_dt(
+            meta.get("reports_monthly_last_attempt_period_end")
+        ),
+        monthly_last_error=(
+            str(meta.get("reports_monthly_last_error") or "").strip()[:500] or None
+        ),
     )
     return settings_obj, state_obj
 
 
-async def _update_block_meta(session: AsyncSession, block: ContentBlock, updates: dict[str, object | None]) -> None:
+async def _update_block_meta(
+    session: AsyncSession, block: ContentBlock, updates: dict[str, object | None]
+) -> None:
     meta = dict(getattr(block, "meta", None) or {})
     for key, value in updates.items():
         if value is None:
@@ -318,7 +372,11 @@ async def _compute_summary(
     orders_total = await session.scalar(
         select(func.count())
         .select_from(Order)
-        .where(Order.created_at >= period_start, Order.created_at < period_end, exclude_test_orders)
+        .where(
+            Order.created_at >= period_start,
+            Order.created_at < period_end,
+            exclude_test_orders,
+        )
     )
     orders_success = await session.scalar(
         select(func.count())
@@ -380,7 +438,9 @@ async def _top_products(
             exclude_test_orders,
         )
         .group_by(Product.id)
-        .order_by(func.sum(OrderItem.quantity).desc(), func.sum(OrderItem.subtotal).desc())
+        .order_by(
+            func.sum(OrderItem.quantity).desc(), func.sum(OrderItem.subtotal).desc()
+        )
         .limit(limit)
     )
     rows = (await session.execute(stmt)).all()
@@ -430,7 +490,9 @@ async def _low_stock(
                 "sku": product.sku,
                 "stock_quantity": stock,
                 "threshold": threshold_int,
-                "is_critical": bool(stock <= 0 or stock < max(1, int(threshold_int // 2))),
+                "is_critical": bool(
+                    stock <= 0 or stock < max(1, int(threshold_int // 2))
+                ),
             }
         )
     return items
@@ -446,7 +508,9 @@ async def _send_report_email(
     top_products_limit: int,
     low_stock_limit: int,
 ) -> tuple[int, int]:
-    summary = await _compute_summary(session, period_start=period_start, period_end=period_end)
+    summary = await _compute_summary(
+        session, period_start=period_start, period_end=period_end
+    )
     top_products = await _top_products(
         session,
         period_start=period_start,
@@ -477,17 +541,25 @@ async def _send_report_email(
     return attempted, delivered
 
 
-async def _effective_recipients(session: AsyncSession, recipients: list[str] | None) -> list[str]:
+async def _effective_recipients(
+    session: AsyncSession, recipients: list[str] | None
+) -> list[str]:
     if recipients:
         return recipients
     owner = await auth_service.get_owner_user(session)
-    fallback = ((owner.email if owner and owner.email else None) or settings.admin_alert_email or "").strip()
+    fallback = (
+        (owner.email if owner and owner.email else None)
+        or settings.admin_alert_email
+        or ""
+    ).strip()
     if fallback and _EMAIL_RE.match(fallback):
         return [fallback.lower()]
     return []
 
 
-async def send_due_reports(session: AsyncSession, *, now: datetime | None = None) -> None:
+async def send_due_reports(
+    session: AsyncSession, *, now: datetime | None = None
+) -> None:
     if not settings.smtp_enabled:
         return
 
@@ -502,7 +574,11 @@ async def send_due_reports(session: AsyncSession, *, now: datetime | None = None
         return
 
     if settings_obj.weekly_enabled:
-        period_end = _weekly_period_end(now, weekday=settings_obj.weekly_weekday, hour_utc=settings_obj.weekly_hour_utc)
+        period_end = _weekly_period_end(
+            now,
+            weekday=settings_obj.weekly_weekday,
+            hour_utc=settings_obj.weekly_hour_utc,
+        )
         if state_obj.weekly_last_sent_period_end == period_end:
             pass
         elif _cooldown_active(
@@ -552,7 +628,9 @@ async def send_due_reports(session: AsyncSession, *, now: datetime | None = None
                 )
 
     if settings_obj.monthly_enabled:
-        period_end = _monthly_period_end(now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc)
+        period_end = _monthly_period_end(
+            now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc
+        )
         if state_obj.monthly_last_sent_period_end == period_end:
             pass
         elif _cooldown_active(
@@ -627,7 +705,11 @@ async def send_report_now(
         raise ValueError("Invalid report kind")
 
     if kind_clean == "weekly":
-        period_end = _weekly_period_end(now, weekday=settings_obj.weekly_weekday, hour_utc=settings_obj.weekly_hour_utc)
+        period_end = _weekly_period_end(
+            now,
+            weekday=settings_obj.weekly_weekday,
+            hour_utc=settings_obj.weekly_hour_utc,
+        )
         period_start = period_end - timedelta(days=7)
         last_sent = state_obj.weekly_last_sent_period_end
         if not force and last_sent == period_end:
@@ -649,7 +731,11 @@ async def send_report_now(
             low_stock_limit=settings_obj.low_stock_limit,
         )
         if delivered > 0:
-            await _update_block_meta(session, block, {"reports_weekly_last_sent_period_end": period_end.isoformat()})
+            await _update_block_meta(
+                session,
+                block,
+                {"reports_weekly_last_sent_period_end": period_end.isoformat()},
+            )
         return {
             "kind": "weekly",
             "period_start": period_start.isoformat(),
@@ -659,7 +745,9 @@ async def send_report_now(
             "skipped": False,
         }
 
-    period_end = _monthly_period_end(now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc)
+    period_end = _monthly_period_end(
+        now, day=settings_obj.monthly_day, hour_utc=settings_obj.monthly_hour_utc
+    )
     period_start = _subtract_one_month(period_end)
     last_sent = state_obj.monthly_last_sent_period_end
     if not force and last_sent == period_end:
@@ -681,7 +769,11 @@ async def send_report_now(
         low_stock_limit=settings_obj.low_stock_limit,
     )
     if delivered > 0:
-        await _update_block_meta(session, block, {"reports_monthly_last_sent_period_end": period_end.isoformat()})
+        await _update_block_meta(
+            session,
+            block,
+            {"reports_monthly_last_sent_period_end": period_end.isoformat()},
+        )
     return {
         "kind": "monthly",
         "period_start": period_start.isoformat(),
@@ -690,4 +782,3 @@ async def send_report_now(
         "delivered": delivered,
         "skipped": False,
     }
-

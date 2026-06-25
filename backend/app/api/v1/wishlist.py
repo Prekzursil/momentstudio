@@ -13,20 +13,25 @@ router = APIRouter(prefix="/wishlist", tags=["wishlist"])
 
 @router.get("", response_model=list[ProductRead])
 async def list_wishlist(
-    current_user: User = Depends(require_complete_profile), session: AsyncSession = Depends(get_session)
+    current_user: User = Depends(require_complete_profile),
+    session: AsyncSession = Depends(get_session),
 ) -> list[ProductRead]:
     products = await wishlist_service.list_wishlist(session, current_user.id)
     return products
 
 
-@router.post("/{product_id}", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{product_id}", response_model=ProductRead, status_code=status.HTTP_201_CREATED
+)
 async def add_wishlist_item(
     product_id: uuid.UUID,
     current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ) -> ProductRead:
-    product = await wishlist_service.add_to_wishlist(session, current_user.id, product_id)
-    return product
+    product = await wishlist_service.add_to_wishlist(
+        session, current_user.id, product_id
+    )
+    return ProductRead.model_validate(product)
 
 
 @router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)

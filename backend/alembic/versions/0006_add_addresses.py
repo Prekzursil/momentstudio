@@ -21,8 +21,15 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "addresses",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id"), nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "user_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("users.id"),
+            nullable=False,
+        ),
         sa.Column("label", sa.String(length=50), nullable=True),
         sa.Column("line1", sa.String(length=200), nullable=False),
         sa.Column("line2", sa.String(length=200), nullable=True),
@@ -30,9 +37,24 @@ def upgrade() -> None:
         sa.Column("region", sa.String(length=100), nullable=True),
         sa.Column("postal_code", sa.String(length=20), nullable=False),
         sa.Column("country", sa.String(length=2), nullable=False),
-        sa.Column("is_default_shipping", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("is_default_billing", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "is_default_shipping",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
+        sa.Column(
+            "is_default_billing",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.false(),
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),

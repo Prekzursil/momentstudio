@@ -6,8 +6,12 @@ from pathlib import Path
 
 
 def _load_module():
-    module_path = Path(__file__).resolve().parents[2] / "seo" / "generate_content_backlog.py"
-    spec = importlib.util.spec_from_file_location("generate_content_backlog", module_path)
+    module_path = (
+        Path(__file__).resolve().parents[2] / "seo" / "generate_content_backlog.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "generate_content_backlog", module_path
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

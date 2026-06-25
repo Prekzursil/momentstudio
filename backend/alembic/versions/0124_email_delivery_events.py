@@ -22,16 +22,29 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "email_delivery_events",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("to_email", sa.String(length=255), nullable=False),
         sa.Column("subject", sa.String(length=255), nullable=False),
         sa.Column("status", sa.String(length=16), nullable=False),
         sa.Column("error_message", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
-    op.create_index("ix_email_delivery_events_to_email", "email_delivery_events", ["to_email"])
-    op.create_index("ix_email_delivery_events_created_at", "email_delivery_events", ["created_at"])
-    op.create_index("ix_email_delivery_events_status", "email_delivery_events", ["status"])
+    op.create_index(
+        "ix_email_delivery_events_to_email", "email_delivery_events", ["to_email"]
+    )
+    op.create_index(
+        "ix_email_delivery_events_created_at", "email_delivery_events", ["created_at"]
+    )
+    op.create_index(
+        "ix_email_delivery_events_status", "email_delivery_events", ["status"]
+    )
 
     op.execute(
         """
@@ -44,6 +57,10 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_email_delivery_events_status", table_name="email_delivery_events")
-    op.drop_index("ix_email_delivery_events_created_at", table_name="email_delivery_events")
-    op.drop_index("ix_email_delivery_events_to_email", table_name="email_delivery_events")
+    op.drop_index(
+        "ix_email_delivery_events_created_at", table_name="email_delivery_events"
+    )
+    op.drop_index(
+        "ix_email_delivery_events_to_email", table_name="email_delivery_events"
+    )
     op.drop_table("email_delivery_events")

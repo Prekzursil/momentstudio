@@ -11,10 +11,20 @@ from app.core.config import settings
 class BackpressureMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, max_concurrent: int | None = None):
         super().__init__(app)
-        self.max_concurrent = settings.max_concurrent_requests if max_concurrent is None else int(max_concurrent)
-        self.limiter = anyio.CapacityLimiter(self.max_concurrent) if self.max_concurrent > 0 else None
+        self.max_concurrent = (
+            settings.max_concurrent_requests
+            if max_concurrent is None
+            else int(max_concurrent)
+        )
+        self.limiter = (
+            anyio.CapacityLimiter(self.max_concurrent)
+            if self.max_concurrent > 0
+            else None
+        )
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable]):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable]
+    ):
         if request.url.path.startswith("/api/v1/health"):
             return await call_next(request)
         if not self.limiter:
@@ -32,7 +42,9 @@ class BackpressureMiddleware(BaseHTTPMiddleware):
             if request_id:
                 payload["request_id"] = request_id
             payload["retry_after"] = 1
-            return JSONResponse(status_code=429, content=payload, headers={"Retry-After": retry_after})
+            return JSONResponse(
+                status_code=429, content=payload, headers={"Retry-After": retry_after}
+            )
 
         try:
             return await call_next(request)
@@ -45,7 +57,9 @@ class MaintenanceModeMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.bypass_token = bypass_token or settings.maintenance_bypass_token
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable]):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable]
+    ):
         if settings.maintenance_mode and not _is_exempt(request, self.bypass_token):
             return JSONResponse(
                 status_code=503,

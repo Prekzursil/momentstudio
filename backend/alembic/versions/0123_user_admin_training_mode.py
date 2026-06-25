@@ -32,4 +32,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("users", "admin_training_mode")
-

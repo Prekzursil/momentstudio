@@ -29,7 +29,9 @@ const DAY_MS = 86_400_000;
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, TranslateModule, ButtonComponent],
   template: `
-    <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
       <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div class="grid gap-1">
           <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
@@ -48,12 +50,23 @@ const DAY_MS = 86_400_000;
               [ngModel]="windowDays()"
               (ngModelChange)="setWindowDays($event)"
             >
-              <option [ngValue]="30">{{ 'adminUi.content.scheduling.window30' | translate }}</option>
-              <option [ngValue]="90">{{ 'adminUi.content.scheduling.window90' | translate }}</option>
-              <option [ngValue]="180">{{ 'adminUi.content.scheduling.window180' | translate }}</option>
+              <option [ngValue]="30">
+                {{ 'adminUi.content.scheduling.window30' | translate }}
+              </option>
+              <option [ngValue]="90">
+                {{ 'adminUi.content.scheduling.window90' | translate }}
+              </option>
+              <option [ngValue]="180">
+                {{ 'adminUi.content.scheduling.window180' | translate }}
+              </option>
             </select>
           </label>
-          <app-button size="sm" variant="ghost" [label]="'adminUi.actions.refresh' | translate" (action)="load()"></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.actions.refresh' | translate"
+            (action)="load()"
+          ></app-button>
         </div>
       </div>
 
@@ -74,41 +87,53 @@ const DAY_MS = 86_400_000;
         {{ error() }}
       </div>
 
-      <div *ngIf="!loading() && !error() && scheduleRows().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+      <div
+        *ngIf="!loading() && !error() && scheduleRows().length === 0"
+        class="text-sm text-slate-600 dark:text-slate-300"
+      >
         {{ 'adminUi.content.scheduling.empty' | translate }}
       </div>
 
       <div *ngIf="!loading() && !error() && scheduleRows().length" class="grid gap-3">
-        <div *ngFor="let row of scheduleRows(); trackBy: trackRow" class="grid gap-2 lg:grid-cols-[360px_1fr] items-center">
+        <div
+          *ngFor="let row of scheduleRows(); trackBy: trackRow"
+          class="grid gap-2 lg:grid-cols-[360px_1fr] items-center"
+        >
           <a
             class="rounded-lg px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800/60"
             [routerLink]="row.editorLink.path"
             [queryParams]="row.editorLink.queryParams"
           >
             <div class="flex flex-wrap items-center gap-2">
-              <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ row.title }}</span>
+              <span class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{
+                row.title
+              }}</span>
               <span
                 class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold"
                 [ngClass]="kindBadgeClass(row.kind)"
               >
-                {{ ('adminUi.content.scheduling.kind.' + row.kind) | translate }}
+                {{ 'adminUi.content.scheduling.kind.' + row.kind | translate }}
               </span>
             </div>
             <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
               {{ row.key }}
               <span *ngIf="row.publishAt" class="px-1">·</span>
               <span *ngIf="row.publishAt">
-                {{ 'adminUi.content.scheduling.publish' | translate }}: {{ row.publishAt | date: 'yyyy-MM-dd HH:mm' }}
+                {{ 'adminUi.content.scheduling.publish' | translate }}:
+                {{ row.publishAt | date: 'yyyy-MM-dd HH:mm' }}
               </span>
               <span *ngIf="row.unpublishAt" class="px-1">·</span>
               <span *ngIf="row.unpublishAt">
-                {{ 'adminUi.content.scheduling.unpublish' | translate }}: {{ row.unpublishAt | date: 'yyyy-MM-dd HH:mm' }}
+                {{ 'adminUi.content.scheduling.unpublish' | translate }}:
+                {{ row.unpublishAt | date: 'yyyy-MM-dd HH:mm' }}
               </span>
             </div>
           </a>
 
           <div class="relative h-10 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden">
-            <div class="absolute inset-y-2 left-0 right-0 border border-dashed border-slate-200 dark:border-slate-700 rounded-md"></div>
+            <div
+              class="absolute inset-y-2 left-0 right-0 border border-dashed border-slate-200 dark:border-slate-700 rounded-md"
+            ></div>
             <div
               *ngIf="row.widthPct > 0"
               class="absolute inset-y-2 rounded-md bg-indigo-600"
@@ -154,7 +179,7 @@ const DAY_MS = 86_400_000;
         </div>
       </div>
     </section>
-  `
+  `,
 })
 export class AdminContentSchedulingComponent implements OnInit {
   loading = signal<boolean>(false);
@@ -168,7 +193,7 @@ export class AdminContentSchedulingComponent implements OnInit {
 
   constructor(
     private readonly admin: AdminService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
@@ -189,22 +214,24 @@ export class AdminContentSchedulingComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.admin.contentScheduling({
-      window_days: this.windowDays(),
-      window_start: this.calendarStartDate().toISOString(),
-      page: this.page(),
-      limit: this.pageSize,
-    }).subscribe({
-      next: (resp) => {
-        this.items.set(resp?.items || []);
-        this.meta.set(resp?.meta || null);
-      },
-      error: () => {
-        this.error.set(this.t('adminUi.content.scheduling.errors.load'));
-        this.loading.set(false);
-      },
-      complete: () => this.loading.set(false),
-    });
+    this.admin
+      .contentScheduling({
+        window_days: this.windowDays(),
+        window_start: this.calendarStartDate().toISOString(),
+        page: this.page(),
+        limit: this.pageSize,
+      })
+      .subscribe({
+        next: (resp) => {
+          this.items.set(resp?.items || []);
+          this.meta.set(resp?.meta || null);
+        },
+        error: () => {
+          this.error.set(this.t('adminUi.content.scheduling.errors.load'));
+          this.loading.set(false);
+        },
+        complete: () => this.loading.set(false),
+      });
   }
 
   prevPage(): void {
@@ -259,7 +286,9 @@ export class AdminContentSchedulingComponent implements OnInit {
       return 'page';
     };
 
-    const editorLinkForKey = (key: string): { path: string; queryParams: Record<string, string> } => {
+    const editorLinkForKey = (
+      key: string,
+    ): { path: string; queryParams: Record<string, string> } => {
       const value = (key || '').trim();
       if (value.startsWith('blog.')) {
         const slug = value.split('.', 2)[1] || value.slice('blog.'.length);
@@ -279,7 +308,8 @@ export class AdminContentSchedulingComponent implements OnInit {
       const unpublishMs = parseTs(block.published_until ?? null);
 
       const publishUpcoming = publishMs !== null && publishMs >= nowMs && publishMs < windowEnd;
-      const unpublishUpcoming = unpublishMs !== null && unpublishMs >= nowMs && unpublishMs < windowEnd;
+      const unpublishUpcoming =
+        unpublishMs !== null && unpublishMs >= nowMs && unpublishMs < windowEnd;
       if (!publishUpcoming && !unpublishUpcoming) continue;
 
       const barStartMs = Math.max(publishMs ?? windowStart, windowStart);
@@ -287,8 +317,12 @@ export class AdminContentSchedulingComponent implements OnInit {
       const leftPct = ((barStartMs - windowStart) / duration) * 100;
       const widthPct = Math.max(0, ((barEndMs - barStartMs) / duration) * 100);
 
-      const publishPct = publishUpcoming && publishMs !== null ? ((publishMs - windowStart) / duration) * 100 : null;
-      const unpublishPct = unpublishUpcoming && unpublishMs !== null ? ((unpublishMs - windowStart) / duration) * 100 : null;
+      const publishPct =
+        publishUpcoming && publishMs !== null ? ((publishMs - windowStart) / duration) * 100 : null;
+      const unpublishPct =
+        unpublishUpcoming && unpublishMs !== null
+          ? ((unpublishMs - windowStart) / duration) * 100
+          : null;
 
       out.push({
         key,
@@ -300,7 +334,7 @@ export class AdminContentSchedulingComponent implements OnInit {
         widthPct: Math.max(0, Math.min(100, widthPct)),
         publishPct: publishPct === null ? null : Math.max(0, Math.min(100, publishPct)),
         unpublishPct: unpublishPct === null ? null : Math.max(0, Math.min(100, unpublishPct)),
-        editorLink: editorLinkForKey(key)
+        editorLink: editorLinkForKey(key),
       });
     }
 
@@ -311,7 +345,7 @@ export class AdminContentSchedulingComponent implements OnInit {
       const unpublishUpcoming = unpublishMs !== null && unpublishMs >= nowMs;
       return Math.min(
         publishUpcoming && publishMs !== null ? publishMs : Number.POSITIVE_INFINITY,
-        unpublishUpcoming && unpublishMs !== null ? unpublishMs : Number.POSITIVE_INFINITY
+        unpublishUpcoming && unpublishMs !== null ? unpublishMs : Number.POSITIVE_INFINITY,
       );
     };
 
@@ -332,4 +366,3 @@ export class AdminContentSchedulingComponent implements OnInit {
     return row.key;
   }
 }
-

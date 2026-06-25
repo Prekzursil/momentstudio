@@ -19,11 +19,13 @@ import { AuthService } from '../../core/auth.service';
     TranslateModule,
     ContainerComponent,
     ButtonComponent,
-    PasswordStrengthComponent
+    PasswordStrengthComponent,
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-xl">
-      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">{{ 'account.passwordChange.title' | translate }}</h1>
+      <h1 class="text-2xl font-semibold text-slate-900 dark:text-slate-50">
+        {{ 'account.passwordChange.title' | translate }}
+      </h1>
       <form #changeForm="ngForm" class="grid gap-4" (ngSubmit)="onSubmit(changeForm)">
         <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
           {{ 'account.passwordChange.fields.current' | translate }}
@@ -40,7 +42,9 @@ import { AuthService } from '../../core/auth.service';
               type="button"
               class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
               (click)="showCurrent = !showCurrent"
-              [attr.aria-label]="(showCurrent ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              [attr.aria-label]="
+                (showCurrent ? 'auth.hidePassword' : 'auth.showPassword') | translate
+              "
             >
               {{ (showCurrent ? 'auth.hide' : 'auth.show') | translate }}
             </button>
@@ -84,18 +88,27 @@ import { AuthService } from '../../core/auth.service';
               type="button"
               class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
               (click)="showConfirm = !showConfirm"
-              [attr.aria-label]="(showConfirm ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+              [attr.aria-label]="
+                (showConfirm ? 'auth.hidePassword' : 'auth.showPassword') | translate
+              "
             >
               {{ (showConfirm ? 'auth.hide' : 'auth.show') | translate }}
             </button>
           </div>
         </label>
-        <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">{{ error | translate }}</p>
-        <app-button [label]="'account.passwordChange.actions.update' | translate" type="submit"></app-button>
-        <a routerLink="/account" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{ 'account.passwordChange.actions.back' | translate }}</a>
+        <p *ngIf="error" class="text-sm text-amber-700 dark:text-amber-300">
+          {{ error | translate }}
+        </p>
+        <app-button
+          [label]="'account.passwordChange.actions.update' | translate"
+          type="submit"
+        ></app-button>
+        <a routerLink="/account" class="text-sm text-indigo-600 dark:text-indigo-300 font-medium">{{
+          'account.passwordChange.actions.back' | translate
+        }}</a>
       </form>
     </app-container>
-  `
+  `,
 })
 export class ChangePasswordComponent {
   current = '';
@@ -106,7 +119,11 @@ export class ChangePasswordComponent {
   showNew = false;
   showConfirm = false;
 
-  constructor(private readonly toast: ToastService, private auth: AuthService, private translate: TranslateService) {}
+  constructor(
+    private readonly toast: ToastService,
+    private auth: AuthService,
+    private translate: TranslateService,
+  ) {}
 
   onSubmit(form: NgForm): void {
     if (!form.valid) {
@@ -122,7 +139,7 @@ export class ChangePasswordComponent {
       next: () => {
         this.toast.success(
           this.translate.instant('account.passwordChange.toast.updatedTitle'),
-          this.translate.instant('account.passwordChange.toast.updatedDesc')
+          this.translate.instant('account.passwordChange.toast.updatedDesc'),
         );
         this.current = '';
         this.password = '';
@@ -137,8 +154,7 @@ export class ChangePasswordComponent {
         }
         this.error = 'account.passwordChange.errors.updateFailed';
         this.toast.error(this.translate.instant('account.passwordChange.errors.updateFailed'));
-      }
+      },
     });
   }
 }
-

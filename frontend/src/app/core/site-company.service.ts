@@ -30,7 +30,7 @@ const EMPTY_COMPANY: SiteCompanyInfo = {
   cui: null,
   address: null,
   phone: null,
-  email: null
+  email: null,
 };
 
 interface ContentBlockRead {
@@ -48,7 +48,7 @@ export class SiteCompanyService {
     this.cached$ = this.api.get<ContentBlockRead>('/content/site.company').pipe(
       map((block) => this.parseBlock(block)),
       catchError(() => of(EMPTY_COMPANY)),
-      shareReplay({ bufferSize: 1, refCount: false })
+      shareReplay({ bufferSize: 1, refCount: false }),
     );
     return this.cached$;
   }
@@ -72,7 +72,7 @@ export class SiteCompanyService {
       cui,
       address,
       phone,
-      email
+      email,
     };
   }
 
@@ -83,9 +83,9 @@ export class SiteCompanyService {
     }
     if (typeof value === 'number') {
       const cleaned = String(value).trim();
+      /* istanbul ignore next -- unreachable: no finite number stringifies to an empty/whitespace-only value */
       return cleaned ? cleaned : null;
     }
     return null;
   }
 }
-

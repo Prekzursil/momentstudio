@@ -25,4 +25,3 @@ class AdminOrderDocumentExportRead(BaseModel):
 class AdminOrderDocumentExportListResponse(BaseModel):
     items: list[AdminOrderDocumentExportRead]
     meta: AdminPaginationMeta
-

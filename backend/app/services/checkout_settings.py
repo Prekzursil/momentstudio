@@ -38,7 +38,9 @@ class CheckoutSettings:
     vat_apply_to_shipping: bool = DEFAULT_VAT_APPLY_TO_SHIPPING
     vat_apply_to_fee: bool = DEFAULT_VAT_APPLY_TO_FEE
     receipt_share_days: int = DEFAULT_RECEIPT_SHARE_DAYS
-    money_rounding: Literal["half_up", "half_even", "up", "down"] = DEFAULT_MONEY_ROUNDING
+    money_rounding: Literal["half_up", "half_even", "up", "down"] = (
+        DEFAULT_MONEY_ROUNDING
+    )
 
 
 def _parse_decimal(value: object | None, *, fallback: Decimal) -> Decimal:
@@ -102,25 +104,52 @@ def _parse_int(value: object | None, *, fallback: int) -> int:
 
 
 async def get_checkout_settings(session: AsyncSession) -> CheckoutSettings:
-    block = await content_service.get_published_by_key_following_redirects(session, "site.checkout")
+    block = await content_service.get_published_by_key_following_redirects(
+        session, "site.checkout"
+    )
     meta = (getattr(block, "meta", None) or {}) if block else {}
-    shipping_fee = _parse_decimal(meta.get("shipping_fee_ron"), fallback=DEFAULT_SHIPPING_FEE_RON)
-    threshold = _parse_decimal(meta.get("free_shipping_threshold_ron"), fallback=DEFAULT_FREE_SHIPPING_THRESHOLD_RON)
-    phone_required_home = _parse_bool(meta.get("phone_required_home"), fallback=DEFAULT_PHONE_REQUIRED_HOME)
-    phone_required_locker = _parse_bool(meta.get("phone_required_locker"), fallback=DEFAULT_PHONE_REQUIRED_LOCKER)
+    shipping_fee = _parse_decimal(
+        meta.get("shipping_fee_ron"), fallback=DEFAULT_SHIPPING_FEE_RON
+    )
+    threshold = _parse_decimal(
+        meta.get("free_shipping_threshold_ron"),
+        fallback=DEFAULT_FREE_SHIPPING_THRESHOLD_RON,
+    )
+    phone_required_home = _parse_bool(
+        meta.get("phone_required_home"), fallback=DEFAULT_PHONE_REQUIRED_HOME
+    )
+    phone_required_locker = _parse_bool(
+        meta.get("phone_required_locker"), fallback=DEFAULT_PHONE_REQUIRED_LOCKER
+    )
     fee_enabled = _parse_bool(meta.get("fee_enabled"), fallback=DEFAULT_FEE_ENABLED)
     fee_type_raw = str(meta.get("fee_type") or DEFAULT_FEE_TYPE).strip().lower()
-    fee_type: Literal["flat", "percent"] = "percent" if fee_type_raw == "percent" else "flat"
+    fee_type: Literal["flat", "percent"] = (
+        "percent" if fee_type_raw == "percent" else "flat"
+    )
     fee_value = _parse_decimal(meta.get("fee_value"), fallback=DEFAULT_FEE_VALUE)
     vat_enabled = _parse_bool(meta.get("vat_enabled"), fallback=DEFAULT_VAT_ENABLED)
-    vat_rate_percent = _parse_decimal(meta.get("vat_rate_percent"), fallback=DEFAULT_VAT_RATE_PERCENT)
-    vat_apply_to_shipping = _parse_bool(meta.get("vat_apply_to_shipping"), fallback=DEFAULT_VAT_APPLY_TO_SHIPPING)
-    vat_apply_to_fee = _parse_bool(meta.get("vat_apply_to_fee"), fallback=DEFAULT_VAT_APPLY_TO_FEE)
-    receipt_share_days = _parse_int(meta.get("receipt_share_days"), fallback=DEFAULT_RECEIPT_SHARE_DAYS)
-    rounding_raw = str(meta.get("money_rounding") or DEFAULT_MONEY_ROUNDING).strip().lower()
-    money_rounding: Literal["half_up", "half_even", "up", "down"] = DEFAULT_MONEY_ROUNDING
+    vat_rate_percent = _parse_decimal(
+        meta.get("vat_rate_percent"), fallback=DEFAULT_VAT_RATE_PERCENT
+    )
+    vat_apply_to_shipping = _parse_bool(
+        meta.get("vat_apply_to_shipping"), fallback=DEFAULT_VAT_APPLY_TO_SHIPPING
+    )
+    vat_apply_to_fee = _parse_bool(
+        meta.get("vat_apply_to_fee"), fallback=DEFAULT_VAT_APPLY_TO_FEE
+    )
+    receipt_share_days = _parse_int(
+        meta.get("receipt_share_days"), fallback=DEFAULT_RECEIPT_SHARE_DAYS
+    )
+    rounding_raw = (
+        str(meta.get("money_rounding") or DEFAULT_MONEY_ROUNDING).strip().lower()
+    )
+    money_rounding: Literal["half_up", "half_even", "up", "down"] = (
+        DEFAULT_MONEY_ROUNDING
+    )
     if rounding_raw in {"half_up", "half_even", "up", "down"}:
-        money_rounding = cast(Literal["half_up", "half_even", "up", "down"], rounding_raw)
+        money_rounding = cast(
+            Literal["half_up", "half_even", "up", "down"], rounding_raw
+        )
     if threshold < 0:
         threshold = DEFAULT_FREE_SHIPPING_THRESHOLD_RON
     if shipping_fee < 0:

@@ -4,7 +4,10 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 import { ButtonComponent } from '../../../shared/button.component';
 import { InputComponent } from '../../../shared/input.component';
-import type { AdminDeletedProductImage, AdminProductImageOptimizationStats } from '../../../core/admin.service';
+import type {
+  AdminDeletedProductImage,
+  AdminProductImageOptimizationStats,
+} from '../../../core/admin.service';
 
 type ImageMetaByLang = Record<'en' | 'ro', { alt_text: string; caption: string }>;
 
@@ -68,12 +71,21 @@ export type AdminProductImageUploadItem = {
           </p>
         </div>
 
-        <div *ngFor="let item of uploads()" class="grid gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+        <div
+          *ngFor="let item of uploads()"
+          class="grid gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800"
+        >
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ item.fileName }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ formatBytes(item.bytes) }}</p>
-              <p *ngIf="item.error" class="text-xs text-rose-700 dark:text-rose-200">{{ item.error }}</p>
+              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                {{ item.fileName }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ formatBytes(item.bytes) }}
+              </p>
+              <p *ngIf="item.error" class="text-xs text-rose-700 dark:text-rose-200">
+                {{ item.error }}
+              </p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <span
@@ -126,7 +138,10 @@ export type AdminProductImageUploadItem = {
 
           <div class="grid gap-1">
             <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-              <div class="h-2 bg-indigo-600 dark:bg-indigo-500" [style.width.%]="item.progress"></div>
+              <div
+                class="h-2 bg-indigo-600 dark:bg-indigo-500"
+                [style.width.%]="item.progress"
+              ></div>
             </div>
             <p class="text-xs text-slate-500 dark:text-slate-400">{{ item.progress }}%</p>
           </div>
@@ -138,7 +153,9 @@ export type AdminProductImageUploadItem = {
         data-ignore-dirty
         class="group rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
       >
-        <summary class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50">
+        <summary
+          class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50"
+        >
           {{ 'adminUi.products.form.altHelperTitle' | translate }}
           <span
             *ngIf="altHelperImages().length"
@@ -151,7 +168,10 @@ export type AdminProductImageUploadItem = {
           {{ 'adminUi.products.form.altHelperHint' | translate }}
         </p>
 
-        <div *ngIf="altHelperImages().length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        <div
+          *ngIf="altHelperImages().length === 0"
+          class="mt-2 text-sm text-slate-600 dark:text-slate-300"
+        >
           {{ 'adminUi.products.form.altHelperEmpty' | translate }}
         </div>
 
@@ -161,7 +181,11 @@ export type AdminProductImageUploadItem = {
             class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900"
           >
             <div class="flex items-center gap-3 min-w-0">
-              <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+              <img
+                [src]="img.url"
+                [alt]="img.alt_text || 'image'"
+                class="h-12 w-12 rounded object-cover"
+              />
               <div class="min-w-0">
                 <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
                   {{ img.alt_text || ('adminUi.products.form.image' | translate) }}
@@ -184,9 +208,16 @@ export type AdminProductImageUploadItem = {
       </div>
 
       <div *ngIf="images().length > 0" class="grid gap-2">
-        <div *ngFor="let img of images(); let idx = index" class="rounded-lg border border-slate-200 dark:border-slate-700">
+        <div
+          *ngFor="let img of images(); let idx = index"
+          class="rounded-lg border border-slate-200 dark:border-slate-700"
+        >
           <div class="flex items-center gap-3 p-2">
-            <img [src]="img.url" [alt]="img.alt_text || 'image'" class="h-12 w-12 rounded object-cover" />
+            <img
+              [src]="img.url"
+              [alt]="img.alt_text || 'image'"
+              class="h-12 w-12 rounded object-cover"
+            />
             <div class="flex-1 min-w-0">
               <div class="flex flex-wrap items-center gap-2">
                 <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
@@ -225,7 +256,10 @@ export type AdminProductImageUploadItem = {
             </div>
           </div>
 
-          <div *ngIf="editingImageId() === img.id" class="grid gap-4 border-t border-slate-200 p-3 dark:border-slate-700">
+          <div
+            *ngIf="editingImageId() === img.id"
+            class="grid gap-4 border-t border-slate-200 p-3 dark:border-slate-700"
+          >
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.products.form.imageMeta' | translate }}
@@ -247,29 +281,43 @@ export type AdminProductImageUploadItem = {
                 ></app-button>
               </div>
 
-              <p *ngIf="imageOrderError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageOrderError() }}</p>
+              <p *ngIf="imageOrderError()" class="text-sm text-rose-700 dark:text-rose-300">
+                {{ imageOrderError() }}
+              </p>
             </div>
 
-            <p *ngIf="imageMetaError()" class="text-sm text-rose-700 dark:text-rose-300">{{ imageMetaError() }}</p>
+            <p *ngIf="imageMetaError()" class="text-sm text-rose-700 dark:text-rose-300">
+              {{ imageMetaError() }}
+            </p>
 
             <div *ngIf="imageStats" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
               <p>
                 {{ 'adminUi.products.form.imageSize' | translate }}:
                 <span class="font-semibold">{{ formatBytes(imageStats.original_bytes) }}</span>
-                <span *ngIf="imageStats.width && imageStats.height" class="text-slate-500 dark:text-slate-400">
+                <span
+                  *ngIf="imageStats.width && imageStats.height"
+                  class="text-slate-500 dark:text-slate-400"
+                >
                   · {{ imageStats.width }}×{{ imageStats.height }}
                 </span>
               </p>
               <p class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.products.form.imageThumbs' | translate }}: sm {{ formatBytes(imageStats.thumb_sm_bytes) }}, md
-                {{ formatBytes(imageStats.thumb_md_bytes) }}, lg {{ formatBytes(imageStats.thumb_lg_bytes) }}
+                {{ 'adminUi.products.form.imageThumbs' | translate }}: sm
+                {{ formatBytes(imageStats.thumb_sm_bytes) }}, md
+                {{ formatBytes(imageStats.thumb_md_bytes) }}, lg
+                {{ formatBytes(imageStats.thumb_lg_bytes) }}
               </p>
             </div>
 
             <div class="grid gap-3 lg:grid-cols-2">
-              <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+              <div
+                class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800"
+              >
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
-                <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.ro.alt_text"></app-input>
+                <app-input
+                  [label]="'adminUi.products.form.imageAltText' | translate"
+                  [(value)]="imageMeta.ro.alt_text"
+                ></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.products.form.imageCaption' | translate }}
                   <textarea
@@ -280,9 +328,14 @@ export type AdminProductImageUploadItem = {
                 </label>
               </div>
 
-              <div class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+              <div
+                class="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800"
+              >
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
-                <app-input [label]="'adminUi.products.form.imageAltText' | translate" [(value)]="imageMeta.en.alt_text"></app-input>
+                <app-input
+                  [label]="'adminUi.products.form.imageAltText' | translate"
+                  [(value)]="imageMeta.en.alt_text"
+                ></app-input>
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
                   {{ 'adminUi.products.form.imageCaption' | translate }}
                   <textarea
@@ -321,7 +374,10 @@ export type AdminProductImageUploadItem = {
           {{ deletedImagesError() }}
         </div>
 
-        <div *ngIf="!deletedImagesBusy() && deletedImages().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+        <div
+          *ngIf="!deletedImagesBusy() && deletedImages().length === 0"
+          class="text-sm text-slate-600 dark:text-slate-300"
+        >
           {{ 'adminUi.products.form.noDeletedImages' | translate }}
         </div>
 
@@ -331,10 +387,13 @@ export type AdminProductImageUploadItem = {
             class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
           >
             <div class="min-w-0">
-              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ img.alt_text || ('adminUi.products.form.image' | translate) }}</p>
+              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                {{ img.alt_text || ('adminUi.products.form.image' | translate) }}
+              </p>
               <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ img.url }}</p>
               <p *ngIf="img.deleted_at" class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.products.form.deletedAt' | translate }}: {{ img.deleted_at | date: 'short' }}
+                {{ 'adminUi.products.form.deletedAt' | translate }}:
+                {{ img.deleted_at | date: 'short' }}
               </p>
             </div>
             <app-button
@@ -348,12 +407,14 @@ export type AdminProductImageUploadItem = {
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class AdminProductsImageManagerComponent {
   @Input({ required: true }) hasEditingSlug = false;
 
-  @Input({ required: true }) images!: Signal<Array<{ id: string; url: string; alt_text?: string | null }>>;
+  @Input({ required: true }) images!: Signal<
+    Array<{ id: string; url: string; alt_text?: string | null }>
+  >;
   @Input({ required: true }) editingImageId!: Signal<string | null>;
   @Input({ required: true }) imageOrderBusy!: Signal<boolean>;
   @Input({ required: true }) imageOrderError!: Signal<string | null>;

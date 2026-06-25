@@ -59,7 +59,10 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_admin_token(session_factory) -> str:
     async def create_and_token():
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email="cms@example.com", password="cmspassword", name="CMS"))
+            user = await create_user(
+                session,
+                UserCreate(email="cms@example.com", password="cmspassword", name="CMS"),
+            )
             user.role = UserRole.admin
             session.add(
                 UserPasskey(
@@ -96,7 +99,9 @@ def test_content_asset_delete_versions_flag(test_app: Dict[str, object]) -> None
     )
     assert img_resp.status_code == 200
 
-    assets = client.get("/api/v1/content/admin/assets/images", headers=auth_headers(admin_token))
+    assets = client.get(
+        "/api/v1/content/admin/assets/images", headers=auth_headers(admin_token)
+    )
     assert assets.status_code == 200, assets.text
     first_img = assets.json()["items"][0]
 
@@ -135,7 +140,12 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     async def create_customer_token() -> str:
         async with SessionLocal() as session:
-            user = await create_user(session, UserCreate(email="user@example.com", password="password123", name="User"))
+            user = await create_user(
+                session,
+                UserCreate(
+                    email="user@example.com", password="password123", name="User"
+                ),
+            )
             user.role = UserRole.customer
             await session.commit()
             tokens = await issue_tokens_for_user(session, user)
@@ -146,7 +156,13 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     # Create
     create = client.post(
         "/api/v1/content/admin/home.hero",
-        json={"title": "Hero", "body_markdown": "Welcome!", "status": "published", "meta": {"headline": "Hero"}, "lang": "en"},
+        json={
+            "title": "Hero",
+            "body_markdown": "Welcome!",
+            "status": "published",
+            "meta": {"headline": "Hero"},
+            "lang": "en",
+        },
         headers=auth_headers(admin_token),
     )
     assert create.status_code == 201, create.text
@@ -231,7 +247,12 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     # Static page slug
     client.post(
         "/api/v1/content/admin/page.faq",
-        json={"title": "FAQ", "body_markdown": "FAQ body", "status": "published", "meta": {"priority": 1}},
+        json={
+            "title": "FAQ",
+            "body_markdown": "FAQ body",
+            "status": "published",
+            "meta": {"priority": 1},
+        },
         headers=auth_headers(admin_token),
     )
     page = client.get("/api/v1/content/pages/faq")
@@ -241,7 +262,12 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     restricted = client.post(
         "/api/v1/content/admin/page.secret",
-        json={"title": "Secret", "body_markdown": "Hidden", "status": "published", "meta": {"requires_auth": True}},
+        json={
+            "title": "Secret",
+            "body_markdown": "Hidden",
+            "status": "published",
+            "meta": {"requires_auth": True},
+        },
         headers=auth_headers(admin_token),
     )
     assert restricted.status_code == 201, restricted.text
@@ -249,7 +275,9 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     restricted_public = client.get("/api/v1/content/pages/secret")
     assert restricted_public.status_code == 401, restricted_public.text
 
-    restricted_authed = client.get("/api/v1/content/pages/secret", headers=auth_headers(user_token))
+    restricted_authed = client.get(
+        "/api/v1/content/pages/secret", headers=auth_headers(user_token)
+    )
     assert restricted_authed.status_code == 200, restricted_authed.text
 
     sitemap = client.get("/api/v1/sitemap.xml")
@@ -266,7 +294,10 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert missing.status_code == 404
 
     # Preview token works for draft
-    preview = client.get("/api/v1/content/admin/page.about/preview", params={"token": settings.content_preview_token})
+    preview = client.get(
+        "/api/v1/content/admin/page.about/preview",
+        params={"token": settings.content_preview_token},
+    )
     assert preview.status_code == 200
 
     # Shareable preview token works for draft page
@@ -287,7 +318,12 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     # Shareable preview token works for home preview
     home_sections_create = client.post(
         "/api/v1/content/admin/home.sections",
-        json={"title": "Home sections", "body_markdown": "Layout", "status": "draft", "meta": {}},
+        json={
+            "title": "Home sections",
+            "body_markdown": "Layout",
+            "status": "draft",
+            "meta": {},
+        },
         headers=auth_headers(admin_token),
     )
     assert home_sections_create.status_code in (200, 201), home_sections_create.text
@@ -322,7 +358,9 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert img_resp.status_code == 200
     assert len(img_resp.json()["images"]) == 1
 
-    assets = client.get("/api/v1/content/admin/assets/images", headers=auth_headers(admin_token))
+    assets = client.get(
+        "/api/v1/content/admin/assets/images", headers=auth_headers(admin_token)
+    )
     assert assets.status_code == 200, assets.text
     data = assets.json()
     assert data["meta"]["total_items"] >= 1
@@ -376,7 +414,11 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     client.patch(
         "/api/v1/content/admin/page.about",
-        json={"title": "About", "body_markdown": f"Uses {first_img['url']}", "status": "draft"},
+        json={
+            "title": "About",
+            "body_markdown": f"Uses {first_img['url']}",
+            "status": "draft",
+        },
         headers=auth_headers(admin_token),
     )
     usage = client.get(
@@ -411,7 +453,9 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     )
     assert sorted_by_key.status_code == 200, sorted_by_key.text
     sort_items = sorted_by_key.json()["items"]
-    assert [item["content_key"] for item in sort_items] == sorted(item["content_key"] for item in sort_items)
+    assert [item["content_key"] for item in sort_items] == sorted(
+        item["content_key"] for item in sort_items
+    )
 
     future_only = client.get(
         "/api/v1/content/admin/assets/images",
@@ -423,7 +467,10 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     invalid_range = client.get(
         "/api/v1/content/admin/assets/images",
-        params={"created_from": "2026-01-02T00:00:00Z", "created_to": "2026-01-01T00:00:00Z"},
+        params={
+            "created_from": "2026-01-02T00:00:00Z",
+            "created_to": "2026-01-01T00:00:00Z",
+        },
         headers=auth_headers(admin_token),
     )
     assert invalid_range.status_code == 400, invalid_range.text
@@ -434,7 +481,9 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
         headers=auth_headers(admin_token),
     )
     assert assets_filtered.status_code == 200, assets_filtered.text
-    assert all(item["content_key"] == "home.hero" for item in assets_filtered.json()["items"])
+    assert all(
+        item["content_key"] == "home.hero" for item in assets_filtered.json()["items"]
+    )
 
     # Delete: blocked while used, then requires deleting edited versions first.
     delete_used = client.delete(
@@ -467,7 +516,9 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert delete_original.status_code == 204, delete_original.text
 
     # Audit log
-    audit = client.get("/api/v1/content/admin/home.hero/audit", headers=auth_headers(admin_token))
+    audit = client.get(
+        "/api/v1/content/admin/home.hero/audit", headers=auth_headers(admin_token)
+    )
     assert audit.status_code == 200
     assert len(audit.json()) >= 2
 
@@ -516,21 +567,30 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     redirect_import = client.post(
         "/api/v1/content/admin/redirects/import",
-        files={"file": ("redirects.csv", b"from,to\n/pages/old,/pages/new\n", "text/csv")},
+        files={
+            "file": ("redirects.csv", b"from,to\n/pages/old,/pages/new\n", "text/csv")
+        },
         headers=auth_headers(admin_token),
     )
     assert redirect_import.status_code == 200, redirect_import.text
     assert redirect_import.json()["created"] == 1
 
-    redirect_list = client.get("/api/v1/content/admin/redirects", headers=auth_headers(admin_token))
+    redirect_list = client.get(
+        "/api/v1/content/admin/redirects", headers=auth_headers(admin_token)
+    )
     assert redirect_list.status_code == 200, redirect_list.text
     items = redirect_list.json()["items"]
-    assert any(item["from_key"] == "page.old" and item["to_key"] == "page.new" for item in items)
+    assert any(
+        item["from_key"] == "page.old" and item["to_key"] == "page.new"
+        for item in items
+    )
     imported = next(item for item in items if item["from_key"] == "page.old")
     assert imported["target_exists"] is True
     assert imported["chain_error"] is None
 
-    redirect_export = client.get("/api/v1/content/admin/redirects/export", headers=auth_headers(admin_token))
+    redirect_export = client.get(
+        "/api/v1/content/admin/redirects/export", headers=auth_headers(admin_token)
+    )
     assert redirect_export.status_code == 200, redirect_export.text
     assert "text/csv" in (redirect_export.headers.get("content-type") or "")
     assert "from,to,from_key,to_key" in redirect_export.text
@@ -539,7 +599,13 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     loop = client.post(
         "/api/v1/content/admin/redirects/import",
-        files={"file": ("redirects.csv", b"from,to\n/pages/a,/pages/b\n/pages/b,/pages/a\n", "text/csv")},
+        files={
+            "file": (
+                "redirects.csv",
+                b"from,to\n/pages/a,/pages/b\n/pages/b,/pages/a\n",
+                "text/csv",
+            )
+        },
         headers=auth_headers(admin_token),
     )
     assert loop.status_code == 400
@@ -551,13 +617,21 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
             await session.commit()
 
     asyncio.run(seed_loop())
-    loop_list = client.get("/api/v1/content/admin/redirects", headers=auth_headers(admin_token))
+    loop_list = client.get(
+        "/api/v1/content/admin/redirects", headers=auth_headers(admin_token)
+    )
     assert loop_list.status_code == 200, loop_list.text
-    loop_items = [item for item in loop_list.json()["items"] if item["from_key"] in {"page.loop1", "page.loop2"}]
+    loop_items = [
+        item
+        for item in loop_list.json()["items"]
+        if item["from_key"] in {"page.loop1", "page.loop2"}
+    ]
     assert loop_items
     assert all(item["chain_error"] == "loop" for item in loop_items)
 
-    sitemap_preview = client.get("/api/v1/content/admin/seo/sitemap-preview", headers=auth_headers(admin_token))
+    sitemap_preview = client.get(
+        "/api/v1/content/admin/seo/sitemap-preview", headers=auth_headers(admin_token)
+    )
     assert sitemap_preview.status_code == 200, sitemap_preview.text
     by_lang = sitemap_preview.json()["by_lang"]
     assert "en" in by_lang and "ro" in by_lang
@@ -582,11 +656,17 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     asyncio.run(seed_product())
 
-    structured = client.get("/api/v1/content/admin/seo/structured-data/validate", headers=auth_headers(admin_token))
+    structured = client.get(
+        "/api/v1/content/admin/seo/structured-data/validate",
+        headers=auth_headers(admin_token),
+    )
     assert structured.status_code == 200, structured.text
     payload = structured.json()
     assert payload["checked_products"] >= 1
-    assert any(i["entity_type"] == "product" and i["severity"] == "warning" for i in payload["issues"])
+    assert any(
+        i["entity_type"] == "product" and i["severity"] == "warning"
+        for i in payload["issues"]
+    )
 
     # Broken link checker for internal URLs.
     link_block = client.post(
@@ -634,7 +714,14 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
             "body_markdown": "hello old",
             "status": "draft",
             "lang": "en",
-            "meta": {"blocks": [{"type": "text", "body_markdown": {"en": "old in meta", "ro": "old in meta ro"}}]},
+            "meta": {
+                "blocks": [
+                    {
+                        "type": "text",
+                        "body_markdown": {"en": "old in meta", "ro": "old in meta ro"},
+                    }
+                ]
+            },
         },
         headers=auth_headers(admin_token),
     )
@@ -649,7 +736,13 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     fr_preview = client.post(
         "/api/v1/content/admin/tools/find-replace/preview",
-        json={"find": "old", "replace": "new", "key_prefix": "page.", "case_sensitive": True, "limit": 50},
+        json={
+            "find": "old",
+            "replace": "new",
+            "key_prefix": "page.",
+            "case_sensitive": True,
+            "limit": 50,
+        },
         headers=auth_headers(admin_token),
     )
     assert fr_preview.status_code == 200, fr_preview.text
@@ -660,7 +753,12 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
 
     fr_apply = client.post(
         "/api/v1/content/admin/tools/find-replace/apply",
-        json={"find": "old", "replace": "new", "key_prefix": "page.", "case_sensitive": True},
+        json={
+            "find": "old",
+            "replace": "new",
+            "key_prefix": "page.",
+            "case_sensitive": True,
+        },
         headers=auth_headers(admin_token),
     )
     assert fr_apply.status_code == 200, fr_apply.text
@@ -688,19 +786,21 @@ def test_content_crud_and_public(test_app: Dict[str, object]) -> None:
     assert "new" in ro_after.json()["body_markdown"]
 
 
-def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object], tmp_path: Path) -> None:
+def test_admin_fetch_social_thumbnail(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object], tmp_path: Path
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_admin_token(SessionLocal)
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
 
     instagram_html = (
-        '<html><head>'
+        "<html><head>"
         '<meta property="og:image" content="https://scontent.cdninstagram.com/v/t51.2885-19/profile.jpg?oe=699592F8">'
         "</head><body>ok</body></html>"
     )
     facebook_html = (
-        '<html><head>'
+        "<html><head>"
         '<meta property="og:image" content="https://scontent.fbcdn.net/v/t39.30808-1/fb-page.jpg">'
         "</head><body>ok</body></html>"
     )
@@ -709,7 +809,12 @@ def test_admin_fetch_social_thumbnail(monkeypatch: pytest.MonkeyPatch, test_app:
     async def handler(request: httpx.Request) -> httpx.Response:
         host = (request.url.host or "").lower().rstrip(".")
         if host in {"scontent.cdninstagram.com", "scontent.fbcdn.net"}:
-            return httpx.Response(200, content=image_bytes, headers={"content-type": "image/jpeg"}, request=request)
+            return httpx.Response(
+                200,
+                content=image_bytes,
+                headers={"content-type": "image/jpeg"},
+                request=request,
+            )
         if host == "www.facebook.com":
             return httpx.Response(200, text=facebook_html, request=request)
         return httpx.Response(200, text=instagram_html, request=request)
@@ -772,7 +877,9 @@ def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_admin_token(SessionLocal)
 
-    stale_remote = "https://scontent.cdninstagram.com/v/t51.2885-19/stale.jpg?oe=696AF278"
+    stale_remote = (
+        "https://scontent.cdninstagram.com/v/t51.2885-19/stale.jpg?oe=696AF278"
+    )
     create = client.post(
         "/api/v1/content/admin/site.social",
         json={
@@ -817,20 +924,29 @@ def test_public_site_social_hydrates_stale_remote_thumbnail_without_db_mutation(
     public_thumb = public_meta["instagram_pages"][0]["thumbnail_url"]
     assert public_thumb == "/media/social/hydrated.jpg"
 
-    admin_res = client.get("/api/v1/content/admin/site.social", headers=auth_headers(admin_token))
+    admin_res = client.get(
+        "/api/v1/content/admin/site.social", headers=auth_headers(admin_token)
+    )
     assert admin_res.status_code == 200, admin_res.text
     admin_meta = admin_res.json().get("meta") or {}
     assert admin_meta["instagram_pages"][0]["thumbnail_url"] == stale_remote
 
 
-def test_legal_pages_require_bilingual_before_publish(test_app: Dict[str, object]) -> None:
+def test_legal_pages_require_bilingual_before_publish(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
     admin_token = create_admin_token(SessionLocal)
 
     create = client.post(
         "/api/v1/content/admin/page.terms",
-        json={"title": "Terms", "body_markdown": "Terms placeholder", "status": "draft", "lang": "en"},
+        json={
+            "title": "Terms",
+            "body_markdown": "Terms placeholder",
+            "status": "draft",
+            "lang": "en",
+        },
         headers=auth_headers(admin_token),
     )
     assert create.status_code == 201, create.text

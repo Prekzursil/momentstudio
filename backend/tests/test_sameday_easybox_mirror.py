@@ -14,7 +14,12 @@ from app.core.dependencies import get_current_user
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.shipping_locker import ShippingLockerMirror, ShippingLockerProvider, ShippingLockerSyncRun, ShippingLockerSyncStatus
+from app.models.shipping_locker import (
+    ShippingLockerMirror,
+    ShippingLockerProvider,
+    ShippingLockerSyncRun,
+    ShippingLockerSyncStatus,
+)
 from app.models.user import UserRole
 from app.schemas.shipping import LockerProvider, LockerRead
 from app.services import lockers as lockers_service
@@ -54,8 +59,22 @@ def test_sameday_mirror_sync_success_upsert_and_deactivate(test_ctx, monkeypatch
     async def payload_v1():
         return (
             [
-                {"lockerId": "A1", "name": "Easybox A1", "address": "Str. A", "city": "Bucuresti", "lat": 44.4, "lng": 26.1},
-                {"lockerId": "B2", "name": "Easybox B2", "address": "Str. B", "city": "Bucuresti", "lat": 44.41, "lng": 26.11},
+                {
+                    "lockerId": "A1",
+                    "name": "Easybox A1",
+                    "address": "Str. A",
+                    "city": "Bucuresti",
+                    "lat": 44.4,
+                    "lng": 26.1,
+                },
+                {
+                    "lockerId": "B2",
+                    "name": "Easybox B2",
+                    "address": "Str. B",
+                    "city": "Bucuresti",
+                    "lat": 44.41,
+                    "lng": 26.11,
+                },
             ],
             "https://sameday.ro/api/easybox/locations",
         )
@@ -63,12 +82,20 @@ def test_sameday_mirror_sync_success_upsert_and_deactivate(test_ctx, monkeypatch
     async def payload_v2():
         return (
             [
-                {"lockerId": "A1", "name": "Easybox A1 Updated", "address": "Str. A nr. 2", "city": "Bucuresti", "lat": 44.4, "lng": 26.1},
+                {
+                    "lockerId": "A1",
+                    "name": "Easybox A1 Updated",
+                    "address": "Str. A nr. 2",
+                    "city": "Bucuresti",
+                    "lat": 44.4,
+                    "lng": 26.1,
+                },
             ],
             "https://sameday.ro/api/easybox/locations",
         )
 
     monkeypatch.setattr(sameday_easybox_mirror, "_fetch_raw_payload", payload_v1)
+
     async def run_first():
         async with SessionLocal() as session:
             run = await sameday_easybox_mirror.sync_now(session, trigger="test")
@@ -77,6 +104,7 @@ def test_sameday_mirror_sync_success_upsert_and_deactivate(test_ctx, monkeypatch
     _run(run_first())
 
     monkeypatch.setattr(sameday_easybox_mirror, "_fetch_raw_payload", payload_v2)
+
     async def run_second():
         async with SessionLocal() as session:
             run = await sameday_easybox_mirror.sync_now(session, trigger="test")
@@ -86,7 +114,17 @@ def test_sameday_mirror_sync_success_upsert_and_deactivate(test_ctx, monkeypatch
             assert run.normalized_count == 1
             assert (run.normalization_ratio or 0.0) > 0
             assert run.schema_signature
-            rows = (await session.execute(select(ShippingLockerMirror).order_by(ShippingLockerMirror.external_id))).scalars().all()
+            rows = (
+                (
+                    await session.execute(
+                        select(ShippingLockerMirror).order_by(
+                            ShippingLockerMirror.external_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
             assert len(rows) == 2
             assert rows[0].name == "Easybox A1 Updated"
             assert rows[1].is_active is False
@@ -100,7 +138,14 @@ def test_sameday_mirror_sync_failure_keeps_previous_snapshot(test_ctx, monkeypat
     async def payload_ok():
         return (
             [
-                {"lockerId": "A1", "name": "Easybox A1", "address": "Str. A", "city": "Iasi", "lat": 47.16, "lng": 27.58},
+                {
+                    "lockerId": "A1",
+                    "name": "Easybox A1",
+                    "address": "Str. A",
+                    "city": "Iasi",
+                    "lat": 47.16,
+                    "lng": 27.58,
+                },
             ],
             "https://sameday.ro/api/easybox/locations",
         )
@@ -109,6 +154,7 @@ def test_sameday_mirror_sync_failure_keeps_previous_snapshot(test_ctx, monkeypat
         raise RuntimeError("Cloudflare challenge")
 
     monkeypatch.setattr(sameday_easybox_mirror, "_fetch_raw_payload", payload_ok)
+
     async def run_seed():
         async with SessionLocal() as session:
             await sameday_easybox_mirror.sync_now(session, trigger="test")
@@ -123,7 +169,8 @@ def test_sameday_mirror_sync_failure_keeps_previous_snapshot(test_ctx, monkeypat
                         select(func.count())
                         .select_from(ShippingLockerMirror)
                         .where(
-                            ShippingLockerMirror.provider == ShippingLockerProvider.sameday,
+                            ShippingLockerMirror.provider
+                            == ShippingLockerProvider.sameday,
                             ShippingLockerMirror.is_active.is_(True),
                         )
                     )
@@ -133,6 +180,7 @@ def test_sameday_mirror_sync_failure_keeps_previous_snapshot(test_ctx, monkeypat
 
     before = _run(count_active())
     monkeypatch.setattr(sameday_easybox_mirror, "_fetch_raw_payload", payload_fail)
+
     async def run_fail():
         async with SessionLocal() as session:
             run = await sameday_easybox_mirror.sync_now(session, trigger="test")
@@ -150,7 +198,9 @@ def test_shipping_lockers_uses_mirror_for_sameday(test_ctx, monkeypatch):
     lockers_service._reset_cache_for_tests()
     monkeypatch.setattr(lockers_service.settings, "sameday_mirror_enabled", True)
 
-    async def fake_nearby(_session, *, lat: float, lng: float, radius_km: float, limit: int):
+    async def fake_nearby(
+        _session, *, lat: float, lng: float, radius_km: float, limit: int
+    ):
         return [
             LockerRead(
                 id="sameday:A1",
@@ -164,7 +214,9 @@ def test_shipping_lockers_uses_mirror_for_sameday(test_ctx, monkeypatch):
         ]
 
     monkeypatch.setattr(sameday_easybox_mirror, "list_nearby_lockers", fake_nearby)
-    response = client.get("/api/v1/shipping/lockers?provider=sameday&lat=44.4&lng=26.1&radius_km=10")
+    response = client.get(
+        "/api/v1/shipping/lockers?provider=sameday&lat=44.4&lng=26.1&radius_km=10"
+    )
     assert response.status_code == 200, response.text
     body = response.json()
     assert body and body[0]["id"] == "sameday:A1"
@@ -213,7 +265,9 @@ def test_shipping_lockers_city_autocomplete(test_ctx):
             await session.commit()
 
     _run(seed())
-    response = client.get("/api/v1/shipping/lockers/cities?provider=sameday&q=Buc&limit=5")
+    response = client.get(
+        "/api/v1/shipping/lockers/cities?provider=sameday&q=Buc&limit=5"
+    )
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["items"]
@@ -255,7 +309,9 @@ def test_shipping_lockers_city_snapshot_exposes_canary_alerts(test_ctx):
             await session.commit()
 
     _run(seed())
-    response = client.get("/api/v1/shipping/lockers/cities?provider=sameday&q=Buc&limit=5")
+    response = client.get(
+        "/api/v1/shipping/lockers/cities?provider=sameday&q=Buc&limit=5"
+    )
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["snapshot"]["challenge_failure_streak"] == 3
@@ -388,7 +444,15 @@ def test_manual_sync_endpoint_rbac(test_ctx, monkeypatch):
 
     async def payload_ok():
         return (
-            [{"lockerId": "A1", "name": "Easybox", "city": "Bucuresti", "lat": 44.4, "lng": 26.1}],
+            [
+                {
+                    "lockerId": "A1",
+                    "name": "Easybox",
+                    "city": "Bucuresti",
+                    "lat": 44.4,
+                    "lng": 26.1,
+                }
+            ],
             "https://sameday.ro/api/easybox/locations",
         )
 

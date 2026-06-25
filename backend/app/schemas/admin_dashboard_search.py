@@ -14,4 +14,3 @@ class AdminDashboardSearchResult(BaseModel):
 
 class AdminDashboardSearchResponse(BaseModel):
     items: list[AdminDashboardSearchResult]
-

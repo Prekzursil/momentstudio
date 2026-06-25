@@ -95,8 +95,8 @@ async def sitemap(session: AsyncSession = Depends(get_session)) -> Response:
         for url in by_lang.get(lang, []):
             urls.append(f"<url><loc>{url}</loc></url>")
     body = (
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">"
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
         + "".join(urls)
         + "</urlset>"
     )
@@ -121,7 +121,13 @@ def robots() -> Response:
 @api_router.get("/feeds/products.json", tags=["sitemap"])
 async def product_feed(session: AsyncSession = Depends(get_session)) -> list[dict]:
     result = await session.execute(
-        select(Product.slug, Product.name, Product.base_price, Product.currency, Product.updated_at).where(
+        select(
+            Product.slug,
+            Product.name,
+            Product.base_price,
+            Product.currency,
+            Product.updated_at,
+        ).where(
             Product.status == ProductStatus.published,
             Product.is_active.is_(True),
             Product.is_deleted.is_(False),

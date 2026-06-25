@@ -31,7 +31,7 @@ export class ToastService {
       tone?: 'info' | 'success' | 'error';
       durationMs?: number;
       actionAriaLabel?: string;
-    }
+    },
   ): void {
     this.push(
       {
@@ -40,9 +40,9 @@ export class ToastService {
         tone: options?.tone ?? 'info',
         actionLabel,
         actionAriaLabel: options?.actionAriaLabel,
-        onAction
+        onAction,
       },
-      options?.durationMs ?? 6000
+      options?.durationMs ?? 6000,
     );
   }
 
@@ -59,7 +59,9 @@ export class ToastService {
       !message.onAction &&
       this.messagesSignal().some(
         (existing) =>
-          existing.title === message.title && existing.description === message.description && existing.tone === message.tone
+          existing.title === message.title &&
+          existing.description === message.description &&
+          existing.tone === message.tone,
       );
     if (hasDuplicate) return;
     const id = uuidv4();

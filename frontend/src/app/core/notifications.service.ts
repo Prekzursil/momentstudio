@@ -47,7 +47,7 @@ export class NotificationsService {
       error: (err) => {
         this.lastErrorAt = Date.now();
         captureException(err);
-      }
+      },
     });
   }
 
@@ -65,7 +65,7 @@ export class NotificationsService {
         this.lastErrorAt = Date.now();
         captureException(err);
         this.loadingSignal.set(false);
-      }
+      },
     });
   }
 
@@ -77,20 +77,21 @@ export class NotificationsService {
         this.itemsSignal.set(next);
         this.unreadCountSignal.set(next.filter((n) => !n.read_at && !n.dismissed_at).length);
       },
-      error: (err) => captureException(err)
+      error: (err) => captureException(err),
     });
   }
 
   dismiss(id: string): void {
     if (!id) return;
-    this.api.post<UserNotification>(`/notifications/${encodeURIComponent(id)}/dismiss`, {}).subscribe({
-      next: (updated) => {
-        const next = this.itemsSignal().filter((n) => n.id !== updated.id);
-        this.itemsSignal.set(next);
-        this.unreadCountSignal.set(next.filter((n) => !n.read_at && !n.dismissed_at).length);
-      },
-      error: (err) => captureException(err)
-    });
+    this.api
+      .post<UserNotification>(`/notifications/${encodeURIComponent(id)}/dismiss`, {})
+      .subscribe({
+        next: (updated) => {
+          const next = this.itemsSignal().filter((n) => n.id !== updated.id);
+          this.itemsSignal.set(next);
+          this.unreadCountSignal.set(next.filter((n) => !n.read_at && !n.dismissed_at).length);
+        },
+        error: (err) => captureException(err),
+      });
   }
 }
-

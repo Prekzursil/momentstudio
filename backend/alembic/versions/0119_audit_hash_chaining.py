@@ -23,15 +23,37 @@ def upgrade() -> None:
         "audit_chain_state",
         sa.Column("entity", sa.String(length=32), primary_key=True),
         sa.Column("tail_hash", sa.String(length=64), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.func.now(),
+        ),
     )
 
-    op.add_column("product_audit_logs", sa.Column("chain_prev_hash", sa.String(length=64), nullable=True))
-    op.add_column("product_audit_logs", sa.Column("chain_hash", sa.String(length=64), nullable=True))
-    op.add_column("content_audit_log", sa.Column("chain_prev_hash", sa.String(length=64), nullable=True))
-    op.add_column("content_audit_log", sa.Column("chain_hash", sa.String(length=64), nullable=True))
-    op.add_column("admin_audit_log", sa.Column("chain_prev_hash", sa.String(length=64), nullable=True))
-    op.add_column("admin_audit_log", sa.Column("chain_hash", sa.String(length=64), nullable=True))
+    op.add_column(
+        "product_audit_logs",
+        sa.Column("chain_prev_hash", sa.String(length=64), nullable=True),
+    )
+    op.add_column(
+        "product_audit_logs",
+        sa.Column("chain_hash", sa.String(length=64), nullable=True),
+    )
+    op.add_column(
+        "content_audit_log",
+        sa.Column("chain_prev_hash", sa.String(length=64), nullable=True),
+    )
+    op.add_column(
+        "content_audit_log",
+        sa.Column("chain_hash", sa.String(length=64), nullable=True),
+    )
+    op.add_column(
+        "admin_audit_log",
+        sa.Column("chain_prev_hash", sa.String(length=64), nullable=True),
+    )
+    op.add_column(
+        "admin_audit_log", sa.Column("chain_hash", sa.String(length=64), nullable=True)
+    )
 
     table = sa.table(
         "audit_chain_state",
@@ -56,4 +78,3 @@ def downgrade() -> None:
     op.drop_column("product_audit_logs", "chain_hash")
     op.drop_column("product_audit_logs", "chain_prev_hash")
     op.drop_table("audit_chain_state")
-

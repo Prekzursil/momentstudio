@@ -18,10 +18,12 @@ export function app(): express.Express {
   server.set('view engine', 'html');
   server.set('views', distFolder);
 
-  server.use(express.static(distFolder, {
-    maxAge: '1y',
-    index: false,
-  }));
+  server.use(
+    express.static(distFolder, {
+      maxAge: '1y',
+      index: false,
+    }),
+  );
 
   // All regular routes use the Angular engine
   server.use((req, res, next) => {

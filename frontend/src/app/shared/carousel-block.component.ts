@@ -8,11 +8,7 @@ import { CarouselSettings, Slide } from './page-blocks';
   standalone: true,
   imports: [CommonModule, BannerBlockComponent],
   template: `
-    <div
-      class="relative"
-      (mouseenter)="onHover(true)"
-      (mouseleave)="onHover(false)"
-    >
+    <div class="relative" (mouseenter)="onHover(true)" (mouseleave)="onHover(false)">
       <app-banner-block
         *ngIf="activeSlide() as slide"
         [slide]="slide"
@@ -46,14 +42,18 @@ import { CarouselSettings, Slide } from './page-blocks';
           *ngFor="let s of slides; let idx = index"
           type="button"
           class="h-2.5 w-2.5 rounded-full transition"
-          [ngClass]="idx === activeIndex ? 'bg-slate-900 dark:bg-slate-50' : 'bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500'"
+          [ngClass]="
+            idx === activeIndex
+              ? 'bg-slate-900 dark:bg-slate-50'
+              : 'bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500'
+          "
           (click)="goTo(idx)"
           [attr.aria-label]="'Go to slide ' + (idx + 1)"
           [attr.aria-current]="idx === activeIndex ? 'true' : null"
         ></button>
       </div>
     </div>
-  `
+  `,
 })
 export class CarouselBlockComponent implements OnInit, OnDestroy {
   @Input({ required: true }) slides: Slide[] = [];
@@ -62,7 +62,7 @@ export class CarouselBlockComponent implements OnInit, OnDestroy {
     interval_ms: 5000,
     show_dots: true,
     show_arrows: true,
-    pause_on_hover: true
+    pause_on_hover: true,
   };
   @Input() tagline: string | null = null;
 
@@ -131,4 +131,3 @@ export class CarouselBlockComponent implements OnInit, OnDestroy {
     this.startAutoplay();
   }
 }
-

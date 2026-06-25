@@ -46,16 +46,20 @@ def _load_module():
 
 
 def _write_findings(tmp_path: Path) -> None:
-    findings_path = tmp_path / "artifacts" / "audit-evidence" / "deterministic-findings.json"
+    findings_path = (
+        tmp_path / "artifacts" / "audit-evidence" / "deterministic-findings.json"
+    )
     findings_path.parent.mkdir(parents=True, exist_ok=True)
     findings_path.write_text(json.dumps(FINDINGS_PAYLOAD), encoding="utf-8")
 
 
 def _expected_output_path(tmp_path: Path) -> Path:
-    return tmp_path / "artifacts" / "audit-evidence" / "severe-issues-upserted.json"
+    return tmp_path / "artifacts" / "audit-evidence" / "severe-issues.json"
 
 
-def test_main_writes_severe_output_and_excludes_non_severe(tmp_path, monkeypatch) -> None:
+def test_main_writes_severe_output_and_excludes_non_severe(
+    tmp_path, monkeypatch
+) -> None:
     module = _load_module()
     monkeypatch.setattr(module, "_repo_root", lambda: tmp_path)
     _write_findings(tmp_path)
@@ -72,7 +76,9 @@ def test_main_writes_severe_output_and_excludes_non_severe(tmp_path, monkeypatch
     monkeypatch.setattr(
         module,
         "_github_context",
-        lambda _: module.GitHubContext(token="x", owner="Prekzursil", repo="AdrianaArt"),
+        lambda _: module.GitHubContext(
+            token="x", owner="Prekzursil", repo="AdrianaArt"
+        ),
     )
 
     argv = [
@@ -80,7 +86,7 @@ def test_main_writes_severe_output_and_excludes_non_severe(tmp_path, monkeypatch
         "--findings",
         "artifacts/audit-evidence/deterministic-findings.json",
         "--severe-output",
-        "artifacts/audit-evidence/severe-issues-upserted.json",
+        "artifacts/audit-evidence/severe-issues.json",
         "--skip-digest",
     ]
     monkeypatch.setattr(sys, "argv", argv)
@@ -107,7 +113,9 @@ def test_upsert_severe_returns_updated_entry_for_existing_issue(monkeypatch) -> 
         "body": f"<!-- audit:fingerprint:{marker} -->\nold body",
     }
 
-    monkeypatch.setattr(module, "_list_open_issues", lambda *_args, **_kwargs: [open_issue])
+    monkeypatch.setattr(
+        module, "_list_open_issues", lambda *_args, **_kwargs: [open_issue]
+    )
 
     calls: list[tuple[str, str, dict[str, object] | None]] = []
 

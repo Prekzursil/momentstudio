@@ -44,7 +44,12 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_user_token(session_factory) -> tuple[str, uuid.UUID]:
     async def _create() -> tuple[str, uuid.UUID]:
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email="notify@example.com", password="pass123", name="Notify"))
+            user = await create_user(
+                session,
+                UserCreate(
+                    email="notify@example.com", password="pass123", name="Notify"
+                ),
+            )
             user.email_verified = True
             await session.commit()
             await session.refresh(user)
@@ -117,7 +122,9 @@ def test_notifications_list_and_unread_count(test_app: Dict[str, object]) -> Non
     assert ids["dismissed_id"] not in returned_ids
     assert ids["old_read_id"] not in returned_ids
 
-    count = client.get("/api/v1/notifications/unread-count", headers=auth_headers(token))
+    count = client.get(
+        "/api/v1/notifications/unread-count", headers=auth_headers(token)
+    )
     assert count.status_code == 200, count.text
     assert count.json()["count"] == 1
 
@@ -129,15 +136,22 @@ def test_notifications_mark_read_and_dismiss(test_app: Dict[str, object]) -> Non
     token, user_id = create_user_token(SessionLocal)
     ids = seed_notifications(SessionLocal, user_id)
 
-    mark = client.post(f"/api/v1/notifications/{ids['unread_id']}/read", headers=auth_headers(token))
+    mark = client.post(
+        f"/api/v1/notifications/{ids['unread_id']}/read", headers=auth_headers(token)
+    )
     assert mark.status_code == 200, mark.text
     assert mark.json()["read_at"] is not None
 
-    count = client.get("/api/v1/notifications/unread-count", headers=auth_headers(token))
+    count = client.get(
+        "/api/v1/notifications/unread-count", headers=auth_headers(token)
+    )
     assert count.status_code == 200, count.text
     assert count.json()["count"] == 0
 
-    dismiss = client.post(f"/api/v1/notifications/{ids['recent_read_id']}/dismiss", headers=auth_headers(token))
+    dismiss = client.post(
+        f"/api/v1/notifications/{ids['recent_read_id']}/dismiss",
+        headers=auth_headers(token),
+    )
     assert dismiss.status_code == 200, dismiss.text
     assert dismiss.json()["dismissed_at"] is not None
 
@@ -147,7 +161,9 @@ def test_notifications_mark_read_and_dismiss(test_app: Dict[str, object]) -> Non
     assert ids["recent_read_id"] not in returned_ids
 
 
-def test_notifications_list_include_dismissed_and_old_read(test_app: Dict[str, object]) -> None:
+def test_notifications_list_include_dismissed_and_old_read(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
@@ -171,7 +187,10 @@ def test_notifications_restore(test_app: Dict[str, object]) -> None:
     token, user_id = create_user_token(SessionLocal)
     ids = seed_notifications(SessionLocal, user_id)
 
-    restore = client.post(f"/api/v1/notifications/{ids['dismissed_id']}/restore", headers=auth_headers(token))
+    restore = client.post(
+        f"/api/v1/notifications/{ids['dismissed_id']}/restore",
+        headers=auth_headers(token),
+    )
     assert restore.status_code == 200, restore.text
     assert restore.json()["dismissed_at"] is None
 

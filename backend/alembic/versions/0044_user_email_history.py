@@ -26,7 +26,9 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "user_email_history",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column(
             "user_id",
             postgresql.UUID(as_uuid=True),
@@ -34,7 +36,12 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("email", sa.String(length=255), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
     op.create_index("ix_user_email_history_user_id", "user_email_history", ["user_id"])
 
@@ -44,7 +51,10 @@ def upgrade() -> None:
         return
 
     now = datetime.now(timezone.utc)
-    rows = [{"id": uuid.uuid4(), "user_id": row[0], "email": row[1], "created_at": now} for row in users]
+    rows = [
+        {"id": uuid.uuid4(), "user_id": row[0], "email": row[1], "created_at": now}
+        for row in users
+    ]
     email_history = sa.table(
         "user_email_history",
         sa.column("id", postgresql.UUID(as_uuid=True)),
@@ -58,4 +68,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("ix_user_email_history_user_id", table_name="user_email_history")
     op.drop_table("user_email_history")
-

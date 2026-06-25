@@ -20,7 +20,7 @@ import {
   MediaRetryPolicyPreset,
   MediaRetryPolicyPresetKey,
   MediaRetryPolicySnapshot,
-  MediaTelemetryResponse
+  MediaTelemetryResponse,
 } from '../../../core/admin.service';
 import { AuthService } from '../../../core/auth.service';
 import { ToastService } from '../../../core/toast.service';
@@ -68,7 +68,9 @@ type RetryPolicyRollbackPreview = {
         </button>
       </div>
 
-      <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+      <div
+        class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+      >
         <div class="flex flex-wrap items-end gap-2">
           <label class="grid gap-1">
             <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Search</span>
@@ -155,28 +157,62 @@ type RetryPolicyRollbackPreview = {
           >
             Reset
           </button>
-          <label class="h-10 cursor-pointer rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700">
+          <label
+            class="h-10 cursor-pointer rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700"
+          >
             Upload
             <input type="file" class="hidden" (change)="upload($event)" />
           </label>
         </div>
 
         <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Queue depth</p>
-            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ telemetry()?.queue_depth ?? 0 }}</p>
+          <div
+            class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+          >
+            <p
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+            >
+              Queue depth
+            </p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ telemetry()?.queue_depth ?? 0 }}
+            </p>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Online workers</p>
-            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ telemetry()?.online_workers ?? 0 }}</p>
+          <div
+            class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+          >
+            <p
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+            >
+              Online workers
+            </p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ telemetry()?.online_workers ?? 0 }}
+            </p>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Stale processing</p>
-            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ telemetry()?.stale_processing_count ?? 0 }}</p>
+          <div
+            class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+          >
+            <p
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+            >
+              Stale processing
+            </p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ telemetry()?.stale_processing_count ?? 0 }}
+            </p>
           </div>
-          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Oldest queued</p>
-            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">{{ oldestQueuedLabel() }}</p>
+          <div
+            class="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+          >
+            <p
+              class="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400"
+            >
+              Oldest queued
+            </p>
+            <p class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ oldestQueuedLabel() }}
+            </p>
           </div>
         </div>
 
@@ -188,10 +224,14 @@ type RetryPolicyRollbackPreview = {
           (retry)="reload()"
         ></app-error-state>
 
-        <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">Loading media…</div>
+        <div *ngIf="loading()" class="text-sm text-slate-600 dark:text-slate-300">
+          Loading media…
+        </div>
 
         <div *ngIf="tab() === 'collections'" class="grid gap-3">
-          <div class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/30">
+          <div
+            class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/30"
+          >
             <input
               class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-800"
               [(ngModel)]="newCollectionName"
@@ -223,12 +263,26 @@ type RetryPolicyRollbackPreview = {
               class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
             >
               <div>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ c.name }} <span class="text-xs text-slate-500">({{ c.slug }})</span></p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">{{ c.visibility }} · {{ c.item_count }} items</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ c.name }} <span class="text-xs text-slate-500">({{ c.slug }})</span>
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ c.visibility }} · {{ c.item_count }} items
+                </p>
               </div>
               <div class="flex flex-wrap items-center gap-2">
-                <button type="button" class="text-xs text-slate-700 underline dark:text-slate-200" (click)="editCollection(c)">Edit</button>
-                <button type="button" class="text-xs text-indigo-700 underline dark:text-indigo-300" (click)="attachSelectionToCollection(c)">
+                <button
+                  type="button"
+                  class="text-xs text-slate-700 underline dark:text-slate-200"
+                  (click)="editCollection(c)"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="text-xs text-indigo-700 underline dark:text-indigo-300"
+                  (click)="attachSelectionToCollection(c)"
+                >
                   Add selected ({{ selectedCount() }})
                 </button>
               </div>
@@ -263,7 +317,9 @@ type RetryPolicyRollbackPreview = {
               Dead-letter
             </button>
           </div>
-          <div class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/30">
+          <div
+            class="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950/30"
+          >
             <label class="grid gap-1">
               <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Status</span>
               <select
@@ -354,7 +410,9 @@ type RetryPolicyRollbackPreview = {
                 (change)="loadJobs(true)"
               />
             </label>
-            <label class="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+            <label
+              class="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            >
               <input type="checkbox" [(ngModel)]="queueSlaBreachedOnly" (change)="loadJobs(true)" />
               SLA breached
             </label>
@@ -381,11 +439,17 @@ type RetryPolicyRollbackPreview = {
             </button>
           </div>
 
-          <div class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <div
+            class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+          >
             <div class="flex items-center justify-between gap-2">
               <div>
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Retry policies</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Per job-type attempts, schedule, and jitter for newly queued jobs.</p>
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  Retry policies
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Per job-type attempts, schedule, and jitter for newly queued jobs.
+                </p>
               </div>
               <button
                 type="button"
@@ -397,13 +461,26 @@ type RetryPolicyRollbackPreview = {
               </button>
             </div>
 
-            <p *ngIf="retryPoliciesError()" class="text-xs text-rose-700 dark:text-rose-300">{{ retryPoliciesError() }}</p>
-            <div *ngIf="retryPoliciesLoading()" class="text-xs text-slate-500 dark:text-slate-400">Loading retry policies…</div>
+            <p *ngIf="retryPoliciesError()" class="text-xs text-rose-700 dark:text-rose-300">
+              {{ retryPoliciesError() }}
+            </p>
+            <div *ngIf="retryPoliciesLoading()" class="text-xs text-slate-500 dark:text-slate-400">
+              Loading retry policies…
+            </div>
 
-            <div *ngFor="let policy of retryPolicies()" class="grid gap-2 rounded border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950/20">
+            <div
+              *ngFor="let policy of retryPolicies()"
+              class="grid gap-2 rounded border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950/20"
+            >
               <div class="flex flex-wrap items-center justify-between gap-2">
-                <p class="text-xs font-semibold text-slate-800 uppercase tracking-[0.14em] dark:text-slate-100">{{ policy.job_type }}</p>
-                <p class="text-[11px] text-slate-500 dark:text-slate-400">Updated {{ policy.updated_at | date: 'short' }}</p>
+                <p
+                  class="text-xs font-semibold text-slate-800 uppercase tracking-[0.14em] dark:text-slate-100"
+                >
+                  {{ policy.job_type }}
+                </p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  Updated {{ policy.updated_at | date: 'short' }}
+                </p>
               </div>
               <div class="grid gap-2 md:grid-cols-5">
                 <label class="grid gap-1 text-xs">
@@ -428,7 +505,9 @@ type RetryPolicyRollbackPreview = {
                   />
                 </label>
                 <label class="grid gap-1 text-xs md:col-span-2">
-                  <span class="font-semibold text-slate-700 dark:text-slate-200">Schedule (seconds)</span>
+                  <span class="font-semibold text-slate-700 dark:text-slate-200"
+                    >Schedule (seconds)</span
+                  >
                   <input
                     class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
                     [ngModel]="retryPolicyDraft(policy.job_type).scheduleText"
@@ -451,8 +530,15 @@ type RetryPolicyRollbackPreview = {
                   />
                 </label>
               </div>
-              <p class="text-[11px] text-slate-500 dark:text-slate-400">Preview delays: {{ retryDelayPreview(policy.job_type) }}</p>
-              <p *ngIf="retryPolicyError(policy.job_type)" class="text-xs text-rose-700 dark:text-rose-300">{{ retryPolicyError(policy.job_type) }}</p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                Preview delays: {{ retryDelayPreview(policy.job_type) }}
+              </p>
+              <p
+                *ngIf="retryPolicyError(policy.job_type)"
+                class="text-xs text-rose-700 dark:text-rose-300"
+              >
+                {{ retryPolicyError(policy.job_type) }}
+              </p>
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 <button
                   type="button"
@@ -517,14 +603,23 @@ type RetryPolicyRollbackPreview = {
                 <p class="text-[11px] text-slate-500 dark:text-slate-400">
                   Presets: {{ retryPolicyPresetSummary(policy.job_type) }}
                 </p>
-                <p *ngIf="retryPolicyHistoryError(policy.job_type)" class="text-xs text-rose-700 dark:text-rose-300">
+                <p
+                  *ngIf="retryPolicyHistoryError(policy.job_type)"
+                  class="text-xs text-rose-700 dark:text-rose-300"
+                >
                   {{ retryPolicyHistoryError(policy.job_type) }}
                 </p>
-                <p *ngIf="retryPolicyHistoryLoading(policy.job_type)" class="text-xs text-slate-500 dark:text-slate-400">
+                <p
+                  *ngIf="retryPolicyHistoryLoading(policy.job_type)"
+                  class="text-xs text-slate-500 dark:text-slate-400"
+                >
                   Loading policy history…
                 </p>
                 <p
-                  *ngIf="!retryPolicyHistoryLoading(policy.job_type) && retryPolicyHistoryItems(policy.job_type).length === 0"
+                  *ngIf="
+                    !retryPolicyHistoryLoading(policy.job_type) &&
+                    retryPolicyHistoryItems(policy.job_type).length === 0
+                  "
                   class="text-xs text-slate-500 dark:text-slate-400"
                 >
                   No policy events yet.
@@ -538,11 +633,13 @@ type RetryPolicyRollbackPreview = {
                       {{ evt.action }} <span *ngIf="evt.preset_key">· {{ evt.preset_key }}</span>
                     </p>
                     <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                      {{ evt.created_at | date: 'short' }} · actor {{ evt.actor_user_id || 'system' }}
+                      {{ evt.created_at | date: 'short' }} · actor
+                      {{ evt.actor_user_id || 'system' }}
                     </p>
                   </div>
                   <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                    {{ formatPolicySnapshot(evt.before_policy) }} → {{ formatPolicySnapshot(evt.after_policy) }}
+                    {{ formatPolicySnapshot(evt.before_policy) }} →
+                    {{ formatPolicySnapshot(evt.after_policy) }}
                   </p>
                   <div class="mt-1 flex flex-wrap gap-1">
                     <span
@@ -560,10 +657,14 @@ type RetryPolicyRollbackPreview = {
                       <p class="font-semibold">{{ row.label }}</p>
                       <p>Before: {{ row.before }}</p>
                       <p>After: {{ row.after }}</p>
-                      <p *ngIf="row.detail" class="text-slate-500 dark:text-slate-400">{{ row.detail }}</p>
+                      <p *ngIf="row.detail" class="text-slate-500 dark:text-slate-400">
+                        {{ row.detail }}
+                      </p>
                     </div>
                   </div>
-                  <p *ngIf="evt.note" class="text-xs text-slate-700 dark:text-slate-200">{{ evt.note }}</p>
+                  <p *ngIf="evt.note" class="text-xs text-slate-700 dark:text-slate-200">
+                    {{ evt.note }}
+                  </p>
                   <button
                     *ngIf="canEditRetryPolicies()"
                     type="button"
@@ -599,11 +700,15 @@ type RetryPolicyRollbackPreview = {
                   </button>
                 </div>
                 <div class="grid gap-2 md:grid-cols-2">
-                  <div class="rounded border border-slate-300 bg-white p-2 text-[11px] dark:border-slate-700 dark:bg-slate-900">
+                  <div
+                    class="rounded border border-slate-300 bg-white p-2 text-[11px] dark:border-slate-700 dark:bg-slate-900"
+                  >
                     <p class="font-semibold text-slate-700 dark:text-slate-100">Current</p>
                     <p>{{ formatPolicySnapshot(retryPolicyRollbackPreview()!.currentPolicy) }}</p>
                   </div>
-                  <div class="rounded border border-slate-300 bg-white p-2 text-[11px] dark:border-slate-700 dark:bg-slate-900">
+                  <div
+                    class="rounded border border-slate-300 bg-white p-2 text-[11px] dark:border-slate-700 dark:bg-slate-900"
+                  >
                     <p class="font-semibold text-slate-700 dark:text-slate-100">Target</p>
                     <p>{{ formatPolicySnapshot(retryPolicyRollbackPreview()!.targetPolicy) }}</p>
                   </div>
@@ -616,7 +721,9 @@ type RetryPolicyRollbackPreview = {
                     <p class="font-semibold text-slate-700 dark:text-slate-100">{{ row.label }}</p>
                     <p>Before: {{ row.before }}</p>
                     <p>After: {{ row.after }}</p>
-                    <p *ngIf="row.detail" class="text-slate-500 dark:text-slate-400">{{ row.detail }}</p>
+                    <p *ngIf="row.detail" class="text-slate-500 dark:text-slate-400">
+                      {{ row.detail }}
+                    </p>
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -641,33 +748,103 @@ type RetryPolicyRollbackPreview = {
             </div>
           </div>
 
-          <div *ngIf="selectedQueueJobCount() > 0" class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs dark:border-slate-800 dark:bg-slate-900">
-            <span class="font-semibold text-slate-700 dark:text-slate-100">{{ selectedQueueJobCount() }} selected</span>
-            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkRetrySelectedJobs()">Retry selected</button>
-            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkAssignSelectedJobs()">Assign</button>
-            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkMarkSelectedJobs('ignored')">Mark ignored</button>
-            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkMarkSelectedJobs('resolved')">Mark resolved</button>
-            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkAddTagToSelectedJobs()">Add tag</button>
-            <button type="button" class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="bulkRemoveTagFromSelectedJobs()">Remove tag</button>
+          <div
+            *ngIf="selectedQueueJobCount() > 0"
+            class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 text-xs dark:border-slate-800 dark:bg-slate-900"
+          >
+            <span class="font-semibold text-slate-700 dark:text-slate-100"
+              >{{ selectedQueueJobCount() }} selected</span
+            >
+            <button
+              type="button"
+              class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              (click)="bulkRetrySelectedJobs()"
+            >
+              Retry selected
+            </button>
+            <button
+              type="button"
+              class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              (click)="bulkAssignSelectedJobs()"
+            >
+              Assign
+            </button>
+            <button
+              type="button"
+              class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              (click)="bulkMarkSelectedJobs('ignored')"
+            >
+              Mark ignored
+            </button>
+            <button
+              type="button"
+              class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              (click)="bulkMarkSelectedJobs('resolved')"
+            >
+              Mark resolved
+            </button>
+            <button
+              type="button"
+              class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              (click)="bulkAddTagToSelectedJobs()"
+            >
+              Add tag
+            </button>
+            <button
+              type="button"
+              class="rounded border border-slate-300 px-2 py-1 font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              (click)="bulkRemoveTagFromSelectedJobs()"
+            >
+              Remove tag
+            </button>
           </div>
 
-          <div *ngIf="queueError()" class="text-sm text-rose-700 dark:text-rose-300">{{ queueError() }}</div>
-          <div *ngIf="queueLoading()" class="text-sm text-slate-600 dark:text-slate-300">Loading job queue…</div>
-          <div *ngIf="!queueLoading() && jobs().length === 0" class="text-sm text-slate-500 dark:text-slate-400">No jobs found.</div>
+          <div *ngIf="queueError()" class="text-sm text-rose-700 dark:text-rose-300">
+            {{ queueError() }}
+          </div>
+          <div *ngIf="queueLoading()" class="text-sm text-slate-600 dark:text-slate-300">
+            Loading job queue…
+          </div>
+          <div
+            *ngIf="!queueLoading() && jobs().length === 0"
+            class="text-sm text-slate-500 dark:text-slate-400"
+          >
+            No jobs found.
+          </div>
           <div
             *ngFor="let job of jobs()"
             class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           >
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
-                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ job.job_type }} · {{ job.status }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Asset {{ job.asset_id || 'n/a' }} · {{ job.progress_pct }}% · attempt {{ job.attempt }}/{{ job.max_attempts }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Triage: {{ job.triage_state }} · Created {{ job.created_at | date: 'short' }}</p>
-                <p *ngIf="job.next_retry_at" class="text-xs text-indigo-700 dark:text-indigo-300">Next retry: {{ job.next_retry_at | date: 'short' }}</p>
-                <p *ngIf="job.sla_due_at" class="text-xs text-amber-700 dark:text-amber-300">SLA: {{ job.sla_due_at | date: 'short' }}</p>
-                <p *ngIf="job.incident_url" class="truncate text-xs text-slate-500 dark:text-slate-400">Incident: {{ job.incident_url }}</p>
+                <p class="font-semibold text-slate-900 dark:text-slate-50">
+                  {{ job.job_type }} · {{ job.status }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Asset {{ job.asset_id || 'n/a' }} · {{ job.progress_pct }}% · attempt
+                  {{ job.attempt }}/{{ job.max_attempts }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Triage: {{ job.triage_state }} · Created {{ job.created_at | date: 'short' }}
+                </p>
+                <p *ngIf="job.next_retry_at" class="text-xs text-indigo-700 dark:text-indigo-300">
+                  Next retry: {{ job.next_retry_at | date: 'short' }}
+                </p>
+                <p *ngIf="job.sla_due_at" class="text-xs text-amber-700 dark:text-amber-300">
+                  SLA: {{ job.sla_due_at | date: 'short' }}
+                </p>
+                <p
+                  *ngIf="job.incident_url"
+                  class="truncate text-xs text-slate-500 dark:text-slate-400"
+                >
+                  Incident: {{ job.incident_url }}
+                </p>
               </div>
-              <input type="checkbox" [checked]="selectedQueueJobIds().has(job.id)" (change)="toggleQueueJobSelected(job.id, $event)" />
+              <input
+                type="checkbox"
+                [checked]="selectedQueueJobIds().has(job.id)"
+                (change)="toggleQueueJobSelected(job.id, $event)"
+              />
             </div>
             <div *ngIf="job.tags?.length" class="mt-2 flex flex-wrap gap-1">
               <span
@@ -677,19 +854,87 @@ type RetryPolicyRollbackPreview = {
                 {{ t }}
               </span>
             </div>
-            <p *ngIf="job.error_message" class="mt-2 text-xs text-rose-600 dark:text-rose-300">{{ job.error_message }}</p>
+            <p *ngIf="job.error_message" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
+              {{ job.error_message }}
+            </p>
             <div class="mt-2 flex flex-wrap gap-2 text-xs">
-              <button type="button" class="text-indigo-700 underline dark:text-indigo-300" (click)="retryJob(job)">Retry now</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="assignJob(job)">Assign</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setSla(job)">Set SLA</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setIncident(job)">Set incident</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setTriageState(job, 'open')">Open</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setTriageState(job, 'ignored')">Ignore</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="setTriageState(job, 'resolved')">Resolve</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="addJobTag(job)">Add tag</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="removeJobTag(job)">Remove tag</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="addTriageNote(job)">Add note</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="openJobEvents(job)">Events</button>
+              <button
+                type="button"
+                class="text-indigo-700 underline dark:text-indigo-300"
+                (click)="retryJob(job)"
+              >
+                Retry now
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="assignJob(job)"
+              >
+                Assign
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="setSla(job)"
+              >
+                Set SLA
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="setIncident(job)"
+              >
+                Set incident
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="setTriageState(job, 'open')"
+              >
+                Open
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="setTriageState(job, 'ignored')"
+              >
+                Ignore
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="setTriageState(job, 'resolved')"
+              >
+                Resolve
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="addJobTag(job)"
+              >
+                Add tag
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="removeJobTag(job)"
+              >
+                Remove tag
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="addTriageNote(job)"
+              >
+                Add note
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="openJobEvents(job)"
+              >
+                Events
+              </button>
             </div>
           </div>
 
@@ -702,7 +947,9 @@ type RetryPolicyRollbackPreview = {
             >
               Prev
             </button>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Page {{ queuePage }} / {{ jobsMetaTotalPages() }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Page {{ queuePage }} / {{ jobsMetaTotalPages() }}
+            </p>
             <button
               type="button"
               class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
@@ -714,17 +961,28 @@ type RetryPolicyRollbackPreview = {
           </div>
         </div>
 
-        <div *ngIf="tab() !== 'collections' && tab() !== 'queue'" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div
+          *ngIf="tab() !== 'collections' && tab() !== 'queue'"
+          class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
+        >
           <label
             *ngFor="let asset of assets()"
             class="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
           >
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
-                <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">{{ asset.original_filename || asset.public_url }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">{{ asset.asset_type }} · {{ asset.status }} · {{ asset.visibility }}</p>
+                <p class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ asset.original_filename || asset.public_url }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ asset.asset_type }} · {{ asset.status }} · {{ asset.visibility }}
+                </p>
               </div>
-              <input type="checkbox" [checked]="selectedIds().has(asset.id)" (change)="toggleSelected(asset.id, $event)" />
+              <input
+                type="checkbox"
+                [checked]="selectedIds().has(asset.id)"
+                (change)="toggleSelected(asset.id, $event)"
+              />
             </div>
             <img
               *ngIf="asset.asset_type === 'image'"
@@ -733,10 +991,15 @@ type RetryPolicyRollbackPreview = {
               class="h-36 w-full rounded-lg border border-slate-200 object-cover dark:border-slate-700"
               loading="lazy"
             />
-            <div *ngIf="asset.asset_type !== 'image'" class="rounded-lg border border-dashed border-slate-300 p-4 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+            <div
+              *ngIf="asset.asset_type !== 'image'"
+              class="rounded-lg border border-dashed border-slate-300 p-4 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400"
+            >
               {{ asset.asset_type.toUpperCase() }} preview
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ asset.public_url }}</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+              {{ asset.public_url }}
+            </p>
             <div class="flex flex-wrap gap-1">
               <span
                 *ngFor="let t of asset.tags"
@@ -746,16 +1009,81 @@ type RetryPolicyRollbackPreview = {
               </span>
             </div>
             <div class="flex flex-wrap gap-2 text-xs">
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="openDetails(asset)">Details</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="editTags(asset)">Tags</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="openUsage(asset)">Usage</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="requestVariant(asset)">Variant</button>
-              <button type="button" class="text-slate-700 underline dark:text-slate-200" (click)="editImage(asset)">Edit</button>
-              <button *ngIf="asset.status === 'draft'" type="button" class="text-emerald-700 underline dark:text-emerald-300" (click)="approve(asset)">Approve</button>
-              <button *ngIf="asset.status === 'draft'" type="button" class="text-rose-700 underline dark:text-rose-300" (click)="reject(asset)">Reject</button>
-              <button *ngIf="asset.status !== 'trashed'" type="button" class="text-rose-700 underline dark:text-rose-300" (click)="softDelete(asset)">Trash</button>
-              <button *ngIf="asset.status === 'trashed'" type="button" class="text-indigo-700 underline dark:text-indigo-300" (click)="restore(asset)">Restore</button>
-              <button *ngIf="asset.status === 'trashed'" type="button" class="text-rose-700 underline dark:text-rose-300" (click)="purge(asset)">Purge</button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="openDetails(asset)"
+              >
+                Details
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="editTags(asset)"
+              >
+                Tags
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="openUsage(asset)"
+              >
+                Usage
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="requestVariant(asset)"
+              >
+                Variant
+              </button>
+              <button
+                type="button"
+                class="text-slate-700 underline dark:text-slate-200"
+                (click)="editImage(asset)"
+              >
+                Edit
+              </button>
+              <button
+                *ngIf="asset.status === 'draft'"
+                type="button"
+                class="text-emerald-700 underline dark:text-emerald-300"
+                (click)="approve(asset)"
+              >
+                Approve
+              </button>
+              <button
+                *ngIf="asset.status === 'draft'"
+                type="button"
+                class="text-rose-700 underline dark:text-rose-300"
+                (click)="reject(asset)"
+              >
+                Reject
+              </button>
+              <button
+                *ngIf="asset.status !== 'trashed'"
+                type="button"
+                class="text-rose-700 underline dark:text-rose-300"
+                (click)="softDelete(asset)"
+              >
+                Trash
+              </button>
+              <button
+                *ngIf="asset.status === 'trashed'"
+                type="button"
+                class="text-indigo-700 underline dark:text-indigo-300"
+                (click)="restore(asset)"
+              >
+                Restore
+              </button>
+              <button
+                *ngIf="asset.status === 'trashed'"
+                type="button"
+                class="text-rose-700 underline dark:text-rose-300"
+                (click)="purge(asset)"
+              >
+                Purge
+              </button>
             </div>
           </label>
         </div>
@@ -769,7 +1097,9 @@ type RetryPolicyRollbackPreview = {
           >
             Prev
           </button>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Page {{ page }} / {{ metaTotalPages() }}</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            Page {{ page }} / {{ metaTotalPages() }}
+          </p>
           <button
             type="button"
             class="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
@@ -781,35 +1111,62 @@ type RetryPolicyRollbackPreview = {
         </div>
       </div>
 
-      <div *ngIf="detailAsset()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      <div
+        *ngIf="detailAsset()"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      >
+        <div
+          class="w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+        >
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ detailAsset()?.original_filename || detailAsset()?.public_url }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ detailAsset()?.asset_type }} · {{ detailAsset()?.status }}</p>
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                {{ detailAsset()?.original_filename || detailAsset()?.public_url }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ detailAsset()?.asset_type }} · {{ detailAsset()?.status }}
+              </p>
             </div>
-            <button type="button" class="text-xs font-semibold text-slate-700 underline dark:text-slate-200" (click)="closeDetails()">Close</button>
+            <button
+              type="button"
+              class="text-xs font-semibold text-slate-700 underline dark:text-slate-200"
+              (click)="closeDetails()"
+            >
+              Close
+            </button>
           </div>
           <div class="mt-3 grid gap-3 md:grid-cols-2">
             <div class="grid gap-2">
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Rights license</span>
-                <input class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editRightsLicense" />
+                <input
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editRightsLicense"
+                />
               </label>
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Rights owner</span>
-                <input class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editRightsOwner" />
+                <input
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editRightsOwner"
+                />
               </label>
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Visibility</span>
-                <select class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editVisibility">
+                <select
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editVisibility"
+                >
                   <option value="public">Public</option>
                   <option value="private">Private</option>
                 </select>
               </label>
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Status</span>
-                <select class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editStatus">
+                <select
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editStatus"
+                >
                   <option value="draft">Draft</option>
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
@@ -820,58 +1177,115 @@ type RetryPolicyRollbackPreview = {
             <div class="grid gap-2">
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Title EN</span>
-                <input class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editTitleEn" />
+                <input
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editTitleEn"
+                />
               </label>
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Alt EN</span>
-                <input class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editAltEn" />
+                <input
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editAltEn"
+                />
               </label>
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Title RO</span>
-                <input class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editTitleRo" />
+                <input
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editTitleRo"
+                />
               </label>
               <label class="grid gap-1 text-xs">
                 <span class="font-semibold text-slate-700 dark:text-slate-200">Alt RO</span>
-                <input class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900" [(ngModel)]="editAltRo" />
+                <input
+                  class="h-10 rounded border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900"
+                  [(ngModel)]="editAltRo"
+                />
               </label>
             </div>
           </div>
           <div class="mt-3 flex justify-end gap-2">
-            <button type="button" class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100" (click)="closeDetails()">Cancel</button>
-            <button type="button" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white dark:bg-slate-100 dark:text-slate-900" (click)="saveDetails()">Save</button>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-100"
+              (click)="closeDetails()"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white dark:bg-slate-100 dark:text-slate-900"
+              (click)="saveDetails()"
+            >
+              Save
+            </button>
           </div>
         </div>
       </div>
 
-      <div *ngIf="activeJobEventsFor()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-        <div class="w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+      <div
+        *ngIf="activeJobEventsFor()"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      >
+        <div
+          class="w-full max-w-3xl rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+        >
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">Job events</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ activeJobEventsFor()?.job_type }} · {{ activeJobEventsFor()?.id }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ activeJobEventsFor()?.job_type }} · {{ activeJobEventsFor()?.id }}
+              </p>
             </div>
-            <button type="button" class="text-xs font-semibold text-slate-700 underline dark:text-slate-200" (click)="closeJobEvents()">Close</button>
+            <button
+              type="button"
+              class="text-xs font-semibold text-slate-700 underline dark:text-slate-200"
+              (click)="closeJobEvents()"
+            >
+              Close
+            </button>
           </div>
-          <div *ngIf="jobEventsLoading()" class="mt-3 text-sm text-slate-600 dark:text-slate-300">Loading events…</div>
-          <div *ngIf="!jobEventsLoading() && !jobEvents().length" class="mt-3 text-sm text-slate-500 dark:text-slate-400">No events recorded.</div>
+          <div *ngIf="jobEventsLoading()" class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+            Loading events…
+          </div>
+          <div
+            *ngIf="!jobEventsLoading() && !jobEvents().length"
+            class="mt-3 text-sm text-slate-500 dark:text-slate-400"
+          >
+            No events recorded.
+          </div>
           <div *ngIf="jobEvents().length" class="mt-3 max-h-[55vh] space-y-2 overflow-auto pr-1">
-            <div *ngFor="let evt of jobEvents()" class="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900">
-              <p class="text-xs font-semibold text-slate-900 dark:text-slate-50">{{ evt.action }}</p>
-              <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ evt.created_at | date: 'short' }} · actor {{ evt.actor_user_id || 'system' }}</p>
-              <p *ngIf="evt.note" class="text-xs text-slate-700 dark:text-slate-200">{{ evt.note }}</p>
-              <pre *ngIf="evt.meta_json" class="mt-1 overflow-auto rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">{{ evt.meta_json }}</pre>
+            <div
+              *ngFor="let evt of jobEvents()"
+              class="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <p class="text-xs font-semibold text-slate-900 dark:text-slate-50">
+                {{ evt.action }}
+              </p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                {{ evt.created_at | date: 'short' }} · actor {{ evt.actor_user_id || 'system' }}
+              </p>
+              <p *ngIf="evt.note" class="text-xs text-slate-700 dark:text-slate-200">
+                {{ evt.note }}
+              </p>
+              <pre
+                *ngIf="evt.meta_json"
+                class="mt-1 overflow-auto rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
+                >{{ evt.meta_json }}</pre
+              >
             </div>
           </div>
         </div>
       </div>
     </section>
-  `
+  `,
 })
 export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   constructor(
     private readonly admin: AdminService,
     private readonly auth: AuthService,
-    private readonly toast: ToastService
+    private readonly toast: ToastService,
   ) {}
 
   readonly tabs: Array<{ id: DamTab; label: string }> = [
@@ -879,7 +1293,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     { id: 'review', label: 'Review queue' },
     { id: 'collections', label: 'Collections' },
     { id: 'trash', label: 'Trash' },
-    { id: 'queue', label: 'Jobs' }
+    { id: 'queue', label: 'Jobs' },
   ];
 
   readonly tab = signal<DamTab>('library');
@@ -901,17 +1315,24 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   readonly errorRequestId = signal<string | null>(null);
   readonly detailAsset = signal<MediaAsset | null>(null);
   readonly selectedIds = signal<Set<string>>(new Set());
-  readonly meta = signal<{ total_items: number; total_pages: number; page: number; limit: number }>({
+  readonly meta = signal<{ total_items: number; total_pages: number; page: number; limit: number }>(
+    {
+      total_items: 0,
+      total_pages: 1,
+      page: 1,
+      limit: 24,
+    },
+  );
+  readonly jobsMeta = signal<{
+    total_items: number;
+    total_pages: number;
+    page: number;
+    limit: number;
+  }>({
     total_items: 0,
     total_pages: 1,
     page: 1,
-    limit: 24
-  });
-  readonly jobsMeta = signal<{ total_items: number; total_pages: number; page: number; limit: number }>({
-    total_items: 0,
-    total_pages: 1,
-    page: 1,
-    limit: 20
+    limit: 20,
   });
 
   readonly metaTotalPages = computed(() => Math.max(1, this.meta().total_pages || 1));
@@ -1043,7 +1464,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
         include_trashed: this.tab() === 'trash',
         page: this.page,
         limit: 24,
-        sort: this.sort
+        sort: this.sort,
       })
       .subscribe({
         next: (res) => {
@@ -1056,7 +1477,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
           this.error.set(err?.error?.detail || 'Failed to load media assets.');
           this.errorRequestId.set(extractRequestId(err));
           this.loading.set(false);
-        }
+        },
       });
   }
 
@@ -1089,20 +1510,22 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
         dead_letter_only: this.queueMode === 'dead_letter',
         asset_id: this.queueAssetId.trim() || undefined,
         created_from: this.queueCreatedFrom ? `${this.queueCreatedFrom}T00:00:00+00:00` : undefined,
-        created_to: this.queueCreatedTo ? `${this.queueCreatedTo}T23:59:59+00:00` : undefined
+        created_to: this.queueCreatedTo ? `${this.queueCreatedTo}T23:59:59+00:00` : undefined,
       })
       .subscribe({
         next: (res) => {
           this.jobs.set(res.items || []);
           this.selectedQueueJobIds.set(new Set());
-          this.jobsMeta.set(res.meta || { total_items: 0, total_pages: 1, page: this.queuePage, limit: 20 });
+          this.jobsMeta.set(
+            res.meta || { total_items: 0, total_pages: 1, page: this.queuePage, limit: 20 },
+          );
           this.queueLoading.set(false);
           this.loadTelemetry();
         },
         error: (err) => {
           this.queueError.set(err?.error?.detail || 'Failed to load media jobs.');
           this.queueLoading.set(false);
-        }
+        },
       });
   }
 
@@ -1111,15 +1534,20 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     this.retryPoliciesError.set(null);
     this.admin.listMediaRetryPolicies().subscribe({
       next: (res) => {
-        const items = (res.items || []).slice().sort((a, b) => a.job_type.localeCompare(b.job_type));
+        const items = (res.items || [])
+          .slice()
+          .sort((a, b) => a.job_type.localeCompare(b.job_type));
         this.retryPolicies.set(items);
-        const drafts: Record<string, { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }> = {};
+        const drafts: Record<
+          string,
+          { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }
+        > = {};
         for (const item of items) {
           drafts[item.job_type] = {
             max_attempts: item.max_attempts,
             scheduleText: (item.backoff_schedule_seconds || []).join(','),
             jitter_ratio: item.jitter_ratio,
-            enabled: item.enabled
+            enabled: item.enabled,
           };
         }
         this.retryPolicyDrafts = drafts;
@@ -1135,7 +1563,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.retryPoliciesError.set(err?.error?.detail || 'Failed to load retry policies.');
         this.retryPoliciesLoading.set(false);
-      }
+      },
     });
   }
 
@@ -1169,9 +1597,19 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     return role === 'owner' || role === 'admin';
   }
 
-  retryPolicyDraft(jobType: MediaJobType): { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean } {
+  retryPolicyDraft(jobType: MediaJobType): {
+    max_attempts: number;
+    scheduleText: string;
+    jitter_ratio: number;
+    enabled: boolean;
+  } {
     if (!this.retryPolicyDrafts[jobType]) {
-      this.retryPolicyDrafts[jobType] = { max_attempts: 5, scheduleText: '30,120,600,1800', jitter_ratio: 0.15, enabled: true };
+      this.retryPolicyDrafts[jobType] = {
+        max_attempts: 5,
+        scheduleText: '30,120,600,1800',
+        jitter_ratio: 0.15,
+        enabled: true,
+      };
     }
     return this.retryPolicyDrafts[jobType];
   }
@@ -1211,7 +1649,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       this.toast.error(this.retryPolicyRowErrors[jobType]);
       return;
     }
-    if (!Number.isFinite(Number(draft.max_attempts)) || Number(draft.max_attempts) < 1 || Number(draft.max_attempts) > 20) {
+    if (
+      !Number.isFinite(Number(draft.max_attempts)) ||
+      Number(draft.max_attempts) < 1 ||
+      Number(draft.max_attempts) > 20
+    ) {
       this.retryPolicyRowErrors[jobType] = 'Max attempts must be between 1 and 20.';
       this.toast.error(this.retryPolicyRowErrors[jobType]);
       return;
@@ -1229,8 +1671,8 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
           enabled: !!draft.enabled,
           max_attempts: Number(draft.max_attempts),
           backoff_schedule_seconds: parsedSchedule,
-          jitter_ratio: jitter
-        })
+          jitter_ratio: jitter,
+        }),
       );
       this.applyRetryPolicySavedState(saved);
       if (this.isRetryPolicyHistoryOpen(saved.job_type)) {
@@ -1239,7 +1681,8 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       }
       this.toast.success(`Retry policy updated for ${saved.job_type}.`);
     } catch (err) {
-      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to update retry policy.';
+      this.retryPolicyRowErrors[jobType] =
+        (err as any)?.error?.detail || 'Failed to update retry policy.';
       this.toast.error(this.retryPolicyRowErrors[jobType]);
     }
   }
@@ -1255,7 +1698,8 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       }
       this.toast.success(`Retry policy reset for ${saved.job_type}.`);
     } catch (err) {
-      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to reset retry policy.';
+      this.retryPolicyRowErrors[jobType] =
+        (err as any)?.error?.detail || 'Failed to reset retry policy.';
       this.toast.error(this.retryPolicyRowErrors[jobType]);
     }
   }
@@ -1266,13 +1710,16 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       const res = await firstValueFrom(this.admin.resetAllMediaRetryPolicies());
       const items = (res.items || []).slice().sort((a, b) => a.job_type.localeCompare(b.job_type));
       this.retryPolicies.set(items);
-      const drafts: Record<string, { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }> = {};
+      const drafts: Record<
+        string,
+        { max_attempts: number; scheduleText: string; jitter_ratio: number; enabled: boolean }
+      > = {};
       for (const item of items) {
         drafts[item.job_type] = {
           max_attempts: item.max_attempts,
           scheduleText: (item.backoff_schedule_seconds || []).join(','),
           jitter_ratio: item.jitter_ratio,
-          enabled: item.enabled
+          enabled: item.enabled,
         };
       }
       this.retryPolicyDrafts = drafts;
@@ -1346,13 +1793,13 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       backoff_schedule_seconds: [...(policy.backoff_schedule_seconds || [])],
       jitter_ratio: Number(policy.jitter_ratio || 0),
       enabled: !!policy.enabled,
-      version_ts: policy.updated_at || null
+      version_ts: policy.updated_at || null,
     };
   }
 
   private computeRetryPolicyDiffRows(
     before: MediaRetryPolicySnapshot,
-    after: MediaRetryPolicySnapshot
+    after: MediaRetryPolicySnapshot,
   ): RetryPolicyDiffRow[] {
     const beforeSchedule = [...(before.backoff_schedule_seconds || [])];
     const afterSchedule = [...(after.backoff_schedule_seconds || [])];
@@ -1371,7 +1818,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
         label: 'Max attempts',
         before: String(before.max_attempts),
         after: String(after.max_attempts),
-        changed: Number(before.max_attempts) !== Number(after.max_attempts)
+        changed: Number(before.max_attempts) !== Number(after.max_attempts),
       },
       {
         field: 'backoff_schedule_seconds',
@@ -1379,33 +1826,38 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
         before: beforeSchedule.join(', ') || '—',
         after: afterSchedule.join(', ') || '—',
         changed: changedSteps.length > 0,
-        detail: changedSteps.length ? changedSteps.join(' · ') : undefined
+        detail: changedSteps.length ? changedSteps.join(' · ') : undefined,
       },
       {
         field: 'jitter_ratio',
         label: 'Jitter ratio',
         before: Number(before.jitter_ratio || 0).toFixed(2),
         after: Number(after.jitter_ratio || 0).toFixed(2),
-        changed: Number(before.jitter_ratio || 0) !== Number(after.jitter_ratio || 0)
+        changed: Number(before.jitter_ratio || 0) !== Number(after.jitter_ratio || 0),
       },
       {
         field: 'enabled',
         label: 'Enabled',
         before: before.enabled ? 'on' : 'off',
         after: after.enabled ? 'on' : 'off',
-        changed: Boolean(before.enabled) !== Boolean(after.enabled)
-      }
+        changed: Boolean(before.enabled) !== Boolean(after.enabled),
+      },
     ];
   }
 
-  retryPolicyDiffChips(before: MediaRetryPolicySnapshot, after: MediaRetryPolicySnapshot): string[] {
+  retryPolicyDiffChips(
+    before: MediaRetryPolicySnapshot,
+    after: MediaRetryPolicySnapshot,
+  ): string[] {
     return this.computeRetryPolicyDiffRows(before, after)
       .filter((row) => row.changed)
       .map((row) => row.label);
   }
 
   retryPolicyEventDiffRows(event: MediaRetryPolicyEvent): RetryPolicyDiffRow[] {
-    return this.computeRetryPolicyDiffRows(event.before_policy, event.after_policy).filter((row) => row.changed);
+    return this.computeRetryPolicyDiffRows(event.before_policy, event.after_policy).filter(
+      (row) => row.changed,
+    );
   }
 
   async loadMoreRetryPolicyHistory(jobType: MediaJobType): Promise<void> {
@@ -1420,18 +1872,24 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       await this.loadRetryPolicyPresets(jobType);
       await this.loadRetryPolicyHistory(jobType, false);
     } catch (err) {
-      this.retryPolicyRowErrors[jobType] = (err as any)?.error?.detail || 'Failed to mark policy as known good.';
+      this.retryPolicyRowErrors[jobType] =
+        (err as any)?.error?.detail || 'Failed to mark policy as known good.';
       this.toast.error(this.retryPolicyRowErrors[jobType]);
     }
   }
 
-  async rollbackRetryPolicyPreset(jobType: MediaJobType, presetKey: MediaRetryPolicyPresetKey): Promise<void> {
+  async rollbackRetryPolicyPreset(
+    jobType: MediaJobType,
+    presetKey: MediaRetryPolicyPresetKey,
+  ): Promise<void> {
     if (!this.canEditRetryPolicies()) return;
     const presets = this.retryPolicyPresetsByType[jobType] || [];
     let preset = presets.find((item) => item.preset_key === presetKey);
     if (!preset) {
       await this.loadRetryPolicyPresets(jobType);
-      preset = (this.retryPolicyPresetsByType[jobType] || []).find((item) => item.preset_key === presetKey);
+      preset = (this.retryPolicyPresetsByType[jobType] || []).find(
+        (item) => item.preset_key === presetKey,
+      );
     }
     if (!preset) {
       this.retryPolicyRowErrors[jobType] = 'Preset is not available.';
@@ -1450,7 +1908,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       targetPolicy: preset.policy,
       currentPolicy,
       diffs: this.computeRetryPolicyDiffRows(currentPolicy, preset.policy),
-      request: { preset_key: presetKey }
+      request: { preset_key: presetKey },
     });
   }
 
@@ -1479,7 +1937,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       targetPolicy: event.after_policy,
       currentPolicy,
       diffs: this.computeRetryPolicyDiffRows(currentPolicy, event.after_policy),
-      request: { event_id: eventId }
+      request: { event_id: eventId },
     });
   }
 
@@ -1492,14 +1950,17 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (!preview || !this.canEditRetryPolicies()) return;
     this.retryPolicyRollbackApplying.set(true);
     try {
-      const saved = await firstValueFrom(this.admin.rollbackMediaRetryPolicy(preview.jobType, preview.request));
+      const saved = await firstValueFrom(
+        this.admin.rollbackMediaRetryPolicy(preview.jobType, preview.request),
+      );
       this.applyRetryPolicySavedState(saved);
       this.toast.success(`Rolled back ${preview.jobType} policy.`);
       await this.loadRetryPolicyPresets(preview.jobType);
       await this.loadRetryPolicyHistory(preview.jobType, false);
       this.retryPolicyRollbackPreview.set(null);
     } catch (err) {
-      this.retryPolicyRowErrors[preview.jobType] = (err as any)?.error?.detail || 'Failed to rollback retry policy.';
+      this.retryPolicyRowErrors[preview.jobType] =
+        (err as any)?.error?.detail || 'Failed to rollback retry policy.';
       this.toast.error(this.retryPolicyRowErrors[preview.jobType]);
     } finally {
       this.retryPolicyRollbackApplying.set(false);
@@ -1551,9 +2012,12 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       await Promise.all(
         ids.map((jobId) =>
           firstValueFrom(
-            this.admin.updateMediaJobTriage(jobId, value.trim() ? { assigned_to_user_id: value.trim() } : { clear_assignee: true })
-          )
-        )
+            this.admin.updateMediaJobTriage(
+              jobId,
+              value.trim() ? { assigned_to_user_id: value.trim() } : { clear_assignee: true },
+            ),
+          ),
+        ),
       );
       this.toast.success('Assignment updated for selected jobs.');
       this.loadJobs();
@@ -1566,7 +2030,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     const ids = Array.from(this.selectedQueueJobIds());
     if (!ids.length) return;
     try {
-      await Promise.all(ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { triage_state: state }))));
+      await Promise.all(
+        ids.map((jobId) =>
+          firstValueFrom(this.admin.updateMediaJobTriage(jobId, { triage_state: state })),
+        ),
+      );
       this.toast.success(`Marked selected jobs as ${state}.`);
       this.loadJobs();
     } catch (err) {
@@ -1581,7 +2049,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (!value?.trim()) return;
     try {
       await Promise.all(
-        ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { add_tags: [value.trim()] })))
+        ids.map((jobId) =>
+          firstValueFrom(this.admin.updateMediaJobTriage(jobId, { add_tags: [value.trim()] })),
+        ),
       );
       this.toast.success('Tag added to selected jobs.');
       this.loadJobs();
@@ -1597,7 +2067,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (!value?.trim()) return;
     try {
       await Promise.all(
-        ids.map((jobId) => firstValueFrom(this.admin.updateMediaJobTriage(jobId, { remove_tags: [value.trim()] })))
+        ids.map((jobId) =>
+          firstValueFrom(this.admin.updateMediaJobTriage(jobId, { remove_tags: [value.trim()] })),
+        ),
       );
       this.toast.success('Tag removed from selected jobs.');
       this.loadJobs();
@@ -1618,25 +2090,28 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   }
 
   async assignJob(job: MediaJob): Promise<void> {
-    const value = window.prompt('Assign user id (blank clears assignee)', job.assigned_to_user_id || '');
+    const value = window.prompt(
+      'Assign user id (blank clears assignee)',
+      job.assigned_to_user_id || '',
+    );
     if (value === null) return;
     await this.patchJobTriage(
       job,
       value.trim() ? { assigned_to_user_id: value.trim() } : { clear_assignee: true },
-      'Assignment updated.'
+      'Assignment updated.',
     );
   }
 
   async setSla(job: MediaJob): Promise<void> {
     const value = window.prompt(
       'SLA due at (ISO 8601, blank to clear)',
-      (job.sla_due_at || '').replace('Z', '')
+      (job.sla_due_at || '').replace('Z', ''),
     );
     if (value === null) return;
     await this.patchJobTriage(
       job,
       value.trim() ? { sla_due_at: value.trim() } : { clear_sla_due_at: true },
-      'SLA updated.'
+      'SLA updated.',
     );
   }
 
@@ -1646,7 +2121,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     await this.patchJobTriage(
       job,
       value.trim() ? { incident_url: value.trim() } : { clear_incident_url: true },
-      'Incident link updated.'
+      'Incident link updated.',
     );
   }
 
@@ -1684,7 +2159,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.jobEventsLoading.set(false);
         this.toast.error(err?.error?.detail || 'Failed to load job events.');
-      }
+      },
     });
   }
 
@@ -1707,7 +2182,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     const file = input.files?.[0];
     if (!file) return;
     try {
-      await firstValueFrom(this.admin.uploadMediaAsset(file, { visibility: 'private', auto_finalize: true }));
+      await firstValueFrom(
+        this.admin.uploadMediaAsset(file, { visibility: 'private', auto_finalize: true }),
+      );
       this.toast.success('Media uploaded.');
       this.reload();
     } catch (err) {
@@ -1747,9 +2224,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
           status: this.editStatus,
           i18n: [
             { lang: 'en', title: this.editTitleEn || null, alt_text: this.editAltEn || null },
-            { lang: 'ro', title: this.editTitleRo || null, alt_text: this.editAltRo || null }
-          ]
-        })
+            { lang: 'ro', title: this.editTitleRo || null, alt_text: this.editAltRo || null },
+          ],
+        }),
       );
       this.toast.success('Asset metadata updated.');
       this.closeDetails();
@@ -1793,7 +2270,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (rotateText === null) return;
     const rotate = Number(rotateText || 0);
     try {
-      const job = await firstValueFrom(this.admin.editMediaAsset(asset.id, { rotate_cw: rotate as 0 | 90 | 180 | 270 }));
+      const job = await firstValueFrom(
+        this.admin.editMediaAsset(asset.id, { rotate_cw: rotate as 0 | 90 | 180 | 270 }),
+      );
       this.pushJob(job);
       this.toast.success('Edit job queued.');
       this.reload();
@@ -1881,7 +2360,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       return;
     }
     try {
-      await firstValueFrom(this.admin.createMediaCollection({ name, slug, visibility: this.newCollectionVisibility }));
+      await firstValueFrom(
+        this.admin.createMediaCollection({ name, slug, visibility: this.newCollectionVisibility }),
+      );
       this.newCollectionName = '';
       this.newCollectionSlug = '';
       this.newCollectionVisibility = 'private';
@@ -1897,15 +2378,18 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     if (name === null) return;
     const slug = window.prompt('Collection slug', collection.slug);
     if (slug === null) return;
-    const visibility = window.prompt('Visibility (public/private)', collection.visibility) as MediaAssetVisibility | null;
+    const visibility = window.prompt(
+      'Visibility (public/private)',
+      collection.visibility,
+    ) as MediaAssetVisibility | null;
     if (!visibility) return;
     try {
       await firstValueFrom(
         this.admin.updateMediaCollection(collection.id, {
           name: name.trim(),
           slug: slug.trim().toLowerCase(),
-          visibility: visibility === 'public' ? 'public' : 'private'
-        })
+          visibility: visibility === 'public' ? 'public' : 'private',
+        }),
       );
       this.toast.success('Collection updated.');
       await this.loadCollections();
@@ -1953,7 +2437,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       next: (res) => this.telemetry.set(res),
       error: () => {
         // Keep stale telemetry visible if refresh fails.
-      }
+      },
     });
   }
 
@@ -1980,12 +2464,14 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
   }
 
   private applyRetryPolicySavedState(saved: MediaRetryPolicy): void {
-    this.retryPolicies.set(this.retryPolicies().map((row) => (row.job_type === saved.job_type ? saved : row)));
+    this.retryPolicies.set(
+      this.retryPolicies().map((row) => (row.job_type === saved.job_type ? saved : row)),
+    );
     this.retryPolicyDrafts[saved.job_type] = {
       max_attempts: saved.max_attempts,
       scheduleText: (saved.backoff_schedule_seconds || []).join(','),
       jitter_ratio: saved.jitter_ratio,
-      enabled: saved.enabled
+      enabled: saved.enabled,
     };
     this.retryPolicyRowErrors[saved.job_type] = '';
   }
@@ -1996,7 +2482,8 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       this.retryPolicyPresetsByType[jobType] = (res.items || []).slice();
     } catch (err) {
       this.retryPolicyPresetsByType[jobType] = [];
-      this.retryPolicyHistoryErrorByType[jobType] = (err as any)?.error?.detail || 'Failed to load retry policy presets.';
+      this.retryPolicyHistoryErrorByType[jobType] =
+        (err as any)?.error?.detail || 'Failed to load retry policy presets.';
     }
   }
 
@@ -2012,8 +2499,8 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
         this.admin.listMediaRetryPolicyHistory({
           job_type: jobType,
           page: nextPage,
-          limit: 10
-        })
+          limit: 10,
+        }),
       );
       const nextItems = res.items || [];
       this.retryPolicyHistories[jobType] = append
@@ -2022,10 +2509,11 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       const meta = res.meta || { page: nextPage, total_pages: 1 };
       this.retryPolicyHistoryMeta[jobType] = {
         page: Number(meta.page || nextPage),
-        total_pages: Math.max(1, Number(meta.total_pages || 1))
+        total_pages: Math.max(1, Number(meta.total_pages || 1)),
       };
     } catch (err) {
-      this.retryPolicyHistoryErrorByType[jobType] = (err as any)?.error?.detail || 'Failed to load retry policy history.';
+      this.retryPolicyHistoryErrorByType[jobType] =
+        (err as any)?.error?.detail || 'Failed to load retry policy history.';
     } finally {
       this.retryPolicyHistoryLoadingByType[jobType] = false;
     }

@@ -176,14 +176,18 @@ def _resolve_repo_path(raw: str, *, allowed_prefixes: tuple[str, ...]) -> Path:
         rel = candidate.relative_to(root).as_posix()
     except ValueError as exc:
         raise ValueError(f"Path must stay inside repository: {raw}") from exc
-    if not any(rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes):
+    if not any(
+        rel == prefix or rel.startswith(f"{prefix}/") for prefix in allowed_prefixes
+    ):
         raise ValueError(f"Path is outside allowed audit roots: {raw}")
     return candidate
 
 
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def _validate_identifier(value: str, *, label: str) -> str:
@@ -204,7 +208,9 @@ def _parse_repo(full_name: str) -> RepoRef:
     return RepoRef(owner=owner, repo=repo)
 
 
-def _graphql_request(token: str, query: str, variables: dict[str, Any]) -> dict[str, Any]:
+def _graphql_request(
+    token: str, query: str, variables: dict[str, Any]
+) -> dict[str, Any]:
     payload = json.dumps({"query": query, "variables": variables}).encode("utf-8")
     req = urllib.request.Request(
         url=GRAPHQL_URL,
@@ -228,7 +234,9 @@ def _graphql_request(token: str, query: str, variables: dict[str, Any]) -> dict[
 
     errors = payload_json.get("errors") or []
     if errors:
-        first = errors[0] if isinstance(errors[0], dict) else {"message": str(errors[0])}
+        first = (
+            errors[0] if isinstance(errors[0], dict) else {"message": str(errors[0])}
+        )
         message = str(first.get("message") or "GraphQL request failed.")
         raise RuntimeError(f"GitHub GraphQL request failed: {message}")
     data = payload_json.get("data")
@@ -239,7 +247,9 @@ def _graphql_request(token: str, query: str, variables: dict[str, Any]) -> dict[
 
 def _extract_project_node(data: dict[str, Any]) -> dict[str, Any] | None:
     user_node = data.get("user") if isinstance(data.get("user"), dict) else None
-    org_node = data.get("organization") if isinstance(data.get("organization"), dict) else None
+    org_node = (
+        data.get("organization") if isinstance(data.get("organization"), dict) else None
+    )
     if user_node and isinstance(user_node.get("projectV2"), dict):
         return user_node["projectV2"]
     if org_node and isinstance(org_node.get("projectV2"), dict):
@@ -296,7 +306,9 @@ def _resolve_project(
     status_name: str,
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> ProjectRef:
-    data = request_fn(token, RESOLVE_PROJECT_QUERY, {"owner": project_owner, "number": project_number})
+    data = request_fn(
+        token, RESOLVE_PROJECT_QUERY, {"owner": project_owner, "number": project_number}
+    )
     project = _extract_project_node(data)
     if not isinstance(project, dict):
         raise RuntimeError(f"Project not found for {project_owner} #{project_number}.")
@@ -305,10 +317,12 @@ def _resolve_project(
 
     fields = project.get("fields") if isinstance(project.get("fields"), dict) else {}
     fields_nodes = fields.get("nodes") if isinstance(fields.get("nodes"), list) else []
-    lane_field_id, lane_option_id, status_field_id, status_option_id = _resolve_project_fields(
-        [field for field in fields_nodes if isinstance(field, dict)],
-        lane_name=lane_name,
-        status_name=status_name,
+    lane_field_id, lane_option_id, status_field_id, status_option_id = (
+        _resolve_project_fields(
+            [field for field in fields_nodes if isinstance(field, dict)],
+            lane_name=lane_name,
+            status_name=status_name,
+        )
     )
 
     return ProjectRef(
@@ -332,8 +346,12 @@ def _parse_project_item(item: dict[str, Any]) -> tuple[str, dict[str, str]] | No
 
     status_name = ""
     lane_name = ""
-    field_values = item.get("fieldValues") if isinstance(item.get("fieldValues"), dict) else {}
-    values_nodes = field_values.get("nodes") if isinstance(field_values.get("nodes"), list) else []
+    field_values = (
+        item.get("fieldValues") if isinstance(item.get("fieldValues"), dict) else {}
+    )
+    values_nodes = (
+        field_values.get("nodes") if isinstance(field_values.get("nodes"), list) else []
+    )
 
     for value in values_nodes:
         if str(value.get("__typename") or "") != "ProjectV2ItemFieldSingleSelectValue":
@@ -363,7 +381,9 @@ def _list_project_issue_items(
     mapping: dict[str, dict[str, str]] = {}
 
     while True:
-        payload = request_fn(token, PROJECT_ITEMS_QUERY, {"projectId": project_id, "after": after})
+        payload = request_fn(
+            token, PROJECT_ITEMS_QUERY, {"projectId": project_id, "after": after}
+        )
         node = payload.get("node") if isinstance(payload.get("node"), dict) else None
         if not node:
             break
@@ -378,7 +398,9 @@ def _list_project_issue_items(
                 issue_node_id, row = parsed
                 mapping[issue_node_id] = row
 
-        page_info = items.get("pageInfo") if isinstance(items.get("pageInfo"), dict) else {}
+        page_info = (
+            items.get("pageInfo") if isinstance(items.get("pageInfo"), dict) else {}
+        )
         if not bool(page_info.get("hasNextPage")):
             break
         after = str(page_info.get("endCursor") or "")
@@ -400,10 +422,14 @@ def _resolve_issue_node_id(
         ISSUE_NODE_QUERY,
         {"owner": repo.owner, "repo": repo.repo, "number": issue_number},
     )
-    repository = data.get("repository") if isinstance(data.get("repository"), dict) else None
+    repository = (
+        data.get("repository") if isinstance(data.get("repository"), dict) else None
+    )
     if not repository:
         return ""
-    issue = repository.get("issue") if isinstance(repository.get("issue"), dict) else None
+    issue = (
+        repository.get("issue") if isinstance(repository.get("issue"), dict) else None
+    )
     if not issue:
         return ""
     return str(issue.get("id") or "")
@@ -416,8 +442,16 @@ def _add_project_item(
     issue_node_id: str,
     request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
 ) -> str:
-    data = request_fn(token, ADD_PROJECT_ITEM_MUTATION, {"projectId": project_id, "contentId": issue_node_id})
-    created = data.get("addProjectV2ItemById") if isinstance(data.get("addProjectV2ItemById"), dict) else {}
+    data = request_fn(
+        token,
+        ADD_PROJECT_ITEM_MUTATION,
+        {"projectId": project_id, "contentId": issue_node_id},
+    )
+    created = (
+        data.get("addProjectV2ItemById")
+        if isinstance(data.get("addProjectV2ItemById"), dict)
+        else {}
+    )
     item = created.get("item") if isinstance(created.get("item"), dict) else {}
     item_id = str(item.get("id") or "")
     if not item_id:
@@ -519,7 +553,13 @@ def _initialize_summary(
     }
 
 
-def _resolve_issue_node(issue: dict[str, Any], *, token: str, repo: RepoRef, request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]]) -> str:
+def _resolve_issue_node(
+    issue: dict[str, Any],
+    *,
+    token: str,
+    repo: RepoRef,
+    request_fn: Callable[[str, str, dict[str, Any]], dict[str, Any]],
+) -> str:
     issue_node_id = str(issue.get("issue_node_id") or "")
     if issue_node_id:
         return issue_node_id
@@ -627,7 +667,13 @@ def run_sync(
 
     if not token:
         if allow_skip_missing_token:
-            summary.update({"skipped": len(issues), "skip_reason": "missing_project_write_token", "skipped_run": True})
+            summary.update(
+                {
+                    "skipped": len(issues),
+                    "skip_reason": "missing_project_write_token",
+                    "skipped_run": True,
+                }
+            )
             return summary
         raise RuntimeError("Missing ROADMAP_PROJECT_WRITE_TOKEN.")
 
@@ -645,10 +691,14 @@ def run_sync(
     )
     summary["project_url"] = project.project_url
 
-    existing_items = _list_project_issue_items(token=token, project_id=project.project_id, request_fn=request_fn)
+    existing_items = _list_project_issue_items(
+        token=token, project_id=project.project_id, request_fn=request_fn
+    )
 
     for issue in issues:
-        issue_node_id = _resolve_issue_node(issue, token=token, repo=repo, request_fn=request_fn)
+        issue_node_id = _resolve_issue_node(
+            issue, token=token, repo=repo, request_fn=request_fn
+        )
         issue_number = int(issue["issue_number"])
         if not issue_node_id:
             summary["errors"] += 1
@@ -687,14 +737,26 @@ def run_sync(
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", required=True, help="Repository in owner/repo format.")
-    parser.add_argument("--project-owner", default="Prekzursil", help="Project owner login.")
-    parser.add_argument("--project-number", type=int, default=2, help="ProjectV2 number.")
-    parser.add_argument("--issues-json", required=True, help="Path to severe issues handoff JSON.")
+    parser.add_argument(
+        "--repo", required=True, help="Repository in owner/repo format."
+    )
+    parser.add_argument(
+        "--project-owner", default="Prekzursil", help="Project owner login."
+    )
+    parser.add_argument(
+        "--project-number", type=int, default=2, help="ProjectV2 number."
+    )
+    parser.add_argument(
+        "--issues-json", required=True, help="Path to severe issues handoff JSON."
+    )
     parser.add_argument("--lane-name", default="Now", help="Roadmap Lane option name.")
     parser.add_argument("--status-name", default="Todo", help="Status option name.")
-    parser.add_argument("--summary-output", default="", help="Optional output path for summary JSON.")
-    parser.add_argument("--dry-run", action="store_true", help="Do not mutate project items.")
+    parser.add_argument(
+        "--summary-output", default="", help="Optional output path for summary JSON."
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Do not mutate project items."
+    )
     parser.add_argument(
         "--allow-skip-missing-token",
         action="store_true",
@@ -703,7 +765,9 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _parse_main_context(args: argparse.Namespace) -> tuple[RepoRef, str, int, Path, Path | None]:
+def _parse_main_context(
+    args: argparse.Namespace,
+) -> tuple[RepoRef, str, int, Path, Path | None]:
     repo = _parse_repo(args.repo)
     project_owner = _validate_identifier(args.project_owner, label="project owner")
     project_number = int(args.project_number)
@@ -721,7 +785,10 @@ def _parse_main_context(args: argparse.Namespace) -> tuple[RepoRef, str, int, Pa
     if args.summary_output:
         summary_path = _resolve_repo_path(
             args.summary_output,
-            allowed_prefixes=("artifacts/audit-evidence", "artifacts/audit-evidence-local"),
+            allowed_prefixes=(
+                "artifacts/audit-evidence",
+                "artifacts/audit-evidence-local",
+            ),
         )
 
     return repo, project_owner, project_number, issues_path, summary_path
@@ -729,7 +796,9 @@ def _parse_main_context(args: argparse.Namespace) -> tuple[RepoRef, str, int, Pa
 
 def main() -> int:
     args = _parse_args()
-    repo, project_owner, project_number, issues_path, summary_path = _parse_main_context(args)
+    repo, project_owner, project_number, issues_path, summary_path = (
+        _parse_main_context(args)
+    )
 
     token = (os.environ.get("ROADMAP_PROJECT_WRITE_TOKEN") or "").strip()
     summary = run_sync(

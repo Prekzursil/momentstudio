@@ -4,7 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription, forkJoin } from 'rxjs';
-import { AdminReturnsService, ReturnRequestListItem, ReturnRequestRead, ReturnRequestStatus } from '../../../core/admin-returns.service';
+import {
+  AdminReturnsService,
+  ReturnRequestListItem,
+  ReturnRequestRead,
+  ReturnRequestStatus,
+} from '../../../core/admin-returns.service';
 import { ToastService } from '../../../core/toast.service';
 import { BreadcrumbComponent } from '../../../shared/breadcrumb.component';
 import { ButtonComponent } from '../../../shared/button.component';
@@ -29,226 +34,326 @@ type BoardColumn = { items: ReturnRequestListItem[]; total: number };
     ButtonComponent,
     ErrorStateComponent,
     SkeletonComponent,
-    AdminPageHeaderComponent
+    AdminPageHeaderComponent,
   ],
-		  template: `
-		    <div class="grid gap-6">
-		      <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
+  template: `
+    <div class="grid gap-6">
+      <app-breadcrumb [crumbs]="crumbs()"></app-breadcrumb>
 
-	        <app-admin-page-header [titleKey]="'adminUi.returns.title'" [hintKey]="'adminUi.returns.subtitle'"></app-admin-page-header>
+      <app-admin-page-header
+        [titleKey]="'adminUi.returns.title'"
+        [hintKey]="'adminUi.returns.subtitle'"
+      ></app-admin-page-header>
 
-	      <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-	        <div class="flex flex-wrap items-end gap-3">
-	          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.returns.filters.search' | translate }}</span>
+      <div
+        class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+      >
+        <div class="flex flex-wrap items-end gap-3">
+          <label class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
+            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+              'adminUi.returns.filters.search' | translate
+            }}</span>
             <input
               class="h-10 w-64 max-w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="query"
               (keyup.enter)="applyFilters()"
               [placeholder]="'adminUi.returns.filters.searchPh' | translate"
             />
-	          </label>
+          </label>
 
-	          <label *ngIf="viewMode() === 'list'" class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-	            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{ 'adminUi.returns.filters.status' | translate }}</span>
-	            <select
-	              class="h-10 w-56 max-w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	              [(ngModel)]="statusFilter"
-	            >
-              <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="">
+          <label
+            *ngIf="viewMode() === 'list'"
+            class="grid gap-1 text-sm text-slate-700 dark:text-slate-200"
+          >
+            <span class="text-xs font-medium text-slate-600 dark:text-slate-300">{{
+              'adminUi.returns.filters.status' | translate
+            }}</span>
+            <select
+              class="h-10 w-56 max-w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="statusFilter"
+            >
+              <option
+                class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                value=""
+              >
                 {{ 'adminUi.returns.filters.statusAll' | translate }}
               </option>
-              <option *ngFor="let opt of statusOptions" class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" [value]="opt.value">
+              <option
+                *ngFor="let opt of statusOptions"
+                class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                [value]="opt.value"
+              >
                 {{ opt.labelKey | translate }}
-	              </option>
-	            </select>
-	          </label>
+              </option>
+            </select>
+          </label>
 
-	          <app-button size="sm" [label]="'adminUi.returns.filters.apply' | translate" (action)="applyFilters()"></app-button>
+          <app-button
+            size="sm"
+            [label]="'adminUi.returns.filters.apply' | translate"
+            (action)="applyFilters()"
+          ></app-button>
 
-	          <div class="flex items-center gap-2">
-	            <button
-	              type="button"
-	              class="h-10 rounded-lg border px-3 text-sm font-medium shadow-sm transition-colors dark:shadow-none"
-	              [ngClass]="
-	                viewMode() === 'list'
-	                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-700/60 dark:bg-indigo-950/30 dark:text-indigo-200'
-	                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40'
-	              "
-	              (click)="setView('list')"
-	            >
-	              {{ 'adminUi.returns.view.list' | translate }}
-	            </button>
-	            <button
-	              type="button"
-	              class="h-10 rounded-lg border px-3 text-sm font-medium shadow-sm transition-colors dark:shadow-none"
-	              [ngClass]="
-	                viewMode() === 'board'
-	                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-700/60 dark:bg-indigo-950/30 dark:text-indigo-200'
-	                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40'
-	              "
-	              (click)="setView('board')"
-	            >
-	              {{ 'adminUi.returns.view.board' | translate }}
-	            </button>
-	          </div>
-	        </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="h-10 rounded-lg border px-3 text-sm font-medium shadow-sm transition-colors dark:shadow-none"
+              [ngClass]="
+                viewMode() === 'list'
+                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-700/60 dark:bg-indigo-950/30 dark:text-indigo-200'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40'
+              "
+              (click)="setView('list')"
+            >
+              {{ 'adminUi.returns.view.list' | translate }}
+            </button>
+            <button
+              type="button"
+              class="h-10 rounded-lg border px-3 text-sm font-medium shadow-sm transition-colors dark:shadow-none"
+              [ngClass]="
+                viewMode() === 'board'
+                  ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-700/60 dark:bg-indigo-950/30 dark:text-indigo-200'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700/40'
+              "
+              (click)="setView('board')"
+            >
+              {{ 'adminUi.returns.view.board' | translate }}
+            </button>
+          </div>
+        </div>
 
-	        <div class="grid lg:grid-cols-[1fr_440px] gap-4 items-start">
-	          <div class="grid gap-3">
-	            <ng-container *ngIf="viewMode() === 'list'">
-	              <div *ngIf="loading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-	                <app-skeleton [rows]="6"></app-skeleton>
-	              </div>
+        <div class="grid lg:grid-cols-[1fr_440px] gap-4 items-start">
+          <div class="grid gap-3">
+            <ng-container *ngIf="viewMode() === 'list'">
+              <div
+                *ngIf="loading()"
+                class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+              >
+                <app-skeleton [rows]="6"></app-skeleton>
+              </div>
 
-	              <app-error-state
-                  *ngIf="!loading() && error()"
-                  [message]="error()!"
-                  [requestId]="errorRequestId()"
-                  [showRetry]="true"
-                  (retry)="retryLoad()"
-                ></app-error-state>
+              <app-error-state
+                *ngIf="!loading() && error()"
+                [message]="error()!"
+                [requestId]="errorRequestId()"
+                [showRetry]="true"
+                (retry)="retryLoad()"
+              ></app-error-state>
 
-	              <div *ngIf="!loading() && !items().length" class="text-sm text-slate-600 dark:text-slate-300">
-	                {{ 'adminUi.returns.empty' | translate }}
-	              </div>
+              <div
+                *ngIf="!loading() && !items().length"
+                class="text-sm text-slate-600 dark:text-slate-300"
+              >
+                {{ 'adminUi.returns.empty' | translate }}
+              </div>
 
-	              <div *ngIf="items().length" class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-	                <table class="min-w-[760px] w-full text-sm">
-	                  <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-	                    <tr>
-	                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.returns.table.date' | translate }}</th>
-	                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.returns.table.status' | translate }}</th>
-	                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.returns.table.order' | translate }}</th>
-	                      <th class="text-left font-semibold px-3 py-2">{{ 'adminUi.returns.table.customer' | translate }}</th>
-	                    </tr>
-	                  </thead>
-	                  <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-	                    <tr
-	                      *ngFor="let row of items()"
-	                      class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60"
-	                      [ngClass]="row.id === selectedId() ? 'bg-slate-100 dark:bg-slate-800/70' : ''"
-	                      (click)="select(row.id)"
-	                    >
-	                      <td class="px-3 py-2 whitespace-nowrap text-slate-700 dark:text-slate-200">
-	                        {{ row.created_at | date: 'short' }}
-	                      </td>
-	                      <td class="px-3 py-2">
-	                        <span class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700">
-	                          {{ ('adminUi.returns.status.' + row.status) | translate }}
-	                        </span>
-	                      </td>
-	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-	                        <span class="font-mono text-xs">{{ row.order_reference || row.order_id.slice(0, 8) }}</span>
-	                      </td>
-	                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-	                        <div class="font-medium text-slate-900 dark:text-slate-50">{{ row.customer_name || '—' }}</div>
-	                        <div class="text-xs text-slate-500 dark:text-slate-400">{{ row.customer_email || '—' }}</div>
-	                      </td>
-	                    </tr>
-	                  </tbody>
-	                </table>
-	              </div>
+              <div
+                *ngIf="items().length"
+                class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+              >
+                <table class="min-w-[760px] w-full text-sm">
+                  <thead
+                    class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200"
+                  >
+                    <tr>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.returns.table.date' | translate }}
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.returns.table.status' | translate }}
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.returns.table.order' | translate }}
+                      </th>
+                      <th class="text-left font-semibold px-3 py-2">
+                        {{ 'adminUi.returns.table.customer' | translate }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                    <tr
+                      *ngFor="let row of items()"
+                      class="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      [ngClass]="row.id === selectedId() ? 'bg-slate-100 dark:bg-slate-800/70' : ''"
+                      (click)="select(row.id)"
+                    >
+                      <td class="px-3 py-2 whitespace-nowrap text-slate-700 dark:text-slate-200">
+                        {{ row.created_at | date: 'short' }}
+                      </td>
+                      <td class="px-3 py-2">
+                        <span
+                          class="inline-flex rounded-full px-2 py-0.5 text-xs border border-slate-200 dark:border-slate-700"
+                        >
+                          {{ 'adminUi.returns.status.' + row.status | translate }}
+                        </span>
+                      </td>
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        <span class="font-mono text-xs">{{
+                          row.order_reference || row.order_id.slice(0, 8)
+                        }}</span>
+                      </td>
+                      <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                        <div class="font-medium text-slate-900 dark:text-slate-50">
+                          {{ row.customer_name || '—' }}
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">
+                          {{ row.customer_email || '—' }}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
 
-	              <div *ngIf="items().length" class="flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300">
-	                <span>
-	                  {{
-	                    'adminUi.returns.pagination'
-	                      | translate: { page: meta().page || 1, total: meta().total_pages || 1, count: meta().total_items || 0 }
-	                  }}
-	                </span>
-	                <div class="flex items-center gap-2">
-	                  <app-button size="sm" [disabled]="!hasPrev()" [label]="'adminUi.returns.prev' | translate" (action)="prev()"></app-button>
-	                  <app-button size="sm" [disabled]="!hasNext()" [label]="'adminUi.returns.next' | translate" (action)="next()"></app-button>
-	                </div>
-	              </div>
-	            </ng-container>
+              <div
+                *ngIf="items().length"
+                class="flex items-center justify-between gap-3 text-sm text-slate-600 dark:text-slate-300"
+              >
+                <span>
+                  {{
+                    'adminUi.returns.pagination'
+                      | translate
+                        : {
+                            page: meta().page || 1,
+                            total: meta().total_pages || 1,
+                            count: meta().total_items || 0,
+                          }
+                  }}
+                </span>
+                <div class="flex items-center gap-2">
+                  <app-button
+                    size="sm"
+                    [disabled]="!hasPrev()"
+                    [label]="'adminUi.returns.prev' | translate"
+                    (action)="prev()"
+                  ></app-button>
+                  <app-button
+                    size="sm"
+                    [disabled]="!hasNext()"
+                    [label]="'adminUi.returns.next' | translate"
+                    (action)="next()"
+                  ></app-button>
+                </div>
+              </div>
+            </ng-container>
 
-	            <ng-container *ngIf="viewMode() === 'board'">
-	              <div *ngIf="boardLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-	                <app-skeleton [rows]="6"></app-skeleton>
-	              </div>
+            <ng-container *ngIf="viewMode() === 'board'">
+              <div
+                *ngIf="boardLoading()"
+                class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+              >
+                <app-skeleton [rows]="6"></app-skeleton>
+              </div>
 
-	              <app-error-state
-                  *ngIf="!boardLoading() && boardError()"
-                  [message]="boardError()!"
-                  [requestId]="boardErrorRequestId()"
-                  [showRetry]="true"
-                  (retry)="retryLoad()"
-                ></app-error-state>
+              <app-error-state
+                *ngIf="!boardLoading() && boardError()"
+                [message]="boardError()!"
+                [requestId]="boardErrorRequestId()"
+                [showRetry]="true"
+                (retry)="retryLoad()"
+              ></app-error-state>
 
-	              <div *ngIf="!boardLoading() && !boardError()" class="grid gap-3 xl:grid-cols-4">
-	                <div
-	                  *ngFor="let status of boardStatuses"
-	                  class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-	                >
-	                  <div class="flex items-center justify-between gap-2">
-	                    <div class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
-	                      {{ ('adminUi.returns.status.' + status) | translate }}
-	                    </div>
-	                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ board()[status].total }}</div>
-	                  </div>
+              <div *ngIf="!boardLoading() && !boardError()" class="grid gap-3 xl:grid-cols-4">
+                <div
+                  *ngFor="let status of boardStatuses"
+                  class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div class="flex items-center justify-between gap-2">
+                    <div
+                      class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300"
+                    >
+                      {{ 'adminUi.returns.status.' + status | translate }}
+                    </div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ board()[status].total }}
+                    </div>
+                  </div>
 
-	                  <div *ngIf="!board()[status].items.length" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-	                    {{ 'adminUi.returns.board.empty' | translate }}
-	                  </div>
+                  <div
+                    *ngIf="!board()[status].items.length"
+                    class="mt-2 text-xs text-slate-500 dark:text-slate-400"
+                  >
+                    {{ 'adminUi.returns.board.empty' | translate }}
+                  </div>
 
-	                  <div *ngIf="board()[status].items.length" class="mt-2 grid gap-2">
-	                    <button
-	                      *ngFor="let row of board()[status].items"
-	                      type="button"
-	                      class="text-left rounded-lg border border-slate-200 bg-white px-3 py-2 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700/40"
-	                      [ngClass]="row.id === selectedId() ? 'ring-2 ring-indigo-500/40' : ''"
-	                      (click)="select(row.id)"
-	                    >
-	                      <div class="flex items-center justify-between gap-2">
-	                        <div class="font-mono text-xs text-slate-600 dark:text-slate-300 truncate">
-	                          {{ row.order_reference || row.order_id.slice(0, 8) }}
-	                        </div>
-	                        <div class="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">{{ row.created_at | date: 'shortDate' }}</div>
-	                      </div>
-	                      <div class="mt-1 text-sm font-medium text-slate-900 dark:text-slate-50 truncate">
-	                        {{ row.customer_name || '—' }}
-	                      </div>
-	                      <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
-	                        {{ row.customer_email || '—' }}
-	                      </div>
-	                    </button>
-	                  </div>
+                  <div *ngIf="board()[status].items.length" class="mt-2 grid gap-2">
+                    <button
+                      *ngFor="let row of board()[status].items"
+                      type="button"
+                      class="text-left rounded-lg border border-slate-200 bg-white px-3 py-2 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700/40"
+                      [ngClass]="row.id === selectedId() ? 'ring-2 ring-indigo-500/40' : ''"
+                      (click)="select(row.id)"
+                    >
+                      <div class="flex items-center justify-between gap-2">
+                        <div class="font-mono text-xs text-slate-600 dark:text-slate-300 truncate">
+                          {{ row.order_reference || row.order_id.slice(0, 8) }}
+                        </div>
+                        <div class="text-[11px] text-slate-500 dark:text-slate-400 shrink-0">
+                          {{ row.created_at | date: 'shortDate' }}
+                        </div>
+                      </div>
+                      <div
+                        class="mt-1 text-sm font-medium text-slate-900 dark:text-slate-50 truncate"
+                      >
+                        {{ row.customer_name || '—' }}
+                      </div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        {{ row.customer_email || '—' }}
+                      </div>
+                    </button>
+                  </div>
 
-	                  <div class="mt-3 flex items-center justify-between gap-2 text-xs">
-	                    <button
-	                      type="button"
-	                      class="text-indigo-600 hover:underline dark:text-indigo-300"
-	                      (click)="openStatusList(status)"
-	                    >
-	                      {{ 'adminUi.returns.board.viewAll' | translate }}
-	                    </button>
-	                    <div *ngIf="board()[status].total > board()[status].items.length" class="text-slate-500 dark:text-slate-400">
-	                      +{{ board()[status].total - board()[status].items.length }}
-	                    </div>
-	                  </div>
-	                </div>
-	              </div>
-	            </ng-container>
-	          </div>
+                  <div class="mt-3 flex items-center justify-between gap-2 text-xs">
+                    <button
+                      type="button"
+                      class="text-indigo-600 hover:underline dark:text-indigo-300"
+                      (click)="openStatusList(status)"
+                    >
+                      {{ 'adminUi.returns.board.viewAll' | translate }}
+                    </button>
+                    <div
+                      *ngIf="board()[status].total > board()[status].items.length"
+                      class="text-slate-500 dark:text-slate-400"
+                    >
+                      +{{ board()[status].total - board()[status].items.length }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+          </div>
 
-	          <div class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900">
-	            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'adminUi.returns.detail.title' | translate }}</div>
+          <div
+            class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-3 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'adminUi.returns.detail.title' | translate }}
+            </div>
 
-            <div *ngIf="detailLoading()" class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <div
+              *ngIf="detailLoading()"
+              class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"
+            >
               <app-skeleton [rows]="5"></app-skeleton>
             </div>
 
-            <div *ngIf="!detailLoading() && !selected()" class="text-sm text-slate-600 dark:text-slate-300">
+            <div
+              *ngIf="!detailLoading() && !selected()"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
               {{ 'adminUi.returns.detail.empty' | translate }}
             </div>
 
-	            <div *ngIf="!detailLoading() && selected()" class="grid gap-3 text-sm text-slate-700 dark:text-slate-200">
-	              <div class="grid gap-1">
-	                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.returns.detail.order' | translate }}
-	                </div>
+            <div
+              *ngIf="!detailLoading() && selected()"
+              class="grid gap-3 text-sm text-slate-700 dark:text-slate-200"
+            >
+              <div class="grid gap-1">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.returns.detail.order' | translate }}
+                </div>
                 <a
                   [routerLink]="['/admin/orders', selected()!.order_id]"
                   class="text-indigo-600 hover:underline dark:text-indigo-300"
@@ -266,100 +371,132 @@ type BoardColumn = { items: ReturnRequestListItem[]; total: number };
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="editStatus"
                 >
-                  <option *ngFor="let opt of statusOptions" class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" [value]="opt.value">
+                  <option
+                    *ngFor="let opt of statusOptions"
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    [value]="opt.value"
+                  >
                     {{ opt.labelKey | translate }}
                   </option>
                 </select>
               </label>
 
               <div class="grid gap-1">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.returns.detail.reason' | translate }}
                 </div>
-                <div class="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{{ selected()!.reason }}</div>
+                <div class="whitespace-pre-wrap text-slate-700 dark:text-slate-200">
+                  {{ selected()!.reason }}
+                </div>
               </div>
 
               <div *ngIf="selected()!.customer_message" class="grid gap-1">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.returns.detail.customerMessage' | translate }}
                 </div>
-                <div class="whitespace-pre-wrap text-slate-700 dark:text-slate-200">{{ selected()!.customer_message }}</div>
+                <div class="whitespace-pre-wrap text-slate-700 dark:text-slate-200">
+                  {{ selected()!.customer_message }}
+                </div>
               </div>
 
               <div class="grid gap-1">
-                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
                   {{ 'adminUi.returns.detail.items' | translate }}
                 </div>
                 <ul class="grid gap-1">
-                  <li *ngFor="let item of selected()!.items" class="flex items-center justify-between gap-2">
-                    <span class="truncate">{{ item.product_name || item.order_item_id || item.id }}</span>
-                    <span class="font-mono text-xs text-slate-500 dark:text-slate-400">×{{ item.quantity }}</span>
-	                  </li>
-	                </ul>
-	              </div>
+                  <li
+                    *ngFor="let item of selected()!.items"
+                    class="flex items-center justify-between gap-2"
+                  >
+                    <span class="truncate">{{
+                      item.product_name || item.order_item_id || item.id
+                    }}</span>
+                    <span class="font-mono text-xs text-slate-500 dark:text-slate-400"
+                      >×{{ item.quantity }}</span
+                    >
+                  </li>
+                </ul>
+              </div>
 
-	              <div class="grid gap-2">
-	                <div class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
-	                  {{ 'adminUi.returns.detail.returnLabel' | translate }}
-	                </div>
+              <div class="grid gap-2">
+                <div
+                  class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+                >
+                  {{ 'adminUi.returns.detail.returnLabel' | translate }}
+                </div>
 
-	                <div
-	                  *ngIf="returnLabelError()"
-	                  class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-xs dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	                >
-	                  {{ returnLabelError() }}
-	                </div>
+                <div
+                  *ngIf="returnLabelError()"
+                  class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-2 text-xs dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                >
+                  {{ returnLabelError() }}
+                </div>
 
-	                <div class="flex flex-wrap items-center gap-2">
-	                  <label
-	                    class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  >
-	                    <input type="file" class="hidden" (change)="onReturnLabelSelected($event)" />
-	                    <span class="font-medium text-slate-900 dark:text-slate-50">{{ 'adminUi.returns.detail.returnLabelChoose' | translate }}</span>
-	                    <span class="text-xs text-slate-500 dark:text-slate-300 truncate max-w-[220px]">
-	                      {{ returnLabelFileName() }}
-	                    </span>
-	                  </label>
+                <div class="flex flex-wrap items-center gap-2">
+                  <label
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    <input type="file" class="hidden" (change)="onReturnLabelSelected($event)" />
+                    <span class="font-medium text-slate-900 dark:text-slate-50">{{
+                      'adminUi.returns.detail.returnLabelChoose' | translate
+                    }}</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-300 truncate max-w-[220px]">
+                      {{ returnLabelFileName() }}
+                    </span>
+                  </label>
 
-	                  <app-button
-	                    size="sm"
-	                    variant="ghost"
-	                    [label]="'adminUi.returns.detail.returnLabelUpload' | translate"
-	                    [disabled]="returnLabelBusy() || !returnLabelFile"
-	                    (action)="uploadReturnLabel()"
-	                  ></app-button>
+                  <app-button
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.returns.detail.returnLabelUpload' | translate"
+                    [disabled]="returnLabelBusy() || !returnLabelFile"
+                    (action)="uploadReturnLabel()"
+                  ></app-button>
 
-	                  <app-button
-	                    *ngIf="selected()!.has_return_label"
-	                    size="sm"
-	                    variant="ghost"
-	                    [label]="'adminUi.returns.detail.returnLabelDownload' | translate"
-	                    [disabled]="returnLabelBusy()"
-	                    (action)="downloadReturnLabel()"
-	                  ></app-button>
+                  <app-button
+                    *ngIf="selected()!.has_return_label"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.returns.detail.returnLabelDownload' | translate"
+                    [disabled]="returnLabelBusy()"
+                    (action)="downloadReturnLabel()"
+                  ></app-button>
 
-	                  <app-button
-	                    *ngIf="selected()!.has_return_label"
-	                    size="sm"
-	                    variant="ghost"
-	                    [label]="'adminUi.returns.detail.returnLabelDelete' | translate"
-	                    [disabled]="returnLabelBusy()"
-	                    (action)="deleteReturnLabel()"
-	                  ></app-button>
-	                </div>
+                  <app-button
+                    *ngIf="selected()!.has_return_label"
+                    size="sm"
+                    variant="ghost"
+                    [label]="'adminUi.returns.detail.returnLabelDelete' | translate"
+                    [disabled]="returnLabelBusy()"
+                    (action)="deleteReturnLabel()"
+                  ></app-button>
+                </div>
 
-	                <div *ngIf="selected()!.has_return_label" class="text-xs text-slate-600 dark:text-slate-300">
-	                  {{ selected()!.return_label_filename }} · {{ selected()!.return_label_uploaded_at | date: 'short' }}
-	                </div>
-	                <div *ngIf="!selected()!.has_return_label" class="text-xs text-slate-600 dark:text-slate-300">
-	                  {{ 'adminUi.returns.detail.returnLabelNone' | translate }}
-	                </div>
-	              </div>
+                <div
+                  *ngIf="selected()!.has_return_label"
+                  class="text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ selected()!.return_label_filename }} ·
+                  {{ selected()!.return_label_uploaded_at | date: 'short' }}
+                </div>
+                <div
+                  *ngIf="!selected()!.has_return_label"
+                  class="text-xs text-slate-600 dark:text-slate-300"
+                >
+                  {{ 'adminUi.returns.detail.returnLabelNone' | translate }}
+                </div>
+              </div>
 
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.returns.detail.adminNote' | translate }}
-	                <textarea
-	                  class="min-h-[120px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.returns.detail.adminNote' | translate }}
+                <textarea
+                  class="min-h-[120px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
                   [(ngModel)]="editNote"
                   [placeholder]="'adminUi.returns.detail.adminNotePh' | translate"
                 ></textarea>
@@ -378,7 +515,7 @@ type BoardColumn = { items: ReturnRequestListItem[]; total: number };
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class AdminReturnsComponent implements OnInit, OnDestroy {
   viewMode = signal<'list' | 'board'>('list');
@@ -396,7 +533,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     requested: { items: [], total: 0 },
     approved: { items: [], total: 0 },
     received: { items: [], total: 0 },
-    refunded: { items: [], total: 0 }
+    refunded: { items: [], total: 0 },
   });
 
   selectedId = signal<string | null>(null);
@@ -424,7 +561,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     { value: 'rejected', labelKey: 'adminUi.returns.status.rejected' },
     { value: 'received', labelKey: 'adminUi.returns.status.received' },
     { value: 'refunded', labelKey: 'adminUi.returns.status.refunded' },
-    { value: 'closed', labelKey: 'adminUi.returns.status.closed' }
+    { value: 'closed', labelKey: 'adminUi.returns.status.closed' },
   ];
 
   private readonly routeSub?: Subscription;
@@ -433,13 +570,22 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     private readonly api: AdminReturnsService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    route: ActivatedRoute
+    route: ActivatedRoute,
   ) {
     this.routeSub = route.queryParamMap.subscribe((params) => {
       const orderId = params.get('order_id');
       this.orderIdFilter = orderId;
-      const statusParam = (params.get('status') || params.get('status_filter') || '').trim().toLowerCase();
-      const allowedStatuses = new Set(['requested', 'approved', 'rejected', 'received', 'refunded', 'closed']);
+      const statusParam = (params.get('status') || params.get('status_filter') || '')
+        .trim()
+        .toLowerCase();
+      const allowedStatuses = new Set([
+        'requested',
+        'approved',
+        'rejected',
+        'received',
+        'refunded',
+        'closed',
+      ]);
       if (statusParam && allowedStatuses.has(statusParam)) {
         this.statusFilter = statusParam as ReturnRequestStatus;
         this.viewMode.set('list');
@@ -463,7 +609,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     return [
       { label: 'nav.home', url: '/' },
       { label: 'nav.admin', url: '/admin/dashboard' },
-      { label: 'adminUi.returns.title' }
+      { label: 'adminUi.returns.title' },
     ];
   }
 
@@ -522,7 +668,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       error: () => {
         this.toast.error(this.translate.instant('adminUi.returns.errors.loadDetail'));
         this.detailLoading.set(false);
-      }
+      },
     });
   }
 
@@ -546,7 +692,10 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
   }
 
   returnLabelFileName(): string {
-    return this.returnLabelSelectedName() || this.translate.instant('adminUi.returns.detail.returnLabelNoFile');
+    return (
+      this.returnLabelSelectedName() ||
+      this.translate.instant('adminUi.returns.detail.returnLabelNoFile')
+    );
   }
 
   onReturnLabelSelected(event: Event): void {
@@ -576,7 +725,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
         const msg = err?.error?.detail || this.translate.instant('adminUi.returns.errors.save');
         this.returnLabelError.set(msg);
         this.toast.error(msg);
-      }
+      },
     });
   }
 
@@ -585,7 +734,8 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     if (!id) return;
     this.returnLabelBusy.set(true);
     this.returnLabelError.set(null);
-    const orderRef = this.selected()?.order_reference || this.selected()?.order_id?.slice(0, 8) || id.slice(0, 8);
+    const orderRef =
+      this.selected()?.order_reference || this.selected()?.order_id?.slice(0, 8) || id.slice(0, 8);
     this.api.downloadReturnLabel(id).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
@@ -600,10 +750,11 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.returnLabelBusy.set(false);
-        const msg = err?.error?.detail || this.translate.instant('adminUi.returns.errors.loadDetail');
+        const msg =
+          err?.error?.detail || this.translate.instant('adminUi.returns.errors.loadDetail');
         this.returnLabelError.set(msg);
         this.toast.error(msg);
-      }
+      },
     });
   }
 
@@ -617,7 +768,12 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       next: () => {
         const current = this.selected();
         if (current) {
-          this.selected.set({ ...current, has_return_label: false, return_label_filename: null, return_label_uploaded_at: null });
+          this.selected.set({
+            ...current,
+            has_return_label: false,
+            return_label_filename: null,
+            return_label_uploaded_at: null,
+          });
         }
         this.returnLabelBusy.set(false);
         this.toast.success(this.translate.instant('adminUi.returns.success.saved'));
@@ -627,7 +783,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
         const msg = err?.error?.detail || this.translate.instant('adminUi.returns.errors.save');
         this.returnLabelError.set(msg);
         this.toast.error(msg);
-      }
+      },
     });
   }
 
@@ -635,19 +791,21 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
     const id = this.selectedId();
     if (!id) return;
     this.saving.set(true);
-    this.api.update(id, { status: this.editStatus, admin_note: this.editNote.trim() || null }).subscribe({
-      next: (updated) => {
-        this.selected.set(updated);
-        this.saving.set(false);
-        this.toast.success(this.translate.instant('adminUi.returns.success.saved'));
-        this.load(false);
-      },
-      error: (err) => {
-        this.saving.set(false);
-        const msg = err?.error?.detail || this.translate.instant('adminUi.returns.errors.save');
-        this.toast.error(msg);
-      }
-    });
+    this.api
+      .update(id, { status: this.editStatus, admin_note: this.editNote.trim() || null })
+      .subscribe({
+        next: (updated) => {
+          this.selected.set(updated);
+          this.saving.set(false);
+          this.toast.success(this.translate.instant('adminUi.returns.success.saved'));
+          this.load(false);
+        },
+        error: (err) => {
+          this.saving.set(false);
+          const msg = err?.error?.detail || this.translate.instant('adminUi.returns.errors.save');
+          this.toast.error(msg);
+        },
+      });
   }
 
   private load(clearSelection = true): void {
@@ -673,7 +831,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
         this.error.set(this.translate.instant('adminUi.returns.errors.load'));
         this.errorRequestId.set(extractRequestId(err));
         this.loading.set(false);
-      }
+      },
     });
   }
 
@@ -690,14 +848,26 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
       requested: this.api.search({ ...params, status_filter: 'requested' }),
       approved: this.api.search({ ...params, status_filter: 'approved' }),
       received: this.api.search({ ...params, status_filter: 'received' }),
-      refunded: this.api.search({ ...params, status_filter: 'refunded' })
+      refunded: this.api.search({ ...params, status_filter: 'refunded' }),
     }).subscribe({
       next: (resp) => {
         this.board.set({
-          requested: { items: resp.requested.items || [], total: resp.requested.meta?.total_items || 0 },
-          approved: { items: resp.approved.items || [], total: resp.approved.meta?.total_items || 0 },
-          received: { items: resp.received.items || [], total: resp.received.meta?.total_items || 0 },
-          refunded: { items: resp.refunded.items || [], total: resp.refunded.meta?.total_items || 0 }
+          requested: {
+            items: resp.requested.items || [],
+            total: resp.requested.meta?.total_items || 0,
+          },
+          approved: {
+            items: resp.approved.items || [],
+            total: resp.approved.meta?.total_items || 0,
+          },
+          received: {
+            items: resp.received.items || [],
+            total: resp.received.meta?.total_items || 0,
+          },
+          refunded: {
+            items: resp.refunded.items || [],
+            total: resp.refunded.meta?.total_items || 0,
+          },
         });
         this.boardLoading.set(false);
       },
@@ -705,8 +875,7 @@ export class AdminReturnsComponent implements OnInit, OnDestroy {
         this.boardError.set(this.translate.instant('adminUi.returns.errors.load'));
         this.boardErrorRequestId.set(extractRequestId(err));
         this.boardLoading.set(false);
-      }
+      },
     });
   }
 }
-

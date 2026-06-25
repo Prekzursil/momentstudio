@@ -12,13 +12,16 @@ import { SkeletonComponent } from './skeleton.component';
   imports: [CommonModule, SkeletonComponent],
   template: `
     <div class="grid gap-3" [class.p-4]="padded">
-      <div *ngFor="let _ of placeholders" class="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <div
+        *ngFor="let _ of placeholders"
+        class="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      >
         <app-skeleton [height]="titleHeight" [width]="titleWidth"></app-skeleton>
         <app-skeleton [height]="lineHeight" width="95%"></app-skeleton>
         <app-skeleton [height]="lineHeight" width="82%"></app-skeleton>
       </div>
     </div>
-  `
+  `,
 })
 export class LoadingStateComponent {
   @Input() rows = 3;

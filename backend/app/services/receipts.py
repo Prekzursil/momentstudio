@@ -14,19 +14,34 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    Flowable,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from app.core.config import settings
-from app.schemas.receipt import ReceiptAddressRead, ReceiptItemRead, ReceiptRead, ReceiptRefundRead
+from app.schemas.receipt import (
+    ReceiptAddressRead,
+    ReceiptItemRead,
+    ReceiptRead,
+    ReceiptRefundRead,
+)
 from app.services.font_utils import load_font as _load_font
-
 
 MoneyValue = str | SupportsFloat | SupportsIndex
 _REPORTLAB_FONTS: tuple[str, str] | None = None
 
 
 def _order_locale(order) -> str:
-    preferred = (getattr(getattr(order, "user", None), "preferred_language", None) or "").strip().lower()
+    preferred = (
+        (getattr(getattr(order, "user", None), "preferred_language", None) or "")
+        .strip()
+        .lower()
+    )
     if preferred in {"en", "ro"}:
         return preferred
 
@@ -34,7 +49,11 @@ def _order_locale(order) -> str:
     if currency == "RON":
         return "ro"
 
-    country = (getattr(getattr(order, "shipping_address", None), "country", None) or "").strip().upper()
+    country = (
+        (getattr(getattr(order, "shipping_address", None), "country", None) or "")
+        .strip()
+        .upper()
+    )
     if country == "RO":
         return "ro"
 
@@ -74,8 +93,10 @@ def _as_decimal(value: object | None) -> Decimal:
         return Decimal("0.00")
 
 
-def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool = False) -> ReceiptRead:
-    items = items or getattr(order, "items", []) or []
+def build_order_receipt(
+    order, items: Sequence | None = None, *, redacted: bool = False
+) -> ReceiptRead:
+    items = list(items) if items else list(getattr(order, "items", []) or [])
     currency = getattr(order, "currency", "RON") or "RON"
     frontend_origin = settings.frontend_origin.rstrip("/")
 
@@ -107,7 +128,9 @@ def build_order_receipt(order, items: Sequence | None = None, *, redacted: bool 
     for item in items:
         product = getattr(item, "product", None)
         slug = (getattr(product, "slug", None) or "").strip() or None
-        name = (getattr(product, "name", None) or "").strip() or str(getattr(item, "product_id", ""))
+        name = (getattr(product, "name", None) or "").strip() or str(
+            getattr(item, "product_id", "")
+        )
         product_url = f"{frontend_origin}/products/{slug}" if slug else None
         receipt_items.append(
             ReceiptItemRead(
@@ -189,7 +212,9 @@ def _register_reportlab_fonts() -> tuple[str, str]:
     ]
 
     regular_path = next((p for p in regular_candidates if Path(p).exists()), None)
-    bold_path = next((p for p in bold_candidates if Path(p).exists()), None) or regular_path
+    bold_path = (
+        next((p for p in bold_candidates if Path(p).exists()), None) or regular_path
+    )
     if regular_path is None and bold_path is not None:
         regular_path = bold_path
 
@@ -228,10 +253,12 @@ def _payment_method_bilingual_label(payment_method: str) -> str:
     return value.upper()
 
 
-def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *, redacted: bool = False) -> bytes:
+def _render_order_receipt_pdf_reportlab(
+    order, items: Sequence | None = None, *, redacted: bool = False
+) -> bytes:
     """Render a bilingual (RO/EN) receipt PDF with clickable product links."""
 
-    items = items or getattr(order, "items", []) or []
+    items = list(items) if items else list(getattr(order, "items", []) or [])
     locale = _order_locale(order)
     receipt = build_order_receipt(order, items, redacted=redacted)
 
@@ -281,7 +308,7 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
         title=f"Receipt {receipt.reference_code or receipt.order_id}",
     )
 
-    story: list[object] = []
+    story: list[Flowable] = []
 
     story.append(Paragraph("Receipt / Chitanță", h1))
     story.append(Spacer(1, 6))
@@ -318,8 +345,16 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
         addr_table = Table(
             [
                 [
-                    Paragraph("<b>Shipping / Livrare</b><br/>" + _addr_lines(receipt.shipping_address), base_style),
-                    Paragraph("<b>Billing / Facturare</b><br/>" + _addr_lines(receipt.billing_address), base_style),
+                    Paragraph(
+                        "<b>Shipping / Livrare</b><br/>"
+                        + _addr_lines(receipt.shipping_address),
+                        base_style,
+                    ),
+                    Paragraph(
+                        "<b>Billing / Facturare</b><br/>"
+                        + _addr_lines(receipt.billing_address),
+                        base_style,
+                    ),
                 ]
             ],
             colWidths=[(doc.width - 12) / 2, (doc.width - 12) / 2],
@@ -343,20 +378,35 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     if receipt.invoice_company or receipt.invoice_vat_id:
         story.append(Paragraph("Invoice / Factură", h2))
         if receipt.invoice_company:
-            story.append(Paragraph(f"Company / Firmă: {xml_escape(receipt.invoice_company)}", base_style))
+            story.append(
+                Paragraph(
+                    f"Company / Firmă: {xml_escape(receipt.invoice_company)}",
+                    base_style,
+                )
+            )
         if receipt.invoice_vat_id:
-            story.append(Paragraph(f"VAT ID / CUI: {xml_escape(receipt.invoice_vat_id)}", base_style))
+            story.append(
+                Paragraph(
+                    f"VAT ID / CUI: {xml_escape(receipt.invoice_vat_id)}", base_style
+                )
+            )
         story.append(Spacer(1, 8))
 
     # Payment / delivery info
     info_lines: list[str] = []
     if receipt.payment_method:
-        info_lines.append(f"Payment / Plată: {xml_escape(_payment_method_bilingual_label(receipt.payment_method))}")
+        info_lines.append(
+            f"Payment / Plată: {xml_escape(_payment_method_bilingual_label(receipt.payment_method))}"
+        )
     if receipt.courier or receipt.delivery_type:
         detail = " · ".join([x for x in [receipt.courier, receipt.delivery_type] if x])
         info_lines.append(f"Delivery / Livrare: {xml_escape(detail)}")
-    if receipt.delivery_type == "locker" and (receipt.locker_name or receipt.locker_address):
-        locker_detail = " — ".join([x for x in [receipt.locker_name, receipt.locker_address] if x])
+    if receipt.delivery_type == "locker" and (
+        receipt.locker_name or receipt.locker_address
+    ):
+        locker_detail = " — ".join(
+            [x for x in [receipt.locker_name, receipt.locker_address] if x]
+        )
         info_lines.append(f"Locker: {xml_escape(locker_detail)}")
     if receipt.tracking_number:
         info_lines.append(f"AWB / Tracking: {xml_escape(receipt.tracking_number)}")
@@ -374,7 +424,9 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     )
 
     def _money_cell(value: MoneyValue | None) -> str:
-        if value is None:
+        if (
+            value is None
+        ):  # pragma: no cover - defensive: callers always pass a Decimal (items/totals are normalized via _as_decimal / `or Decimal("0.00")`)
             return "—"
         return xml_escape(_money(value, receipt.currency, locale=locale))
 
@@ -401,14 +453,27 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
             ]
         )
 
-    table = Table(rows, colWidths=[doc.width * 0.55, doc.width * 0.10, doc.width * 0.17, doc.width * 0.18])
+    table = Table(
+        rows,
+        colWidths=[
+            doc.width * 0.55,
+            doc.width * 0.10,
+            doc.width * 0.17,
+            doc.width * 0.18,
+        ],
+    )
     table.setStyle(
         TableStyle(
             [
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.HexColor("#e2e8f0")),
                 ("LINEABOVE", (0, 1), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#f8fafc")],
+                ),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("TOPPADDING", (0, 0), (-1, -1), 6),
@@ -427,7 +492,9 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     totals_rows.append(
         [
             Paragraph("Shipping / Livrare", small_muted),
-            Paragraph(_money_cell(receipt.shipping_amount or Decimal("0.00")), base_style),
+            Paragraph(
+                _money_cell(receipt.shipping_amount or Decimal("0.00")), base_style
+            ),
         ]
     )
     if receipt.fee_amount and receipt.fee_amount != 0:
@@ -446,7 +513,10 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
     totals_rows.append(
         [
             Paragraph("<b>Total / Total</b>", base_style),
-            Paragraph(f"<b>{_money_cell(receipt.total_amount or Decimal('0.00'))}</b>", base_style),
+            Paragraph(
+                f"<b>{_money_cell(receipt.total_amount or Decimal('0.00'))}</b>",
+                base_style,
+            ),
         ]
     )
     totals = Table(totals_rows, colWidths=[doc.width * 0.75, doc.width * 0.25])
@@ -469,7 +539,7 @@ def _render_order_receipt_pdf_reportlab(order, items: Sequence | None = None, *,
             created_at = _format_date(refund.created_at, locale=locale)
             provider = (refund.provider or "").strip()
             summary = f"{xml_escape(created_at)} — {xml_escape(amount)}"
-            if provider:
+            if provider:  # pragma: no branch - defensive: build_order_receipt always sets provider to "manual" when empty, so this is always truthy here
                 summary = f"{summary} ({xml_escape(provider)})"
             story.append(Paragraph(summary, base_style))
             if refund.note:
@@ -507,7 +577,9 @@ def _format_date(value: object, *, locale: str | None = None) -> str:
     return str(value)
 
 
-def render_order_receipt_pdf(order, items: Sequence | None = None, *, redacted: bool = False) -> bytes:
+def render_order_receipt_pdf(
+    order, items: Sequence | None = None, *, redacted: bool = False
+) -> bytes:
     try:
         return _render_order_receipt_pdf_reportlab(order, items, redacted=redacted)
     except Exception:
@@ -515,13 +587,15 @@ def render_order_receipt_pdf(order, items: Sequence | None = None, *, redacted: 
         return render_order_receipt_pdf_raster(order, items, redacted=redacted)
 
 
-def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, redacted: bool = False) -> bytes:
+def render_order_receipt_pdf_raster(
+    order, items: Sequence | None = None, *, redacted: bool = False
+) -> bytes:
     """Legacy receipt renderer (PDF-embedded raster image).
 
     Kept as a fallback in case the PDF engine/font stack fails.
     """
 
-    items = items or getattr(order, "items", []) or []
+    items = list(items) if items else list(getattr(order, "items", []) or [])
     locale = _order_locale(order)
     ref = getattr(order, "reference_code", None) or str(getattr(order, "id", ""))
     created_at = getattr(order, "created_at", None)
@@ -548,7 +622,12 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
     draw.text((margin, y), f"Order / Comandă: {ref}", fill=fg, font=h_font)
     y += 30
     if created_at:
-        draw.text((margin, y), f"Date / Dată: {_format_date(created_at, locale=locale)}", fill=muted, font=small_font)
+        draw.text(
+            (margin, y),
+            f"Date / Dată: {_format_date(created_at, locale=locale)}",
+            fill=muted,
+            font=small_font,
+        )
         y += 26
     draw.line((margin, y + 14, page_w - margin, y + 14), fill=border, width=2)
     y += 40
@@ -611,7 +690,12 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
             ]
         ):
             x0 = margin + idx * (box_w + 24)
-            draw.rounded_rectangle((x0, box_y, x0 + box_w, box_y + box_h), radius=18, outline=border, width=2)
+            draw.rounded_rectangle(
+                (x0, box_y, x0 + box_w, box_y + box_h),
+                radius=18,
+                outline=border,
+                width=2,
+            )
             draw.text((x0 + 18, box_y + 14), label, fill=muted, font=small_font)
             ay = box_y + 44
             for line in _address_lines(addr)[:6]:
@@ -628,10 +712,17 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
         draw.text((margin, y), "Invoice / Factură", fill=fg, font=h_font)
         y += 26
         if invoice_company:
-            draw.text((margin, y), f"Company / Firmă: {invoice_company}", fill=fg, font=small_font)
+            draw.text(
+                (margin, y),
+                f"Company / Firmă: {invoice_company}",
+                fill=fg,
+                font=small_font,
+            )
             y += 22
         if invoice_vat_id:
-            draw.text((margin, y), f"VAT ID / CUI: {invoice_vat_id}", fill=fg, font=small_font)
+            draw.text(
+                (margin, y), f"VAT ID / CUI: {invoice_vat_id}", fill=fg, font=small_font
+            )
             y += 22
         y += 10
 
@@ -642,14 +733,18 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
     draw.text((margin, y), "Product / Produs", fill=muted, font=small_font)
     draw.text((page_w - margin - 240, y), "Qty", fill=muted, font=small_font)
     draw.text((page_w - margin - 170, y), "Unit", fill=muted, font=small_font)
-    draw.text((page_w - margin - 70, y), "Total", fill=muted, font=small_font, anchor="ra")
+    draw.text(
+        (page_w - margin - 70, y), "Total", fill=muted, font=small_font, anchor="ra"
+    )
     y += 16
     draw.line((margin, y + 10, page_w - margin, y + 10), fill=border, width=2)
     y += 24
 
     for item in items[:30]:
         product = getattr(item, "product", None)
-        name = (getattr(product, "name", None) or str(getattr(item, "product_id", ""))).strip() or "—"
+        name = (
+            getattr(product, "name", None) or str(getattr(item, "product_id", ""))
+        ).strip() or "—"
         qty = int(getattr(item, "quantity", 0) or 0)
         unit_price = getattr(item, "unit_price", None)
         subtotal = getattr(item, "subtotal", None)
@@ -669,15 +764,26 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
                 current = word
         if current:
             name_lines.append(current)
-        if not name_lines:
+        if not name_lines:  # pragma: no cover - defensive: name is normalized to a non-empty, non-whitespace string, so name.split() always yields >= 1 word
             name_lines = [name]
 
         draw.text((margin, y), name_lines[0], fill=fg, font=small_font)
         draw.text((page_w - margin - 240, y), str(qty), fill=fg, font=small_font)
         if unit_price is not None:
-            draw.text((page_w - margin - 170, y), _money(unit_price, currency, locale=locale), fill=fg, font=small_font)
+            draw.text(
+                (page_w - margin - 170, y),
+                _money(unit_price, currency, locale=locale),
+                fill=fg,
+                font=small_font,
+            )
         if subtotal is not None:
-            draw.text((page_w - margin - 70, y), _money(subtotal, currency, locale=locale), fill=fg, font=small_font, anchor="ra")
+            draw.text(
+                (page_w - margin - 70, y),
+                _money(subtotal, currency, locale=locale),
+                fill=fg,
+                font=small_font,
+                anchor="ra",
+            )
         y += 22
 
         for extra in name_lines[1:3]:
@@ -701,7 +807,13 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
     def _right(label: str, value: MoneyValue) -> None:
         nonlocal y
         draw.text((page_w - margin - 240, y), label, fill=muted, font=small_font)
-        draw.text((page_w - margin - 70, y), _money(value, currency, locale=locale), fill=fg, font=small_font, anchor="ra")
+        draw.text(
+            (page_w - margin - 70, y),
+            _money(value, currency, locale=locale),
+            fill=fg,
+            font=small_font,
+            anchor="ra",
+        )
         y += 22
 
     if shipping_amount is not None:
@@ -712,7 +824,13 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
         _right("VAT / TVA", tax_amount)
     if total_amount is not None:
         draw.text((page_w - margin - 240, y), "Total / Total", fill=fg, font=h_font)
-        draw.text((page_w - margin - 70, y + 2), _money(total_amount, currency, locale=locale), fill=fg, font=h_font, anchor="ra")
+        draw.text(
+            (page_w - margin - 70, y + 2),
+            _money(total_amount, currency, locale=locale),
+            fill=fg,
+            font=h_font,
+            anchor="ra",
+        )
         y += 30
 
     refunds = list(getattr(order, "refunds", []) or [])
@@ -739,7 +857,12 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
     y += 10
     pm = (getattr(order, "payment_method", None) or "").strip()
     if pm:
-        draw.text((margin, y), f"Payment / Plată: {_payment_method_bilingual_label(pm)}", fill=muted, font=small_font)
+        draw.text(
+            (margin, y),
+            f"Payment / Plată: {_payment_method_bilingual_label(pm)}",
+            fill=muted,
+            font=small_font,
+        )
         y += 22
     courier = (getattr(order, "courier", None) or "").strip()
     delivery_type = (getattr(order, "delivery_type", None) or "").strip()
@@ -755,7 +878,12 @@ def render_order_receipt_pdf_raster(order, items: Sequence | None = None, *, red
         locker_name = (getattr(order, "locker_name", None) or "").strip()
         locker_address = (getattr(order, "locker_address", None) or "").strip()
         if locker_name or locker_address:
-            draw.text((margin, y), f"Locker: {' — '.join([x for x in [locker_name, locker_address] if x])}", fill=muted, font=small_font)
+            draw.text(
+                (margin, y),
+                f"Locker: {' — '.join([x for x in [locker_name, locker_address] if x])}",
+                fill=muted,
+                font=small_font,
+            )
             y += 22
 
     y = max(y, page_h - margin - 50)

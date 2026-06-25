@@ -13,14 +13,22 @@ import { AnalyticsService } from '../../core/analytics.service';
   standalone: true,
   imports: [CommonModule, FormsModule, TranslateModule, ButtonComponent, SkeletonComponent],
   template: `
-    <section class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'account.privacy.title' | translate }}</h2>
+    <section
+      class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+    >
+      <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+        {{ 'account.privacy.title' | translate }}
+      </h2>
 
       <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'account.privacy.export.title' | translate }}</p>
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'account.privacy.export.copy' | translate }}</p>
+            <p class="font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'account.privacy.export.title' | translate }}
+            </p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'account.privacy.export.copy' | translate }}
+            </p>
           </div>
           <app-button
             size="sm"
@@ -33,23 +41,32 @@ import { AnalyticsService } from '../../core/analytics.service';
 
         <div *ngIf="account.exportJob() as job" class="grid gap-2">
           <div class="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-            <span>{{ ('account.privacy.export.status.' + job.status) | translate }}</span>
-            <span *ngIf="job.status === 'pending' || job.status === 'running'">{{ job.progress || 0 }}%</span>
+            <span>{{ 'account.privacy.export.status.' + job.status | translate }}</span>
+            <span *ngIf="job.status === 'pending' || job.status === 'running'"
+              >{{ job.progress || 0 }}%</span
+            >
           </div>
-          <div *ngIf="job.status === 'pending' || job.status === 'running'" class="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
+          <div
+            *ngIf="job.status === 'pending' || job.status === 'running'"
+            class="h-2 rounded-full bg-slate-100 dark:bg-slate-800"
+          >
             <div
               class="h-2 rounded-full bg-indigo-600 dark:bg-indigo-500 transition-all"
               [style.width.%]="job.progress || 0"
             ></div>
           </div>
 
-          <p *ngIf="job.status === 'pending' || job.status === 'running'" class="text-xs text-slate-600 dark:text-slate-300">
+          <p
+            *ngIf="job.status === 'pending' || job.status === 'running'"
+            class="text-xs text-slate-600 dark:text-slate-300"
+          >
             {{ 'account.privacy.export.notifyCopy' | translate }}
           </p>
           <p *ngIf="job.status === 'succeeded'" class="text-xs text-slate-600 dark:text-slate-300">
             {{
               job.expires_at
-                ? ('account.privacy.export.readyWithExpiry' | translate: { date: account.formatTimestamp(job.expires_at) })
+                ? ('account.privacy.export.readyWithExpiry'
+                  | translate: { date: account.formatTimestamp(job.expires_at) })
                 : ('account.privacy.export.ready' | translate)
             }}
           </p>
@@ -58,14 +75,20 @@ import { AnalyticsService } from '../../core/analytics.service';
           </p>
         </div>
 
-        <p *ngIf="account.exportError" class="text-xs text-rose-700 dark:text-rose-300">{{ account.exportError }}</p>
+        <p *ngIf="account.exportError" class="text-xs text-rose-700 dark:text-rose-300">
+          {{ account.exportError }}
+        </p>
       </div>
 
       <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800 grid gap-2">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="font-semibold text-slate-900 dark:text-slate-50">{{ 'account.privacy.analytics.title' | translate }}</p>
-            <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'account.privacy.analytics.copy' | translate }}</p>
+            <p class="font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'account.privacy.analytics.title' | translate }}
+            </p>
+            <p class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'account.privacy.analytics.copy' | translate }}
+            </p>
           </div>
           <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
             <input type="checkbox" [(ngModel)]="analyticsOptIn" />
@@ -74,12 +97,18 @@ import { AnalyticsService } from '../../core/analytics.service';
         </div>
       </div>
 
-      <div class="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30 grid gap-3">
+      <div
+        class="rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30 grid gap-3"
+      >
         <div class="flex items-center justify-between">
-          <p class="font-semibold text-rose-900 dark:text-rose-100">{{ 'account.privacy.deletion.title' | translate }}</p>
-          <span *ngIf="account.deletionStatus()?.scheduled_for" class="text-xs text-rose-800 dark:text-rose-200">{{
-            'account.privacy.deletion.scheduledBadge' | translate
-          }}</span>
+          <p class="font-semibold text-rose-900 dark:text-rose-100">
+            {{ 'account.privacy.deletion.title' | translate }}
+          </p>
+          <span
+            *ngIf="account.deletionStatus()?.scheduled_for"
+            class="text-xs text-rose-800 dark:text-rose-200"
+            >{{ 'account.privacy.deletion.scheduledBadge' | translate }}</span
+          >
         </div>
 
         <div *ngIf="account.deletionLoading(); else deletionBody" class="grid gap-2">
@@ -88,22 +117,40 @@ import { AnalyticsService } from '../../core/analytics.service';
         </div>
         <ng-template #deletionBody>
           <p class="text-sm text-rose-900 dark:text-rose-100">
-            {{ 'account.privacy.deletion.copy' | translate: { hours: account.deletionStatus()?.cooldown_hours || 24 } }}
+            {{
+              'account.privacy.deletion.copy'
+                | translate: { hours: account.deletionStatus()?.cooldown_hours || 24 }
+            }}
           </p>
 
-          <div *ngIf="account.deletionStatus()?.scheduled_for; else requestDelete" class="grid gap-2">
+          <div
+            *ngIf="account.deletionStatus()?.scheduled_for; else requestDelete"
+            class="grid gap-2"
+          >
             <p class="text-sm text-rose-900 dark:text-rose-100">
               {{
                 'account.privacy.deletion.scheduledFor'
-                  | translate: { date: account.formatTimestamp(account.deletionStatus()?.scheduled_for || '') }
+                  | translate
+                    : {
+                        date: account.formatTimestamp(
+                          account.deletionStatus()?.scheduled_for || ''
+                        ),
+                      }
               }}
             </p>
             <div class="grid gap-2">
-              <div class="flex items-center justify-between text-xs text-rose-800 dark:text-rose-200">
+              <div
+                class="flex items-center justify-between text-xs text-rose-800 dark:text-rose-200"
+              >
                 <span>
                   {{
                     'account.privacy.deletion.remaining'
-                      | translate: { time: account.formatDurationShort(account.deletionCooldownRemainingMs() || 0) }
+                      | translate
+                        : {
+                            time: account.formatDurationShort(
+                              account.deletionCooldownRemainingMs() || 0
+                            ),
+                          }
                   }}
                 </span>
                 <span>{{ account.deletionCooldownProgressPercent() | number: '1.0-0' }}%</span>
@@ -132,8 +179,12 @@ import { AnalyticsService } from '../../core/analytics.service';
                   | translate: { hours: account.deletionStatus()?.cooldown_hours || 24 }
               }}
             </p>
-            <div class="grid gap-2 rounded-xl border border-rose-200 bg-white/70 p-3 dark:border-rose-900/40 dark:bg-slate-900/40">
-              <p class="text-sm font-semibold text-rose-900 dark:text-rose-100">{{ 'account.privacy.deletion.consequencesTitle' | translate }}</p>
+            <div
+              class="grid gap-2 rounded-xl border border-rose-200 bg-white/70 p-3 dark:border-rose-900/40 dark:bg-slate-900/40"
+            >
+              <p class="text-sm font-semibold text-rose-900 dark:text-rose-100">
+                {{ 'account.privacy.deletion.consequencesTitle' | translate }}
+              </p>
               <ul class="list-disc pl-5 text-sm text-rose-900 dark:text-rose-100 grid gap-1">
                 <li>{{ 'account.privacy.deletion.consequences.logout' | translate }}</li>
                 <li>{{ 'account.privacy.deletion.consequences.anonymize' | translate }}</li>
@@ -163,7 +214,9 @@ import { AnalyticsService } from '../../core/analytics.service';
                   type="button"
                   class="absolute inset-y-0 right-2 inline-flex items-center text-xs font-semibold text-slate-600 dark:text-slate-300"
                   (click)="showDeletionPassword = !showDeletionPassword"
-                  [attr.aria-label]="(showDeletionPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate"
+                  [attr.aria-label]="
+                    (showDeletionPassword ? 'auth.hidePassword' : 'auth.showPassword') | translate
+                  "
                 >
                   {{ (showDeletionPassword ? 'auth.hide' : 'auth.show') | translate }}
                 </button>
@@ -181,11 +234,13 @@ import { AnalyticsService } from '../../core/analytics.service';
             </div>
           </ng-template>
 
-          <p *ngIf="account.deletionError()" class="text-xs text-rose-700 dark:text-rose-300">{{ account.deletionError() }}</p>
+          <p *ngIf="account.deletionError()" class="text-xs text-rose-700 dark:text-rose-300">
+            {{ account.deletionError() }}
+          </p>
         </ng-template>
       </div>
     </section>
-  `
+  `,
 })
 export class AccountPrivacyComponent {
   protected readonly account = inject(AccountComponent);

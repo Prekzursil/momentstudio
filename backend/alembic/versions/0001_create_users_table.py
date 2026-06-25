@@ -21,7 +21,9 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("email", sa.String(length=255), nullable=False, unique=True),
         sa.Column("hashed_password", sa.String(length=255), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=True),
@@ -31,7 +33,12 @@ def upgrade() -> None:
             nullable=False,
             server_default="customer",
         ),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),

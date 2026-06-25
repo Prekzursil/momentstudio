@@ -9,7 +9,13 @@ import { ContainerComponent } from '../layout/container.component';
 import { BannerBlockComponent } from './banner-block.component';
 import { CarouselBlockComponent } from './carousel-block.component';
 import { SkeletonComponent } from './skeleton.component';
-import { PageBlock, UiLang, pageBlockInnerClasses, pageBlockOuterClasses, parsePageBlocks } from './page-blocks';
+import {
+  PageBlock,
+  UiLang,
+  pageBlockInnerClasses,
+  pageBlockOuterClasses,
+  parsePageBlocks,
+} from './page-blocks';
 
 type ContentBlockRead = {
   meta?: Record<string, unknown> | null;
@@ -18,7 +24,14 @@ type ContentBlockRead = {
 @Component({
   selector: 'app-cms-global-section-blocks',
   standalone: true,
-  imports: [CommonModule, TranslateModule, ContainerComponent, BannerBlockComponent, CarouselBlockComponent, SkeletonComponent],
+  imports: [
+    CommonModule,
+    TranslateModule,
+    ContainerComponent,
+    BannerBlockComponent,
+    CarouselBlockComponent,
+    SkeletonComponent,
+  ],
   template: `
     <section *ngIf="loading() || blocks().length" class="w-full" [ngClass]="sectionClasses">
       <app-container [classes]="containerClasses">
@@ -28,7 +41,11 @@ type ContentBlockRead = {
             [ngClass]="reserveLoadingHeightClass || 'min-h-[8rem]'"
             data-cms-global-loading="true"
           >
-            <app-skeleton *ngFor="let row of loadingRows()" height="14px" [width]="row % 2 === 0 ? '94%' : '78%'"></app-skeleton>
+            <app-skeleton
+              *ngFor="let row of loadingRows()"
+              height="14px"
+              [width]="row % 2 === 0 ? '94%' : '78%'"
+            ></app-skeleton>
           </div>
         </ng-container>
 
@@ -39,14 +56,23 @@ type ContentBlockRead = {
                 <div [ngClass]="pageBlockInnerClasses(b.layout)">
                   <ng-container [ngSwitch]="b.type">
                     <div *ngSwitchCase="'text'" class="grid gap-2">
-                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      <h2
+                        *ngIf="b.title"
+                        class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                      >
                         {{ b.title }}
                       </h2>
-                      <div class="markdown text-base text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="b.body_html"></div>
+                      <div
+                        class="markdown text-base text-slate-700 leading-relaxed dark:text-slate-200"
+                        [innerHTML]="b.body_html"
+                      ></div>
                     </div>
 
                     <div *ngSwitchCase="'image'" class="grid gap-2">
-                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      <h2
+                        *ngIf="b.title"
+                        class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                      >
                         {{ b.title }}
                       </h2>
                       <a
@@ -73,11 +99,16 @@ type ContentBlockRead = {
                           loading="lazy"
                         />
                       </ng-template>
-                      <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ b.caption }}</p>
+                      <p *ngIf="b.caption" class="text-sm text-slate-600 dark:text-slate-300">
+                        {{ b.caption }}
+                      </p>
                     </div>
 
                     <div *ngSwitchCase="'gallery'" class="grid gap-2">
-                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      <h2
+                        *ngIf="b.title"
+                        class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                      >
                         {{ b.title }}
                       </h2>
                       <div class="grid gap-3 sm:grid-cols-2">
@@ -89,23 +120,34 @@ type ContentBlockRead = {
                             [style.object-position]="focalPosition(img.focal_x, img.focal_y)"
                             loading="lazy"
                           />
-                          <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">{{ img.caption }}</p>
+                          <p *ngIf="img.caption" class="text-sm text-slate-600 dark:text-slate-300">
+                            {{ img.caption }}
+                          </p>
                         </div>
                       </div>
                     </div>
 
                     <div *ngSwitchCase="'banner'" class="grid gap-2">
-                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      <h2
+                        *ngIf="b.title"
+                        class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                      >
                         {{ b.title }}
                       </h2>
                       <app-banner-block [slide]="b.slide"></app-banner-block>
                     </div>
 
                     <div *ngSwitchCase="'carousel'" class="grid gap-2">
-                      <h2 *ngIf="b.title" class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                      <h2
+                        *ngIf="b.title"
+                        class="text-xl font-semibold text-slate-900 dark:text-slate-50"
+                      >
                         {{ b.title }}
                       </h2>
-                      <app-carousel-block [slides]="b.slides" [settings]="b.settings"></app-carousel-block>
+                      <app-carousel-block
+                        [slides]="b.slides"
+                        [settings]="b.settings"
+                      ></app-carousel-block>
                     </div>
                   </ng-container>
                 </div>
@@ -115,7 +157,7 @@ type ContentBlockRead = {
         </ng-template>
       </app-container>
     </section>
-  `
+  `,
 })
 export class CmsGlobalSectionBlocksComponent implements OnInit, OnDestroy {
   @Input({ required: true }) contentKey!: string;
@@ -134,7 +176,7 @@ export class CmsGlobalSectionBlocksComponent implements OnInit, OnDestroy {
   constructor(
     private readonly api: ApiService,
     private readonly markdown: MarkdownService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnInit(): void {
@@ -168,7 +210,10 @@ export class CmsGlobalSectionBlocksComponent implements OnInit, OnDestroy {
     this.loading.set(true);
     this.api.get<ContentBlockRead>(`/content/${encodeURIComponent(key)}`, { lang }).subscribe({
       next: (block) => {
-        const meta = ((block as { meta?: Record<string, unknown> | null })?.meta || {}) as Record<string, unknown>;
+        const meta = ((block as { meta?: Record<string, unknown> | null })?.meta || {}) as Record<
+          string,
+          unknown
+        >;
         this.blocks.set(parsePageBlocks(meta, lang, (md) => this.markdown.render(md)));
         this.loading.set(false);
       },
@@ -180,8 +225,7 @@ export class CmsGlobalSectionBlocksComponent implements OnInit, OnDestroy {
         }
         this.blocks.set([]);
         this.loading.set(false);
-      }
+      },
     });
   }
 }
-

@@ -43,7 +43,7 @@ interface ContentBlock {
     ImgFallbackDirective,
     CmsPageBlocksComponent,
     ButtonComponent,
-    CaptchaTurnstileComponent
+    CaptchaTurnstileComponent,
   ],
   template: `
     <app-container classes="py-10 grid gap-6 max-w-3xl">
@@ -74,8 +74,12 @@ interface ContentBlock {
           </div>
 
           <div *ngIf="!loading() && hasError()" class="grid gap-2">
-            <p class="font-semibold text-amber-900 dark:text-amber-100">{{ 'contact.errorTitle' | translate }}</p>
-            <p class="text-sm text-amber-800 dark:text-amber-200">{{ 'contact.errorCopy' | translate }}</p>
+            <p class="font-semibold text-amber-900 dark:text-amber-100">
+              {{ 'contact.errorTitle' | translate }}
+            </p>
+            <p class="text-sm text-amber-800 dark:text-amber-200">
+              {{ 'contact.errorCopy' | translate }}
+            </p>
           </div>
 
           <ng-container *ngIf="!loading()">
@@ -83,7 +87,10 @@ interface ContentBlock {
               <app-cms-page-blocks [blocks]="pageBlocks()"></app-cms-page-blocks>
             </ng-container>
             <ng-template #markdownIntro>
-              <div class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200" [innerHTML]="bodyHtml()"></div>
+              <div
+                class="markdown text-lg text-slate-700 leading-relaxed dark:text-slate-200"
+                [innerHTML]="bodyHtml()"
+              ></div>
             </ng-template>
           </ng-container>
 
@@ -95,7 +102,9 @@ interface ContentBlock {
               <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                 {{ 'contact.phoneLabel' | translate }}
               </p>
-              <p class="mt-1 font-semibold text-slate-900 group-hover:text-slate-950 dark:text-slate-50">
+              <p
+                class="mt-1 font-semibold text-slate-900 group-hover:text-slate-950 dark:text-slate-50"
+              >
                 {{ phone() }}
               </p>
             </a>
@@ -106,7 +115,9 @@ interface ContentBlock {
               <p class="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                 {{ 'contact.emailLabel' | translate }}
               </p>
-              <p class="mt-1 font-semibold text-slate-900 group-hover:text-slate-950 dark:text-slate-50 break-all">
+              <p
+                class="mt-1 font-semibold text-slate-900 group-hover:text-slate-950 dark:text-slate-50 break-all"
+              >
                 {{ email() }}
               </p>
             </a>
@@ -117,8 +128,13 @@ interface ContentBlock {
               {{ 'contact.followUs' | translate }}
             </p>
             <div class="grid gap-3 sm:grid-cols-2">
-              <div *ngIf="instagramPages().length" class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'footer.instagram' | translate }}</p>
+              <div
+                *ngIf="instagramPages().length"
+                class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'footer.instagram' | translate }}
+                </p>
                 <div class="mt-2 grid gap-2">
                   <a
                     *ngFor="let page of instagramPages()"
@@ -137,7 +153,9 @@ interface ContentBlock {
                       />
                     </ng-container>
                     <ng-template #instagramAvatar>
-                      <span class="h-8 w-8 rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 grid place-items-center text-xs font-semibold text-white">
+                      <span
+                        class="h-8 w-8 rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 grid place-items-center text-xs font-semibold text-white"
+                      >
                         {{ initialsForLabel(page.label) }}
                       </span>
                     </ng-template>
@@ -145,8 +163,13 @@ interface ContentBlock {
                   </a>
                 </div>
               </div>
-              <div *ngIf="facebookPages().length" class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">{{ 'footer.facebook' | translate }}</p>
+              <div
+                *ngIf="facebookPages().length"
+                class="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'footer.facebook' | translate }}
+                </p>
                 <div class="mt-2 grid gap-2">
                   <a
                     *ngFor="let page of facebookPages()"
@@ -165,7 +188,9 @@ interface ContentBlock {
                       />
                     </ng-container>
                     <ng-template #facebookAvatar>
-                      <span class="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-sky-500 grid place-items-center text-xs font-semibold text-white">
+                      <span
+                        class="h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-sky-500 grid place-items-center text-xs font-semibold text-white"
+                      >
                         {{ initialsForLabel(page.label) }}
                       </span>
                     </ng-template>
@@ -177,7 +202,9 @@ interface ContentBlock {
           </div>
 
           <div class="border-t border-slate-200 pt-6 grid gap-4 dark:border-slate-800">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">{{ 'contact.form.title' | translate }}</h2>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              {{ 'contact.form.title' | translate }}
+            </h2>
 
             <div
               *ngIf="submitSuccess()"
@@ -187,7 +214,10 @@ interface ContentBlock {
               <p class="text-sm">{{ 'contact.form.successCopy' | translate }}</p>
             </div>
 
-            <div *ngIf="submitError()" class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+            <div
+              *ngIf="submitError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
               {{ submitError() }}
             </div>
 
@@ -200,10 +230,30 @@ interface ContentBlock {
                   [(ngModel)]="formTopic"
                   required
                 >
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="contact">{{ 'contact.form.topicContact' | translate }}</option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="support">{{ 'contact.form.topicSupport' | translate }}</option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="refund">{{ 'contact.form.topicRefund' | translate }}</option>
-                  <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">{{ 'contact.form.topicDispute' | translate }}</option>
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="contact"
+                  >
+                    {{ 'contact.form.topicContact' | translate }}
+                  </option>
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="support"
+                  >
+                    {{ 'contact.form.topicSupport' | translate }}
+                  </option>
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="refund"
+                  >
+                    {{ 'contact.form.topicRefund' | translate }}
+                  </option>
+                  <option
+                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                    value="dispute"
+                  >
+                    {{ 'contact.form.topicDispute' | translate }}
+                  </option>
                 </select>
               </label>
 
@@ -270,9 +320,15 @@ interface ContentBlock {
                 <button
                   type="submit"
                   class="h-11 px-5 rounded-xl bg-slate-900 text-white font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                  [disabled]="submitting() || !contactForm.form.valid || (captchaEnabled && !captchaToken)"
+                  [disabled]="
+                    submitting() || !contactForm.form.valid || (captchaEnabled && !captchaToken)
+                  "
                 >
-                  {{ submitting() ? ('contact.form.sending' | translate) : ('contact.form.submit' | translate) }}
+                  {{
+                    submitting()
+                      ? ('contact.form.sending' | translate)
+                      : ('contact.form.submit' | translate)
+                  }}
                 </button>
               </div>
             </form>
@@ -280,13 +336,10 @@ interface ContentBlock {
         </div>
       </app-card>
     </app-container>
-  `
+  `,
 })
 export class ContactComponent implements OnInit, OnDestroy {
-  crumbs = [
-    { label: 'nav.home', url: '/' },
-    { label: 'nav.contact' }
-  ];
+  crumbs = [{ label: 'nav.home', url: '/' }, { label: 'nav.contact' }];
 
   block = signal<ContentBlock | null>(null);
   loading = signal<boolean>(true);
@@ -332,7 +385,7 @@ export class ContactComponent implements OnInit, OnDestroy {
     private readonly markdown: MarkdownService,
     private readonly social: SiteSocialService,
     private readonly auth: AuthService,
-    private readonly support: SupportService
+    private readonly support: SupportService,
   ) {}
 
   ngOnInit(): void {
@@ -366,7 +419,10 @@ export class ContactComponent implements OnInit, OnDestroy {
     this.pageBlocks.set([]);
     const lang = this.translate.currentLang === 'ro' ? 'ro' : 'en';
     const req = (this.previewToken || '').trim()
-      ? this.api.get<ContentBlock>('/content/pages/contact/preview', { token: this.previewToken, lang })
+      ? this.api.get<ContentBlock>('/content/pages/contact/preview', {
+          token: this.previewToken,
+          lang,
+        })
       : this.api.get<ContentBlock>('/content/pages/contact', { lang });
     req.subscribe({
       next: (block) => {
@@ -375,7 +431,9 @@ export class ContactComponent implements OnInit, OnDestroy {
         this.pageBlocks.set(parsePageBlocks(block.meta, lang, (md) => this.markdown.render(md)));
         this.loading.set(false);
         this.hasError.set(false);
-        const metaBody = this.pageBlocks().length ? pageBlocksToPlainText(this.pageBlocks()) : block.body_markdown;
+        const metaBody = this.pageBlocks().length
+          ? pageBlocksToPlainText(this.pageBlocks())
+          : block.body_markdown;
         this.setMetaTags(block.title, metaBody);
       },
       error: () => {
@@ -385,8 +443,11 @@ export class ContactComponent implements OnInit, OnDestroy {
         this.pageBlocks.set([]);
         this.loading.set(false);
         this.hasError.set(true);
-        this.setMetaTags(this.translate.instant('contact.metaTitle'), this.translate.instant('contact.metaDescription'));
-      }
+        this.setMetaTags(
+          this.translate.instant('contact.metaTitle'),
+          this.translate.instant('contact.metaDescription'),
+        );
+      },
     });
   }
 
@@ -399,7 +460,7 @@ export class ContactComponent implements OnInit, OnDestroy {
       lang,
       (body || '').replace(/\s+/g, ' ').trim().slice(0, 160),
       this.translate.instant('meta.descriptions.contact'),
-      this.translate.instant('contact.metaDescription')
+      this.translate.instant('contact.metaDescription'),
     );
     const canonical = this.seoHeadLinks.setLocalizedCanonical('/contact', lang, {});
     this.title.setTitle(pageTitle);
@@ -413,6 +474,7 @@ export class ContactComponent implements OnInit, OnDestroy {
     const cleaned = (label || '').trim();
     if (!cleaned) return 'MS';
     const parts = cleaned.split(/\s+/).filter(Boolean);
+    /* istanbul ignore next -- defensive: a non-empty trimmed label always yields parts[0][0], so the cleaned[0]/'M' fallbacks are unreachable */
     const first = parts[0]?.[0] ?? cleaned[0] ?? 'M';
     const second = parts[1]?.[0] ?? parts[0]?.[1] ?? 'S';
     return `${first}${second}`.toUpperCase();
@@ -448,7 +510,7 @@ export class ContactComponent implements OnInit, OnDestroy {
       email: this.formEmail.trim(),
       message: this.formMessage.trim(),
       order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null,
-      captcha_token: this.captchaToken
+      captcha_token: this.captchaToken,
     };
     this.submitting.set(true);
     this.support
@@ -456,7 +518,7 @@ export class ContactComponent implements OnInit, OnDestroy {
       .pipe(
         finalize(() => {
           this.submitting.set(false);
-        })
+        }),
       )
       .subscribe({
         next: () => {
@@ -471,8 +533,7 @@ export class ContactComponent implements OnInit, OnDestroy {
           this.submitError.set(msg);
           this.captchaToken = null;
           this.contactCaptcha?.reset();
-        }
+        },
       });
   }
 }
-

@@ -18,11 +18,13 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
       (click)="onClick($event)"
       (keydown)="onKeyDown($event)"
     >
-      <div *ngIf="title" class="text-base font-semibold text-slate-900 dark:text-slate-50 mb-2">{{ title }}</div>
+      <div *ngIf="title" class="text-base font-semibold text-slate-900 dark:text-slate-50 mb-2">
+        {{ title }}
+      </div>
       <div *ngIf="subtitle" class="text-sm text-slate-600 dark:text-slate-300">{{ subtitle }}</div>
       <ng-content></ng-content>
     </div>
-  `
+  `,
 })
 export class CardComponent {
   @Input() title = '';

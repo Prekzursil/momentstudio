@@ -23,10 +23,16 @@ import { TranslateModule } from '@ngx-translate/core';
       </div>
 
       <div class="flex flex-wrap items-center justify-end gap-2">
-        <ng-container *ngIf="primaryActionsTpl" [ngTemplateOutlet]="primaryActionsTpl"></ng-container>
+        <ng-container
+          *ngIf="primaryActionsTpl"
+          [ngTemplateOutlet]="primaryActionsTpl"
+        ></ng-container>
 
         <div class="hidden md:flex flex-wrap items-center justify-end gap-2">
-          <ng-container *ngIf="secondaryActionsTpl" [ngTemplateOutlet]="secondaryActionsTpl"></ng-container>
+          <ng-container
+            *ngIf="secondaryActionsTpl"
+            [ngTemplateOutlet]="secondaryActionsTpl"
+          ></ng-container>
         </div>
 
         <details *ngIf="secondaryActionsTpl" class="group relative md:hidden">
@@ -38,7 +44,9 @@ import { TranslateModule } from '@ngx-translate/core';
             <span>{{ 'adminUi.actions.more' | translate }}</span>
           </summary>
 
-          <div class="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+          <div
+            class="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900"
+          >
             <div class="grid gap-2" (click)="closeDetailsMenu($event)">
               <ng-container [ngTemplateOutlet]="secondaryActionsTpl"></ng-container>
             </div>
@@ -46,14 +54,15 @@ import { TranslateModule } from '@ngx-translate/core';
         </details>
       </div>
     </div>
-  `
+  `,
 })
 export class AdminPageHeaderComponent {
   @Input({ required: true }) titleKey!: string;
   @Input() hintKey = '';
 
   @ContentChild('primaryActions', { read: TemplateRef }) primaryActionsTpl?: TemplateRef<unknown>;
-  @ContentChild('secondaryActions', { read: TemplateRef }) secondaryActionsTpl?: TemplateRef<unknown>;
+  @ContentChild('secondaryActions', { read: TemplateRef })
+  secondaryActionsTpl?: TemplateRef<unknown>;
   @ContentChild('meta', { read: TemplateRef }) metaTpl?: TemplateRef<unknown>;
 
   closeDetailsMenu(event: MouseEvent): void {

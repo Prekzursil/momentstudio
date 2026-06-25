@@ -5,13 +5,16 @@ from datetime import datetime, timedelta, timezone
 from functools import partial
 from uuid import UUID
 
-import anyio
+import anyio.to_thread
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.order import Order
-from app.models.order_document_export import OrderDocumentExport, OrderDocumentExportKind
+from app.models.order_document_export import (
+    OrderDocumentExport,
+    OrderDocumentExportKind,
+)
 from app.services import private_storage
 
 
@@ -108,18 +111,17 @@ async def list_exports(
     return [(row[0], row[1]) for row in rows], int(total or 0)
 
 
-async def get_export(session: AsyncSession, export_id: UUID) -> tuple[OrderDocumentExport | None, str | None]:
+async def get_export(
+    session: AsyncSession, export_id: UUID
+) -> tuple[OrderDocumentExport | None, str | None]:
     row = (
-        (
-            await session.execute(
-                select(OrderDocumentExport, Order.reference_code)
-                .outerjoin(Order, Order.id == OrderDocumentExport.order_id)
-                .where(OrderDocumentExport.id == export_id)
-                .limit(1)
-            )
+        await session.execute(
+            select(OrderDocumentExport, Order.reference_code)
+            .outerjoin(Order, Order.id == OrderDocumentExport.order_id)
+            .where(OrderDocumentExport.id == export_id)
+            .limit(1)
         )
-        .all()
-    )
+    ).all()
     if not row:
         return None, None
     export, ref = row[0]

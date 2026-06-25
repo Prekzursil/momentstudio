@@ -17,9 +17,18 @@ UNSUBSCRIBE_TOKEN_TTL_DAYS = 3650  # 10 years
 
 def create_newsletter_token(*, email: str, purpose: str) -> str:
     cleaned_email = str(email or "").strip().lower()
-    ttl_days = CONFIRM_TOKEN_TTL_DAYS if purpose == NEWSLETTER_PURPOSE_CONFIRM else UNSUBSCRIBE_TOKEN_TTL_DAYS
+    ttl_days = (
+        CONFIRM_TOKEN_TTL_DAYS
+        if purpose == NEWSLETTER_PURPOSE_CONFIRM
+        else UNSUBSCRIBE_TOKEN_TTL_DAYS
+    )
     exp = datetime.now(timezone.utc) + timedelta(days=int(ttl_days))
-    payload = {"type": NEWSLETTER_TOKEN_TYPE, "purpose": str(purpose), "email": cleaned_email, "exp": exp}
+    payload = {
+        "type": NEWSLETTER_TOKEN_TYPE,
+        "purpose": str(purpose),
+        "email": cleaned_email,
+        "exp": exp,
+    }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
 
 
@@ -40,7 +49,9 @@ def build_frontend_confirm_url(*, token: str) -> str:
 
 
 def build_frontend_unsubscribe_url(*, token: str) -> str:
-    return f"{settings.frontend_origin.rstrip('/')}/newsletter/unsubscribe?token={token}"
+    return (
+        f"{settings.frontend_origin.rstrip('/')}/newsletter/unsubscribe?token={token}"
+    )
 
 
 def build_api_unsubscribe_url(*, token: str) -> str:

@@ -93,7 +93,9 @@ def get_application() -> FastAPI:
         if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
             retry_after = headers.get("Retry-After") or "1"
             headers.setdefault("Retry-After", str(retry_after))
-            body: dict[str, object] = ErrorResponse(detail=exc.detail, code="too_many_requests").model_dump()
+            body: dict[str, object] = ErrorResponse(
+                detail=exc.detail, code="too_many_requests"
+            ).model_dump()
             request_id = getattr(request.state, "request_id", None)
             if request_id:
                 body["request_id"] = request_id
@@ -101,17 +103,31 @@ def get_application() -> FastAPI:
                 body["retry_after"] = int(str(retry_after))
             except Exception:
                 body["retry_after"] = str(retry_after)
-            return JSONResponse(status_code=exc.status_code, content=jsonable_encoder(body), headers=headers)
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=jsonable_encoder(body),
+                headers=headers,
+            )
 
         error_code = headers.get("X-Error-Code") or headers.get("x-error-code")
-        err = ErrorResponse(detail=exc.detail, code=str(error_code) if error_code else None)
-        return JSONResponse(status_code=exc.status_code, content=jsonable_encoder(err.model_dump()), headers=headers)
+        err = ErrorResponse(
+            detail=exc.detail, code=str(error_code) if error_code else None
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=jsonable_encoder(err.model_dump()),
+            headers=headers,
+        )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
         errors = jsonable_encoder(exc.errors())
         payload = ErrorResponse(detail=errors, code="validation_error")
-        return JSONResponse(status_code=422, content=jsonable_encoder(payload.model_dump()))
+        return JSONResponse(
+            status_code=422, content=jsonable_encoder(payload.model_dump())
+        )
 
     return app
 

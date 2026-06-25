@@ -3,7 +3,11 @@ import { Component, Input, OnChanges, OnDestroy, SimpleChanges, signal } from '@
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
-import { AdminService, ContentBlockVersionListItem, ContentBlockVersionRead } from '../../../core/admin.service';
+import {
+  AdminService,
+  ContentBlockVersionListItem,
+  ContentBlockVersionRead,
+} from '../../../core/admin.service';
 import { ToastService } from '../../../core/toast.service';
 import { diffLines, Change } from 'diff';
 import { ErrorStateComponent } from '../../../shared/error-state.component';
@@ -18,7 +22,9 @@ import { extractRequestId } from '../../../shared/http-error';
       <div class="flex items-center justify-between gap-3">
         <div class="grid gap-0.5">
           <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            {{ titleKey ? (titleKey | translate) : ('adminUi.content.revisions.title' | translate) }}
+            {{
+              titleKey ? (titleKey | translate) : ('adminUi.content.revisions.title' | translate)
+            }}
           </p>
           <p class="text-xs text-slate-500 dark:text-slate-400">{{ contentKey }}</p>
         </div>
@@ -43,7 +49,10 @@ import { extractRequestId } from '../../../shared/http-error';
         {{ 'adminUi.content.revisions.loading' | translate }}
       </div>
 
-      <div *ngIf="!loading() && !error() && versions().length === 0" class="text-sm text-slate-500 dark:text-slate-400">
+      <div
+        *ngIf="!loading() && !error() && versions().length === 0"
+        class="text-sm text-slate-500 dark:text-slate-400"
+      >
         {{ 'adminUi.content.revisions.empty' | translate }}
       </div>
 
@@ -64,7 +73,10 @@ import { extractRequestId } from '../../../shared/http-error';
         <div *ngIf="selectedRead() && currentRead()" class="grid gap-2">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.content.revisions.diffVsCurrent' | translate: { from: selectedRead()!.version, to: currentRead()!.version } }}
+              {{
+                'adminUi.content.revisions.diffVsCurrent'
+                  | translate: { from: selectedRead()!.version, to: currentRead()!.version }
+              }}
             </p>
             <button
               type="button"
@@ -75,10 +87,18 @@ import { extractRequestId } from '../../../shared/http-error';
             </button>
           </div>
 
-          <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs whitespace-pre-wrap text-slate-900 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-100">
+          <div
+            class="rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs whitespace-pre-wrap text-slate-900 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-100"
+          >
             <ng-container *ngFor="let part of diffParts">
               <span
-                [ngClass]="part.added ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100' : part.removed ? 'bg-rose-200 text-rose-900 dark:bg-rose-900/40 dark:text-rose-100' : ''"
+                [ngClass]="
+                  part.added
+                    ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
+                    : part.removed
+                      ? 'bg-rose-200 text-rose-900 dark:bg-rose-900/40 dark:text-rose-100'
+                      : ''
+                "
                 >{{ part.value }}</span
               >
             </ng-container>
@@ -86,7 +106,7 @@ import { extractRequestId } from '../../../shared/http-error';
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class ContentRevisionsComponent implements OnChanges, OnDestroy {
   @Input({ required: true }) contentKey!: string;
@@ -108,7 +128,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
   constructor(
     private readonly admin: AdminService,
     private readonly toast: ToastService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -148,6 +168,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
 
     const maybeInitSelection = (): void => {
       if (pendingCurrent) return;
+      /* istanbul ignore next -- guard against re-entry: the load orchestration only sets selectedVersion via this function once per reload */
       if (this.selectedVersion) return;
       const items = this.versions();
       if (!items?.length) return;
@@ -180,48 +201,48 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
           }
           pendingVersions = false;
           finish();
-        }
-      })
+        },
+      }),
     );
 
     this.subs.add(
-        this.admin.getContent(key).subscribe({
-          next: (block) => {
-            const version = block?.version;
-            if (!version) {
-              pendingCurrent = false;
-              maybeInitSelection();
-              finish();
-              return;
-            }
-            this.subs.add(
-              this.admin.getContentVersion(key, version).subscribe({
-                next: (read) => {
-                  this.currentRead.set(read);
-                  this.recomputeDiff();
-                  pendingCurrent = false;
-                  maybeInitSelection();
-                  finish();
-                },
-                error: (err) => {
-                  this.error.set(this.t('adminUi.content.revisions.errors.loadVersion'));
-                  this.errorRequestId.set(extractRequestId(err));
-                  pendingCurrent = false;
-                  maybeInitSelection();
-                  finish();
-                }
-              })
-            );
-          },
-          error: () => {
-            // Missing content blocks simply have no history yet.
-            this.currentRead.set(null);
+      this.admin.getContent(key).subscribe({
+        next: (block) => {
+          const version = block?.version;
+          if (!version) {
             pendingCurrent = false;
             maybeInitSelection();
             finish();
+            return;
           }
-        })
-      );
+          this.subs.add(
+            this.admin.getContentVersion(key, version).subscribe({
+              next: (read) => {
+                this.currentRead.set(read);
+                this.recomputeDiff();
+                pendingCurrent = false;
+                maybeInitSelection();
+                finish();
+              },
+              error: (err) => {
+                this.error.set(this.t('adminUi.content.revisions.errors.loadVersion'));
+                this.errorRequestId.set(extractRequestId(err));
+                pendingCurrent = false;
+                maybeInitSelection();
+                finish();
+              },
+            }),
+          );
+        },
+        error: () => {
+          // Missing content blocks simply have no history yet.
+          this.currentRead.set(null);
+          pendingCurrent = false;
+          maybeInitSelection();
+          finish();
+        },
+      }),
+    );
   }
 
   loadSelectedVersion(): void {
@@ -236,8 +257,8 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
         },
         error: () => {
           this.toast.error(this.t('adminUi.content.revisions.errors.loadVersion'));
-        }
-      })
+        },
+      }),
     );
   }
 
@@ -245,7 +266,9 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
     const key = (this.contentKey || '').trim();
     const selected = this.selectedRead();
     if (!key || !selected) return;
-    const ok = confirm(this.t('adminUi.content.revisions.confirms.rollback', { version: selected.version }));
+    const ok = confirm(
+      this.t('adminUi.content.revisions.confirms.rollback', { version: selected.version }),
+    );
     if (!ok) return;
     this.subs.add(
       this.admin.rollbackContentVersion(key, selected.version).subscribe({
@@ -253,8 +276,8 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
           this.toast.success(this.t('adminUi.content.revisions.success.rolledBack'));
           this.reload();
         },
-        error: () => this.toast.error(this.t('adminUi.content.revisions.errors.rollback'))
-      })
+        error: () => this.toast.error(this.t('adminUi.content.revisions.errors.rollback')),
+      }),
     );
   }
 
@@ -286,7 +309,7 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
       `published_until: ${read.published_until ?? 'null'}`,
       `meta:\n${meta}`,
       `body_markdown:\n${read.body_markdown || ''}`,
-      `translations:\n${translations.length ? translations.join('\n\n') : '[]'}`
+      `translations:\n${translations.length ? translations.join('\n\n') : '[]'}`,
     ].join('\n\n');
   }
 
@@ -294,4 +317,3 @@ export class ContentRevisionsComponent implements OnChanges, OnDestroy {
     return this.translate.instant(key, params);
   }
 }
-

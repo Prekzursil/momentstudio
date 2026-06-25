@@ -12,7 +12,7 @@ export class RouteRobotsService implements OnDestroy {
 
   constructor(
     private readonly router: Router,
-    private readonly meta: Meta
+    private readonly meta: Meta,
   ) {}
 
   start(): void {
@@ -37,11 +37,11 @@ export class RouteRobotsService implements OnDestroy {
     let node: ActivatedRouteSnapshot | null = root;
     let policy = '';
     while (node) {
-      const candidate = typeof node.data?.['robots'] === 'string' ? String(node.data['robots']).trim() : '';
+      const candidate =
+        typeof node.data?.['robots'] === 'string' ? String(node.data['robots']).trim() : '';
       if (candidate) policy = candidate;
       node = node.firstChild ?? null;
     }
     return policy || DEFAULT_ROBOTS;
   }
 }
-

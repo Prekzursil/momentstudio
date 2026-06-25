@@ -228,7 +228,9 @@ class ContentImageEditRequest(BaseModel):
     @model_validator(mode="after")
     def _validate_crop_aspect(self) -> "ContentImageEditRequest":
         if (self.crop_aspect_w is None) ^ (self.crop_aspect_h is None):
-            raise ValueError("crop_aspect_w and crop_aspect_h must be provided together")
+            raise ValueError(
+                "crop_aspect_w and crop_aspect_h must be provided together"
+            )
         if (
             self.rotate_cw == 0
             and self.crop_aspect_w is None
@@ -296,7 +298,9 @@ class ContentFindReplacePreviewItem(BaseModel):
     title: str
     matches: int
     base_matches: int
-    translations: list[ContentFindReplacePreviewTranslationCount] = Field(default_factory=list)
+    translations: list[ContentFindReplacePreviewTranslationCount] = Field(
+        default_factory=list
+    )
 
 
 class ContentFindReplacePreviewResponse(BaseModel):

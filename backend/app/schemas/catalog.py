@@ -5,7 +5,12 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
 
-from app.models.catalog import ProductBadgeType, ProductStatus, ShippingClass, StockAdjustmentReason
+from app.models.catalog import (
+    ProductBadgeType,
+    ProductStatus,
+    ShippingClass,
+    StockAdjustmentReason,
+)
 
 
 _ALLOWED_COURIERS: set[str] = {"sameday", "fan_courier"}
@@ -86,7 +91,6 @@ class CategoryRead(CategoryBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
-    sort_order: int
     tax_group_id: UUID | None = None
 
 
@@ -396,6 +400,7 @@ class ProductUpdate(BaseModel):
         if value is None:
             return value
         return _validate_disallowed_couriers(value)
+
     meta_title: str | None = Field(default=None, max_length=180)
     meta_description: str | None = Field(default=None, max_length=300)
 

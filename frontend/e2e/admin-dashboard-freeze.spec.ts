@@ -5,7 +5,10 @@ import { loginUi } from './checkout-helpers';
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
-    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
+    localStorage.setItem(
+      'admin.onboarding.v1',
+      JSON.stringify({ completed_at: new Date().toISOString() }),
+    );
   });
 });
 
@@ -28,11 +31,11 @@ test('admin dashboard stays responsive after View admin navigation', async ({ pa
       readyState: document.readyState,
       hasLayout: Boolean(document.querySelector('app-admin-layout')),
       hasDashboard: Boolean(document.querySelector('app-admin-dashboard')),
-      bodyTextLength: document.body?.innerText?.length ?? 0
+      bodyTextLength: document.body?.innerText?.length ?? 0,
     })),
     new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('admin main-thread lock detected')), 2_000);
-    })
+    }),
   ]);
 
   expect(probe.hasLayout).toBe(true);

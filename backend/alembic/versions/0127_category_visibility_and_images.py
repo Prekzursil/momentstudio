@@ -19,9 +19,16 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("categories", sa.Column("is_visible", sa.Boolean(), nullable=False, server_default=sa.true()))
-    op.add_column("categories", sa.Column("thumbnail_url", sa.String(length=500), nullable=True))
-    op.add_column("categories", sa.Column("banner_url", sa.String(length=500), nullable=True))
+    op.add_column(
+        "categories",
+        sa.Column("is_visible", sa.Boolean(), nullable=False, server_default=sa.true()),
+    )
+    op.add_column(
+        "categories", sa.Column("thumbnail_url", sa.String(length=500), nullable=True)
+    )
+    op.add_column(
+        "categories", sa.Column("banner_url", sa.String(length=500), nullable=True)
+    )
     op.alter_column("categories", "is_visible", server_default=None)
 
 
@@ -29,4 +36,3 @@ def downgrade() -> None:
     op.drop_column("categories", "banner_url")
     op.drop_column("categories", "thumbnail_url")
     op.drop_column("categories", "is_visible")
-

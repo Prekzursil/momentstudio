@@ -57,7 +57,9 @@ def _github_context(repo_arg: str | None) -> GitHubContext:
     return GitHubContext(token=token, owner=owner, repo=repo)
 
 
-def _request(ctx: GitHubContext, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+def _request(
+    ctx: GitHubContext, method: str, path: str, payload: dict[str, Any] | None = None
+) -> Any:
     url = f"{ctx.api_root}{path}"
     data = None
     headers = {
@@ -99,7 +101,9 @@ def _list_open_in_progress_issues(ctx: GitHubContext) -> list[dict[str, Any]]:
 
 
 def _parse_ts(value: str) -> dt.datetime:
-    return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
+    return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=dt.timezone.utc
+    )
 
 
 def _matches_filter(issue: dict[str, Any], audit_filter: str) -> bool:
@@ -112,23 +116,28 @@ def _matches_filter(issue: dict[str, Any], audit_filter: str) -> bool:
         return any(label.startswith("audit:") for label in labels)
     if normalized.startswith("audit:"):
         return normalized in {label.lower() for label in labels}
-    raise ValueError("--audit-filter must be one of: all, audit:*, audit-only, or an exact audit:* label.")
+    raise ValueError(
+        "--audit-filter must be one of: all, audit:*, audit-only, or an exact audit:* label."
+    )
 
 
 def _stale_comment(days: int) -> str:
-    return "\n".join(
-        [
-            "Automated watchdog timeout: this issue has been in `ai:in-progress` without updates",
-            f"for at least **{days} days**.",
-            "",
-            "Escalation action taken:",
-            "- Removed `ai:in-progress`.",
-            "- Added `ai:ready` for re-queue.",
-            "- Removed assignee `copilot` if it was still present.",
-            "",
-            "Maintainers can relabel or reassign if active work is still underway.",
-        ]
-    ).strip() + "\n"
+    return (
+        "\n".join(
+            [
+                "Automated watchdog timeout: this issue has been in `ai:in-progress` without updates",
+                f"for at least **{days} days**.",
+                "",
+                "Escalation action taken:",
+                "- Removed `ai:in-progress`.",
+                "- Added `ai:ready` for re-queue.",
+                "- Removed assignee `copilot` if it was still present.",
+                "",
+                "Maintainers can relabel or reassign if active work is still underway.",
+            ]
+        ).strip()
+        + "\n"
+    )
 
 
 def _is_stale(issue: dict[str, Any], now: dt.datetime, stale_days: int) -> bool:
@@ -176,7 +185,9 @@ def run(repo: str | None, stale_days: int, audit_filter: str) -> int:
             payload={"labels": _update_labels(issue)},
         )
 
-        assignees = [str(row.get("login") or "") for row in issue.get("assignees") or []]
+        assignees = [
+            str(row.get("login") or "") for row in issue.get("assignees") or []
+        ]
         if "copilot" in assignees:
             _request(
                 ctx,
@@ -193,8 +204,14 @@ def run(repo: str | None, stale_days: int, audit_filter: str) -> int:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Watchdog for stalled ai:in-progress issues.")
-    parser.add_argument("--repo", default=None, help="owner/repo override. Defaults to GITHUB_REPOSITORY.")
+    parser = argparse.ArgumentParser(
+        description="Watchdog for stalled ai:in-progress issues."
+    )
+    parser.add_argument(
+        "--repo",
+        default=None,
+        help="owner/repo override. Defaults to GITHUB_REPOSITORY.",
+    )
     parser.add_argument(
         "--stale-days",
         type=int,
@@ -211,4 +228,6 @@ def parse_args() -> argparse.Namespace:
 
 if __name__ == "__main__":
     args = parse_args()
-    raise SystemExit(run(repo=args.repo, stale_days=args.stale_days, audit_filter=args.audit_filter))
+    raise SystemExit(
+        run(repo=args.repo, stale_days=args.stale_days, audit_filter=args.audit_filter)
+    )

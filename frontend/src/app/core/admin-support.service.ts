@@ -82,7 +82,10 @@ export interface SupportSlaSettings {
 export class AdminSupportService {
   constructor(private readonly api: ApiService) {}
 
-  submitFeedback(payload: { message: string; context?: string | null }): Observable<AdminContactSubmissionRead> {
+  submitFeedback(payload: {
+    message: string;
+    context?: string | null;
+  }): Observable<AdminContactSubmissionRead> {
     return this.api.post<AdminContactSubmissionRead>('/support/admin/feedback', payload);
   }
 
@@ -98,7 +101,10 @@ export class AdminSupportService {
     include_pii?: boolean;
   }): Observable<AdminContactSubmissionListResponse> {
     const finalParams = { ...params, include_pii: params.include_pii ?? true };
-    return this.api.get<AdminContactSubmissionListResponse>('/support/admin/submissions', finalParams);
+    return this.api.get<AdminContactSubmissionListResponse>(
+      '/support/admin/submissions',
+      finalParams,
+    );
   }
 
   listAssignees(): Observable<SupportAgentRef[]> {
@@ -112,20 +118,43 @@ export class AdminSupportService {
 
   update(
     id: string,
-    payload: { status?: SupportStatus | null; admin_note?: string | null; assignee_id?: string | null },
-    opts?: { include_pii?: boolean }
+    payload: {
+      status?: SupportStatus | null;
+      admin_note?: string | null;
+      assignee_id?: string | null;
+    },
+    opts?: { include_pii?: boolean },
   ): Observable<AdminContactSubmissionRead> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.patch<AdminContactSubmissionRead>(`/support/admin/submissions/${id}`, payload, undefined, params);
+    return this.api.patch<AdminContactSubmissionRead>(
+      `/support/admin/submissions/${id}`,
+      payload,
+      undefined,
+      params,
+    );
   }
 
-  addMessage(id: string, message: string, opts?: { include_pii?: boolean }): Observable<AdminContactSubmissionRead> {
+  addMessage(
+    id: string,
+    message: string,
+    opts?: { include_pii?: boolean },
+  ): Observable<AdminContactSubmissionRead> {
     const params = { include_pii: opts?.include_pii ?? true };
-    return this.api.post<AdminContactSubmissionRead>(`/support/admin/submissions/${id}/messages`, { message }, undefined, params);
+    return this.api.post<AdminContactSubmissionRead>(
+      `/support/admin/submissions/${id}/messages`,
+      { message },
+      undefined,
+      params,
+    );
   }
 
-  listCannedResponses(params?: { include_inactive?: boolean }): Observable<SupportCannedResponseRead[]> {
-    return this.api.get<SupportCannedResponseRead[]>('/support/admin/canned-responses', params || {});
+  listCannedResponses(params?: {
+    include_inactive?: boolean;
+  }): Observable<SupportCannedResponseRead[]> {
+    return this.api.get<SupportCannedResponseRead[]>(
+      '/support/admin/canned-responses',
+      params || {},
+    );
   }
 
   createCannedResponse(payload: {
@@ -139,9 +168,17 @@ export class AdminSupportService {
 
   updateCannedResponse(
     id: string,
-    payload: { title?: string | null; body_en?: string | null; body_ro?: string | null; is_active?: boolean | null }
+    payload: {
+      title?: string | null;
+      body_en?: string | null;
+      body_ro?: string | null;
+      is_active?: boolean | null;
+    },
   ): Observable<SupportCannedResponseRead> {
-    return this.api.patch<SupportCannedResponseRead>(`/support/admin/canned-responses/${id}`, payload);
+    return this.api.patch<SupportCannedResponseRead>(
+      `/support/admin/canned-responses/${id}`,
+      payload,
+    );
   }
 
   deleteCannedResponse(id: string): Observable<unknown> {
@@ -156,4 +193,3 @@ export class AdminSupportService {
     return this.api.patch<SupportSlaSettings>('/support/admin/sla-settings', payload);
   }
 }
-

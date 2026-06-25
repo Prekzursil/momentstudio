@@ -71,9 +71,9 @@ def upgrade() -> None:
 
     row = (
         conn.execute(
-            sa.select(content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta).where(
-                content_blocks.c.key == "home.sections"
-            )
+            sa.select(
+                content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta
+            ).where(content_blocks.c.key == "home.sections")
         )
         .mappings()
         .first()
@@ -86,18 +86,24 @@ def upgrade() -> None:
 
     blocks: list[dict] = [b for b in blocks_raw if isinstance(b, dict)]
 
-    has_explicit_sections = any(_as_str(b.get("type")).lower() in HOME_SECTION_TYPES for b in blocks)
+    has_explicit_sections = any(
+        _as_str(b.get("type")).lower() in HOME_SECTION_TYPES for b in blocks
+    )
     if has_explicit_sections:
         return
 
     has_custom_non_hero = any(
-        (t := _as_str(b.get("type")).lower()) and (t not in HOME_SECTION_TYPES) and (t not in HERO_LIKE_TYPES)
+        (t := _as_str(b.get("type")).lower())
+        and (t not in HOME_SECTION_TYPES)
+        and (t not in HERO_LIKE_TYPES)
         for b in blocks
     )
     if has_custom_non_hero:
         return
 
-    hero_like_blocks = [b for b in blocks if _as_str(b.get("type")).lower() in HERO_LIKE_TYPES]
+    hero_like_blocks = [
+        b for b in blocks if _as_str(b.get("type")).lower() in HERO_LIKE_TYPES
+    ]
     if not hero_like_blocks:
         hero_like_blocks = [
             {
@@ -108,8 +114,14 @@ def upgrade() -> None:
                 "slide": {
                     "image_url": "assets/home/banner_image.jpeg",
                     "alt": {"en": "", "ro": ""},
-                    "headline": {"en": "Welcome to momentstudio", "ro": "Welcome to momentstudio"},
-                    "subheadline": {"en": "Handmade art for your home", "ro": "Handmade art for your home"},
+                    "headline": {
+                        "en": "Welcome to momentstudio",
+                        "ro": "Welcome to momentstudio",
+                    },
+                    "subheadline": {
+                        "en": "Handmade art for your home",
+                        "ro": "Handmade art for your home",
+                    },
                     "cta_label": {"en": "Shop now", "ro": "Shop now"},
                     "cta_url": "/shop",
                     "variant": "split",
@@ -124,7 +136,11 @@ def upgrade() -> None:
         {"key": "sale_products", "type": "sale_products", "enabled": True},
         {"key": "new_arrivals", "type": "new_arrivals", "enabled": True},
         {"key": "recently_viewed", "type": "recently_viewed", "enabled": True},
-        {"key": "featured_collections", "type": "featured_collections", "enabled": True},
+        {
+            "key": "featured_collections",
+            "type": "featured_collections",
+            "enabled": True,
+        },
         {"key": "story", "type": "story", "enabled": True},
         {"key": "why", "type": "why", "enabled": False},
     ]
@@ -133,15 +149,26 @@ def upgrade() -> None:
     meta["blocks"] = hero_like_blocks + section_blocks
 
     # Keep legacy lists consistent (for older clients / tooling).
-    meta["sections"] = [{"id": b["type"], "enabled": bool(b["enabled"])} for b in section_blocks]
+    meta["sections"] = [
+        {"id": b["type"], "enabled": bool(b["enabled"])} for b in section_blocks
+    ]
     meta["order"] = [b["type"] for b in section_blocks]
 
-    conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta, updated_at=now))
+    conn.execute(
+        sa.update(content_blocks)
+        .where(content_blocks.c.id == row["id"])
+        .values(meta=meta, updated_at=now)
+    )
 
     current_version = int(row.get("version") or 1)
     conn.execute(
         sa.update(versions)
-        .where(sa.and_(versions.c.content_block_id == row["id"], versions.c.version == current_version))
+        .where(
+            sa.and_(
+                versions.c.content_block_id == row["id"],
+                versions.c.version == current_version,
+            )
+        )
         .values(meta=meta)
     )
 
@@ -149,4 +176,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: removing seeded homepage layout defaults would overwrite user edits.
     return
-

@@ -4,16 +4,30 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from email.utils import format_datetime
+from typing import Literal
 from xml.etree import ElementTree
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
-from app.core.dependencies import require_admin_section, require_complete_profile, require_verified_email
+from app.core.dependencies import (
+    require_admin_section,
+    require_complete_profile,
+    require_verified_email,
+)
 from app.core.security import create_content_preview_token, decode_content_preview_token
 from app.db.session import get_session
 from app.models.blog import BlogComment
@@ -49,6 +63,15 @@ router = APIRouter(prefix="/blog", tags=["blog"])
 
 BLOG_VIEW_COOKIE = "blog_viewed"
 BLOG_VIEW_COOKIE_TTL_SECONDS = 6 * 60 * 60
+
+
+def _cookie_samesite() -> Literal["lax", "strict", "none"]:
+    value = settings.cookie_samesite.lower()
+    if value == "strict":
+        return "strict"
+    if value == "none":
+        return "none"
+    return "lax"
 
 
 def _site_base_url() -> str:
@@ -108,6 +131,8 @@ def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
         if not post_id:
             continue
         if not isinstance(ts, int):
+            if ts is None:
+                continue
             try:
                 ts = int(ts)
             except Exception:
@@ -117,7 +142,11 @@ def _decode_view_cookie(value: str) -> list[tuple[str, int]]:
 
 
 def _encode_view_cookie(entries: list[tuple[str, int]]) -> str:
-    payload = [{"pid": post_id, "ts": ts} for post_id, ts in entries if post_id and isinstance(ts, int)]
+    payload = [
+        {"pid": post_id, "ts": ts}
+        for post_id, ts in entries
+        if post_id and isinstance(ts, int)
+    ]
     raw = json.dumps(payload, separators=(",", ":"))
     return base64.urlsafe_b64encode(raw.encode("utf-8")).decode("utf-8")
 
@@ -144,7 +173,9 @@ async def list_blog_posts(
     tag: str | None = Query(default=None, max_length=50),
     series: str | None = Query(default=None, max_length=80),
     author_id: uuid.UUID | None = Query(default=None),
-    sort: str = Query(default="newest", pattern="^(newest|oldest|most_viewed|most_commented)$"),
+    sort: str = Query(
+        default="newest", pattern="^(newest|oldest|most_viewed|most_commented)$"
+    ),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=50),
 ) -> BlogPostListResponse:
@@ -162,7 +193,9 @@ async def list_blog_posts(
     total_pages = (total_items + limit - 1) // limit if total_items else 1
     return BlogPostListResponse(
         items=[blog_service.to_list_item(b, lang=lang) for b in blocks],
-        meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+        meta=PaginationMeta(
+            total_items=total_items, total_pages=total_pages, page=page, limit=limit
+        ),
     )
 
 
@@ -173,7 +206,9 @@ async def blog_rss_feed(
 ) -> Response:
     base = _site_base_url()
     chosen_lang = lang or settings.default_locale or "en"
-    blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
+    blocks, _ = await blog_service.list_published_posts(
+        session, lang=lang, page=1, limit=50, sort="newest"
+    )
     blocks = sorted(
         blocks,
         key=lambda b: (
@@ -190,14 +225,21 @@ async def blog_rss_feed(
     channel = ElementTree.SubElement(rss, "channel")
 
     feed_url = f"{base}/api/v1/blog/rss.xml?lang={chosen_lang}"
-    ElementTree.SubElement(channel, f"{{{ns_atom}}}link", {"href": feed_url, "rel": "self", "type": "application/rss+xml"})
+    ElementTree.SubElement(
+        channel,
+        f"{{{ns_atom}}}link",
+        {"href": feed_url, "rel": "self", "type": "application/rss+xml"},
+    )
     ElementTree.SubElement(channel, "title").text = f"{settings.site_name} Blog"
     ElementTree.SubElement(channel, "link").text = f"{base}/blog?lang={chosen_lang}"
     ElementTree.SubElement(channel, "description").text = _site_description(chosen_lang)
     ElementTree.SubElement(channel, "language").text = _site_locale(chosen_lang)
     if blocks:
         latest = max(
-            (b.updated_at or b.published_at or datetime.now(timezone.utc) for b in blocks),
+            (
+                b.updated_at or b.published_at or datetime.now(timezone.utc)
+                for b in blocks
+            ),
             default=datetime.now(timezone.utc),
         )
         ElementTree.SubElement(channel, "lastBuildDate").text = format_datetime(latest)
@@ -205,16 +247,18 @@ async def blog_rss_feed(
     for block in blocks:
         item = ElementTree.SubElement(channel, "item")
         data = blog_service.to_list_item(block, lang=lang)
-        slug = str(data.get("slug") or "")
-        title = str(data.get("title") or "")
-        excerpt = str(data.get("excerpt") or "")
+        slug = str(data.slug or "")
+        title = str(data.title or "")
+        excerpt = str(data.excerpt or "")
         link = f"{base}/blog/{slug}?lang={chosen_lang}"
 
         ElementTree.SubElement(item, "title").text = title
         ElementTree.SubElement(item, "link").text = link
         ElementTree.SubElement(item, "guid").text = link
         if block.published_at:
-            ElementTree.SubElement(item, "pubDate").text = format_datetime(block.published_at)
+            ElementTree.SubElement(item, "pubDate").text = format_datetime(
+                block.published_at
+            )
         ElementTree.SubElement(item, "description").text = excerpt
 
     payload = ElementTree.tostring(rss, encoding="utf-8", xml_declaration=True)
@@ -228,7 +272,9 @@ async def blog_json_feed(
 ) -> Response:
     base = _site_base_url()
     chosen_lang = lang or settings.default_locale or "en"
-    blocks, _ = await blog_service.list_published_posts(session, lang=lang, page=1, limit=50, sort="newest")
+    blocks, _ = await blog_service.list_published_posts(
+        session, lang=lang, page=1, limit=50, sort="newest"
+    )
     blocks = sorted(
         blocks,
         key=lambda b: (
@@ -241,27 +287,27 @@ async def blog_json_feed(
     items: list[dict] = []
     for block in blocks:
         data = blog_service.to_list_item(block, lang=lang)
-        slug = str(data.get("slug") or "")
+        slug = str(data.slug or "")
         url = f"{base}/blog/{slug}?lang={chosen_lang}"
         published = block.published_at or block.updated_at
         item: dict = {
             "id": url,
             "url": url,
-            "title": data.get("title") or "",
-            "summary": data.get("excerpt") or "",
+            "title": data.title or "",
+            "summary": data.excerpt or "",
         }
-        if published:
+        if published:  # pragma: no branch -- always truthy: persisted blocks always have a server-set updated_at, so published_at-or-updated_at is never None here
             item["date_published"] = published.isoformat()
-        author_name = data.get("author_name")
+        author_name = data.author_name
         if author_name:
             item["authors"] = [{"name": author_name}]
-        image = data.get("cover_image_url")
+        image = data.cover_image_url
         if image:
             item["image"] = image
-        tags = data.get("tags") or []
+        tags = data.tags or []
         if tags:
             item["tags"] = tags
-        series = data.get("series")
+        series = data.series
         if series:
             item["_series"] = series
         items.append(item)
@@ -275,7 +321,10 @@ async def blog_json_feed(
         "language": _site_locale(chosen_lang),
         "items": items,
     }
-    return Response(content=json.dumps(feed, ensure_ascii=False), media_type="application/feed+json; charset=utf-8")
+    return Response(
+        content=json.dumps(feed, ensure_ascii=False),
+        media_type="application/feed+json; charset=utf-8",
+    )
 
 
 @router.get("/posts/{slug}", response_model=BlogPostRead)
@@ -288,18 +337,24 @@ async def get_blog_post(
 ) -> BlogPostRead:
     block = await blog_service.get_published_post(session, slug=slug, lang=lang)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
     payload = blog_service.to_read(block, lang=lang)
     should_count_view = False
     cookie_needs_update = False
     ua = request.headers.get("user-agent") or ""
     if not _is_probable_bot(ua):
         post_cookie_id = _normalize_cookie_post_id(block.id)
-        if not post_cookie_id:
+        if not post_cookie_id:  # pragma: no cover -- defensive: block.id is always a valid persisted UUID, so normalization never yields an empty string
             return BlogPostRead.model_validate(payload)
         now = int(time.time())
         existing = _decode_view_cookie(request.cookies.get(BLOG_VIEW_COOKIE) or "")
-        fresh = [(post_id, ts) for post_id, ts in existing if now - ts < BLOG_VIEW_COOKIE_TTL_SECONDS]
+        fresh = [
+            (post_id, ts)
+            for post_id, ts in existing
+            if now - ts < BLOG_VIEW_COOKIE_TTL_SECONDS
+        ]
         if len(fresh) != len(existing):
             cookie_needs_update = True
         seen = any(post_id == post_cookie_id for post_id, _ in fresh)
@@ -312,7 +367,7 @@ async def get_blog_post(
                 _encode_view_cookie([(post_cookie_id, now)]),
                 httponly=True,
                 secure=settings.secure_cookies,
-                samesite=settings.cookie_samesite.lower(),
+                samesite=_cookie_samesite(),
                 path="/",
                 max_age=BLOG_VIEW_COOKIE_TTL_SECONDS,
             )
@@ -342,10 +397,18 @@ async def get_blog_post_neighbors(
 ) -> BlogPostNeighbors:
     block = await blog_service.get_published_post(session, slug=slug, lang=None)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    previous_post, next_post = await blog_service.get_post_neighbors(session, slug=slug, lang=lang)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+    previous_post, next_post = await blog_service.get_post_neighbors(
+        session, slug=slug, lang=lang
+    )
     return BlogPostNeighbors(
-        previous=blog_service.to_list_item(previous_post, lang=lang) if previous_post else None,
+        previous=(
+            blog_service.to_list_item(previous_post, lang=lang)
+            if previous_post
+            else None
+        ),
         next=blog_service.to_list_item(next_post, lang=lang) if next_post else None,
     )
 
@@ -360,10 +423,14 @@ async def preview_blog_post(
     key = decode_content_preview_token(token)
     expected_key = f"blog.{slug}"
     if not key or key != expected_key:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token"
+        )
     block = await content_service.get_block_by_key(session, expected_key, lang=lang)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
     return BlogPostRead.model_validate(blog_service.to_read(block, lang=lang))
 
 
@@ -378,12 +445,18 @@ async def create_blog_preview_token(
     key = f"blog.{slug}"
     block = await content_service.get_block_by_key(session, key)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
 
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
     token = create_content_preview_token(content_key=key, expires_at=expires_at)
 
-    chosen_lang = lang or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en") or "en"
+    chosen_lang = (
+        lang
+        or (block.lang if getattr(block, "lang", None) in ("en", "ro") else "en")
+        or "en"
+    )
     url = f"{settings.frontend_origin.rstrip('/')}/blog/{slug}?preview={token}&lang={chosen_lang}"
     return BlogPreviewTokenResponse(token=token, expires_at=expires_at, url=url)
 
@@ -397,7 +470,9 @@ async def blog_post_og_image(
 ) -> Response:
     block = await blog_service.get_published_post(session, slug=slug, lang=lang)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
 
     etag = f'W/"blog-og-{slug}-v{block.version}-{lang or "base"}"'
     cache_control = "public, max-age=3600"
@@ -408,7 +483,9 @@ async def blog_post_og_image(
             candidate = raw_candidate.strip()
             if not candidate:
                 continue
-            normalized_candidate = candidate[2:] if candidate.startswith("W/") else candidate
+            normalized_candidate = (
+                candidate[2:] if candidate.startswith("W/") else candidate
+            )
             if normalized_candidate == normalized_etag:
                 return Response(
                     status_code=status.HTTP_304_NOT_MODIFIED,
@@ -416,8 +493,14 @@ async def blog_post_og_image(
                 )
 
     data = blog_service.to_read(block, lang=lang)
-    png = og_images.render_blog_post_og(title=str(data.get("title") or ""), subtitle=data.get("summary") or None)
-    return Response(content=png, media_type="image/png", headers={"ETag": etag, "Cache-Control": cache_control})
+    png = og_images.render_blog_post_og(
+        title=str(data.get("title") or ""), subtitle=data.get("summary") or None
+    )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"ETag": etag, "Cache-Control": cache_control},
+    )
 
 
 @router.get("/posts/{slug}/og-preview.png", response_class=Response)
@@ -430,13 +513,23 @@ async def blog_post_og_preview_image(
     key = decode_content_preview_token(token)
     expected_key = f"blog.{slug}"
     if not key or key != expected_key:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Invalid preview token"
+        )
     block = await content_service.get_block_by_key(session, expected_key, lang=lang)
     if not block:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
     data = blog_service.to_read(block, lang=lang)
-    png = og_images.render_blog_post_og(title=str(data.get("title") or ""), subtitle=data.get("summary") or None)
-    return Response(content=png, media_type="image/png", headers={"Cache-Control": "private, no-store"})
+    png = og_images.render_blog_post_og(
+        title=str(data.get("title") or ""), subtitle=data.get("summary") or None
+    )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 @router.get("/posts/{slug}/comments", response_model=BlogCommentListResponse)
@@ -448,18 +541,27 @@ async def list_blog_comments(
 ) -> BlogCommentListResponse:
     post = await blog_service.get_published_post(session, slug=slug, lang=None)
     if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
     comments, total_items = await blog_service.list_comments(
         session, content_block_id=post.id, page=page, limit=limit
     )
     total_pages = (total_items + limit - 1) // limit if total_items else 1
     return BlogCommentListResponse(
-        items=[BlogCommentRead.model_validate(blog_service.to_comment_read(c)) for c in comments],
-        meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+        items=[
+            BlogCommentRead.model_validate(blog_service.to_comment_read(c))
+            for c in comments
+        ],
+        meta=PaginationMeta(
+            total_items=total_items, total_pages=total_pages, page=page, limit=limit
+        ),
     )
 
 
-@router.get("/posts/{slug}/comment-threads", response_model=BlogCommentThreadListResponse)
+@router.get(
+    "/posts/{slug}/comment-threads", response_model=BlogCommentThreadListResponse
+)
 async def list_blog_comment_threads(
     slug: str,
     session: AsyncSession = Depends(get_session),
@@ -469,7 +571,9 @@ async def list_blog_comment_threads(
 ) -> BlogCommentThreadListResponse:
     post = await blog_service.get_published_post(session, slug=slug, lang=None)
     if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
 
     threads, total_threads, total_comments = await blog_service.list_comment_threads(
         session, content_block_id=post.id, page=page, limit=limit, sort=sort
@@ -479,11 +583,16 @@ async def list_blog_comment_threads(
         items=[
             BlogCommentThreadRead(
                 root=BlogCommentRead.model_validate(blog_service.to_comment_read(root)),
-                replies=[BlogCommentRead.model_validate(blog_service.to_comment_read(r)) for r in replies],
+                replies=[
+                    BlogCommentRead.model_validate(blog_service.to_comment_read(r))
+                    for r in replies
+                ],
             )
             for root, replies in threads
         ],
-        meta=PaginationMeta(total_items=total_threads, total_pages=total_pages, page=page, limit=limit),
+        meta=PaginationMeta(
+            total_items=total_threads, total_pages=total_pages, page=page, limit=limit
+        ),
         total_comments=total_comments,
     )
 
@@ -496,8 +605,12 @@ async def get_blog_comment_subscription(
 ) -> dict:
     post = await blog_service.get_published_post(session, slug=slug, lang=None)
     if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    enabled = await blog_service.is_comment_subscription_enabled(session, content_block_id=post.id, user_id=current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+    enabled = await blog_service.is_comment_subscription_enabled(
+        session, content_block_id=post.id, user_id=current_user.id
+    )
     return {"enabled": enabled}
 
 
@@ -510,9 +623,14 @@ async def set_blog_comment_subscription(
 ) -> dict:
     post = await blog_service.get_published_post(session, slug=slug, lang=None)
     if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
     enabled = await blog_service.set_comment_subscription(
-        session, content_block_id=post.id, user_id=current_user.id, enabled=bool(payload.enabled)
+        session,
+        content_block_id=post.id,
+        user_id=current_user.id,
+        enabled=bool(payload.enabled),
     )
     return {"enabled": enabled}
 
@@ -531,11 +649,17 @@ async def list_my_blog_comments(
     total_pages = (total_items + limit - 1) // limit if total_items else 1
     return BlogMyCommentListResponse(
         items=[BlogMyCommentRead.model_validate(item) for item in items],
-        meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+        meta=PaginationMeta(
+            total_items=total_items, total_pages=total_pages, page=page, limit=limit
+        ),
     )
 
 
-@router.post("/posts/{slug}/comments", response_model=BlogCommentRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/posts/{slug}/comments",
+    response_model=BlogCommentRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_blog_comment(
     slug: str,
     payload: BlogCommentCreate,
@@ -546,8 +670,12 @@ async def create_blog_comment(
 ) -> BlogCommentRead:
     post = await blog_service.get_published_post(session, slug=slug, lang=None)
     if not post:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    await captcha_service.verify(payload.captcha_token, remote_ip=request.client.host if request.client else None)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post not found"
+        )
+    await captcha_service.verify(
+        payload.captcha_token, remote_ip=request.client.host if request.client else None
+    )
     comment = await blog_service.create_comment(
         session,
         content_block_id=post.id,
@@ -561,7 +689,10 @@ async def create_blog_comment(
         snippet = (snippet[:400] + "…") if len(snippet) > 400 else snippet
 
         admins = await session.execute(
-            sa.select(User).where(User.role.in_([UserRole.admin, UserRole.owner]), User.notify_blog_comments.is_(True))
+            sa.select(User).where(
+                User.role.in_([UserRole.admin, UserRole.owner]),
+                User.notify_blog_comments.is_(True),
+            )
         )
         for admin in admins.scalars().all():
             if not admin.email:
@@ -615,7 +746,9 @@ async def create_blog_comment(
                 )
 
         if payload.parent_id is None:
-            subscribers = await blog_service.list_comment_subscription_recipients(session, content_block_id=post.id)
+            subscribers = await blog_service.list_comment_subscription_recipients(
+                session, content_block_id=post.id
+            )
             for subscriber in subscribers:
                 if not subscriber.email:
                     continue
@@ -639,18 +772,26 @@ async def delete_blog_comment(
     current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ) -> None:
-    await blog_service.soft_delete_comment(session, comment_id=comment_id, actor=current_user)
+    await blog_service.soft_delete_comment(
+        session, comment_id=comment_id, actor=current_user
+    )
     return None
 
 
-@router.post("/comments/{comment_id}/flag", response_model=BlogCommentFlagRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/comments/{comment_id}/flag",
+    response_model=BlogCommentFlagRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def flag_blog_comment(
     comment_id: uuid.UUID,
     payload: BlogCommentFlagCreate,
     current_user: User = Depends(require_complete_profile),
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentFlagRead:
-    flag = await blog_service.flag_comment(session, comment_id=comment_id, actor=current_user, reason=payload.reason)
+    flag = await blog_service.flag_comment(
+        session, comment_id=comment_id, actor=current_user, reason=payload.reason
+    )
     return BlogCommentFlagRead.model_validate(blog_service.to_flag_read(flag))
 
 
@@ -661,11 +802,15 @@ async def list_flagged_blog_comments(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=50),
 ) -> BlogCommentAdminListResponse:
-    items, total_items = await blog_service.list_flagged_comments(session, page=page, limit=limit)
+    items, total_items = await blog_service.list_flagged_comments(
+        session, page=page, limit=limit
+    )
     total_pages = (total_items + limit - 1) // limit if total_items else 1
     return BlogCommentAdminListResponse(
         items=[BlogCommentAdminRead.model_validate(item) for item in items],
-        meta=PaginationMeta(total_items=total_items, total_pages=total_pages, page=page, limit=limit),
+        meta=PaginationMeta(
+            total_items=total_items, total_pages=total_pages, page=page, limit=limit
+        ),
     )
 
 
@@ -677,10 +822,18 @@ async def hide_blog_comment(
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentAdminRead:
     comment = await blog_service.set_comment_hidden(
-        session, comment_id=comment_id, actor=admin_user, hidden=True, reason=payload.reason
+        session,
+        comment_id=comment_id,
+        actor=admin_user,
+        hidden=True,
+        reason=payload.reason,
     )
-    post_key = await session.scalar(sa.select(ContentBlock.key).where(ContentBlock.id == comment.content_block_id))
-    return BlogCommentAdminRead.model_validate(blog_service.to_comment_admin_read(comment, post_key=str(post_key or "")))
+    post_key = await session.scalar(
+        sa.select(ContentBlock.key).where(ContentBlock.id == comment.content_block_id)
+    )
+    return BlogCommentAdminRead.model_validate(
+        blog_service.to_comment_admin_read(comment, post_key=str(post_key or ""))
+    )
 
 
 @router.post("/admin/comments/{comment_id}/unhide", response_model=BlogCommentAdminRead)
@@ -689,16 +842,26 @@ async def unhide_blog_comment(
     admin_user: User = Depends(require_admin_section("content")),
     session: AsyncSession = Depends(get_session),
 ) -> BlogCommentAdminRead:
-    comment = await blog_service.set_comment_hidden(session, comment_id=comment_id, actor=admin_user, hidden=False)
-    post_key = await session.scalar(sa.select(ContentBlock.key).where(ContentBlock.id == comment.content_block_id))
-    return BlogCommentAdminRead.model_validate(blog_service.to_comment_admin_read(comment, post_key=str(post_key or "")))
+    comment = await blog_service.set_comment_hidden(
+        session, comment_id=comment_id, actor=admin_user, hidden=False
+    )
+    post_key = await session.scalar(
+        sa.select(ContentBlock.key).where(ContentBlock.id == comment.content_block_id)
+    )
+    return BlogCommentAdminRead.model_validate(
+        blog_service.to_comment_admin_read(comment, post_key=str(post_key or ""))
+    )
 
 
-@router.post("/admin/comments/{comment_id}/resolve-flags", response_model=dict[str, int])
+@router.post(
+    "/admin/comments/{comment_id}/resolve-flags", response_model=dict[str, int]
+)
 async def resolve_blog_comment_flags(
     comment_id: uuid.UUID,
     admin_user: User = Depends(require_admin_section("content")),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, int]:
-    resolved = await blog_service.resolve_comment_flags(session, comment_id=comment_id, actor=admin_user)
+    resolved = await blog_service.resolve_comment_flags(
+        session, comment_id=comment_id, actor=admin_user
+    )
     return {"resolved": resolved}

@@ -20,10 +20,25 @@ import { ClarityService } from './core/clarity.service';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, HeaderComponent, FooterComponent, ContainerComponent, CmsGlobalSectionBlocksComponent, ToastComponent],
+  imports: [
+    RouterOutlet,
+    HeaderComponent,
+    FooterComponent,
+    ContainerComponent,
+    CmsGlobalSectionBlocksComponent,
+    ToastComponent,
+  ],
   template: `
-    <a class="skip-link" href="#main-content" aria-label="Skip to main content" data-skip-link="true">Skip to main content</a>
-    <div class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors">
+    <a
+      class="skip-link"
+      href="#main-content"
+      aria-label="Skip to main content"
+      data-skip-link="true"
+      >Skip to main content</a
+    >
+    <div
+      class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors"
+    >
       <app-header
         [themePreference]="preference()"
         [language]="language()"
@@ -50,7 +65,7 @@ import { ClarityService } from './core/clarity.service';
       <app-footer></app-footer>
     </div>
     <app-toast [messages]="toasts()"></app-toast>
-  `
+  `,
 })
 export class AppComponent implements OnDestroy {
   toasts = this.toast.messages();
@@ -72,7 +87,7 @@ export class AppComponent implements OnDestroy {
     private readonly clarity: ClarityService,
     private readonly httpErrors: HttpErrorBusService,
     private readonly routeHeadingFocus: RouteHeadingFocusService,
-    private readonly routeRobots: RouteRobotsService
+    private readonly routeRobots: RouteRobotsService,
   ) {
     // Language is handled by LanguageService (localStorage + preferred_language + browser fallback).
     // Revalidate any persisted session on startup to avoid "logged in but unauthorized" UI states.
@@ -109,7 +124,10 @@ export class AppComponent implements OnDestroy {
   onThemeChange(pref: ThemePreference): void {
     this.theme.setPreference(pref);
     const mode = this.theme.mode()().toUpperCase();
-    this.toast.success(this.translate.instant('theme.switched'), this.translate.instant('theme.now', { mode }));
+    this.toast.success(
+      this.translate.instant('theme.switched'),
+      this.translate.instant('theme.now', { mode }),
+    );
   }
 
   onLanguageChange(lang: string): void {
@@ -128,7 +146,7 @@ export class AppComponent implements OnDestroy {
       this.lastGlobalNetworkToastAt = now;
       this.toast.error(
         this.translate.instant('errors.network.title'),
-        this.translate.instant('errors.network.body')
+        this.translate.instant('errors.network.body'),
       );
       return;
     }
@@ -138,9 +156,8 @@ export class AppComponent implements OnDestroy {
       this.lastGlobalServerToastAt = now;
       this.toast.error(
         this.translate.instant('errors.server.title'),
-        this.translate.instant('errors.server.body')
+        this.translate.instant('errors.server.body'),
       );
     }
   }
 }
-

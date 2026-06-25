@@ -34,7 +34,9 @@ def upgrade() -> None:
     now = datetime.now(timezone.utc)
     is_postgres = conn.dialect.name == "postgresql"
 
-    content_status = postgresql.ENUM("draft", "review", "published", name="contentstatus", create_type=False)
+    content_status = postgresql.ENUM(
+        "draft", "review", "published", name="contentstatus", create_type=False
+    )
     draft_status = sa.text("'draft'::contentstatus") if is_postgres else "draft"
 
     content_blocks = sa.table(
@@ -85,7 +87,12 @@ def upgrade() -> None:
         current_version = int(row.get("version") or 1)
         conn.execute(
             sa.update(versions)
-            .where(sa.and_(versions.c.content_block_id == row["id"], versions.c.version == current_version))
+            .where(
+                sa.and_(
+                    versions.c.content_block_id == row["id"],
+                    versions.c.version == current_version,
+                )
+            )
             .values(meta=meta, status=draft_status)
         )
 
@@ -93,4 +100,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: un-hiding pages would be a user decision.
     return
-

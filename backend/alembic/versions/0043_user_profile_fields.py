@@ -21,8 +21,12 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("first_name", sa.String(length=100), nullable=True))
-    op.add_column("users", sa.Column("middle_name", sa.String(length=100), nullable=True))
+    op.add_column(
+        "users", sa.Column("first_name", sa.String(length=100), nullable=True)
+    )
+    op.add_column(
+        "users", sa.Column("middle_name", sa.String(length=100), nullable=True)
+    )
     op.add_column("users", sa.Column("last_name", sa.String(length=100), nullable=True))
     op.add_column("users", sa.Column("date_of_birth", sa.Date(), nullable=True))
 

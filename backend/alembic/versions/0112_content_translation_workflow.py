@@ -21,15 +21,24 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "content_blocks",
-        sa.Column("needs_translation_en", sa.Boolean(), server_default=sa.false(), nullable=False),
+        sa.Column(
+            "needs_translation_en",
+            sa.Boolean(),
+            server_default=sa.false(),
+            nullable=False,
+        ),
     )
     op.add_column(
         "content_blocks",
-        sa.Column("needs_translation_ro", sa.Boolean(), server_default=sa.false(), nullable=False),
+        sa.Column(
+            "needs_translation_ro",
+            sa.Boolean(),
+            server_default=sa.false(),
+            nullable=False,
+        ),
     )
 
 
 def downgrade() -> None:
     op.drop_column("content_blocks", "needs_translation_ro")
     op.drop_column("content_blocks", "needs_translation_en")
-

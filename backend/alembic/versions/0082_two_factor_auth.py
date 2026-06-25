@@ -20,11 +20,24 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "users",
-        sa.Column("two_factor_enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column(
+            "two_factor_enabled",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
     )
-    op.add_column("users", sa.Column("two_factor_totp_secret", sa.String(length=512), nullable=True))
-    op.add_column("users", sa.Column("two_factor_recovery_codes", sa.JSON(), nullable=True))
-    op.add_column("users", sa.Column("two_factor_confirmed_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "users",
+        sa.Column("two_factor_totp_secret", sa.String(length=512), nullable=True),
+    )
+    op.add_column(
+        "users", sa.Column("two_factor_recovery_codes", sa.JSON(), nullable=True)
+    )
+    op.add_column(
+        "users",
+        sa.Column("two_factor_confirmed_at", sa.DateTime(timezone=True), nullable=True),
+    )
 
 
 def downgrade() -> None:
@@ -32,4 +45,3 @@ def downgrade() -> None:
     op.drop_column("users", "two_factor_recovery_codes")
     op.drop_column("users", "two_factor_totp_secret")
     op.drop_column("users", "two_factor_enabled")
-

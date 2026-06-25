@@ -53,14 +53,20 @@ def _make_rsa_keypair() -> tuple[str, str]:
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("utf-8")
-    public_pem = private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode("utf-8")
+    public_pem = (
+        private_key.public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        .decode("utf-8")
+    )
     return private_pem, public_pem
 
 
-def _sign_verification_token(*, private_pem: str, pos_signature: str, payload: bytes) -> str:
+def _sign_verification_token(
+    *, private_pem: str, pos_signature: str, payload: bytes
+) -> str:
     payload_hash = base64.b64encode(hashlib.sha512(payload).digest()).decode("ascii")
     claims = {
         "iss": "NETOPIA Payments",
@@ -73,7 +79,10 @@ def _sign_verification_token(*, private_pem: str, pos_signature: str, payload: b
 
 def test_netopia_webhook_rejects_missing_header(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
-    res = client.post("/api/v1/payments/netopia/webhook", json={"order": {"orderID": "x"}, "payment": {"status": 3}})
+    res = client.post(
+        "/api/v1/payments/netopia/webhook",
+        json={"order": {"orderID": "x"}, "payment": {"status": 3}},
+    )
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["errorType"] == 2
@@ -81,7 +90,9 @@ def test_netopia_webhook_rejects_missing_header(test_app: Dict[str, object]) -> 
     assert body["errorMessage"] == "Missing Netopia verification token"
 
 
-def test_netopia_webhook_marks_order_captured(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_netopia_webhook_marks_order_captured(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
     monkeypatch.setattr(settings, "netopia_enabled", True)
     monkeypatch.setattr(settings, "netopia_pos_signature", "SIG-TEST")
     private_pem, public_pem = _make_rsa_keypair()
@@ -94,8 +105,12 @@ def test_netopia_webhook_marks_order_captured(monkeypatch: pytest.MonkeyPatch, t
         "order": {"orderID": str(order_id)},
         "payment": {"status": 3, "ntpID": "ntp_test_1", "message": "OK"},
     }
-    payload = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    token = _sign_verification_token(private_pem=private_pem, pos_signature="SIG-TEST", payload=payload)
+    payload = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+    token = _sign_verification_token(
+        private_pem=private_pem, pos_signature="SIG-TEST", payload=payload
+    )
 
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory: Callable = test_app["session_factory"]  # type: ignore[assignment]
@@ -142,8 +157,17 @@ def test_netopia_webhook_marks_order_captured(monkeypatch: pytest.MonkeyPatch, t
                 .scalars()
                 .one()
             )
-            captured = any(evt.event == "payment_captured" for evt in (order.events or []))
-            last_note = next((evt.note for evt in reversed(order.events or []) if evt.event == "payment_captured"), None)
+            captured = any(
+                evt.event == "payment_captured" for evt in (order.events or [])
+            )
+            last_note = next(
+                (
+                    evt.note
+                    for evt in reversed(order.events or [])
+                    if evt.event == "payment_captured"
+                ),
+                None,
+            )
             return order.status, captured, last_note
 
     status_val, captured, note = asyncio.run(fetch())
@@ -152,7 +176,9 @@ def test_netopia_webhook_marks_order_captured(monkeypatch: pytest.MonkeyPatch, t
     assert note and "Netopia" in note
 
 
-def test_netopia_webhook_uses_env_specific_keys(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_netopia_webhook_uses_env_specific_keys(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
     monkeypatch.setattr(settings, "netopia_enabled", True)
     monkeypatch.setattr(settings, "netopia_env", "live")
     monkeypatch.setattr(settings, "netopia_pos_signature_live", "SIG-LIVE")
@@ -171,8 +197,12 @@ def test_netopia_webhook_uses_env_specific_keys(monkeypatch: pytest.MonkeyPatch,
         "order": {"orderID": str(order_id)},
         "payment": {"status": 3, "ntpID": "ntp_live_1", "message": "OK"},
     }
-    payload = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    token = _sign_verification_token(private_pem=private_live, pos_signature="SIG-LIVE", payload=payload)
+    payload = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+    token = _sign_verification_token(
+        private_pem=private_live, pos_signature="SIG-LIVE", payload=payload
+    )
 
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     session_factory: Callable = test_app["session_factory"]  # type: ignore[assignment]
@@ -208,10 +238,14 @@ def test_netopia_webhook_uses_env_specific_keys(monkeypatch: pytest.MonkeyPatch,
 
     # Sanity check: the legacy keypair would not validate the token we signed above.
     with pytest.raises(PyJWTError):
-        jwt.decode(token, public_legacy, algorithms=["RS512"], options={"verify_aud": False})
+        jwt.decode(
+            token, public_legacy, algorithms=["RS512"], options={"verify_aud": False}
+        )
 
 
-def test_netopia_webhook_rejects_payload_hash_mismatch(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_netopia_webhook_rejects_payload_hash_mismatch(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
     monkeypatch.setattr(settings, "netopia_enabled", True)
     monkeypatch.setattr(settings, "netopia_pos_signature", "SIG-TEST")
     private_pem, public_pem = _make_rsa_keypair()
@@ -220,8 +254,12 @@ def test_netopia_webhook_rejects_payload_hash_mismatch(monkeypatch: pytest.Monke
     monkeypatch.setattr(settings, "netopia_jwt_alg", "RS512")
 
     payload_obj = {"order": {"orderID": "x"}, "payment": {"status": 3}}
-    payload = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    token = _sign_verification_token(private_pem=private_pem, pos_signature="SIG-TEST", payload=payload)
+    payload = json.dumps(payload_obj, separators=(",", ":"), sort_keys=True).encode(
+        "utf-8"
+    )
+    token = _sign_verification_token(
+        private_pem=private_pem, pos_signature="SIG-TEST", payload=payload
+    )
 
     tampered = payload.replace(b"3", b"5")
 

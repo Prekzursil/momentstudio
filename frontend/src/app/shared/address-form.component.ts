@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, OnDestroy, Output, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { AddressCreateRequest } from '../core/account.service';
@@ -15,7 +23,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
   template: `
     <form #addrForm="ngForm" class="grid gap-3" (ngSubmit)="submit(addrForm)">
       <div *ngIf="addressAutocompleteEnabled" class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.autocomplete.label' | translate }}</label>
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{
+          'addressForm.autocomplete.label' | translate
+        }}</label>
         <div class="relative">
           <input
             class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
@@ -39,11 +49,15 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             </button>
           </div>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'addressForm.autocomplete.poweredBy' | translate }}</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          {{ 'addressForm.autocomplete.poweredBy' | translate }}
+        </p>
       </div>
 
       <div class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.label' | translate }}</label>
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{
+          'addressForm.label' | translate
+        }}</label>
         <div class="grid gap-2 sm:grid-cols-2 min-w-0">
           <select
             class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -70,7 +84,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
       </div>
 
       <div class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'auth.phone' | translate }}</label>
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{
+          'auth.phone' | translate
+        }}</label>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
           <select
             class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -78,19 +94,25 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             [(ngModel)]="phoneCountry"
             (ngModelChange)="onPhoneChanged()"
           >
-            <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.dial }} {{ c.name }}</option>
+            <option *ngFor="let c of countries" [value]="c.code">
+              {{ c.flag }} {{ c.dial }} {{ c.name }}
+            </option>
           </select>
           <input
             #phoneCtrl="ngModel"
             type="tel"
             class="w-full min-w-0 rounded-lg border bg-white px-3 py-2 text-slate-900 shadow-sm dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             [ngClass]="
-              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) || (phoneNational && !phoneE164())
+              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) ||
+              (phoneNational && !phoneE164())
                 ? 'border-rose-300 ring-2 ring-rose-200 dark:border-rose-900/40 dark:ring-rose-900/30'
                 : 'border-slate-200 dark:border-slate-700'
             "
             [attr.aria-invalid]="
-              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) || (phoneNational && !phoneE164()) ? 'true' : null
+              (phoneCtrl.invalid && (phoneCtrl.touched || addrForm.submitted)) ||
+              (phoneNational && !phoneE164())
+                ? 'true'
+                : null
             "
             aria-describedby="address-phone-invalid"
             name="phoneNational"
@@ -101,7 +123,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             pattern="^[0-9]{6,14}$"
           />
         </div>
-        <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'auth.phoneHint' | translate }}</span>
+        <span class="text-xs text-slate-500 dark:text-slate-400">{{
+          'auth.phoneHint' | translate
+        }}</span>
         <span
           *ngIf="phoneNational && !phoneE164()"
           id="address-phone-invalid"
@@ -111,7 +135,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
         </span>
       </div>
       <div class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.line1' | translate }} <span class="text-rose-600">*</span></label>
+        <label class="font-medium text-slate-700 dark:text-slate-200"
+          >{{ 'addressForm.line1' | translate }} <span class="text-rose-600">*</span></label
+        >
         <input
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
           name="line1"
@@ -120,10 +146,17 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           maxlength="200"
           required
         />
-        <p *ngIf="addrForm.submitted && addrForm.controls.line1?.invalid" class="text-xs text-rose-700 dark:text-rose-300">{{ 'validation.required' | translate }}</p>
+        <p
+          *ngIf="addrForm.submitted && addrForm.controls.line1?.invalid"
+          class="text-xs text-rose-700 dark:text-rose-300"
+        >
+          {{ 'validation.required' | translate }}
+        </p>
       </div>
       <div class="grid gap-1 text-sm">
-        <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'addressForm.line2' | translate }}</label>
+        <label class="font-medium text-slate-700 dark:text-slate-200">{{
+          'addressForm.line2' | translate
+        }}</label>
         <input
           class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
           name="line2"
@@ -134,7 +167,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
       </div>
       <div class="grid gap-3 sm:grid-cols-2">
         <div class="grid gap-1 text-sm">
-          <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.city' | translate }} <span class="text-rose-600">*</span></label>
+          <label class="font-medium text-slate-700 dark:text-slate-200"
+            >{{ 'checkout.city' | translate }} <span class="text-rose-600">*</span></label
+          >
           <input
             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="city"
@@ -144,11 +179,17 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             maxlength="100"
             required
           />
-          <p *ngIf="addrForm.submitted && addrForm.controls.city?.invalid" class="text-xs text-rose-700 dark:text-rose-300">{{ 'validation.required' | translate }}</p>
+          <p
+            *ngIf="addrForm.submitted && addrForm.controls.city?.invalid"
+            class="text-xs text-rose-700 dark:text-rose-300"
+          >
+            {{ 'validation.required' | translate }}
+          </p>
         </div>
         <div class="grid gap-1 text-sm">
           <label class="font-medium text-slate-700 dark:text-slate-200"
-            >{{ 'checkout.region' | translate }} <span *ngIf="model.country === 'RO'" class="text-rose-600">*</span></label
+            >{{ 'checkout.region' | translate }}
+            <span *ngIf="model.country === 'RO'" class="text-rose-600">*</span></label
           >
           <ng-container *ngIf="model.country === 'RO'; else freeRegion">
             <select
@@ -175,7 +216,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
       </div>
       <div class="grid gap-3 sm:grid-cols-2">
         <div class="grid gap-1 text-sm">
-          <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.postal' | translate }} <span class="text-rose-600">*</span></label>
+          <label class="font-medium text-slate-700 dark:text-slate-200"
+            >{{ 'checkout.postal' | translate }} <span class="text-rose-600">*</span></label
+          >
           <input
             class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
             name="postal_code"
@@ -186,7 +229,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             maxlength="20"
             required
           />
-          <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'addressForm.postalHint' | translate : { example: postalExample } }}</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400">
+            {{ 'addressForm.postalHint' | translate: { example: postalExample } }}
+          </p>
           <p
             *ngIf="addrForm.submitted && addrForm.controls.postal_code?.errors?.required"
             class="text-xs text-rose-700 dark:text-rose-300"
@@ -201,7 +246,9 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
           </p>
         </div>
         <div class="grid gap-1 text-sm">
-          <label class="font-medium text-slate-700 dark:text-slate-200">{{ 'checkout.country' | translate }} <span class="text-rose-600">*</span></label>
+          <label class="font-medium text-slate-700 dark:text-slate-200"
+            >{{ 'checkout.country' | translate }} <span class="text-rose-600">*</span></label
+          >
           <select
             class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             name="country"
@@ -213,7 +260,12 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
             <option value="">{{ 'checkout.countrySelect' | translate }}</option>
             <option *ngFor="let c of countries" [value]="c.code">{{ c.flag }} {{ c.name }}</option>
           </select>
-          <p *ngIf="addrForm.submitted && addrForm.controls.country?.invalid" class="text-xs text-rose-700 dark:text-rose-300">{{ 'validation.required' | translate }}</p>
+          <p
+            *ngIf="addrForm.submitted && addrForm.controls.country?.invalid"
+            class="text-xs text-rose-700 dark:text-rose-300"
+          >
+            {{ 'validation.required' | translate }}
+          </p>
         </div>
       </div>
       <datalist id="roCities">
@@ -221,7 +273,11 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
       </datalist>
       <div class="grid gap-2 pt-2">
         <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-          <input type="checkbox" name="is_default_shipping" [(ngModel)]="model.is_default_shipping" />
+          <input
+            type="checkbox"
+            name="is_default_shipping"
+            [(ngModel)]="model.is_default_shipping"
+          />
           <span>{{ 'addressForm.defaultShipping' | translate }}</span>
         </label>
         <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
@@ -238,18 +294,23 @@ import { RO_CITIES, RO_COUNTIES } from './ro-geo';
         </button>
       </div>
       <div [ngClass]="stickyActions ? stickyActionsClass : normalActionsClass">
-        <app-button type="button" variant="ghost" [label]="'addressForm.cancel' | translate" (action)="cancel.emit()"></app-button>
+        <app-button
+          type="button"
+          variant="ghost"
+          [label]="'addressForm.cancel' | translate"
+          (action)="cancel.emit()"
+        ></app-button>
         <app-button type="submit" [label]="'addressForm.save' | translate"></app-button>
       </div>
     </form>
-  `
+  `,
 })
 export class AddressFormComponent implements OnChanges, OnDestroy {
   @Input() model: AddressCreateRequest = {
     line1: '',
     city: '',
     postal_code: '',
-    country: 'RO'
+    country: 'RO',
   };
   @Input() stickyActions = false;
   readonly roCounties = RO_COUNTIES;
@@ -305,14 +366,16 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   }
 
   get postalExample(): string {
-    const country = String(this.model?.country || '').trim().toUpperCase();
+    const country = String(this.model?.country || '')
+      .trim()
+      .toUpperCase();
     return (
       {
         RO: '123456',
         US: '12345',
         CA: 'A1A 1A1',
         GB: 'SW1A 1AA',
-        DE: '12345'
+        DE: '12345',
       }[country] || '12345'
     );
   }
@@ -330,14 +393,16 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   }
 
   get postalPattern(): string | null {
-    const country = String(this.model?.country || '').trim().toUpperCase();
+    const country = String(this.model?.country || '')
+      .trim()
+      .toUpperCase();
     return (
       {
         US: '^\\d{5}(-\\d{4})?$',
         CA: '^[A-Za-z]\\d[A-Za-z][ -]?\\d[A-Za-z]\\d$',
         GB: '^[A-Za-z]{1,2}\\d[A-Za-z\\d]? ?\\d[A-Za-z]{2}$',
         RO: '^\\d{6}$',
-        DE: '^\\d{5}$'
+        DE: '^\\d{5}$',
       }[country] || '^[A-Za-z0-9 -]{3,12}$'
     );
   }
@@ -431,24 +496,27 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
   }
 
   private async fetchAutocomplete(query: string): Promise<void> {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     this.autocompleteAbort?.abort();
     const controller = new AbortController();
     this.autocompleteAbort = controller;
 
-    const country = String(this.model?.country || '').trim().toLowerCase();
+    const country = String(this.model?.country || '')
+      .trim()
+      .toLowerCase();
     const params = new URLSearchParams({
       format: 'jsonv2',
       addressdetails: '1',
       limit: '6',
-      q: query
+      q: query,
     });
     if (country.length === 2) params.set('countrycodes', country);
 
     try {
       const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
         signal: controller.signal,
-        headers: { accept: 'application/json' }
+        headers: { accept: 'application/json' },
       });
       if (!resp.ok) {
         this.autocompleteResults = [];
@@ -461,7 +529,7 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
             .slice(0, 6)
             .map((it: any) => ({
               display_name: String(it.display_name || '').trim(),
-              address: typeof it.address === 'object' && it.address ? it.address : {}
+              address: typeof it.address === 'object' && it.address ? it.address : {},
             }))
             .filter((it) => it.display_name)
         : [];
@@ -478,4 +546,3 @@ export class AddressFormComponent implements OnChanges, OnDestroy {
     }
   }
 }
-

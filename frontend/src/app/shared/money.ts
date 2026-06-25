@@ -12,4 +12,3 @@ export function parseMoney(value: unknown): number {
   }
   return 0;
 }
-

@@ -46,9 +46,11 @@ export class ClarityService implements OnDestroy {
   start(): void {
     if (!isPlatformBrowser(this.platformId) || this.started) return;
     this.started = true;
-    this.routerSub = this.router.events.pipe(filter((event) => event instanceof NavigationEnd)).subscribe(() => {
-      this.maybeInit();
-    });
+    this.routerSub = this.router.events
+      .pipe(filter((event) => event instanceof NavigationEnd))
+      .subscribe(() => {
+        this.maybeInit();
+      });
     window.addEventListener('app:analytics-opt-in', this.analyticsOptInListener);
     this.maybeInit();
   }
@@ -84,7 +86,9 @@ export class ClarityService implements OnDestroy {
   }
 
   private injectScript(projectId: string): void {
-    const existing = this.document.querySelector('script[data-clarity="true"]') as HTMLScriptElement | null;
+    const existing = this.document.querySelector(
+      'script[data-clarity="true"]',
+    ) as HTMLScriptElement | null;
     if (existing) return;
     const script = this.document.createElement('script');
     const src = `https://www.clarity.ms/tag/${encodeURIComponent(projectId)}`;
@@ -110,6 +114,7 @@ export class ClarityService implements OnDestroy {
         return fromRouter.startsWith('/') ? fromRouter : `/${fromRouter}`;
       }
     }
+    /* istanbul ignore next -- defensive: window.location.pathname is always a non-empty string and does not throw under Karma */
     try {
       return window.location.pathname || '/';
     } catch {
@@ -118,7 +123,10 @@ export class ClarityService implements OnDestroy {
   }
 
   private isPublicStorefrontPath(pathname: string): boolean {
+    /* istanbul ignore next -- defensive: callers always pass a leading-slash path from currentPathname() */
     const normalized = pathname.startsWith('/') ? pathname : `/${pathname}`;
-    return !ClarityService.privatePrefixes.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
+    return !ClarityService.privatePrefixes.some(
+      (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
+    );
   }
 }

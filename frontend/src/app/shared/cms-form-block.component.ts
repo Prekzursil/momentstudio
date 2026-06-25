@@ -74,7 +74,11 @@ import { ContactSubmissionTopic, PageFormBlock } from './page-blocks';
               <button
                 type="submit"
                 class="h-11 px-5 rounded-xl bg-slate-900 text-white font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                [disabled]="newsletterLoading() || !newsletterForm.form.valid || (captchaEnabled && !newsletterCaptchaToken)"
+                [disabled]="
+                  newsletterLoading() ||
+                  !newsletterForm.form.valid ||
+                  (captchaEnabled && !newsletterCaptchaToken)
+                "
               >
                 {{ 'blog.newsletter.subscribe' | translate }}
               </button>
@@ -111,16 +115,28 @@ import { ContactSubmissionTopic, PageFormBlock } from './page-blocks';
                 [(ngModel)]="formTopic"
                 required
               >
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="contact">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="contact"
+                >
                   {{ 'contact.form.topicContact' | translate }}
                 </option>
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="support">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="support"
+                >
                   {{ 'contact.form.topicSupport' | translate }}
                 </option>
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="refund">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="refund"
+                >
                   {{ 'contact.form.topicRefund' | translate }}
                 </option>
-                <option class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100" value="dispute">
+                <option
+                  class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                  value="dispute"
+                >
                   {{ 'contact.form.topicDispute' | translate }}
                 </option>
               </select>
@@ -189,16 +205,24 @@ import { ContactSubmissionTopic, PageFormBlock } from './page-blocks';
               <button
                 type="submit"
                 class="h-11 px-5 rounded-xl bg-slate-900 text-white font-semibold shadow-sm hover:bg-slate-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
-                [disabled]="contactSubmitting() || !contactForm.form.valid || (captchaEnabled && !contactCaptchaToken)"
+                [disabled]="
+                  contactSubmitting() ||
+                  !contactForm.form.valid ||
+                  (captchaEnabled && !contactCaptchaToken)
+                "
               >
-                {{ contactSubmitting() ? ('contact.form.sending' | translate) : ('contact.form.submit' | translate) }}
+                {{
+                  contactSubmitting()
+                    ? ('contact.form.sending' | translate)
+                    : ('contact.form.submit' | translate)
+                }}
               </button>
             </div>
           </form>
         </ng-container>
       </ng-container>
     </div>
-  `
+  `,
 })
 export class CmsFormBlockComponent implements OnChanges {
   @Input({ required: true }) block!: PageFormBlock;
@@ -231,7 +255,7 @@ export class CmsFormBlockComponent implements OnChanges {
     private readonly auth: AuthService,
     private readonly support: SupportService,
     private readonly newsletter: NewsletterService,
-    private readonly translate: TranslateService
+    private readonly translate: TranslateService,
   ) {}
 
   ngOnChanges(): void {
@@ -263,7 +287,7 @@ export class CmsFormBlockComponent implements OnChanges {
       email: this.formEmail.trim(),
       message: this.formMessage.trim(),
       order_reference: this.formOrderRef.trim() ? this.formOrderRef.trim() : null,
-      captcha_token: this.contactCaptchaToken
+      captcha_token: this.contactCaptchaToken,
     };
 
     this.contactSubmitting.set(true);
@@ -272,7 +296,7 @@ export class CmsFormBlockComponent implements OnChanges {
       .pipe(
         finalize(() => {
           this.contactSubmitting.set(false);
-        })
+        }),
       )
       .subscribe({
         next: () => {
@@ -287,7 +311,7 @@ export class CmsFormBlockComponent implements OnChanges {
           this.contactError.set(msg);
           this.contactCaptchaToken = null;
           this.contactCaptcha?.reset();
-        }
+        },
       });
   }
 
@@ -311,7 +335,7 @@ export class CmsFormBlockComponent implements OnChanges {
       .pipe(
         finalize(() => {
           this.newsletterLoading.set(false);
-        })
+        }),
       )
       .subscribe({
         next: (res) => {
@@ -330,7 +354,7 @@ export class CmsFormBlockComponent implements OnChanges {
           this.newsletterError.set(msg);
           this.newsletterCaptchaToken = null;
           this.newsletterCaptcha?.reset();
-        }
+        },
       });
   }
 
@@ -358,4 +382,3 @@ export class CmsFormBlockComponent implements OnChanges {
     if (name) this.formName = name;
   }
 }
-

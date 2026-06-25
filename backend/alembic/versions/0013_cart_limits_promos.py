@@ -22,7 +22,9 @@ def upgrade() -> None:
     op.add_column("cart_items", sa.Column("max_quantity", sa.Integer(), nullable=True))
     op.create_table(
         "promo_codes",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
         sa.Column("code", sa.String(length=40), nullable=False, unique=True),
         sa.Column("percentage_off", sa.Numeric(5, 2), nullable=True),
         sa.Column("amount_off", sa.Numeric(10, 2), nullable=True),
@@ -30,7 +32,12 @@ def upgrade() -> None:
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("max_uses", sa.Integer(), nullable=True),
         sa.Column("times_used", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
     op.alter_column("promo_codes", "times_used", server_default=None)
 

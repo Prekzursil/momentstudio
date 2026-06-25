@@ -25,13 +25,31 @@ from app.services import media_dam
 logger = logging.getLogger(__name__)
 QUEUE_KEY = media_dam.QUEUE_KEY
 T = TypeVar("T")
-HEARTBEAT_PREFIX = str(getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat") or "media:workers:heartbeat")
-HEARTBEAT_TTL_SECONDS = max(10, int(getattr(settings, "media_dam_worker_heartbeat_ttl_seconds", 30) or 30))
-HEARTBEAT_FILE = str(getattr(settings, "media_dam_worker_heartbeat_file", "/tmp/media-worker-heartbeat.json") or "/tmp/media-worker-heartbeat.json")
-RETRY_SWEEP_SECONDS = max(5, int(getattr(settings, "media_dam_retry_sweep_seconds", 10) or 10))
-FALLBACK_JOB_BATCH_SIZE = max(1, int(getattr(settings, "media_dam_fallback_job_batch_size", 10) or 10))
-FALLBACK_STATS_LOG_SECONDS = max(5, int(getattr(settings, "media_dam_fallback_stats_log_seconds", 30) or 30))
-FALLBACK_MAX_SLEEP_SECONDS = max(1.0, float(getattr(settings, "media_dam_fallback_max_sleep_seconds", 5.0) or 5.0))
+HEARTBEAT_PREFIX = str(
+    getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat")
+    or "media:workers:heartbeat"
+)
+HEARTBEAT_TTL_SECONDS = max(
+    10, int(getattr(settings, "media_dam_worker_heartbeat_ttl_seconds", 30) or 30)
+)
+HEARTBEAT_FILE = str(
+    getattr(
+        settings, "media_dam_worker_heartbeat_file", "/tmp/media-worker-heartbeat.json"
+    )
+    or "/tmp/media-worker-heartbeat.json"
+)
+RETRY_SWEEP_SECONDS = max(
+    5, int(getattr(settings, "media_dam_retry_sweep_seconds", 10) or 10)
+)
+FALLBACK_JOB_BATCH_SIZE = max(
+    1, int(getattr(settings, "media_dam_fallback_job_batch_size", 10) or 10)
+)
+FALLBACK_STATS_LOG_SECONDS = max(
+    5, int(getattr(settings, "media_dam_fallback_stats_log_seconds", 30) or 30)
+)
+FALLBACK_MAX_SLEEP_SECONDS = max(
+    1.0, float(getattr(settings, "media_dam_fallback_max_sleep_seconds", 5.0) or 5.0)
+)
 
 
 async def _process_job_id(raw_job_id: str) -> None:
@@ -74,7 +92,9 @@ async def _process_queued_jobs_once(limit: int = FALLBACK_JOB_BATCH_SIZE) -> int
                 await media_dam.process_job_inline(session, job)
                 processed_count += 1
             except Exception:
-                logger.exception("media_worker_fallback_job_failed", extra={"job_id": str(job.id)})
+                logger.exception(
+                    "media_worker_fallback_job_failed", extra={"job_id": str(job.id)}
+                )
         return processed_count
 
 
@@ -97,7 +117,10 @@ def _write_heartbeat_file(payload: dict[str, object]) -> None:
         target = Path(HEARTBEAT_FILE)
         target.parent.mkdir(parents=True, exist_ok=True)
         temp = target.with_suffix(f"{target.suffix}.tmp")
-        temp.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+        temp.write_text(
+            json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+            encoding="utf-8",
+        )
         temp.replace(target)
     except Exception:
         logger.exception("media_worker_heartbeat_file_failed")
@@ -109,7 +132,13 @@ async def _publish_heartbeat(redis, *, worker_id: str) -> None:
     if redis is None:
         return
     key = f"{HEARTBEAT_PREFIX}:{worker_id}"
-    await _await_if_needed(redis.set(key, json.dumps(payload, separators=(",", ":"), ensure_ascii=False), ex=HEARTBEAT_TTL_SECONDS))
+    await _await_if_needed(
+        redis.set(
+            key,
+            json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+            ex=HEARTBEAT_TTL_SECONDS,
+        )
+    )
 
 
 def _normalize_job_id_candidate(raw: object) -> str | None:
@@ -133,7 +162,9 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
     redis = get_redis()
     worker_id = _worker_id()
     heartbeat_interval = max(5.0, float(HEARTBEAT_TTL_SECONDS) / 2.0)
-    bounded_sleep = min(FALLBACK_MAX_SLEEP_SECONDS, max(0.1, float(poll_interval_seconds)))
+    bounded_sleep = min(
+        FALLBACK_MAX_SLEEP_SECONDS, max(0.1, float(poll_interval_seconds))
+    )
     if redis is None:
         logger.warning(
             "media_worker_degraded_mode_started",
@@ -158,7 +189,9 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
                 if now - last_retry_sweep >= float(RETRY_SWEEP_SECONDS):
                     retry_enqueued_count += await _enqueue_due_retries_once(limit=100)
                     last_retry_sweep = now
-                processed_count += await _process_queued_jobs_once(limit=FALLBACK_JOB_BATCH_SIZE)
+                processed_count += await _process_queued_jobs_once(
+                    limit=FALLBACK_JOB_BATCH_SIZE
+                )
                 if now - last_stats_log >= float(FALLBACK_STATS_LOG_SECONDS):
                     logger.warning(
                         "media_worker_degraded_mode_stats",
@@ -173,7 +206,10 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                logger.exception("media_worker_degraded_mode_loop_error", extra={"worker_id": worker_id})
+                logger.exception(
+                    "media_worker_degraded_mode_loop_error",
+                    extra={"worker_id": worker_id},
+                )
                 await asyncio.sleep(bounded_sleep)
     logger.info("media_worker_started")
     last_heartbeat = 0.0
@@ -187,7 +223,9 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
             if now - last_retry_sweep >= float(RETRY_SWEEP_SECONDS):
                 await _enqueue_due_retries_once(limit=100)
                 last_retry_sweep = now
-            result = await _await_if_needed(redis.blpop([QUEUE_KEY], timeout=max(1, int(poll_interval_seconds))))
+            result = await _await_if_needed(
+                redis.blpop([QUEUE_KEY], timeout=max(1, int(poll_interval_seconds)))
+            )
             if not result:
                 continue
             _, raw = result

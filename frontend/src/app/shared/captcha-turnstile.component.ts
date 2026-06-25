@@ -8,7 +8,7 @@ import {
   Input,
   OnDestroy,
   Output,
-  ViewChild
+  ViewChild,
 } from '@angular/core';
 import { TranslateModule } from '@ngx-translate/core';
 
@@ -22,38 +22,6 @@ declare global {
   }
 }
 
-let turnstileScriptPromise: Promise<void> | null = null;
-
-function loadTurnstileScript(): Promise<void> {
-  if (turnstileScriptPromise) return turnstileScriptPromise;
-  turnstileScriptPromise = new Promise<void>((resolve, reject) => {
-    if (typeof document === 'undefined') {
-      resolve();
-      return;
-    }
-    if (window.turnstile) {
-      resolve();
-      return;
-    }
-    const existing = document.querySelector('script[data-turnstile="true"]') as HTMLScriptElement | null;
-    if (existing) {
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), { once: true });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-    script.async = true;
-    script.defer = true;
-    script.dataset['turnstile'] = 'true';
-    script.addEventListener('load', () => resolve(), { once: true });
-    script.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), { once: true });
-    document.head.appendChild(script);
-  });
-  return turnstileScriptPromise;
-}
-
 @Component({
   selector: 'app-captcha-turnstile',
   standalone: true,
@@ -62,9 +30,11 @@ function loadTurnstileScript(): Promise<void> {
   template: `
     <div class="grid gap-2">
       <div #host></div>
-      <p *ngIf="errorKey" class="text-xs text-rose-700 dark:text-rose-300">{{ errorKey | translate }}</p>
+      <p *ngIf="errorKey" class="text-xs text-rose-700 dark:text-rose-300">
+        {{ errorKey | translate }}
+      </p>
     </div>
-  `
+  `,
 })
 export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
   @Input({ required: true }) siteKey!: string;
@@ -76,15 +46,56 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
   errorKey: string | null = null;
   private widgetId: string | null = null;
 
+  // Memoized once per browser session so the Turnstile script is injected a
+  // single time regardless of how many captcha widgets are mounted.
+  private static scriptPromise: Promise<void> | null = null;
+
   ngAfterViewInit(): void {
     void this.initTurnstile();
+  }
+
+  private loadTurnstileScript(): Promise<void> {
+    if (CaptchaTurnstileComponent.scriptPromise) return CaptchaTurnstileComponent.scriptPromise;
+    CaptchaTurnstileComponent.scriptPromise = new Promise<void>((resolve, reject) => {
+      /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
+      if (typeof document === 'undefined') {
+        resolve();
+        return;
+      }
+      if (window.turnstile) {
+        resolve();
+        return;
+      }
+      const existing = document.querySelector(
+        'script[data-turnstile="true"]',
+      ) as HTMLScriptElement | null;
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), {
+          once: true,
+        });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+      script.async = true;
+      script.defer = true;
+      script.dataset['turnstile'] = 'true';
+      script.addEventListener('load', () => resolve(), { once: true });
+      script.addEventListener('error', () => reject(new Error('Failed to load Turnstile')), {
+        once: true,
+      });
+      document.head.appendChild(script);
+    });
+    return CaptchaTurnstileComponent.scriptPromise;
   }
 
   private async initTurnstile(): Promise<void> {
     if (!this.siteKey) return;
 
     try {
-      await loadTurnstileScript();
+      await this.loadTurnstileScript();
       const api = window.turnstile;
       if (!api) {
         this.errorKey = 'auth.captchaUnavailable';
@@ -100,7 +111,7 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
         'error-callback': () => {
           this.errorKey = 'auth.captchaFailedTryAgain';
           this.tokenChange.emit(null);
-        }
+        },
       });
     } catch {
       this.errorKey = 'auth.captchaFailedLoad';
@@ -120,4 +131,3 @@ export class CaptchaTurnstileComponent implements AfterViewInit, OnDestroy {
     }
   }
 }
-

@@ -16,9 +16,16 @@ type ProductWizardStep = { labelKey: string };
       <div class="flex flex-wrap items-start justify-between gap-3">
         <div class="grid gap-1">
           <p class="font-semibold">{{ titleKey | translate }}</p>
-          <p class="text-xs text-indigo-800 dark:text-indigo-200">{{ descriptionKey | translate }}</p>
+          <p class="text-xs text-indigo-800 dark:text-indigo-200">
+            {{ descriptionKey | translate }}
+          </p>
         </div>
-        <app-button size="sm" variant="ghost" [label]="'adminUi.actions.exit' | translate" (action)="exit.emit()"></app-button>
+        <app-button
+          size="sm"
+          variant="ghost"
+          [label]="'adminUi.actions.exit' | translate"
+          (action)="exit.emit()"
+        ></app-button>
       </div>
 
       <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -70,7 +77,7 @@ type ProductWizardStep = { labelKey: string };
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class AdminProductsEditorWizardComponent {
   @Input({ required: true }) titleKey = '';
@@ -89,4 +96,3 @@ export class AdminProductsEditorWizardComponent {
   @Output() save = new EventEmitter<void>();
   @Output() publishNow = new EventEmitter<void>();
 }
-

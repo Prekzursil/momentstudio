@@ -40,8 +40,12 @@ def upgrade() -> None:
     now = datetime.now(timezone.utc)
     is_postgres = conn.dialect.name == "postgresql"
 
-    content_status = postgresql.ENUM("draft", "published", name="contentstatus", create_type=False)
-    published_status = sa.text("'published'::contentstatus") if is_postgres else "published"
+    content_status = postgresql.ENUM(
+        "draft", "published", name="contentstatus", create_type=False
+    )
+    published_status = (
+        sa.text("'published'::contentstatus") if is_postgres else "published"
+    )
 
     content_blocks = sa.table(
         "content_blocks",
@@ -99,7 +103,9 @@ def upgrade() -> None:
         lang: str | None = None,
         translation_ro: tuple[str, str] | None = None,
     ) -> None:
-        existing = conn.execute(sa.select(content_blocks.c.id).where(content_blocks.c.key == key)).first()
+        existing = conn.execute(
+            sa.select(content_blocks.c.id).where(content_blocks.c.key == key)
+        ).first()
         if existing:
             return
 
@@ -135,7 +141,9 @@ def upgrade() -> None:
                     body_markdown=ro_body,
                 )
             )
-            translations_snapshot.append({"lang": "ro", "title": ro_title, "body_markdown": ro_body})
+            translations_snapshot.append(
+                {"lang": "ro", "title": ro_title, "body_markdown": ro_body}
+            )
 
         conn.execute(
             sa.insert(content_versions).values(

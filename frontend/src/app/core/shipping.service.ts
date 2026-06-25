@@ -65,4 +65,3 @@ export class ShippingService {
     return this.api.get<LockerCitySearchResponse>('/shipping/lockers/cities', params);
   }
 }
-

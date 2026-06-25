@@ -40,7 +40,9 @@ def upgrade() -> None:
     now = datetime.now(timezone.utc)
     is_postgres = conn.dialect.name == "postgresql"
 
-    content_status = postgresql.ENUM("draft", "review", "published", name="contentstatus", create_type=False)
+    content_status = postgresql.ENUM(
+        "draft", "review", "published", name="contentstatus", create_type=False
+    )
 
     content_blocks = sa.table(
         "content_blocks",
@@ -112,7 +114,9 @@ def upgrade() -> None:
     ) = row
 
     translation_row = conn.execute(
-        sa.select(translations.c.id, translations.c.title, translations.c.body_markdown).where(
+        sa.select(
+            translations.c.id, translations.c.title, translations.c.body_markdown
+        ).where(
             translations.c.content_block_id == block_id,
             translations.c.lang == "ro",
         )
@@ -129,7 +133,9 @@ def upgrade() -> None:
         ro_body = (ro_body or "").replace("\r\n", "\n")
     updated_body_ro = _strip_disclaimer(ro_body, DISCLAIMER_RO) if ro_body else ro_body
 
-    if updated_body_en == (current_body.strip() + "\n") and updated_body_ro == (ro_body.strip() + "\n" if ro_body else ro_body):
+    if updated_body_en == (current_body.strip() + "\n") and updated_body_ro == (
+        ro_body.strip() + "\n" if ro_body else ro_body
+    ):
         return
 
     new_version = int(current_version or 0) + 1
@@ -148,7 +154,9 @@ def upgrade() -> None:
 
     translations_snapshot: list[dict[str, object]] = []
     if ro_translation_id:
-        translations_snapshot.append({"lang": "ro", "title": ro_title or "", "body_markdown": updated_body_ro})
+        translations_snapshot.append(
+            {"lang": "ro", "title": ro_title or "", "body_markdown": updated_body_ro}
+        )
 
     conn.execute(
         sa.insert(versions).values(
@@ -171,4 +179,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Intentionally no-op: avoid overwriting user-edited CMS content.
     return
-

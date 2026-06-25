@@ -20,7 +20,9 @@ def upgrade() -> None:
     if backend == "postgresql":
         context = op.get_context()
         with context.autocommit_block():
-            op.execute("ALTER TYPE mediajobtype ADD VALUE IF NOT EXISTS 'usage_reconcile'")
+            op.execute(
+                "ALTER TYPE mediajobtype ADD VALUE IF NOT EXISTS 'usage_reconcile'"
+            )
 
 
 def downgrade() -> None:

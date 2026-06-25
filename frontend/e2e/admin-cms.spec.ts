@@ -14,7 +14,10 @@ async function loginAsOwner(page: Page): Promise<void> {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('lang', 'en');
-    localStorage.setItem('admin.onboarding.v1', JSON.stringify({ completed_at: new Date().toISOString() }));
+    localStorage.setItem(
+      'admin.onboarding.v1',
+      JSON.stringify({ completed_at: new Date().toISOString() }),
+    );
   });
 });
 
@@ -37,9 +40,13 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   });
   await Promise.all([aboutLoadEn, aboutLoadRo, page.goto('/admin/content/pages')]);
 
-  const staticPagesPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Static pages' }) });
+  const staticPagesPanel = page.locator('section', {
+    has: page.getByRole('heading', { name: 'Static pages' }),
+  });
   const aboutEditor = staticPagesPanel.locator('app-rich-editor').first();
-  const aboutField = aboutEditor.locator('[role="textbox"]:visible, textarea:visible, .ProseMirror:visible').first();
+  const aboutField = aboutEditor
+    .locator('[role="textbox"]:visible, textarea:visible, .ProseMirror:visible')
+    .first();
   await expect(aboutField).toBeVisible({ timeout: 30_000 });
   await aboutField.fill(marker);
 
@@ -61,7 +68,9 @@ test('owner can update About page via CMS and audit log records it', async ({ pa
   await expect(page.getByText(marker)).toBeVisible({ timeout: 30_000 });
 
   await page.goto('/admin/dashboard');
-  const auditPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Audit log' }) });
+  const auditPanel = page.locator('section', {
+    has: page.getByRole('heading', { name: 'Audit log' }),
+  });
   await auditPanel.getByLabel('Entity').selectOption('content');
   await auditPanel.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(auditPanel.getByText('page.about').first()).toBeVisible();
@@ -71,7 +80,9 @@ test('owner can toggle homepage sections via CMS', async ({ page }) => {
   await loginAsOwner(page);
 
   await page.goto('/admin/content/home');
-  const sectionsPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Homepage sections order' }) });
+  const sectionsPanel = page.locator('section', {
+    has: page.getByRole('heading', { name: 'Homepage sections order' }),
+  });
   await expect(sectionsPanel).toBeVisible();
 
   const featuredRow = sectionsPanel
@@ -86,7 +97,10 @@ test('owner can toggle homepage sections via CMS', async ({ page }) => {
       if (![200, 201].includes(resp.status())) return false;
       return ['PATCH', 'POST'].includes(resp.request().method());
     });
-    await Promise.all([saveSectionsResponse, sectionsPanel.getByRole('button', { name: 'Save' }).click()]);
+    await Promise.all([
+      saveSectionsResponse,
+      sectionsPanel.getByRole('button', { name: 'Save' }).click(),
+    ]);
   };
 
   const checkbox = featuredRow.locator('input[type="checkbox"]').first();
@@ -134,7 +148,10 @@ test('owner can create a published blog post from CMS', async ({ page }) => {
     if (![200, 201].includes(resp.status())) return false;
     return ['PATCH', 'POST'].includes(resp.request().method());
   });
-  await Promise.all([createPostResponse, page.getByRole('button', { name: 'Create post' }).click()]);
+  await Promise.all([
+    createPostResponse,
+    page.getByRole('button', { name: 'Create post' }).click(),
+  ]);
 
   await page.goto(`/blog/${slug}`);
   await expect(page.getByRole('heading', { name: title })).toBeVisible();

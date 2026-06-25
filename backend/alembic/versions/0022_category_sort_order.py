@@ -17,7 +17,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("categories", sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column(
+        "categories",
+        sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
+    )
     op.alter_column("categories", "sort_order", server_default=None)
 
 

@@ -18,10 +18,12 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("promo_codes", sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.true()))
+    op.add_column(
+        "promo_codes",
+        sa.Column("active", sa.Boolean(), nullable=False, server_default=sa.true()),
+    )
     op.alter_column("promo_codes", "active", server_default=None)
 
 
 def downgrade() -> None:
     op.drop_column("promo_codes", "active")
-

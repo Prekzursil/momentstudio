@@ -34,13 +34,16 @@ def upgrade() -> None:
     )
 
     row = conn.execute(
-        sa.select(content_blocks.c.id, content_blocks.c.meta).where(content_blocks.c.key == "site.social")
+        sa.select(content_blocks.c.id, content_blocks.c.meta).where(
+            content_blocks.c.key == "site.social"
+        )
     ).first()
     if row is None:
         return
 
     block_id, meta = row
     meta = meta or {}
+
     def update_pages(key: str) -> bool:
         local_changed = False
         pages = meta.get(key)

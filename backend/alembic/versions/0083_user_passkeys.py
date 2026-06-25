@@ -30,21 +30,31 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=120), nullable=True),
         sa.Column("credential_id", sa.String(length=255), nullable=False),
         sa.Column("public_key", sa.LargeBinary(), nullable=False),
-        sa.Column("sign_count", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "sign_count", sa.Integer(), nullable=False, server_default=sa.text("0")
+        ),
         sa.Column("aaguid", sa.String(length=64), nullable=True),
         sa.Column("credential_type", sa.String(length=32), nullable=True),
         sa.Column("device_type", sa.String(length=32), nullable=True),
-        sa.Column("backed_up", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "backed_up", sa.Boolean(), nullable=False, server_default=sa.text("false")
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("last_used_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint("credential_id", name="uq_user_passkeys_credential_id"),
     )
     op.create_index("ix_user_passkeys_user_id", "user_passkeys", ["user_id"])
-    op.create_index("ix_user_passkeys_credential_id", "user_passkeys", ["credential_id"])
+    op.create_index(
+        "ix_user_passkeys_credential_id", "user_passkeys", ["credential_id"]
+    )
 
 
 def downgrade() -> None:
     op.drop_index("ix_user_passkeys_credential_id", table_name="user_passkeys")
     op.drop_index("ix_user_passkeys_user_id", table_name="user_passkeys")
     op.drop_table("user_passkeys")
-

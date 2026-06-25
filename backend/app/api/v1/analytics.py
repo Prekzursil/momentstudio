@@ -78,8 +78,12 @@ async def mint_analytics_token(
 ) -> AnalyticsTokenResponse:
     session_id = _normalize_session_id(payload.session_id)
     if not session_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session_id")
-    ttl_seconds = int(getattr(settings, "analytics_token_ttl_seconds", 60 * 60 * 24) or 60 * 60 * 24)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session_id"
+        )
+    ttl_seconds = int(
+        getattr(settings, "analytics_token_ttl_seconds", 60 * 60 * 24) or 60 * 60 * 24
+    )
     token = analytics_tokens.create_analytics_token(session_id=session_id)
 
     # Best-effort: browsers may disconnect early.
@@ -101,11 +105,16 @@ async def ingest_analytics_event(
 ) -> AnalyticsEventIngestResponse:
     event = _normalize_event(payload.event)
     if not _EVENT_RE.match(event) or event not in _ALLOWED_EVENTS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported analytics event")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported analytics event",
+        )
 
     session_id = _normalize_session_id(payload.session_id)
     if not session_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session_id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing session_id"
+        )
 
     raw_token = (request.headers.get("x-analytics-token") or "").strip()
     if bool(getattr(settings, "analytics_require_token", False)):
@@ -115,13 +124,17 @@ async def ingest_analytics_event(
                 detail="Analytics token required",
                 headers={"X-Error-Code": "analytics_token_required"},
             )
-        if not analytics_tokens.validate_analytics_token(token=raw_token, session_id=session_id):
+        if not analytics_tokens.validate_analytics_token(
+            token=raw_token, session_id=session_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid analytics token",
                 headers={"X-Error-Code": "analytics_token_invalid"},
             )
-    elif raw_token and not analytics_tokens.validate_analytics_token(token=raw_token, session_id=session_id):
+    elif raw_token and not analytics_tokens.validate_analytics_token(
+        token=raw_token, session_id=session_id
+    ):
         raw_token = ""
 
     order_id: UUID | None = payload.order_id

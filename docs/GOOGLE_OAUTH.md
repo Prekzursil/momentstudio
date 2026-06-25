@@ -64,4 +64,3 @@ The login/register pages expose a “Continue with Google” button, which uses 
   - You configured the correct `GOOGLE_REDIRECT_URI` in `backend/.env`.
 - **Wrong callback port in local dev**: if the frontend runs on `4201` but `GOOGLE_REDIRECT_URI` is still `http://localhost:4200/...`, Google will redirect to the wrong origin.
 - **Consent screen / verification**: for external users, you may need to configure the OAuth consent screen and publish it (or add test users).
-

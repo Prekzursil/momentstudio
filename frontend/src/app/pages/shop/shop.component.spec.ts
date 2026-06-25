@@ -23,12 +23,25 @@ describe('ShopComponent i18n meta', () => {
       providers: [
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
-        { provide: CatalogService, useValue: { listProducts: () => of({ items: [], meta: null }), listCategories: () => of([]) } },
-        { provide: ActivatedRoute, useValue: { snapshot: { data: {}, queryParams: {} }, paramMap: of(convertToParamMap({})), queryParams: of({}) } },
+        {
+          provide: CatalogService,
+          useValue: {
+            listProducts: () => of({ items: [], meta: null }),
+            listCategories: () => of([]),
+          },
+        },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { data: {}, queryParams: {} },
+            paramMap: of(convertToParamMap({})),
+            queryParams: of({}),
+          },
+        },
         { provide: Router, useValue: { navigate: () => {} } },
         { provide: ToastService, useValue: { error: () => {} } },
-        { provide: DOCUMENT, useValue: doc }
-      ]
+        { provide: DOCUMENT, useValue: doc },
+      ],
     });
   });
 
@@ -43,10 +56,10 @@ describe('ShopComponent i18n meta', () => {
           metaTitle: 'EN title',
           metaDescription: 'EN desc',
           metaTitleCategory: 'EN title {{category}}',
-          metaDescriptionCategory: 'EN desc {{category}}'
-        }
+          metaDescriptionCategory: 'EN desc {{category}}',
+        },
       },
-      true
+      true,
     );
     translate.setTranslation(
       'ro',
@@ -55,10 +68,10 @@ describe('ShopComponent i18n meta', () => {
           metaTitle: 'RO title',
           metaDescription: 'RO desc',
           metaTitleCategory: 'RO title {{category}}',
-          metaDescriptionCategory: 'RO desc {{category}}'
-        }
+          metaDescriptionCategory: 'RO desc {{category}}',
+        },
       },
-      true
+      true,
     );
     translate.use('en');
 
@@ -69,7 +82,9 @@ describe('ShopComponent i18n meta', () => {
     expect(canonicalEn?.getAttribute('href')).toContain('/shop');
     expect(canonicalEn?.getAttribute('href')).not.toContain('lang=en');
     expect(doc.querySelectorAll('link[rel="alternate"][data-seo-managed="true"]').length).toBe(3);
-    expect((doc.querySelector('script#seo-route-schema-1')?.textContent || '')).toContain('"CollectionPage"');
+    expect(doc.querySelector('script#seo-route-schema-1')?.textContent || '').toContain(
+      '"CollectionPage"',
+    );
 
     meta.updateTag.calls.reset();
     title.setTitle.calls.reset();
@@ -77,7 +92,10 @@ describe('ShopComponent i18n meta', () => {
     cmp.categoriesBySlug.set('featured', { slug: 'featured', name: 'Featured' } as any);
     cmp.setMetaTags();
     expect(title.setTitle).toHaveBeenCalledWith('EN title Featured');
-    expect(meta.updateTag).toHaveBeenCalledWith({ name: 'description', content: 'EN desc Featured' });
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      name: 'description',
+      content: 'EN desc Featured',
+    });
 
     meta.updateTag.calls.reset();
     title.setTitle.calls.reset();
@@ -93,10 +111,12 @@ describe('ShopComponent i18n meta', () => {
   it('ignores stale product list responses when multiple loads overlap', () => {
     const first$ = new Subject<any>();
     const second$ = new Subject<any>();
-    const listProducts = jasmine.createSpy('listProducts').and.returnValues(first$.asObservable(), second$.asObservable());
+    const listProducts = jasmine
+      .createSpy('listProducts')
+      .and.returnValues(first$.asObservable(), second$.asObservable());
     const catalog = {
       listCategories: () => of([]),
-      listProducts
+      listProducts,
     };
 
     TestBed.resetTestingModule();
@@ -106,10 +126,17 @@ describe('ShopComponent i18n meta', () => {
         { provide: Title, useValue: title },
         { provide: Meta, useValue: meta },
         { provide: CatalogService, useValue: catalog },
-        { provide: ActivatedRoute, useValue: { snapshot: { data: {}, queryParams: {} }, paramMap: of(convertToParamMap({})), queryParams: of({}) } },
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            snapshot: { data: {}, queryParams: {} },
+            paramMap: of(convertToParamMap({})),
+            queryParams: of({}),
+          },
+        },
         { provide: Router, useValue: { navigate: () => {} } },
-        { provide: ToastService, useValue: { error: () => {} } }
-      ]
+        { provide: ToastService, useValue: { error: () => {} } },
+      ],
     });
 
     const fixture = TestBed.createComponent(ShopComponent);
@@ -121,7 +148,7 @@ describe('ShopComponent i18n meta', () => {
 
     second$.next({
       items: [{ id: 'new', slug: 'new', name: 'New', base_price: 1, currency: 'RON', tags: [] }],
-      meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 }
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 },
     });
     second$.complete();
 
@@ -130,7 +157,7 @@ describe('ShopComponent i18n meta', () => {
 
     first$.next({
       items: [{ id: 'old', slug: 'old', name: 'Old', base_price: 1, currency: 'RON', tags: [] }],
-      meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 }
+      meta: { total_items: 1, total_pages: 1, page: 1, limit: 20 },
     });
     first$.complete();
 

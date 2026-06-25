@@ -19,7 +19,11 @@ def test_should_upsert_issue_includes_s1_s2_and_optional_s3_seo() -> None:
     module = _load_module()
     severe = {"severity": "s2", "labels": ["audit:correctness"]}
     seo_s3 = {"severity": "s3", "labels": ["audit:seo"], "indexable": True}
-    seo_s3_non_indexable = {"severity": "s3", "labels": ["audit:seo"], "indexable": False}
+    seo_s3_non_indexable = {
+        "severity": "s3",
+        "labels": ["audit:seo"],
+        "indexable": False,
+    }
     low = {"severity": "s4", "labels": ["audit:seo"], "indexable": True}
 
     assert module._should_upsert_issue(severe, include_s3_seo=False)
@@ -89,7 +93,9 @@ def test_upsert_issues_updates_existing_and_creates_new(monkeypatch) -> None:
     assert [row["action"] for row in rows] == ["updated", "created"]
 
 
-def test_close_stale_fingerprint_issues_closes_only_non_active_and_not_in_progress(monkeypatch) -> None:
+def test_close_stale_fingerprint_issues_closes_only_non_active_and_not_in_progress(
+    monkeypatch,
+) -> None:
     module = _load_module()
     ctx = module.GitHubContext(token="token", owner="octo", repo="demo")
 
@@ -128,6 +134,11 @@ def test_close_stale_fingerprint_issues_closes_only_non_active_and_not_in_progre
         run_url="https://example.test/run",
     )
     assert closed == 1
-    assert any(method == "POST" and path.endswith("/issues/10/comments") for method, path, _ in actions)
-    assert any(method == "PATCH" and path.endswith("/issues/10") for method, path, _ in actions)
+    assert any(
+        method == "POST" and path.endswith("/issues/10/comments")
+        for method, path, _ in actions
+    )
+    assert any(
+        method == "PATCH" and path.endswith("/issues/10") for method, path, _ in actions
+    )
     assert not any(path.endswith("/issues/12") for _, path, _ in actions)

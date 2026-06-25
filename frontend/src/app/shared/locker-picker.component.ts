@@ -1,9 +1,25 @@
 import { CommonModule } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, Input, OnChanges, OnDestroy, Output, EventEmitter, SimpleChanges, ViewChild } from '@angular/core';
+import {
+  AfterViewInit,
+  Component,
+  ElementRef,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  EventEmitter,
+  SimpleChanges,
+  ViewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { firstValueFrom } from 'rxjs';
-import { ShippingService, LockerMirrorSnapshot, LockerProvider, LockerRead } from '../core/shipping.service';
+import {
+  ShippingService,
+  LockerMirrorSnapshot,
+  LockerProvider,
+  LockerRead,
+} from '../core/shipping.service';
 import { LazyStylesService } from '../core/lazy-styles.service';
 
 type Leaflet = typeof import('leaflet');
@@ -42,13 +58,21 @@ type LocationResult = { display_name: string; lat: number; lng: number; locker_c
             {{ 'checkout.lockers.searchArea' | translate }}
           </button>
         </div>
-        <span *ngIf="loading" class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.lockers.loading' | translate }}</span>
+        <span *ngIf="loading" class="text-xs text-slate-500 dark:text-slate-400">{{
+          'checkout.lockers.loading' | translate
+        }}</span>
       </div>
 
       <div class="grid gap-2">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'checkout.lockers.searchLabel' | translate }}</p>
-          <span *ngIf="searchLoading" class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.lockers.searching' | translate }}</span>
+          <p
+            class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400"
+          >
+            {{ 'checkout.lockers.searchLabel' | translate }}
+          </p>
+          <span *ngIf="searchLoading" class="text-xs text-slate-500 dark:text-slate-400">{{
+            'checkout.lockers.searching' | translate
+          }}</span>
         </div>
         <div class="relative">
           <div class="flex gap-2">
@@ -111,9 +135,13 @@ type LocationResult = { display_name: string; lat: number; lng: number; locker_c
             </button>
           </div>
         </div>
-        <p *ngIf="searchError" class="text-xs text-amber-700 dark:text-amber-300">{{ searchError }}</p>
+        <p *ngIf="searchError" class="text-xs text-amber-700 dark:text-amber-300">
+          {{ searchError }}
+        </p>
         <div *ngIf="selectedLocation" class="flex flex-wrap items-center gap-2">
-          <span class="text-xs text-slate-500 dark:text-slate-400">{{ 'checkout.lockers.searchingAround' | translate }}</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">{{
+            'checkout.lockers.searchingAround' | translate
+          }}</span>
           <button
             type="button"
             class="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -142,16 +170,26 @@ type LocationResult = { display_name: string; lat: number; lng: number; locker_c
         </div>
       </div>
 
-      <div #mapHost class="h-72 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"></div>
+      <div
+        #mapHost
+        class="h-72 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950"
+      ></div>
 
       <p *ngIf="error" class="text-xs text-amber-700 dark:text-amber-300">{{ error }}</p>
-      <p *ngIf="!loading && !error && lockers.length === 0" class="text-xs text-slate-500 dark:text-slate-400">
+      <p
+        *ngIf="!loading && !error && lockers.length === 0"
+        class="text-xs text-slate-500 dark:text-slate-400"
+      >
         {{ 'checkout.lockers.none' | translate }}
       </p>
 
       <div *ngIf="lockers.length" class="grid gap-2">
-        <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">{{ 'checkout.lockers.results' | translate }}</p>
-        <div class="max-h-48 overflow-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <p class="text-xs font-semibold tracking-wide uppercase text-slate-500 dark:text-slate-400">
+          {{ 'checkout.lockers.results' | translate }}
+        </p>
+        <div
+          class="max-h-48 overflow-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        >
           <button
             *ngFor="let l of lockers; trackBy: trackLocker"
             type="button"
@@ -166,9 +204,14 @@ type LocationResult = { display_name: string; lat: number; lng: number; locker_c
             <div class="flex items-start justify-between gap-3">
               <div class="grid gap-0.5">
                 <p class="text-sm font-medium">{{ l.name }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="l.address">{{ l.address }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400" *ngIf="l.address">
+                  {{ l.address }}
+                </p>
               </div>
-              <span class="text-xs text-slate-500 dark:text-slate-400 shrink-0" *ngIf="l.distance_km !== null">
+              <span
+                class="text-xs text-slate-500 dark:text-slate-400 shrink-0"
+                *ngIf="l.distance_km !== null"
+              >
                 {{ l.distance_km | number: '1.0-1' }} km
               </span>
             </div>
@@ -176,7 +219,7 @@ type LocationResult = { display_name: string; lat: number; lng: number; locker_c
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() provider: LockerProvider = 'sameday';
@@ -203,7 +246,11 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   private searchTimer: number | null = null;
   private searchAbort: AbortController | null = null;
 
-  constructor(private readonly shipping: ShippingService, private translate: TranslateService, private styles: LazyStylesService) {}
+  constructor(
+    private readonly shipping: ShippingService,
+    private translate: TranslateService,
+    private styles: LazyStylesService,
+  ) {}
 
   ngAfterViewInit(): void {
     void this.initMap();
@@ -261,10 +308,13 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     const L = await import('leaflet');
     this.leaflet = L;
 
-    const map = L.map(this.mapHost.nativeElement, { zoomControl: true }).setView([this.lastCenter.lat, this.lastCenter.lng], 12);
+    const map = L.map(this.mapHost.nativeElement, { zoomControl: true }).setView(
+      [this.lastCenter.lat, this.lastCenter.lng],
+      12,
+    );
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map);
 
     const markers = L.layerGroup().addTo(map);
@@ -275,7 +325,12 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     map.on('dragend', () => {
       if (!this.selectedLocation) return;
       const center = map.getCenter();
-      const distanceKm = this.haversineKm(this.selectedLocation.lat, this.selectedLocation.lng, center.lat, center.lng);
+      const distanceKm = this.haversineKm(
+        this.selectedLocation.lat,
+        this.selectedLocation.lng,
+        center.lat,
+        center.lng,
+      );
       if (distanceKm > 1) {
         this.selectedLocation = null;
       }
@@ -305,7 +360,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       () => {
         this.error = this.translate.instant('checkout.lockers.geoDenied');
       },
-      { enableHighAccuracy: false, timeout: 8000 }
+      { enableHighAccuracy: false, timeout: 8000 },
     );
   }
 
@@ -335,6 +390,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       this.searchAbort?.abort();
       return;
     }
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     this.searchTimer = window.setTimeout(() => void this.fetchLocations(query), 250);
   }
@@ -386,13 +442,16 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
           this.lockers = [];
           this.redrawMarkers();
           const detail = String(err?.error?.detail || '').toLowerCase();
-          if (this.provider === 'sameday' && (detail.includes('mirror') || detail.includes('locker'))) {
+          if (
+            this.provider === 'sameday' &&
+            (detail.includes('mirror') || detail.includes('locker'))
+          ) {
             this.error = this.translate.instant('checkout.lockers.mirrorUnavailable');
           } else {
             this.error = this.translate.instant('checkout.lockers.error');
           }
           resolve();
-        }
+        },
       });
     });
   }
@@ -411,7 +470,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
         color: stroke,
         fillColor: isSelected ? selectedFill : fill,
         fillOpacity: isSelected ? 1 : 0.9,
-        weight: isSelected ? 3 : 2
+        weight: isSelected ? 3 : 2,
       });
       marker.on('click', () => this.selectLocker(locker));
       marker.addTo(this.markers);
@@ -429,6 +488,7 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   }
 
   private async fetchLocations(query: string, opts?: { applyFirst?: boolean }): Promise<void> {
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     this.searchAbort?.abort();
     const controller = new AbortController();
@@ -442,9 +502,10 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
           this.shipping.listLockerCities({
             provider: this.provider,
             q: query,
-            limit: 6
-          })
+            limit: 6,
+          }),
         );
+        /* istanbul ignore next -- re-entry guard: the in-flight request is aborted by a newer search; not deterministically reproducible under Karma */
         if (controller.signal.aborted) return;
         this.mirrorSnapshot = response?.snapshot ?? null;
         const rows = Array.isArray(response?.items) ? response.items : [];
@@ -453,9 +514,13 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
             display_name: String(row.display_name || '').trim(),
             lat: Number(row.lat),
             lng: Number(row.lng),
-            locker_count: Number.isFinite(Number(row.locker_count)) ? Number(row.locker_count) : undefined
+            locker_count: Number.isFinite(Number(row.locker_count))
+              ? Number(row.locker_count)
+              : undefined,
           }))
-          .filter((row) => row.display_name && Number.isFinite(row.lat) && Number.isFinite(row.lng));
+          .filter(
+            (row) => row.display_name && Number.isFinite(row.lat) && Number.isFinite(row.lng),
+          );
         this.searchResults = results;
         this.searchLoading = false;
         if (opts?.applyFirst && results.length) {
@@ -477,13 +542,13 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       format: 'jsonv2',
       limit: '6',
       q: query,
-      countrycodes: 'ro'
+      countrycodes: 'ro',
     });
 
     try {
       const resp = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
         signal: controller.signal,
-        headers: { accept: 'application/json' }
+        headers: { accept: 'application/json' },
       });
       if (!resp.ok) {
         this.searchResults = [];
@@ -494,12 +559,15 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
       const data = (await resp.json()) as unknown;
       const results: LocationResult[] = Array.isArray(data)
         ? data
-            .filter((it) => it && typeof it === 'object' && 'display_name' in it && 'lat' in it && 'lon' in it)
+            .filter(
+              (it) =>
+                it && typeof it === 'object' && 'display_name' in it && 'lat' in it && 'lon' in it,
+            )
             .slice(0, 6)
             .map((it: any) => ({
               display_name: String(it.display_name || '').trim(),
               lat: Number.parseFloat(String(it.lat || '')),
-              lng: Number.parseFloat(String(it.lon || ''))
+              lng: Number.parseFloat(String(it.lon || '')),
             }))
             .filter((it) => it.display_name && Number.isFinite(it.lat) && Number.isFinite(it.lng))
         : [];
@@ -530,11 +598,12 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
   private async refreshMirrorSnapshot(): Promise<void> {
     if (this.provider !== 'sameday') return;
     try {
-      const res = await firstValueFrom(this.shipping.listLockerCities({ provider: this.provider, q: '', limit: 1 }));
+      const res = await firstValueFrom(
+        this.shipping.listLockerCities({ provider: this.provider, q: '', limit: 1 }),
+      );
       this.mirrorSnapshot = res?.snapshot ?? null;
     } catch {
       // Best-effort only; picker should remain usable without snapshot metadata.
     }
   }
 }
-

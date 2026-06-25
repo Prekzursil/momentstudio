@@ -52,14 +52,20 @@ import {
   defaultAdminTableLayout,
   loadAdminTableLayout,
   saveAdminTableLayout,
-  visibleAdminTableColumnIds
+  visibleAdminTableColumnIds,
 } from '../shared/admin-table-layout';
-import { AdminTableLayoutColumnDef, TableLayoutModalComponent } from '../shared/table-layout-modal.component';
+import {
+  AdminTableLayoutColumnDef,
+  TableLayoutModalComponent,
+} from '../shared/table-layout-modal.component';
 import { AdminPageHeaderComponent } from '../shared/admin-page-header.component';
 import { adminFilterFavoriteKey } from '../shared/admin-filter-favorites';
 import { AdminProductsBulkActionsComponent } from './admin-products-bulk-actions.component';
 import { AdminProductsEditorWizardComponent } from './admin-products-editor-wizard.component';
-import { AdminProductsImageManagerComponent, type AdminProductImageUploadItem } from './admin-products-image-manager.component';
+import {
+  AdminProductsImageManagerComponent,
+  type AdminProductImageUploadItem,
+} from './admin-products-image-manager.component';
 import { AdminProductsRelationshipsManagerComponent } from './admin-products-relationships-manager.component';
 
 type ProductStatusFilter = 'all' | 'draft' | 'published' | 'archived';
@@ -94,32 +100,32 @@ const PRODUCT_CREATE_WIZARD_STEPS: ProductWizardStep[] = [
     id: 'basics',
     labelKey: 'adminUi.products.wizard.steps.basics',
     descriptionKey: 'adminUi.products.wizard.desc.basics',
-    anchorId: 'product-wizard-top'
+    anchorId: 'product-wizard-top',
   },
   {
     id: 'content',
     labelKey: 'adminUi.products.wizard.steps.content',
     descriptionKey: 'adminUi.products.wizard.desc.content',
-    anchorId: 'product-wizard-content'
+    anchorId: 'product-wizard-content',
   },
   {
     id: 'save',
     labelKey: 'adminUi.products.wizard.steps.save',
     descriptionKey: 'adminUi.products.wizard.desc.save',
-    anchorId: 'product-wizard-save'
+    anchorId: 'product-wizard-save',
   },
   {
     id: 'images',
     labelKey: 'adminUi.products.wizard.steps.images',
     descriptionKey: 'adminUi.products.wizard.desc.images',
-    anchorId: 'product-wizard-images'
+    anchorId: 'product-wizard-images',
   },
   {
     id: 'publish',
     labelKey: 'adminUi.products.wizard.steps.publish',
     descriptionKey: 'adminUi.products.wizard.desc.publish',
-    anchorId: 'product-wizard-publish'
-  }
+    anchorId: 'product-wizard-publish',
+  },
 ];
 
 const PRODUCT_PUBLISH_WIZARD_STEPS: ProductWizardStep[] = [
@@ -127,20 +133,20 @@ const PRODUCT_PUBLISH_WIZARD_STEPS: ProductWizardStep[] = [
     id: 'content',
     labelKey: 'adminUi.products.wizard.steps.review',
     descriptionKey: 'adminUi.products.wizard.desc.review',
-    anchorId: 'product-wizard-content'
+    anchorId: 'product-wizard-content',
   },
   {
     id: 'images',
     labelKey: 'adminUi.products.wizard.steps.images',
     descriptionKey: 'adminUi.products.wizard.desc.images',
-    anchorId: 'product-wizard-images'
+    anchorId: 'product-wizard-images',
   },
   {
     id: 'publish',
     labelKey: 'adminUi.products.wizard.steps.publish',
     descriptionKey: 'adminUi.products.wizard.desc.publish',
-    anchorId: 'product-wizard-publish'
-  }
+    anchorId: 'product-wizard-publish',
+  },
 ];
 
 const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
@@ -152,12 +158,12 @@ const PRODUCTS_TABLE_COLUMNS: AdminTableLayoutColumnDef[] = [
   { id: 'stock', labelKey: 'adminUi.products.table.stock' },
   { id: 'active', labelKey: 'adminUi.products.table.active' },
   { id: 'updated', labelKey: 'adminUi.products.table.updated' },
-  { id: 'actions', labelKey: 'adminUi.products.table.actions', required: true }
+  { id: 'actions', labelKey: 'adminUi.products.table.actions', required: true },
 ];
 
 const defaultProductsTableLayout = (): AdminTableLayoutV1 => ({
   ...defaultAdminTableLayout(PRODUCTS_TABLE_COLUMNS),
-  hidden: ['category', 'active', 'updated']
+  hidden: ['category', 'active', 'updated'],
 });
 
 type ProductBadgeKey = 'new' | 'limited' | 'handmade';
@@ -248,42 +254,79 @@ type PriceHistoryChart = {
     FormsModule,
     ScrollingModule,
     TranslateModule,
-	    BreadcrumbComponent,
-	    ButtonComponent,
-      CopyButtonComponent,
-	    ErrorStateComponent,
-	    InputComponent,
-	    HelpPanelComponent,
-	    ModalComponent,
-	    SkeletonComponent,
-      ActionBarComponent,
-      FormSectionComponent,
+    BreadcrumbComponent,
+    ButtonComponent,
+    CopyButtonComponent,
+    ErrorStateComponent,
+    InputComponent,
+    HelpPanelComponent,
+    ModalComponent,
+    SkeletonComponent,
+    ActionBarComponent,
+    FormSectionComponent,
     LocalizedCurrencyPipe,
-	    TableLayoutModalComponent,
-	    AdminPageHeaderComponent,
-	    AdminProductsBulkActionsComponent,
-	    AdminProductsEditorWizardComponent,
-	    AdminProductsImageManagerComponent,
-	    AdminProductsRelationshipsManagerComponent
-	  ],
+    TableLayoutModalComponent,
+    AdminPageHeaderComponent,
+    AdminProductsBulkActionsComponent,
+    AdminProductsEditorWizardComponent,
+    AdminProductsImageManagerComponent,
+    AdminProductsRelationshipsManagerComponent,
+  ],
   template: `
-      <div class="grid gap-6">
+    <div class="grid gap-6">
       <app-breadcrumb [crumbs]="crumbs"></app-breadcrumb>
 
-	      <app-admin-page-header [titleKey]="'adminUi.products.title'" [hintKey]="'adminUi.products.hint'">
-	        <ng-template #primaryActions>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.wizard.start' | translate" (action)="startCreateWizard()"></app-button>
-	          <app-button size="sm" [label]="'adminUi.products.new' | translate" (action)="startNew()"></app-button>
-	        </ng-template>
+      <app-admin-page-header
+        [titleKey]="'adminUi.products.title'"
+        [hintKey]="'adminUi.products.hint'"
+      >
+        <ng-template #primaryActions>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.products.wizard.start' | translate"
+            (action)="startCreateWizard()"
+          ></app-button>
+          <app-button
+            size="sm"
+            [label]="'adminUi.products.new' | translate"
+            (action)="startNew()"
+          ></app-button>
+        </ng-template>
 
-	        <ng-template #secondaryActions>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.export' | translate" (action)="exportProductsCsv()"></app-button>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.products.csv.import' | translate" (action)="openCsvImport()"></app-button>
-	          <app-button size="sm" variant="ghost" [label]="densityToggleLabelKey() | translate" (action)="toggleDensity()"></app-button>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.tableLayout.title' | translate" (action)="openLayoutModal()"></app-button>
-	          <app-button size="sm" variant="ghost" [label]="'adminUi.categories.title' | translate" (action)="openCategoryManager()"></app-button>
-	        </ng-template>
-	      </app-admin-page-header>
+        <ng-template #secondaryActions>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.products.csv.export' | translate"
+            (action)="exportProductsCsv()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.products.csv.import' | translate"
+            (action)="openCsvImport()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="densityToggleLabelKey() | translate"
+            (action)="toggleDensity()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.tableLayout.title' | translate"
+            (action)="openLayoutModal()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.categories.title' | translate"
+            (action)="openCategoryManager()"
+          ></app-button>
+        </ng-template>
+      </app-admin-page-header>
 
       <app-table-layout-modal
         [open]="layoutModalOpen()"
@@ -329,7 +372,12 @@ type PriceHistoryChart = {
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.cancel' | translate" (action)="closeCsvImport()"></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.cancel' | translate"
+              (action)="closeCsvImport()"
+            ></app-button>
             <app-button
               size="sm"
               variant="ghost"
@@ -366,7 +414,9 @@ type PriceHistoryChart = {
               </ul>
             </div>
             <ng-template #csvNoErrors>
-              <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.products.csv.noErrors' | translate }}</p>
+              <p class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.products.csv.noErrors' | translate }}
+              </p>
             </ng-template>
           </div>
         </div>
@@ -378,7 +428,11 @@ type PriceHistoryChart = {
         [subtitle]="'adminUi.products.confirmStatus.subtitle' | translate"
         [closeLabel]="'adminUi.actions.cancel' | translate"
         [cancelLabel]="'adminUi.actions.cancel' | translate"
-        [confirmLabel]="statusConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.save' | translate)"
+        [confirmLabel]="
+          statusConfirmBusy()
+            ? ('adminUi.actions.loading' | translate)
+            : ('adminUi.actions.save' | translate)
+        "
         [confirmDisabled]="statusConfirmBusy()"
         (closed)="closeStatusConfirm()"
         (confirm)="confirmStatusChange()"
@@ -392,9 +446,11 @@ type PriceHistoryChart = {
               {{ 'adminUi.products.confirmStatus.summary' | translate }}
             </p>
             <p class="mt-1 text-sm text-slate-900 dark:text-slate-50">
-              <span class="font-semibold">{{ ('adminUi.status.' + prev.status) | translate }}</span>
+              <span class="font-semibold">{{ 'adminUi.status.' + prev.status | translate }}</span>
               →
-              <span class="font-semibold">{{ ('adminUi.status.' + (statusConfirmTarget()?.status || form.status)) | translate }}</span>
+              <span class="font-semibold">{{
+                'adminUi.status.' + (statusConfirmTarget()?.status || form.status) | translate
+              }}</span>
             </p>
           </div>
 
@@ -419,19 +475,28 @@ type PriceHistoryChart = {
         [subtitle]="'adminUi.products.bulk.status.subtitle' | translate"
         [closeLabel]="'adminUi.actions.cancel' | translate"
         [cancelLabel]="'adminUi.actions.cancel' | translate"
-        [confirmLabel]="bulkStatusConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.products.bulk.status.apply' | translate)"
+        [confirmLabel]="
+          bulkStatusConfirmBusy()
+            ? ('adminUi.actions.loading' | translate)
+            : ('adminUi.products.bulk.status.apply' | translate)
+        "
         [confirmDisabled]="bulkStatusConfirmBusy()"
         (closed)="closeBulkStatusConfirm()"
         (confirm)="confirmBulkStatusChange()"
       >
         <div class="grid gap-3">
-          <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+          <div
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+          >
             <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
               {{ 'adminUi.products.bulk.status.target' | translate }}
             </p>
             <p class="mt-1 text-sm text-slate-900 dark:text-slate-50">
-              <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(bulkStatusTarget)">
-                {{ ('adminUi.status.' + bulkStatusTarget) | translate }}
+              <span
+                class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                [ngClass]="statusPillClass(bulkStatusTarget)"
+              >
+                {{ 'adminUi.status.' + bulkStatusTarget | translate }}
               </span>
             </p>
           </div>
@@ -442,16 +507,26 @@ type PriceHistoryChart = {
               class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
             >
               <div class="min-w-0">
-                <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ product.name }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ product.slug }}</p>
+                <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                  {{ product.name }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {{ product.slug }}
+                </p>
               </div>
               <div class="flex items-center gap-2">
-                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
-                  {{ ('adminUi.status.' + product.status) | translate }}
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                  [ngClass]="statusPillClass(product.status)"
+                >
+                  {{ 'adminUi.status.' + product.status | translate }}
                 </span>
                 <span class="text-slate-400">→</span>
-                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(bulkStatusTarget)">
-                  {{ ('adminUi.status.' + bulkStatusTarget) | translate }}
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                  [ngClass]="statusPillClass(bulkStatusTarget)"
+                >
+                  {{ 'adminUi.status.' + bulkStatusTarget | translate }}
                 </span>
               </div>
             </div>
@@ -500,9 +575,13 @@ type PriceHistoryChart = {
           </div>
 
           <div *ngIf="categoryManagerSelectedCategory() as cat" class="grid gap-4">
-            <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+            <div
+              class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+            >
               <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.slug' | translate }}: {{ cat.slug }}</p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.categories.slug' | translate }}: {{ cat.slug }}
+              </p>
             </div>
 
             <div class="grid gap-2">
@@ -511,10 +590,18 @@ type PriceHistoryChart = {
                 <select
                   class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="categoryManagerParentId"
-                  [disabled]="categoryManagerUpdateBusy() || mergePreviewLoading() || mergeSaving() || deletePreviewLoading() || deleteSaving()"
+                  [disabled]="
+                    categoryManagerUpdateBusy() ||
+                    mergePreviewLoading() ||
+                    mergeSaving() ||
+                    deletePreviewLoading() ||
+                    deleteSaving()
+                  "
                 >
                   <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
-                  <option *ngFor="let parent of categoryParentOptions(cat)" [value]="parent.id">{{ parent.name }}</option>
+                  <option *ngFor="let parent of categoryParentOptions(cat)" [value]="parent.id">
+                    {{ parent.name }}
+                  </option>
                 </select>
               </label>
               <div class="flex items-center justify-end gap-2">
@@ -527,17 +614,26 @@ type PriceHistoryChart = {
                 ></app-button>
                 <app-button
                   size="sm"
-                  [label]="categoryManagerUpdateBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.save' | translate)"
+                  [label]="
+                    categoryManagerUpdateBusy()
+                      ? ('adminUi.actions.loading' | translate)
+                      : ('adminUi.actions.save' | translate)
+                  "
                   (action)="saveCategoryManagerParent()"
                   [disabled]="categoryManagerUpdateBusy()"
                 ></app-button>
               </div>
-              <p *ngIf="categoryManagerUpdateError()" class="text-xs text-rose-700 dark:text-rose-300">
+              <p
+                *ngIf="categoryManagerUpdateError()"
+                class="text-xs text-rose-700 dark:text-rose-300"
+              >
                 {{ categoryManagerUpdateError() }}
               </p>
             </div>
 
-            <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+            <div
+              class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+            >
               <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">
                 {{ 'adminUi.storefront.categories.mergeTitle' | translate }}
               </p>
@@ -549,59 +645,97 @@ type PriceHistoryChart = {
                   class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   [(ngModel)]="mergeTargetSlug"
                   (ngModelChange)="onMergeTargetChange()"
-                  [disabled]="categoryManagerUpdateBusy() || mergePreviewLoading() || mergeSaving() || deletePreviewLoading() || deleteSaving()"
+                  [disabled]="
+                    categoryManagerUpdateBusy() ||
+                    mergePreviewLoading() ||
+                    mergeSaving() ||
+                    deletePreviewLoading() ||
+                    deleteSaving()
+                  "
                 >
-                  <option value="">{{ 'adminUi.storefront.categories.mergeSelectPlaceholder' | translate }}</option>
-                  <option *ngFor="let target of mergeTargetOptions(cat)" [value]="target.slug">{{ target.name }}</option>
+                  <option value="">
+                    {{ 'adminUi.storefront.categories.mergeSelectPlaceholder' | translate }}
+                  </option>
+                  <option *ngFor="let target of mergeTargetOptions(cat)" [value]="target.slug">
+                    {{ target.name }}
+                  </option>
                 </select>
               </label>
-              <p *ngIf="mergePreview() as preview" class="text-xs text-slate-600 dark:text-slate-300">
+              <p
+                *ngIf="mergePreview() as preview"
+                class="text-xs text-slate-600 dark:text-slate-300"
+              >
                 {{
                   'adminUi.storefront.categories.mergePreviewInfo'
-                    | translate : { products: preview.product_count, children: preview.child_count }
+                    | translate: { products: preview.product_count, children: preview.child_count }
                 }}
               </p>
-              <p *ngIf="mergeError()" class="text-xs text-rose-700 dark:text-rose-300">{{ mergeError() }}</p>
+              <p *ngIf="mergeError()" class="text-xs text-rose-700 dark:text-rose-300">
+                {{ mergeError() }}
+              </p>
               <div class="flex flex-wrap justify-end gap-2">
                 <app-button
                   size="sm"
                   variant="ghost"
-                  [label]="mergePreviewLoading() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.mergePreview' | translate)"
+                  [label]="
+                    mergePreviewLoading()
+                      ? ('adminUi.actions.loading' | translate)
+                      : ('adminUi.storefront.categories.mergePreview' | translate)
+                  "
                   [disabled]="mergePreviewLoading() || mergeSaving() || !mergeTargetSlug"
                   (action)="previewCategoryMerge()"
                 ></app-button>
                 <app-button
                   size="sm"
-                  [label]="mergeSaving() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.mergeAction' | translate)"
-                  [disabled]="mergeSaving() || !(mergePreview()?.can_merge)"
+                  [label]="
+                    mergeSaving()
+                      ? ('adminUi.actions.loading' | translate)
+                      : ('adminUi.storefront.categories.mergeAction' | translate)
+                  "
+                  [disabled]="mergeSaving() || !mergePreview()?.can_merge"
                   (action)="mergeCategorySelected()"
                 ></app-button>
               </div>
             </div>
 
-            <div class="grid gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30">
+            <div
+              class="grid gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3 dark:border-rose-900/40 dark:bg-rose-950/30"
+            >
               <p class="text-xs font-semibold text-rose-900 dark:text-rose-100">
                 {{ 'adminUi.storefront.categories.deleteTitle' | translate }}
               </p>
-              <p *ngIf="deletePreview() as preview" class="text-xs text-rose-800 dark:text-rose-200">
+              <p
+                *ngIf="deletePreview() as preview"
+                class="text-xs text-rose-800 dark:text-rose-200"
+              >
                 {{
                   'adminUi.storefront.categories.deletePreviewInfo'
-                    | translate : { products: preview.product_count, children: preview.child_count }
+                    | translate: { products: preview.product_count, children: preview.child_count }
                 }}
               </p>
-              <p *ngIf="deleteError()" class="text-xs text-rose-800 dark:text-rose-200">{{ deleteError() }}</p>
+              <p *ngIf="deleteError()" class="text-xs text-rose-800 dark:text-rose-200">
+                {{ deleteError() }}
+              </p>
               <div class="flex flex-wrap justify-end gap-2">
                 <app-button
                   size="sm"
                   variant="ghost"
-                  [label]="deletePreviewLoading() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.deletePreview' | translate)"
+                  [label]="
+                    deletePreviewLoading()
+                      ? ('adminUi.actions.loading' | translate)
+                      : ('adminUi.storefront.categories.deletePreview' | translate)
+                  "
                   [disabled]="deletePreviewLoading() || deleteSaving()"
                   (action)="previewCategoryDelete()"
                 ></app-button>
                 <app-button
                   size="sm"
-                  [label]="deleteSaving() ? ('adminUi.actions.loading' | translate) : ('adminUi.storefront.categories.deleteAction' | translate)"
-                  [disabled]="deleteSaving() || !(deletePreview()?.can_delete)"
+                  [label]="
+                    deleteSaving()
+                      ? ('adminUi.actions.loading' | translate)
+                      : ('adminUi.storefront.categories.deleteAction' | translate)
+                  "
+                  [disabled]="deleteSaving() || !deletePreview()?.can_delete"
                   (action)="deleteCategorySelectedSafe()"
                 ></app-button>
               </div>
@@ -611,13 +745,19 @@ type PriceHistoryChart = {
           <details
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-200"
           >
-            <summary class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50">
+            <summary
+              class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
+            >
               {{ 'adminUi.categories.csv.title' | translate }}
             </summary>
 
             <div class="mt-3 grid gap-3">
-              <p class="text-xs text-slate-600 dark:text-slate-300">{{ 'adminUi.categories.csv.hint' | translate }}</p>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ 'adminUi.categories.csv.formatHint' | translate }}</p>
+              <p class="text-xs text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.categories.csv.hint' | translate }}
+              </p>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.categories.csv.formatHint' | translate }}
+              </p>
 
               <div class="flex flex-wrap justify-end gap-2">
                 <app-button
@@ -647,31 +787,50 @@ type PriceHistoryChart = {
               </label>
 
               <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" [(ngModel)]="categoryImportDryRun" [disabled]="categoryImportBusy()" />
+                <input
+                  type="checkbox"
+                  [(ngModel)]="categoryImportDryRun"
+                  [disabled]="categoryImportBusy()"
+                />
                 {{ 'adminUi.categories.csv.dryRun' | translate }}
               </label>
 
               <div class="flex justify-end">
                 <app-button
                   size="sm"
-                  [label]="categoryImportBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.categories.csv.run' | translate)"
+                  [label]="
+                    categoryImportBusy()
+                      ? ('adminUi.actions.loading' | translate)
+                      : ('adminUi.categories.csv.run' | translate)
+                  "
                   (action)="runCategoryImport()"
                   [disabled]="categoryImportBusy() || !categoryImportFile"
                 ></app-button>
               </div>
 
-              <p *ngIf="categoryImportError()" class="text-sm text-rose-700 dark:text-rose-300">{{ categoryImportError() }}</p>
+              <p *ngIf="categoryImportError()" class="text-sm text-rose-700 dark:text-rose-300">
+                {{ categoryImportError() }}
+              </p>
 
               <div *ngIf="categoryImportResult() as result" class="grid gap-2">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+                >
                   {{ 'adminUi.categories.csv.result' | translate }}
                 </p>
                 <div class="grid gap-1 text-sm text-slate-700 dark:text-slate-200">
-                  <div>{{ 'adminUi.categories.csv.created' | translate }}: {{ result.created }}</div>
-                  <div>{{ 'adminUi.categories.csv.updated' | translate }}: {{ result.updated }}</div>
+                  <div>
+                    {{ 'adminUi.categories.csv.created' | translate }}: {{ result.created }}
+                  </div>
+                  <div>
+                    {{ 'adminUi.categories.csv.updated' | translate }}: {{ result.updated }}
+                  </div>
                 </div>
 
-                <div *ngIf="(result.errors || []).length > 0; else categoryCsvNoErrors" class="grid gap-2">
+                <div
+                  *ngIf="(result.errors || []).length > 0; else categoryCsvNoErrors"
+                  class="grid gap-2"
+                >
                   <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
                     {{ 'adminUi.categories.csv.errorsTitle' | translate }}
                   </p>
@@ -680,7 +839,9 @@ type PriceHistoryChart = {
                   </ul>
                 </div>
                 <ng-template #categoryCsvNoErrors>
-                  <p class="text-sm text-slate-600 dark:text-slate-300">{{ 'adminUi.categories.csv.noErrors' | translate }}</p>
+                  <p class="text-sm text-slate-600 dark:text-slate-300">
+                    {{ 'adminUi.categories.csv.noErrors' | translate }}
+                  </p>
                 </ng-template>
               </div>
             </div>
@@ -694,7 +855,11 @@ type PriceHistoryChart = {
         [subtitle]="'adminUi.categories.slugAutoHint' | translate"
         [closeLabel]="'adminUi.actions.cancel' | translate"
         [cancelLabel]="'adminUi.actions.cancel' | translate"
-        [confirmLabel]="createCategoryBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.categories.add' | translate)"
+        [confirmLabel]="
+          createCategoryBusy()
+            ? ('adminUi.actions.loading' | translate)
+            : ('adminUi.categories.add' | translate)
+        "
         [confirmDisabled]="createCategoryBusy() || !createCategoryName.trim()"
         (closed)="closeCreateCategory()"
         (confirm)="confirmCreateCategory()"
@@ -737,7 +902,11 @@ type PriceHistoryChart = {
         [subtitle]="'adminUi.products.confirmDeleteImage.subtitle' | translate"
         [closeLabel]="'adminUi.actions.cancel' | translate"
         [cancelLabel]="'adminUi.actions.cancel' | translate"
-        [confirmLabel]="deleteImageConfirmBusy() ? ('adminUi.actions.loading' | translate) : ('adminUi.actions.delete' | translate)"
+        [confirmLabel]="
+          deleteImageConfirmBusy()
+            ? ('adminUi.actions.loading' | translate)
+            : ('adminUi.actions.delete' | translate)
+        "
         [confirmDisabled]="deleteImageConfirmBusy()"
         (closed)="closeDeleteImageConfirm()"
         (confirm)="confirmDeleteImage()"
@@ -749,7 +918,9 @@ type PriceHistoryChart = {
           >
             <img [src]="target.url" [alt]="target.alt" class="h-12 w-12 rounded object-cover" />
             <div class="min-w-0">
-              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ target.alt }}</p>
+              <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                {{ target.alt }}
+              </p>
               <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ target.url }}</p>
             </div>
           </div>
@@ -762,176 +933,203 @@ type PriceHistoryChart = {
         </div>
       </app-modal>
 
-	      <section class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900">
-          <app-help-panel
-            [titleKey]="'adminUi.help.title'"
-            [subtitleKey]="'adminUi.products.help.subtitle'"
-            [mediaSrc]="'assets/help/admin-products-help.svg'"
-            [mediaAltKey]="'adminUi.products.help.mediaAlt'"
+      <section
+        class="rounded-2xl border border-slate-200 bg-white p-4 grid gap-4 dark:border-slate-800 dark:bg-slate-900"
+      >
+        <app-help-panel
+          [titleKey]="'adminUi.help.title'"
+          [subtitleKey]="'adminUi.products.help.subtitle'"
+          [mediaSrc]="'assets/help/admin-products-help.svg'"
+          [mediaAltKey]="'adminUi.products.help.mediaAlt'"
+        >
+          <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
+            <li>{{ 'adminUi.products.help.points.search' | translate }}</li>
+            <li>{{ 'adminUi.products.help.points.bulk' | translate }}</li>
+            <li>{{ 'adminUi.products.help.points.columns' | translate }}</li>
+            <li>{{ 'adminUi.products.help.points.wizard' | translate }}</li>
+          </ul>
+        </app-help-panel>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <div
+            class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
           >
-            <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
-              <li>{{ 'adminUi.products.help.points.search' | translate }}</li>
-              <li>{{ 'adminUi.products.help.points.bulk' | translate }}</li>
-              <li>{{ 'adminUi.products.help.points.columns' | translate }}</li>
-              <li>{{ 'adminUi.products.help.points.wizard' | translate }}</li>
-            </ul>
-          </app-help-panel>
-
-          <div class="flex flex-wrap items-center gap-3">
-            <div class="inline-flex overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <button
-                type="button"
-                class="px-3 py-1.5 text-xs font-semibold"
-                [class.bg-slate-900]="status === 'all'"
-                [class.text-white]="status === 'all'"
-                [class.text-slate-700]="status !== 'all'"
-                [class.dark:text-slate-200]="status !== 'all'"
-                (click)="setStatusFilter('all')"
-              >
-                {{ 'adminUi.products.all' | translate }}
-              </button>
-              <button
-                type="button"
-                class="px-3 py-1.5 text-xs font-semibold"
-                [class.bg-slate-900]="status === 'draft'"
-                [class.text-white]="status === 'draft'"
-                [class.text-slate-700]="status !== 'draft'"
-                [class.dark:text-slate-200]="status !== 'draft'"
-                (click)="setStatusFilter('draft')"
-              >
-                {{ 'adminUi.status.draft' | translate }}
-              </button>
-              <button
-                type="button"
-                class="px-3 py-1.5 text-xs font-semibold"
-                [class.bg-slate-900]="status === 'published'"
-                [class.text-white]="status === 'published'"
-                [class.text-slate-700]="status !== 'published'"
-                [class.dark:text-slate-200]="status !== 'published'"
-                (click)="setStatusFilter('published')"
-              >
-                {{ 'adminUi.status.published' | translate }}
-              </button>
-              <button
-                type="button"
-                class="px-3 py-1.5 text-xs font-semibold"
-                [class.bg-slate-900]="status === 'archived'"
-                [class.text-white]="status === 'archived'"
-                [class.text-slate-700]="status !== 'archived'"
-                [class.dark:text-slate-200]="status !== 'archived'"
-                (click)="setStatusFilter('archived')"
-              >
-                {{ 'adminUi.status.archived' | translate }}
-              </button>
-            </div>
+            <button
+              type="button"
+              class="px-3 py-1.5 text-xs font-semibold"
+              [class.bg-slate-900]="status === 'all'"
+              [class.text-white]="status === 'all'"
+              [class.text-slate-700]="status !== 'all'"
+              [class.dark:text-slate-200]="status !== 'all'"
+              (click)="setStatusFilter('all')"
+            >
+              {{ 'adminUi.products.all' | translate }}
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 text-xs font-semibold"
+              [class.bg-slate-900]="status === 'draft'"
+              [class.text-white]="status === 'draft'"
+              [class.text-slate-700]="status !== 'draft'"
+              [class.dark:text-slate-200]="status !== 'draft'"
+              (click)="setStatusFilter('draft')"
+            >
+              {{ 'adminUi.status.draft' | translate }}
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 text-xs font-semibold"
+              [class.bg-slate-900]="status === 'published'"
+              [class.text-white]="status === 'published'"
+              [class.text-slate-700]="status !== 'published'"
+              [class.dark:text-slate-200]="status !== 'published'"
+              (click)="setStatusFilter('published')"
+            >
+              {{ 'adminUi.status.published' | translate }}
+            </button>
+            <button
+              type="button"
+              class="px-3 py-1.5 text-xs font-semibold"
+              [class.bg-slate-900]="status === 'archived'"
+              [class.text-white]="status === 'archived'"
+              [class.text-slate-700]="status !== 'archived'"
+              [class.dark:text-slate-200]="status !== 'archived'"
+              (click)="setStatusFilter('archived')"
+            >
+              {{ 'adminUi.status.archived' | translate }}
+            </button>
           </div>
+        </div>
 
-		        <div class="flex flex-wrap items-end gap-3">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 flex-1 min-w-[260px]">
-                {{ 'adminUi.products.search' | translate }}
-                <div class="relative">
-                  <input
-                    id="admin-products-search"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    [attr.aria-expanded]="productSearchOpen() ? 'true' : 'false'"
-                    [attr.aria-controls]="'admin-products-search-listbox'"
-                    [attr.aria-activedescendant]="productSearchActiveDescendant()"
-                    class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [placeholder]="'adminUi.products.searchPlaceholder' | translate"
-                    [(ngModel)]="q"
-                    (ngModelChange)="onProductSearchChange()"
-                    (focus)="openProductSearch()"
-                    (blur)="onProductSearchBlur()"
-                    (keydown)="onProductSearchKeydown($event)"
-                    autocomplete="off"
-                    spellcheck="false"
-                  />
+        <div class="flex flex-wrap items-end gap-3">
+          <label
+            class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 flex-1 min-w-[260px]"
+          >
+            {{ 'adminUi.products.search' | translate }}
+            <div class="relative">
+              <input
+                id="admin-products-search"
+                role="combobox"
+                aria-autocomplete="list"
+                [attr.aria-expanded]="productSearchOpen() ? 'true' : 'false'"
+                [attr.aria-controls]="'admin-products-search-listbox'"
+                [attr.aria-activedescendant]="productSearchActiveDescendant()"
+                class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [placeholder]="'adminUi.products.searchPlaceholder' | translate"
+                [(ngModel)]="q"
+                (ngModelChange)="onProductSearchChange()"
+                (focus)="openProductSearch()"
+                (blur)="onProductSearchBlur()"
+                (keydown)="onProductSearchKeydown($event)"
+                autocomplete="off"
+                spellcheck="false"
+              />
 
+              <div
+                *ngIf="productSearchOpen()"
+                class="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div
+                  id="admin-products-search-listbox"
+                  role="listbox"
+                  class="max-h-72 overflow-auto"
+                >
                   <div
-                    *ngIf="productSearchOpen()"
-                    class="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900"
+                    *ngIf="productSearchLoading()"
+                    role="option"
+                    aria-disabled="true"
+                    class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
                   >
-                    <div id="admin-products-search-listbox" role="listbox" class="max-h-72 overflow-auto">
-                      <div
-                        *ngIf="productSearchLoading()"
-                        role="option"
-                        aria-disabled="true"
-                        class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
-                      >
-                        {{ 'adminUi.actions.loading' | translate }}
-                      </div>
-                      <div
-                        *ngIf="productSearchError()"
-                        role="option"
-                        aria-disabled="true"
-                        class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300"
-                      >
-                        {{ productSearchError() }}
-                      </div>
-
-                      <ng-container *ngIf="!productSearchLoading() && !productSearchError()">
-                        <div
-                          *ngIf="productSearchResults().length === 0 && (q || '').trim().length >= 2"
-                          role="option"
-                          aria-disabled="true"
-                          class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
-                        >
-                          {{ 'adminUi.products.searchNoMatches' | translate }}
-                        </div>
-
-                        <button
-                          *ngFor="let item of productSearchResults(); let i = index"
-                          type="button"
-                          role="option"
-                          tabindex="-1"
-                          [id]="'admin-products-search-option-' + i"
-                          [attr.aria-selected]="i === productSearchActiveIndex() ? 'true' : 'false'"
-                          class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                          [class.bg-slate-50]="i === productSearchActiveIndex()"
-                          [class.dark:bg-slate-800/60]="i === productSearchActiveIndex()"
-                          (mousedown)="selectProductSearch(item, $event)"
-                        >
-                          <div class="flex items-center justify-between gap-3">
-                            <span class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 truncate">
-                              {{ item.sku || item.slug }}
-                            </span>
-                            <span class="inline-flex items-center gap-2">
-                              <span
-                                class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                                [ngClass]="statusPillClass(item.status)"
-                              >
-                                {{ ('adminUi.status.' + item.status) | translate }}
-                              </span>
-                              <span *ngIf="item.status === 'published'" class="text-xs text-slate-500 dark:text-slate-400">
-                                {{ item.is_active ? ('adminUi.products.active' | translate) : ('adminUi.products.inactive' | translate) }}
-                              </span>
-                            </span>
-                          </div>
-                          <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">{{ item.name }}</div>
-                          <div class="text-xs text-slate-600 dark:text-slate-300 truncate">{{ item.slug }}</div>
-                        </button>
-                      </ng-container>
-                    </div>
+                    {{ 'adminUi.actions.loading' | translate }}
                   </div>
+                  <div
+                    *ngIf="productSearchError()"
+                    role="option"
+                    aria-disabled="true"
+                    class="px-3 py-2 text-xs text-rose-700 dark:text-rose-300"
+                  >
+                    {{ productSearchError() }}
+                  </div>
+
+                  <ng-container *ngIf="!productSearchLoading() && !productSearchError()">
+                    <div
+                      *ngIf="productSearchResults().length === 0 && (q || '').trim().length >= 2"
+                      role="option"
+                      aria-disabled="true"
+                      class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300"
+                    >
+                      {{ 'adminUi.products.searchNoMatches' | translate }}
+                    </div>
+
+                    <button
+                      *ngFor="let item of productSearchResults(); let i = index"
+                      type="button"
+                      role="option"
+                      tabindex="-1"
+                      [id]="'admin-products-search-option-' + i"
+                      [attr.aria-selected]="i === productSearchActiveIndex() ? 'true' : 'false'"
+                      class="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      [class.bg-slate-50]="i === productSearchActiveIndex()"
+                      [class.dark:bg-slate-800/60]="i === productSearchActiveIndex()"
+                      (mousedown)="selectProductSearch(item, $event)"
+                    >
+                      <div class="flex items-center justify-between gap-3">
+                        <span
+                          class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400 truncate"
+                        >
+                          {{ item.sku || item.slug }}
+                        </span>
+                        <span class="inline-flex items-center gap-2">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                            [ngClass]="statusPillClass(item.status)"
+                          >
+                            {{ 'adminUi.status.' + item.status | translate }}
+                          </span>
+                          <span
+                            *ngIf="item.status === 'published'"
+                            class="text-xs text-slate-500 dark:text-slate-400"
+                          >
+                            {{
+                              item.is_active
+                                ? ('adminUi.products.active' | translate)
+                                : ('adminUi.products.inactive' | translate)
+                            }}
+                          </span>
+                        </span>
+                      </div>
+                      <div class="mt-1 font-medium text-slate-900 dark:text-slate-50 truncate">
+                        {{ item.name }}
+                      </div>
+                      <div class="text-xs text-slate-600 dark:text-slate-300 truncate">
+                        {{ item.slug }}
+                      </div>
+                    </button>
+                  </ng-container>
                 </div>
-              </label>
+              </div>
+            </div>
+          </label>
 
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[180px]">
-	            {{ 'adminUi.products.table.view' | translate }}
-	            <select
-	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	              [(ngModel)]="view"
-	            >
-	              <option value="active">{{ 'adminUi.products.view.active' | translate }}</option>
-	              <option value="deleted">{{ 'adminUi.products.view.deleted' | translate }}</option>
-	            </select>
-	          </label>
+          <label
+            class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[180px]"
+          >
+            {{ 'adminUi.products.table.view' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              [(ngModel)]="view"
+            >
+              <option value="active">{{ 'adminUi.products.view.active' | translate }}</option>
+              <option value="deleted">{{ 'adminUi.products.view.deleted' | translate }}</option>
+            </select>
+          </label>
 
-	          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[200px]">
-	            {{ 'adminUi.products.table.status' | translate }}
-	            <select
-	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          <label
+            class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[200px]"
+          >
+            {{ 'adminUi.products.table.status' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="status"
             >
               <option value="all">{{ 'adminUi.products.all' | translate }}</option>
@@ -941,7 +1139,9 @@ type PriceHistoryChart = {
             </select>
           </label>
 
-          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[220px]">
+          <div
+            class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[220px]"
+          >
             <div class="flex items-center justify-between gap-2">
               <span>{{ 'adminUi.products.table.category' | translate }}</span>
               <app-button
@@ -961,98 +1161,133 @@ type PriceHistoryChart = {
             </select>
           </div>
 
-          <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[220px]">
+          <label
+            class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto min-w-[220px]"
+          >
             {{ 'adminUi.products.table.translations' | translate }}
             <select
               class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               [(ngModel)]="translationFilter"
             >
-              <option value="all">{{ 'adminUi.products.translations.filter.all' | translate }}</option>
-              <option value="missing_any">{{ 'adminUi.products.translations.filter.missingAny' | translate }}</option>
-              <option value="missing_en">{{ 'adminUi.products.translations.filter.missingEn' | translate }}</option>
-              <option value="missing_ro">{{ 'adminUi.products.translations.filter.missingRo' | translate }}</option>
+              <option value="all">
+                {{ 'adminUi.products.translations.filter.all' | translate }}
+              </option>
+              <option value="missing_any">
+                {{ 'adminUi.products.translations.filter.missingAny' | translate }}
+              </option>
+              <option value="missing_en">
+                {{ 'adminUi.products.translations.filter.missingEn' | translate }}
+              </option>
+              <option value="missing_ro">
+                {{ 'adminUi.products.translations.filter.missingRo' | translate }}
+              </option>
             </select>
           </label>
 
-	          <div class="hidden sm:flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
-	            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
-	            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
-	          </div>
-	        </div>
-
-          <app-action-bar class="sm:hidden" [stickyOnMobile]="false">
-            <app-button size="sm" [label]="'adminUi.actions.refresh' | translate" (action)="applyFilters()"></app-button>
-            <app-button size="sm" variant="ghost" [label]="'adminUi.actions.reset' | translate" (action)="resetFilters()"></app-button>
-          </app-action-bar>
-
-          <div class="flex flex-wrap items-end justify-between gap-3">
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto">
-              {{ 'adminUi.favorites.savedViews.label' | translate }}
-              <select
-                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
-                [(ngModel)]="selectedSavedViewKey"
-                (ngModelChange)="applySavedView($event)"
-              >
-                <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
-                <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
-              </select>
-            </label>
-
-            <div class="flex flex-wrap items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="(isCurrentViewPinned() ? 'adminUi.favorites.savedViews.unpinCurrent' : 'adminUi.favorites.savedViews.pinCurrent') | translate"
-                [disabled]="favorites.loading()"
-                (action)="toggleCurrentViewPin()"
-              ></app-button>
-            </div>
+          <div class="hidden sm:flex items-center gap-2 w-full sm:w-auto sm:ml-auto">
+            <app-button
+              size="sm"
+              [label]="'adminUi.actions.refresh' | translate"
+              (action)="applyFilters()"
+            ></app-button>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.actions.reset' | translate"
+              (action)="resetFilters()"
+            ></app-button>
           </div>
+        </div>
 
-          <app-admin-products-bulk-actions
-            *ngIf="selected.size > 0 && view === 'active'"
-            [selectedCount]="selected.size"
-            [disabled]="bulkBusy() || inlineBusy()"
-            [categories]="categories()"
-            [bulkSaleType]="bulkSaleType"
-            (bulkSaleTypeChange)="setBulkSaleType($event)"
-            [bulkSaleValue]="bulkSaleValue"
-            (bulkSaleValueChange)="onBulkSaleValueChange($event)"
-            (applySale)="applySaleToSelected()"
-            (clearSale)="clearSaleForSelected()"
-            [bulkStatusTarget]="bulkStatusTarget"
-            (bulkStatusTargetChange)="bulkStatusTarget = $event"
-            (applyStatus)="openBulkStatusConfirm()"
-            [bulkCategoryId]="bulkCategoryId"
-            (bulkCategoryIdChange)="bulkCategoryId = $event"
-            (applyCategory)="applyCategoryToSelected()"
-            (addAndApplyCategory)="openCreateCategoryFromBulkAssign()"
-            [bulkPublishScheduledFor]="bulkPublishScheduledFor"
-            (bulkPublishScheduledForChange)="bulkPublishScheduledFor = $event"
-            [bulkUnpublishScheduledFor]="bulkUnpublishScheduledFor"
-            (bulkUnpublishScheduledForChange)="bulkUnpublishScheduledFor = $event"
-            (applySchedule)="applyScheduleToSelected()"
-            (clearPublishSchedule)="clearPublishScheduleForSelected()"
-            (clearUnpublishSchedule)="clearUnpublishScheduleForSelected()"
-            [bulkPriceMode]="bulkPriceMode"
-            (bulkPriceModeChange)="setBulkPriceMode($event)"
-            [bulkPriceDirection]="bulkPriceDirection"
-            (bulkPriceDirectionChange)="setBulkPriceDirection($event)"
-            [bulkPriceValue]="bulkPriceValue"
-            (bulkPriceValueChange)="onBulkPriceValueChange($event)"
-            [bulkPricePreview]="bulkPricePreview"
-            (applyPriceAdjustment)="applyPriceAdjustmentToSelected()"
-            [bulkError]="bulkError()"
-            (clearSelection)="clearSelection()"
-          ></app-admin-products-bulk-actions>
+        <app-action-bar class="sm:hidden" [stickyOnMobile]="false">
+          <app-button
+            size="sm"
+            [label]="'adminUi.actions.refresh' | translate"
+            (action)="applyFilters()"
+          ></app-button>
+          <app-button
+            size="sm"
+            variant="ghost"
+            [label]="'adminUi.actions.reset' | translate"
+            (action)="resetFilters()"
+          ></app-button>
+        </app-action-bar>
 
-		        <app-error-state
-            *ngIf="error()"
-            [message]="error()!"
-            [requestId]="errorRequestId()"
-            [showRetry]="true"
-            (retry)="retryLoad()"
-          ></app-error-state>
+        <div class="flex flex-wrap items-end justify-between gap-3">
+          <label
+            class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 w-full sm:w-auto"
+          >
+            {{ 'adminUi.favorites.savedViews.label' | translate }}
+            <select
+              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 min-w-[220px]"
+              [(ngModel)]="selectedSavedViewKey"
+              (ngModelChange)="applySavedView($event)"
+            >
+              <option value="">{{ 'adminUi.favorites.savedViews.none' | translate }}</option>
+              <option *ngFor="let view of savedViews()" [value]="view.key">{{ view.label }}</option>
+            </select>
+          </label>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="
+                (isCurrentViewPinned()
+                  ? 'adminUi.favorites.savedViews.unpinCurrent'
+                  : 'adminUi.favorites.savedViews.pinCurrent'
+                ) | translate
+              "
+              [disabled]="favorites.loading()"
+              (action)="toggleCurrentViewPin()"
+            ></app-button>
+          </div>
+        </div>
+
+        <app-admin-products-bulk-actions
+          *ngIf="selected.size > 0 && view === 'active'"
+          [selectedCount]="selected.size"
+          [disabled]="bulkBusy() || inlineBusy()"
+          [categories]="categories()"
+          [bulkSaleType]="bulkSaleType"
+          (bulkSaleTypeChange)="setBulkSaleType($event)"
+          [bulkSaleValue]="bulkSaleValue"
+          (bulkSaleValueChange)="onBulkSaleValueChange($event)"
+          (applySale)="applySaleToSelected()"
+          (clearSale)="clearSaleForSelected()"
+          [bulkStatusTarget]="bulkStatusTarget"
+          (bulkStatusTargetChange)="bulkStatusTarget = $event"
+          (applyStatus)="openBulkStatusConfirm()"
+          [bulkCategoryId]="bulkCategoryId"
+          (bulkCategoryIdChange)="bulkCategoryId = $event"
+          (applyCategory)="applyCategoryToSelected()"
+          (addAndApplyCategory)="openCreateCategoryFromBulkAssign()"
+          [bulkPublishScheduledFor]="bulkPublishScheduledFor"
+          (bulkPublishScheduledForChange)="bulkPublishScheduledFor = $event"
+          [bulkUnpublishScheduledFor]="bulkUnpublishScheduledFor"
+          (bulkUnpublishScheduledForChange)="bulkUnpublishScheduledFor = $event"
+          (applySchedule)="applyScheduleToSelected()"
+          (clearPublishSchedule)="clearPublishScheduleForSelected()"
+          (clearUnpublishSchedule)="clearUnpublishScheduleForSelected()"
+          [bulkPriceMode]="bulkPriceMode"
+          (bulkPriceModeChange)="setBulkPriceMode($event)"
+          [bulkPriceDirection]="bulkPriceDirection"
+          (bulkPriceDirectionChange)="setBulkPriceDirection($event)"
+          [bulkPriceValue]="bulkPriceValue"
+          (bulkPriceValueChange)="onBulkPriceValueChange($event)"
+          [bulkPricePreview]="bulkPricePreview"
+          (applyPriceAdjustment)="applyPriceAdjustmentToSelected()"
+          [bulkError]="bulkError()"
+          (clearSelection)="clearSelection()"
+        ></app-admin-products-bulk-actions>
+
+        <app-error-state
+          *ngIf="error()"
+          [message]="error()!"
+          [requestId]="errorRequestId()"
+          [showRetry]="true"
+          (retry)="retryLoad()"
+        ></app-error-state>
 
         <div *ngIf="loading(); else tableTpl">
           <app-skeleton [rows]="8"></app-skeleton>
@@ -1069,11 +1304,16 @@ type PriceHistoryChart = {
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">{{ product.name }}</h3>
+                  <h3 class="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ product.name }}
+                  </h3>
                   <div class="text-xs text-slate-500 dark:text-slate-400">
                     {{ product.deleted_slug || product.slug }} · {{ product.sku }}
                   </div>
-                  <div *ngIf="(product.missing_translations || []).length" class="mt-1 flex flex-wrap items-center gap-1">
+                  <div
+                    *ngIf="(product.missing_translations || []).length"
+                    class="mt-1 flex flex-wrap items-center gap-1"
+                  >
                     <span class="text-[10px] font-semibold text-amber-700 dark:text-amber-200">
                       {{ 'adminUi.products.translations.missing' | translate }}
                     </span>
@@ -1086,29 +1326,47 @@ type PriceHistoryChart = {
                   </div>
                 </div>
 
-                <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
-                  {{ ('adminUi.status.' + product.status) | translate }}
+                <span
+                  class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                  [ngClass]="statusPillClass(product.status)"
+                >
+                  {{ 'adminUi.status.' + product.status | translate }}
                 </span>
               </div>
 
               <div class="mt-3 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
                 <div>
-                  <span class="font-semibold">{{ 'adminUi.products.table.price' | translate }}:</span>
-                  {{ product.base_price | localizedCurrency : product.currency }}
+                  <span class="font-semibold"
+                    >{{ 'adminUi.products.table.price' | translate }}:</span
+                  >
+                  {{ product.base_price | localizedCurrency: product.currency }}
                 </div>
                 <div>
-                  <span class="font-semibold">{{ 'adminUi.products.table.stock' | translate }}:</span>
+                  <span class="font-semibold"
+                    >{{ 'adminUi.products.table.stock' | translate }}:</span
+                  >
                   {{ product.stock_quantity }}
                 </div>
                 <div>
-                  <span class="font-semibold">{{ 'adminUi.products.table.category' | translate }}:</span>
+                  <span class="font-semibold"
+                    >{{ 'adminUi.products.table.category' | translate }}:</span
+                  >
                   {{ product.category_name || '—' }}
                 </div>
                 <div>
                   <span class="font-semibold">
-                    {{ view === 'deleted' ? ('adminUi.products.table.deletedAt' | translate) : ('adminUi.products.table.updated' | translate) }}:
+                    {{
+                      view === 'deleted'
+                        ? ('adminUi.products.table.deletedAt' | translate)
+                        : ('adminUi.products.table.updated' | translate)
+                    }}:
                   </span>
-                  {{ (view === 'deleted' ? (product.deleted_at || product.updated_at) : product.updated_at) | date: 'short' }}
+                  {{
+                    (view === 'deleted'
+                      ? product.deleted_at || product.updated_at
+                      : product.updated_at
+                    ) | date: 'short'
+                  }}
                 </div>
               </div>
 
@@ -1122,7 +1380,10 @@ type PriceHistoryChart = {
                     [checked]="selected.has(product.id)"
                     (change)="toggleSelected(product.id, $event)"
                     [disabled]="bulkBusy() || inlineBusy()"
-                    [attr.aria-label]="'adminUi.products.a11y.selectProduct' | translate: { name: product.name || product.slug }"
+                    [attr.aria-label]="
+                      'adminUi.products.a11y.selectProduct'
+                        | translate: { name: product.name || product.slug }
+                    "
                   />
                   {{ 'adminUi.actions.bulkActions' | translate }}
                 </label>
@@ -1146,7 +1407,12 @@ type PriceHistoryChart = {
                         ? ('adminUi.products.quickStatus.unpublish' | translate)
                         : ('adminUi.products.quickStatus.publish' | translate)
                     "
-                    (action)="quickSetStatus(product, product.status === 'published' ? 'draft' : 'published')"
+                    (action)="
+                      quickSetStatus(
+                        product,
+                        product.status === 'published' ? 'draft' : 'published'
+                      )
+                    "
                     [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
                   ></app-button>
                   <app-button
@@ -1160,11 +1426,21 @@ type PriceHistoryChart = {
             </article>
           </div>
 
-          <div *ngIf="products().length > 0" class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <div
+            *ngIf="products().length > 0"
+            class="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800"
+          >
             <ng-template #productsTableHeader>
               <tr>
-                <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
-                  <th *ngSwitchCase="'select'" class="text-left font-semibold w-10" [ngClass]="cellPaddingClass()">
+                <ng-container
+                  *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId"
+                  [ngSwitch]="colId"
+                >
+                  <th
+                    *ngSwitchCase="'select'"
+                    class="text-left font-semibold w-10"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     <input
                       type="checkbox"
                       [checked]="allSelectedOnPage()"
@@ -1173,32 +1449,64 @@ type PriceHistoryChart = {
                       [attr.aria-label]="'adminUi.products.a11y.selectAllOnPage' | translate"
                     />
                   </th>
-                  <th *ngSwitchCase="'name'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'name'"
+                    class="text-left font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{ 'adminUi.products.table.name' | translate }}
                   </th>
-                  <th *ngSwitchCase="'price'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'price'"
+                    class="text-left font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{ 'adminUi.products.table.price' | translate }}
                   </th>
-                  <th *ngSwitchCase="'status'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'status'"
+                    class="text-left font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{ 'adminUi.products.table.status' | translate }}
                   </th>
-                  <th *ngSwitchCase="'category'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'category'"
+                    class="text-left font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{ 'adminUi.products.table.category' | translate }}
                   </th>
-                  <th *ngSwitchCase="'stock'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'stock'"
+                    class="text-left font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{ 'adminUi.products.table.stock' | translate }}
                   </th>
-                  <th *ngSwitchCase="'active'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'active'"
+                    class="text-left font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{ 'adminUi.products.table.active' | translate }}
                   </th>
-                  <th *ngSwitchCase="'updated'" class="text-left font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'updated'"
+                    class="text-left font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{
                       view === 'deleted'
                         ? ('adminUi.products.table.deletedAt' | translate)
                         : ('adminUi.products.table.updated' | translate)
                     }}
                   </th>
-                  <th *ngSwitchCase="'actions'" class="text-right font-semibold" [ngClass]="cellPaddingClass()">
+                  <th
+                    *ngSwitchCase="'actions'"
+                    class="text-right font-semibold"
+                    [ngClass]="cellPaddingClass()"
+                  >
                     {{ 'adminUi.products.table.actions' | translate }}
                   </th>
                 </ng-container>
@@ -1230,255 +1538,350 @@ type PriceHistoryChart = {
             <table class="min-w-[980px] w-full text-sm" [class.hidden]="useVirtualProductsTable()">
               <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                 <ng-container [ngTemplateOutlet]="productsTableHeader"></ng-container>
-	              </thead>
+              </thead>
               <tbody>
                 <ng-template #productRow let-product>
-                  <tr class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40">
-                    <ng-container *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId" [ngSwitch]="colId">
-	                  <td *ngSwitchCase="'select'" class="w-10" [ngClass]="cellPaddingClass()">
-	                    <input
-	                      type="checkbox"
-	                      [checked]="selected.has(product.id)"
-	                      (change)="toggleSelected(product.id, $event)"
-	                      [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
-	                      [attr.aria-label]="'adminUi.products.a11y.selectProduct' | translate: { name: product.name || product.slug }"
-	                    />
-	                  </td>
-	                  <td *ngSwitchCase="'name'" class="font-medium text-slate-900 dark:text-slate-50" [ngClass]="cellPaddingClass()">
-	                    <div class="grid">
-	                      <span class="truncate">{{ product.name }}</span>
-	                      <span class="text-xs text-slate-500 dark:text-slate-400">
-	                        {{ product.deleted_slug || product.slug }} · {{ product.sku }}
-	                      </span>
-                        <div *ngIf="(product.missing_translations || []).length" class="mt-1 flex flex-wrap items-center gap-1">
-                          <span class="text-[10px] font-semibold text-amber-700 dark:text-amber-200">
-                            {{ 'adminUi.products.translations.missing' | translate }}
+                  <tr
+                    class="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                  >
+                    <ng-container
+                      *ngFor="let colId of visibleColumnIds(); trackBy: trackColumnId"
+                      [ngSwitch]="colId"
+                    >
+                      <td *ngSwitchCase="'select'" class="w-10" [ngClass]="cellPaddingClass()">
+                        <input
+                          type="checkbox"
+                          [checked]="selected.has(product.id)"
+                          (change)="toggleSelected(product.id, $event)"
+                          [disabled]="bulkBusy() || inlineBusy() || view === 'deleted'"
+                          [attr.aria-label]="
+                            'adminUi.products.a11y.selectProduct'
+                              | translate: { name: product.name || product.slug }
+                          "
+                        />
+                      </td>
+                      <td
+                        *ngSwitchCase="'name'"
+                        class="font-medium text-slate-900 dark:text-slate-50"
+                        [ngClass]="cellPaddingClass()"
+                      >
+                        <div class="grid">
+                          <span class="truncate">{{ product.name }}</span>
+                          <span class="text-xs text-slate-500 dark:text-slate-400">
+                            {{ product.deleted_slug || product.slug }} · {{ product.sku }}
                           </span>
-                          <span
-                            *ngFor="let lang of product.missing_translations || []"
-                            class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+                          <div
+                            *ngIf="(product.missing_translations || []).length"
+                            class="mt-1 flex flex-wrap items-center gap-1"
                           >
-                            {{ (lang || '').toUpperCase() }}
-                          </span>
+                            <span
+                              class="text-[10px] font-semibold text-amber-700 dark:text-amber-200"
+                            >
+                              {{ 'adminUi.products.translations.missing' | translate }}
+                            </span>
+                            <span
+                              *ngFor="let lang of product.missing_translations || []"
+                              class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-900/30 dark:text-amber-100"
+                            >
+                              {{ (lang || '').toUpperCase() }}
+                            </span>
+                          </div>
                         </div>
-	                    </div>
-	                  </td>
-                  <td *ngSwitchCase="'price'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
-                    <ng-container *ngIf="inlineEditId === product.id; else priceRead">
-                      <div class="grid gap-2 min-w-[240px]">
-                        <div class="grid gap-1">
-                          <input
-                            class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            type="text"
-                            inputMode="decimal"
-                            [value]="inlineBasePrice"
-                            (input)="onInlineBasePriceChange($any($event.target).value)"
-                            [disabled]="inlineBusy()"
-                            [attr.aria-label]="'adminUi.products.a11y.basePrice' | translate"
-                          />
-                          <p *ngIf="inlineBasePriceError" class="text-xs text-rose-700 dark:text-rose-200">
-                            {{ inlineBasePriceError }}
-                          </p>
-                        </div>
-
-                        <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
-                          <input
-                            type="checkbox"
-                            [(ngModel)]="inlineSaleEnabled"
-                            (change)="onInlineSaleEnabledChange()"
-                            [disabled]="inlineBusy()"
-                          />
-                          {{ 'adminUi.products.sale.enabled' | translate }}
-                        </label>
-
-                        <div *ngIf="inlineSaleEnabled" class="grid gap-2">
-                          <div class="grid grid-cols-2 gap-2 items-end">
-                            <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.products.sale.type' | translate }}
-                              <select
-                                class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                                [(ngModel)]="inlineSaleType"
-                                (change)="onInlineSaleTypeChange()"
-                                [disabled]="inlineBusy()"
-                              >
-                                <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
-                                <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
-                              </select>
-                            </label>
-
-                            <label class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200">
-                              {{ 'adminUi.products.sale.value' | translate }}
+                      </td>
+                      <td
+                        *ngSwitchCase="'price'"
+                        class="text-slate-700 dark:text-slate-200"
+                        [ngClass]="cellPaddingClass()"
+                      >
+                        <ng-container *ngIf="inlineEditId === product.id; else priceRead">
+                          <div class="grid gap-2 min-w-[240px]">
+                            <div class="grid gap-1">
                               <input
                                 class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                                 type="text"
                                 inputMode="decimal"
-                                [placeholder]="inlineSaleType === 'percent' ? '10' : '5.00'"
-                                [value]="inlineSaleValue"
-                                (input)="onInlineSaleValueChange($any($event.target).value)"
+                                [value]="inlineBasePrice"
+                                (input)="onInlineBasePriceChange($any($event.target).value)"
+                                [disabled]="inlineBusy()"
+                                [attr.aria-label]="'adminUi.products.a11y.basePrice' | translate"
+                              />
+                              <p
+                                *ngIf="inlineBasePriceError"
+                                class="text-xs text-rose-700 dark:text-rose-200"
+                              >
+                                {{ inlineBasePriceError }}
+                              </p>
+                            </div>
+
+                            <label
+                              class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200"
+                            >
+                              <input
+                                type="checkbox"
+                                [(ngModel)]="inlineSaleEnabled"
+                                (change)="onInlineSaleEnabledChange()"
                                 [disabled]="inlineBusy()"
                               />
+                              {{ 'adminUi.products.sale.enabled' | translate }}
                             </label>
+
+                            <div *ngIf="inlineSaleEnabled" class="grid gap-2">
+                              <div class="grid grid-cols-2 gap-2 items-end">
+                                <label
+                                  class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+                                >
+                                  {{ 'adminUi.products.sale.type' | translate }}
+                                  <select
+                                    class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    [(ngModel)]="inlineSaleType"
+                                    (change)="onInlineSaleTypeChange()"
+                                    [disabled]="inlineBusy()"
+                                  >
+                                    <option [ngValue]="'percent'">
+                                      {{ 'adminUi.products.sale.typePercent' | translate }}
+                                    </option>
+                                    <option [ngValue]="'amount'">
+                                      {{ 'adminUi.products.sale.typeAmount' | translate }}
+                                    </option>
+                                  </select>
+                                </label>
+
+                                <label
+                                  class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200"
+                                >
+                                  {{ 'adminUi.products.sale.value' | translate }}
+                                  <input
+                                    class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                                    type="text"
+                                    inputMode="decimal"
+                                    [placeholder]="inlineSaleType === 'percent' ? '10' : '5.00'"
+                                    [value]="inlineSaleValue"
+                                    (input)="onInlineSaleValueChange($any($event.target).value)"
+                                    [disabled]="inlineBusy()"
+                                  />
+                                </label>
+                              </div>
+
+                              <p
+                                *ngIf="inlineSaleError"
+                                class="text-xs text-rose-700 dark:text-rose-200"
+                              >
+                                {{ inlineSaleError }}
+                              </p>
+                            </div>
+
+                            <p *ngIf="inlineError" class="text-xs text-rose-700 dark:text-rose-200">
+                              {{ inlineError }}
+                            </p>
                           </div>
-
-                          <p *ngIf="inlineSaleError" class="text-xs text-rose-700 dark:text-rose-200">
-                            {{ inlineSaleError }}
-                          </p>
+                        </ng-container>
+                        <ng-template #priceRead>
+                          <div class="grid">
+                            <span>{{
+                              product.base_price | localizedCurrency: product.currency
+                            }}</span>
+                            <span
+                              *ngIf="product.sale_type && product.sale_value"
+                              class="text-xs text-slate-500 dark:text-slate-400"
+                            >
+                              {{ 'adminUi.products.sale.title' | translate }}:
+                              <ng-container *ngIf="product.sale_type === 'percent'"
+                                >{{ product.sale_value }}%</ng-container
+                              >
+                              <ng-container *ngIf="product.sale_type === 'amount'">{{
+                                product.sale_value | localizedCurrency: product.currency
+                              }}</ng-container>
+                            </span>
+                          </div>
+                        </ng-template>
+                      </td>
+                      <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span
+                            class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                            [ngClass]="statusPillClass(product.status)"
+                          >
+                            {{ 'adminUi.status.' + product.status | translate }}
+                          </span>
+                          <span
+                            *ngIf="product.status === 'published'"
+                            class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                            [ngClass]="
+                              product.is_active
+                                ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
+                            "
+                          >
+                            {{
+                              product.is_active
+                                ? ('adminUi.products.active' | translate)
+                                : ('adminUi.products.inactive' | translate)
+                            }}
+                          </span>
                         </div>
-
-                        <p *ngIf="inlineError" class="text-xs text-rose-700 dark:text-rose-200">
-                          {{ inlineError }}
-                        </p>
-                      </div>
-                    </ng-container>
-                    <ng-template #priceRead>
-                      <div class="grid">
-                        <span>{{ product.base_price | localizedCurrency : product.currency }}</span>
-                        <span *ngIf="product.sale_type && product.sale_value" class="text-xs text-slate-500 dark:text-slate-400">
-                          {{ 'adminUi.products.sale.title' | translate }}:
-                          <ng-container *ngIf="product.sale_type === 'percent'">{{ product.sale_value }}%</ng-container>
-                          <ng-container *ngIf="product.sale_type === 'amount'">{{
-                            product.sale_value | localizedCurrency : product.currency
-                          }}</ng-container>
-                        </span>
-                      </div>
-                    </ng-template>
-                  </td>
-                  <td *ngSwitchCase="'status'" [ngClass]="cellPaddingClass()">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold" [ngClass]="statusPillClass(product.status)">
-                        {{ ('adminUi.status.' + product.status) | translate }}
-                      </span>
-                      <span
-                        *ngIf="product.status === 'published'"
-                        class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                        [ngClass]="product.is_active ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                        <div
+                          *ngIf="product.publish_scheduled_for || product.unpublish_scheduled_for"
+                          class="mt-1 grid gap-0.5 text-xs text-slate-500 dark:text-slate-400"
+                        >
+                          <div *ngIf="product.publish_scheduled_for">
+                            {{ 'adminUi.products.bulk.schedule.publishAt' | translate }}:
+                            {{ product.publish_scheduled_for | date: 'short' }}
+                          </div>
+                          <div *ngIf="product.unpublish_scheduled_for">
+                            {{ 'adminUi.products.bulk.schedule.unpublishAt' | translate }}:
+                            {{ product.unpublish_scheduled_for | date: 'short' }}
+                          </div>
+                        </div>
+                      </td>
+                      <td
+                        *ngSwitchCase="'category'"
+                        class="text-slate-700 dark:text-slate-200"
+                        [ngClass]="cellPaddingClass()"
                       >
-                        {{ product.is_active ? ('adminUi.products.active' | translate) : ('adminUi.products.inactive' | translate) }}
-                      </span>
-                    </div>
-                    <div
-                      *ngIf="product.publish_scheduled_for || product.unpublish_scheduled_for"
-                      class="mt-1 grid gap-0.5 text-xs text-slate-500 dark:text-slate-400"
-                    >
-                      <div *ngIf="product.publish_scheduled_for">
-                        {{ 'adminUi.products.bulk.schedule.publishAt' | translate }}:
-                        {{ product.publish_scheduled_for | date: 'short' }}
-                      </div>
-                      <div *ngIf="product.unpublish_scheduled_for">
-                        {{ 'adminUi.products.bulk.schedule.unpublishAt' | translate }}:
-                        {{ product.unpublish_scheduled_for | date: 'short' }}
-                      </div>
-                    </div>
-                  </td>
-                  <td *ngSwitchCase="'category'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
-                    {{ product.category_name }}
-                  </td>
-                  <td *ngSwitchCase="'stock'" class="text-slate-700 dark:text-slate-200" [ngClass]="cellPaddingClass()">
-                    <ng-container *ngIf="inlineEditId === product.id; else stockRead">
-                      <div class="grid gap-1 min-w-[120px]">
-                        <input
-                          class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          type="number"
-                          min="0"
-                          step="1"
-                          inputMode="numeric"
-                          [value]="inlineStockQuantity"
-                          (input)="onInlineStockChange($any($event.target).value)"
-                          [disabled]="inlineBusy()"
-                          [attr.aria-label]="'adminUi.products.a11y.stockQuantity' | translate"
-                        />
-                        <p *ngIf="inlineStockError" class="text-xs text-rose-700 dark:text-rose-200">
-                          {{ inlineStockError }}
-                        </p>
-                      </div>
-                    </ng-container>
-                    <ng-template #stockRead>
-                      {{ product.stock_quantity }}
-                    </ng-template>
-                  </td>
-                  <td *ngSwitchCase="'active'" [ngClass]="cellPaddingClass()">
-                    <span
-                      class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
-                      [ngClass]="product.is_active ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
-                    >
-                      {{ product.is_active ? ('adminUi.products.active' | translate) : ('adminUi.products.inactive' | translate) }}
-                    </span>
-                  </td>
-                  <td *ngSwitchCase="'updated'" class="text-slate-600 dark:text-slate-300" [ngClass]="cellPaddingClass()">
-                    {{
-                      (view === 'deleted' ? (product.deleted_at || product.updated_at) : product.updated_at) | date: 'short'
-                    }}
-                  </td>
-                  <td *ngSwitchCase="'actions'" class="text-right" [ngClass]="cellPaddingClass()">
-                    <div class="flex items-center justify-end gap-2">
-	                      <ng-container *ngIf="inlineEditId === product.id; else rowActions">
-	                        <app-button
-	                          size="sm"
-	                          [label]="'adminUi.actions.save' | translate"
-	                          (action)="saveInlineEdit()"
-	                          [disabled]="inlineBusy()"
-	                        ></app-button>
-	                        <app-button
-	                          size="sm"
-	                          variant="ghost"
-	                          [label]="'adminUi.actions.cancel' | translate"
-	                          (action)="cancelInlineEdit()"
-	                          [disabled]="inlineBusy()"
-	                        ></app-button>
-	                      </ng-container>
-	                      <ng-template #rowActions>
-	                        <ng-container *ngIf="view === 'deleted'; else activeRowActions">
-	                          <app-button
-	                            size="sm"
-	                            variant="ghost"
-	                            [label]="'adminUi.actions.restore' | translate"
-	                            (action)="restoreProduct(product)"
-	                            [disabled]="restoringProductId() === product.id"
-	                          ></app-button>
-	                        </ng-container>
-	                        <ng-template #activeRowActions>
+                        {{ product.category_name }}
+                      </td>
+                      <td
+                        *ngSwitchCase="'stock'"
+                        class="text-slate-700 dark:text-slate-200"
+                        [ngClass]="cellPaddingClass()"
+                      >
+                        <ng-container *ngIf="inlineEditId === product.id; else stockRead">
+                          <div class="grid gap-1 min-w-[120px]">
+                            <input
+                              class="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                              type="number"
+                              min="0"
+                              step="1"
+                              inputMode="numeric"
+                              [value]="inlineStockQuantity"
+                              (input)="onInlineStockChange($any($event.target).value)"
+                              [disabled]="inlineBusy()"
+                              [attr.aria-label]="'adminUi.products.a11y.stockQuantity' | translate"
+                            />
+                            <p
+                              *ngIf="inlineStockError"
+                              class="text-xs text-rose-700 dark:text-rose-200"
+                            >
+                              {{ inlineStockError }}
+                            </p>
+                          </div>
+                        </ng-container>
+                        <ng-template #stockRead>
+                          {{ product.stock_quantity }}
+                        </ng-template>
+                      </td>
+                      <td *ngSwitchCase="'active'" [ngClass]="cellPaddingClass()">
+                        <span
+                          class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold"
+                          [ngClass]="
+                            product.is_active
+                              ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'
+                          "
+                        >
+                          {{
+                            product.is_active
+                              ? ('adminUi.products.active' | translate)
+                              : ('adminUi.products.inactive' | translate)
+                          }}
+                        </span>
+                      </td>
+                      <td
+                        *ngSwitchCase="'updated'"
+                        class="text-slate-600 dark:text-slate-300"
+                        [ngClass]="cellPaddingClass()"
+                      >
+                        {{
+                          (view === 'deleted'
+                            ? product.deleted_at || product.updated_at
+                            : product.updated_at
+                          ) | date: 'short'
+                        }}
+                      </td>
+                      <td
+                        *ngSwitchCase="'actions'"
+                        class="text-right"
+                        [ngClass]="cellPaddingClass()"
+                      >
+                        <div class="flex items-center justify-end gap-2">
+                          <ng-container *ngIf="inlineEditId === product.id; else rowActions">
                             <app-button
-                              *ngIf="product.status !== 'archived'"
                               size="sm"
-                              variant="ghost"
-                              [label]="
-                                product.status === 'published'
-                                  ? ('adminUi.products.quickStatus.unpublish' | translate)
-                                  : ('adminUi.products.quickStatus.publish' | translate)
-                              "
-                              (action)="quickSetStatus(product, product.status === 'published' ? 'draft' : 'published')"
-                              [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                              [label]="'adminUi.actions.save' | translate"
+                              (action)="saveInlineEdit()"
+                              [disabled]="inlineBusy()"
                             ></app-button>
                             <app-button
                               size="sm"
                               variant="ghost"
-                              [label]="
-                                product.status === 'archived'
-                                  ? ('adminUi.products.quickStatus.unarchive' | translate)
-                                  : ('adminUi.products.quickStatus.archive' | translate)
-                              "
-                              (action)="quickSetStatus(product, product.status === 'archived' ? 'draft' : 'archived')"
-                              [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                              [label]="'adminUi.actions.cancel' | translate"
+                              (action)="cancelInlineEdit()"
+                              [disabled]="inlineBusy()"
                             ></app-button>
-	                          <app-button
-	                            size="sm"
-	                            variant="ghost"
-	                            [label]="'adminUi.products.inlineEdit' | translate"
-	                            (action)="startInlineEdit(product)"
-	                            [disabled]="bulkBusy() || inlineBusy()"
-	                          ></app-button>
-	                          <app-button
-	                            size="sm"
-	                            variant="ghost"
-	                            [label]="'adminUi.products.edit' | translate"
-	                            (action)="edit(product.slug)"
-	                          ></app-button>
-	                        </ng-template>
-	                      </ng-template>
-	                    </div>
-	                  </td>
+                          </ng-container>
+                          <ng-template #rowActions>
+                            <ng-container *ngIf="view === 'deleted'; else activeRowActions">
+                              <app-button
+                                size="sm"
+                                variant="ghost"
+                                [label]="'adminUi.actions.restore' | translate"
+                                (action)="restoreProduct(product)"
+                                [disabled]="restoringProductId() === product.id"
+                              ></app-button>
+                            </ng-container>
+                            <ng-template #activeRowActions>
+                              <app-button
+                                *ngIf="product.status !== 'archived'"
+                                size="sm"
+                                variant="ghost"
+                                [label]="
+                                  product.status === 'published'
+                                    ? ('adminUi.products.quickStatus.unpublish' | translate)
+                                    : ('adminUi.products.quickStatus.publish' | translate)
+                                "
+                                (action)="
+                                  quickSetStatus(
+                                    product,
+                                    product.status === 'published' ? 'draft' : 'published'
+                                  )
+                                "
+                                [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                              ></app-button>
+                              <app-button
+                                size="sm"
+                                variant="ghost"
+                                [label]="
+                                  product.status === 'archived'
+                                    ? ('adminUi.products.quickStatus.unarchive' | translate)
+                                    : ('adminUi.products.quickStatus.archive' | translate)
+                                "
+                                (action)="
+                                  quickSetStatus(
+                                    product,
+                                    product.status === 'archived' ? 'draft' : 'archived'
+                                  )
+                                "
+                                [disabled]="bulkBusy() || inlineBusy() || quickStatusBusyId()"
+                              ></app-button>
+                              <app-button
+                                size="sm"
+                                variant="ghost"
+                                [label]="'adminUi.products.inlineEdit' | translate"
+                                (action)="startInlineEdit(product)"
+                                [disabled]="bulkBusy() || inlineBusy()"
+                              ></app-button>
+                              <app-button
+                                size="sm"
+                                variant="ghost"
+                                [label]="'adminUi.products.edit' | translate"
+                                (action)="edit(product.slug)"
+                              ></app-button>
+                            </ng-template>
+                          </ng-template>
+                        </div>
+                      </td>
                     </ng-container>
-	                </tr>
+                  </tr>
                 </ng-template>
 
                 <ng-container *ngIf="!useVirtualProductsTable()">
@@ -1493,13 +1896,36 @@ type PriceHistoryChart = {
             </table>
           </div>
 
-          <div *ngIf="meta()" class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200">
+          <div
+            *ngIf="meta()"
+            class="flex items-center justify-between gap-3 pt-2 text-sm text-slate-700 dark:text-slate-200"
+          >
             <div>
-              {{ 'adminUi.products.pagination' | translate: { page: meta()!.page, total_pages: meta()!.total_pages, total_items: meta()!.total_items } }}
+              {{
+                'adminUi.products.pagination'
+                  | translate
+                    : {
+                        page: meta()!.page,
+                        total_pages: meta()!.total_pages,
+                        total_items: meta()!.total_items,
+                      }
+              }}
             </div>
             <div class="flex items-center gap-2">
-              <app-button size="sm" variant="ghost" [label]="'adminUi.products.prev' | translate" [disabled]="meta()!.page <= 1" (action)="goToPage(meta()!.page - 1)"></app-button>
-              <app-button size="sm" variant="ghost" [label]="'adminUi.products.next' | translate" [disabled]="meta()!.page >= meta()!.total_pages" (action)="goToPage(meta()!.page + 1)"></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.prev' | translate"
+                [disabled]="meta()!.page <= 1"
+                (action)="goToPage(meta()!.page - 1)"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.next' | translate"
+                [disabled]="meta()!.page >= meta()!.total_pages"
+                (action)="goToPage(meta()!.page + 1)"
+              ></app-button>
             </div>
           </div>
         </ng-template>
@@ -1518,14 +1944,22 @@ type PriceHistoryChart = {
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="min-w-0 grid gap-1">
               <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                {{ editingSlug() ? ('adminUi.products.edit' | translate) : ('adminUi.products.create' | translate) }}
+                {{
+                  editingSlug()
+                    ? ('adminUi.products.edit' | translate)
+                    : ('adminUi.products.create' | translate)
+                }}
               </h2>
-              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <div
+                class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400"
+              >
                 <ng-container *ngIf="editingSlug() as slug">
                   <span class="font-mono truncate">{{ slug }}</span>
                   <app-copy-button [value]="slug"></app-copy-button>
                 </ng-container>
-                <span *ngIf="!editingSlug() && predictedSlug()" class="font-mono truncate">{{ predictedSlug() }}</span>
+                <span *ngIf="!editingSlug() && predictedSlug()" class="font-mono truncate">{{
+                  predictedSlug()
+                }}</span>
                 <ng-container *ngIf="editingProductId() as pid">
                   <span class="text-slate-300 dark:text-slate-700">·</span>
                   <span class="font-mono truncate">{{ pid }}</span>
@@ -1549,7 +1983,8 @@ type PriceHistoryChart = {
                     *ngIf="!editorDirty() && editorLastSavedAt()"
                     class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
                   >
-                    {{ 'adminUi.content.autosave.state.saved' | translate }} · {{ editorLastSavedAt() | date: 'shortTime' }}
+                    {{ 'adminUi.content.autosave.state.saved' | translate }} ·
+                    {{ editorLastSavedAt() | date: 'shortTime' }}
                   </span>
                 </ng-container>
               </div>
@@ -1571,7 +2006,11 @@ type PriceHistoryChart = {
 
               <app-button
                 size="sm"
-                [label]="editorSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.products.form.save' | translate)"
+                [label]="
+                  editorSaving()
+                    ? ('adminUi.common.saving' | translate)
+                    : ('adminUi.products.form.save' | translate)
+                "
                 (action)="save()"
                 [disabled]="editorSaving()"
               ></app-button>
@@ -1612,7 +2051,11 @@ type PriceHistoryChart = {
 
           <app-button
             size="sm"
-            [label]="editorSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.products.form.save' | translate)"
+            [label]="
+              editorSaving()
+                ? ('adminUi.common.saving' | translate)
+                : ('adminUi.products.form.save' | translate)
+            "
             (action)="save()"
             [disabled]="editorSaving()"
           ></app-button>
@@ -1635,7 +2078,10 @@ type PriceHistoryChart = {
           ></app-button>
         </app-action-bar>
 
-        <div *ngIf="editorError()" class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+        <div
+          *ngIf="editorError()"
+          class="rounded-lg bg-rose-50 border border-rose-200 text-rose-800 p-3 text-sm dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+        >
           {{ editorError() }}
         </div>
 
@@ -1657,32 +2103,40 @@ type PriceHistoryChart = {
           (publishNow)="wizardPublishNow()"
         ></app-admin-products-editor-wizard>
 
-	        <app-form-section
-            id="product-wizard-content"
-            [titleKey]="'adminUi.products.form.workflowTitle'"
-            [descriptionKey]="'adminUi.products.form.workflowHint'"
-          >
-            <div class="grid gap-3 md:grid-cols-2">
-	          <app-input
+        <app-form-section
+          id="product-wizard-content"
+          [titleKey]="'adminUi.products.form.workflowTitle'"
+          [descriptionKey]="'adminUi.products.form.workflowHint'"
+        >
+          <div class="grid gap-3 md:grid-cols-2">
+            <app-input
               [label]="'adminUi.products.table.name' | translate"
               [value]="form.name"
               (valueChange)="onNameChange($event)"
             ></app-input>
-	          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	            <span>{{ 'adminUi.products.form.slug' | translate }}</span>
-	            <div class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 shadow-sm flex items-center dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100">
-	              <span *ngIf="editingSlug(); else slugHint" class="font-mono truncate">{{ editingSlug() }}</span>
-	              <ng-template #slugHint>
-                  <span *ngIf="predictedSlug(); else slugAuto" class="font-mono truncate">{{ predictedSlug() }}</span>
+            <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+              <span>{{ 'adminUi.products.form.slug' | translate }}</span>
+              <div
+                class="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-900 shadow-sm flex items-center dark:border-slate-800 dark:bg-slate-950/20 dark:text-slate-100"
+              >
+                <span *ngIf="editingSlug(); else slugHint" class="font-mono truncate">{{
+                  editingSlug()
+                }}</span>
+                <ng-template #slugHint>
+                  <span *ngIf="predictedSlug(); else slugAuto" class="font-mono truncate">{{
+                    predictedSlug()
+                  }}</span>
                   <ng-template #slugAuto>
-	                  <span class="text-slate-500 dark:text-slate-400">{{ 'adminUi.products.form.slugAutoHint' | translate }}</span>
+                    <span class="text-slate-500 dark:text-slate-400">{{
+                      'adminUi.products.form.slugAutoHint' | translate
+                    }}</span>
                   </ng-template>
-	              </ng-template>
-	            </div>
+                </ng-template>
+              </div>
               <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
                 {{ 'adminUi.products.form.slugHelp' | translate }}
               </span>
-	          </div>
+            </div>
 
             <div
               *ngIf="duplicateBusy() || duplicateHasWarnings()"
@@ -1696,9 +2150,17 @@ type PriceHistoryChart = {
               </div>
 
               <ng-container *ngIf="duplicateCheck() as dup">
-                <div *ngIf="dup.slug_base && dup.suggested_slug && dup.slug_base !== dup.suggested_slug" class="mt-2">
+                <div
+                  *ngIf="
+                    dup.slug_base && dup.suggested_slug && dup.slug_base !== dup.suggested_slug
+                  "
+                  class="mt-2"
+                >
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <span>{{ 'adminUi.products.duplicates.slugTaken' | translate: { slug: dup.slug_base, suggested: dup.suggested_slug } }}</span>
+                    <span>{{
+                      'adminUi.products.duplicates.slugTaken'
+                        | translate: { slug: dup.slug_base, suggested: dup.suggested_slug }
+                    }}</span>
                     <app-button
                       *ngIf="dup.slug_matches.length"
                       size="sm"
@@ -1710,12 +2172,19 @@ type PriceHistoryChart = {
                 </div>
 
                 <div *ngIf="dup.sku_matches.length" class="mt-2 grid gap-1">
-                  <p class="font-semibold">{{ 'adminUi.products.duplicates.skuMatches' | translate }}</p>
+                  <p class="font-semibold">
+                    {{ 'adminUi.products.duplicates.skuMatches' | translate }}
+                  </p>
                   <div class="grid gap-1">
-                    <div *ngFor="let match of dup.sku_matches" class="flex items-center justify-between gap-2">
+                    <div
+                      *ngFor="let match of dup.sku_matches"
+                      class="flex items-center justify-between gap-2"
+                    >
                       <span class="truncate">
                         <span class="font-mono">{{ match.sku }}</span> · {{ match.name }}
-                        <span class="text-xs text-amber-700 dark:text-amber-200">({{ match.slug }})</span>
+                        <span class="text-xs text-amber-700 dark:text-amber-200"
+                          >({{ match.slug }})</span
+                        >
                       </span>
                       <app-button
                         size="sm"
@@ -1728,11 +2197,19 @@ type PriceHistoryChart = {
                 </div>
 
                 <div *ngIf="dup.name_matches.length" class="mt-2 grid gap-1">
-                  <p class="font-semibold">{{ 'adminUi.products.duplicates.nameMatches' | translate }}</p>
+                  <p class="font-semibold">
+                    {{ 'adminUi.products.duplicates.nameMatches' | translate }}
+                  </p>
                   <div class="grid gap-1">
-                    <div *ngFor="let match of dup.name_matches" class="flex items-center justify-between gap-2">
+                    <div
+                      *ngFor="let match of dup.name_matches"
+                      class="flex items-center justify-between gap-2"
+                    >
                       <span class="truncate">
-                        {{ match.name }} <span class="text-xs text-amber-700 dark:text-amber-200">({{ match.slug }})</span>
+                        {{ match.name }}
+                        <span class="text-xs text-amber-700 dark:text-amber-200"
+                          >({{ match.slug }})</span
+                        >
                       </span>
                       <app-button
                         size="sm"
@@ -1744,13 +2221,16 @@ type PriceHistoryChart = {
                   </div>
                 </div>
 
-                <p *ngIf="duplicateHasWarnings()" class="mt-2 text-xs text-amber-800 dark:text-amber-200">
+                <p
+                  *ngIf="duplicateHasWarnings()"
+                  class="mt-2 text-xs text-amber-800 dark:text-amber-200"
+                >
                   {{ 'adminUi.products.duplicates.mergeHint' | translate }}
                 </p>
               </ng-container>
             </div>
 
-	          <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+            <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
               <div class="flex items-center justify-between gap-2">
                 <span>{{ 'adminUi.products.table.category' | translate }}</span>
                 <app-button
@@ -1761,884 +2241,1107 @@ type PriceHistoryChart = {
                   [disabled]="createCategoryOpen()"
                 ></app-button>
               </div>
-	            <select
-	              class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              [(ngModel)]="form.category_id"
+              <select
+                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                [(ngModel)]="form.category_id"
+              >
+                <option value="" disabled>
+                  {{ 'adminUi.products.selectCategory' | translate }}
+                </option>
+                <option *ngFor="let cat of adminCategories()" [value]="cat.id">
+                  {{ cat.name }}
+                </option>
+              </select>
+            </div>
+
+            <app-input
+              [label]="'adminUi.products.table.price' | translate"
+              [placeholder]="'123.45'"
+              type="text"
+              inputMode="decimal"
+              [value]="form.base_price"
+              (valueChange)="onBasePriceChange($event)"
+              [hint]="basePriceError || ('adminUi.products.form.priceFormatHint' | translate)"
+            ></app-input>
+
+            <div
+              class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
             >
-              <option value="" disabled>{{ 'adminUi.products.selectCategory' | translate }}</option>
-              <option *ngFor="let cat of adminCategories()" [value]="cat.id">{{ cat.name }}</option>
-            </select>
-          </div>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  {{ 'adminUi.products.sale.title' | translate }}
+                </p>
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="form.sale_enabled"
+                    (change)="onSaleEnabledChange()"
+                  />
+                  {{ 'adminUi.products.sale.enabled' | translate }}
+                </label>
+              </div>
 
-          <app-input
-            [label]="'adminUi.products.table.price' | translate"
-            [placeholder]="'123.45'"
-            type="text"
-            inputMode="decimal"
-            [value]="form.base_price"
-            (valueChange)="onBasePriceChange($event)"
-            [hint]="basePriceError || ('adminUi.products.form.priceFormatHint' | translate)"
-          ></app-input>
+              <div class="mt-3 grid gap-3 md:grid-cols-[200px_1fr] items-end">
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.sale.type' | translate }}
+                  <select
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    [(ngModel)]="form.sale_type"
+                    (change)="onSaleTypeChange()"
+                    [disabled]="!form.sale_enabled"
+                  >
+                    <option [ngValue]="'percent'">
+                      {{ 'adminUi.products.sale.typePercent' | translate }}
+                    </option>
+                    <option [ngValue]="'amount'">
+                      {{ 'adminUi.products.sale.typeAmount' | translate }}
+                    </option>
+                  </select>
+                </label>
 
-          <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.products.sale.title' | translate }}
-              </p>
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" [(ngModel)]="form.sale_enabled" (change)="onSaleEnabledChange()" />
-                {{ 'adminUi.products.sale.enabled' | translate }}
-              </label>
-            </div>
-
-	            <div class="mt-3 grid gap-3 md:grid-cols-[200px_1fr] items-end">
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.sale.type' | translate }}
-	                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="form.sale_type"
-                  (change)="onSaleTypeChange()"
+                <app-input
+                  [label]="'adminUi.products.sale.value' | translate"
+                  [placeholder]="form.sale_type === 'percent' ? '10' : '5.00'"
+                  type="text"
+                  inputMode="decimal"
+                  [value]="form.sale_value"
+                  (valueChange)="onSaleValueChange($event)"
                   [disabled]="!form.sale_enabled"
-                >
-                  <option [ngValue]="'percent'">{{ 'adminUi.products.sale.typePercent' | translate }}</option>
-                  <option [ngValue]="'amount'">{{ 'adminUi.products.sale.typeAmount' | translate }}</option>
-                </select>
-              </label>
-
-              <app-input
-                [label]="'adminUi.products.sale.value' | translate"
-                [placeholder]="form.sale_type === 'percent' ? '10' : '5.00'"
-                type="text"
-                inputMode="decimal"
-                [value]="form.sale_value"
-                (valueChange)="onSaleValueChange($event)"
-	                [disabled]="!form.sale_enabled"
-	                [hint]="saleValueError || ('adminUi.products.sale.note' | translate)"
-		              ></app-input>
-		            </div>
-
-                <div *ngIf="salePreviewInfo() as preview" class="mt-2 text-xs text-slate-600 dark:text-slate-300">
-                  {{
-                    'adminUi.products.sale.preview'
-                      | translate
-                        : {
-                            price: (preview.sale | localizedCurrency : editingCurrency()),
-                            saved: (preview.saved | localizedCurrency : editingCurrency()),
-                            percent: (preview.percent | number: '1.0-1')
-                          }
-                  }}
-                </div>
-
-		            <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
-		              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-		                {{ 'adminUi.products.sale.startAt' | translate }}
-		                <input
-	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  type="datetime-local"
-	                  [(ngModel)]="form.sale_start_at"
-	                  [disabled]="!form.sale_enabled"
-	                />
-	              </label>
-
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.sale.endAt' | translate }}
-	                <input
-	                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  type="datetime-local"
-	                  [(ngModel)]="form.sale_end_at"
-	                  [disabled]="!form.sale_enabled"
-	                />
-	              </label>
-
-	              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-	                <input type="checkbox" [(ngModel)]="form.sale_auto_publish" [disabled]="!form.sale_enabled" />
-	                {{ 'adminUi.products.sale.autoPublish' | translate }}
-	              </label>
-	            </div>
-	          </div>
-          <app-input [label]="'adminUi.products.table.stock' | translate" type="number" [(value)]="form.stock_quantity"></app-input>
-          <details
-            id="product-wizard-publish"
-            class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
-            [open]="uiPrefs.mode() === 'advanced' || wizardForcesAdvancedOpen()"
-          >
-            <summary class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.products.form.advancedSettings' | translate }}
-            </summary>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.products.form.advancedHint' | translate }}
-            </p>
-
-            <div class="mt-3 grid gap-3 md:grid-cols-2">
-              <app-input
-                [label]="'adminUi.lowStock.thresholdLabel' | translate"
-                [hint]="'adminUi.lowStock.thresholdHint' | translate"
-                type="number"
-                [(value)]="form.low_stock_threshold"
-              ></app-input>
-
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.table.status' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="form.status"
-                >
-                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-                  <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
-                </select>
-              </label>
-
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                <input type="checkbox" [(ngModel)]="form.is_active" />
-                {{ 'adminUi.products.form.active' | translate }}
-              </label>
-
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                <input type="checkbox" [(ngModel)]="form.is_featured" />
-                {{ 'adminUi.products.form.featured' | translate }}
-              </label>
-
-              <app-input
-                [label]="'adminUi.products.form.sku' | translate"
-                [value]="form.sku"
-                (valueChange)="onSkuChange($event)"
-                [hint]="'adminUi.products.form.skuHint' | translate"
-              ></app-input>
-
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.products.form.publishAt' | translate }}
-                <input
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  type="datetime-local"
-                  [(ngModel)]="form.publish_at"
-                />
-              </label>
-
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" [(ngModel)]="form.is_bestseller" />
-                {{ 'adminUi.products.form.bestseller' | translate }}
-              </label>
-            </div>
-
-            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.products.badges.title' | translate }}
-                </p>
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.badges.hint' | translate }}
-                </span>
+                  [hint]="saleValueError || ('adminUi.products.sale.note' | translate)"
+                ></app-input>
               </div>
 
-              <div class="mt-3 grid gap-4">
-                <div class="grid gap-3 md:grid-cols-3 items-end">
-                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                    <input type="checkbox" [(ngModel)]="form.badges.new.enabled" />
-                    {{ 'adminUi.products.badges.new' | translate }}
-                  </label>
-
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.badges.startAt' | translate }}
-                    <input
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      type="datetime-local"
-                      [(ngModel)]="form.badges.new.start_at"
-                      [disabled]="!form.badges.new.enabled"
-                    />
-                  </label>
-
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.badges.endAt' | translate }}
-                    <input
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      type="datetime-local"
-                      [(ngModel)]="form.badges.new.end_at"
-                      [disabled]="!form.badges.new.enabled"
-                    />
-                  </label>
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-3 items-end">
-                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                    <input type="checkbox" [(ngModel)]="form.badges.limited.enabled" />
-                    {{ 'adminUi.products.badges.limited' | translate }}
-                  </label>
-
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.badges.startAt' | translate }}
-                    <input
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      type="datetime-local"
-                      [(ngModel)]="form.badges.limited.start_at"
-                      [disabled]="!form.badges.limited.enabled"
-                    />
-                  </label>
-
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.badges.endAt' | translate }}
-                    <input
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      type="datetime-local"
-                      [(ngModel)]="form.badges.limited.end_at"
-                      [disabled]="!form.badges.limited.enabled"
-                    />
-                  </label>
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-3 items-end">
-                  <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                    <input type="checkbox" [(ngModel)]="form.badges.handmade.enabled" />
-                    {{ 'adminUi.products.badges.handmade' | translate }}
-                  </label>
-
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.badges.startAt' | translate }}
-                    <input
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      type="datetime-local"
-                      [(ngModel)]="form.badges.handmade.start_at"
-                      [disabled]="!form.badges.handmade.enabled"
-                    />
-                  </label>
-
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.badges.endAt' | translate }}
-                    <input
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      type="datetime-local"
-                      [(ngModel)]="form.badges.handmade.end_at"
-                      [disabled]="!form.badges.handmade.enabled"
-                    />
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.products.shipping.title' | translate }}
-                </p>
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.shipping.hint' | translate }}
-                </span>
-              </div>
-
-              <div class="mt-3 grid gap-3 md:grid-cols-4 items-end">
-                <app-input
-                  [label]="'adminUi.products.shipping.weight' | translate"
-                  type="number"
-                  inputMode="numeric"
-                  [value]="form.weight_grams"
-                  (valueChange)="form.weight_grams = String($event ?? '')"
-                  [min]="0"
-                  [hint]="'adminUi.products.shipping.weightUnit' | translate"
-                ></app-input>
-
-                <app-input
-                  [label]="'adminUi.products.shipping.width' | translate"
-                  type="number"
-                  inputMode="decimal"
-                  [value]="form.width_cm"
-                  (valueChange)="form.width_cm = String($event ?? '')"
-                  [min]="0"
-                  [step]="0.01"
-                  [hint]="'adminUi.products.shipping.cm' | translate"
-                ></app-input>
-
-                <app-input
-                  [label]="'adminUi.products.shipping.height' | translate"
-                  type="number"
-                  inputMode="decimal"
-                  [value]="form.height_cm"
-                  (valueChange)="form.height_cm = String($event ?? '')"
-                  [min]="0"
-                  [step]="0.01"
-                  [hint]="'adminUi.products.shipping.cm' | translate"
-                ></app-input>
-
-                <app-input
-                  [label]="'adminUi.products.shipping.depth' | translate"
-                  type="number"
-                  inputMode="decimal"
-                  [value]="form.depth_cm"
-                  (valueChange)="form.depth_cm = String($event ?? '')"
-                  [min]="0"
-                  [step]="0.01"
-                  [hint]="'adminUi.products.shipping.cm' | translate"
-                ></app-input>
+              <div
+                *ngIf="salePreviewInfo() as preview"
+                class="mt-2 text-xs text-slate-600 dark:text-slate-300"
+              >
+                {{
+                  'adminUi.products.sale.preview'
+                    | translate
+                      : {
+                          price: (preview.sale | localizedCurrency: editingCurrency()),
+                          saved: (preview.saved | localizedCurrency: editingCurrency()),
+                          percent: (preview.percent | number: '1.0-1'),
+                        }
+                }}
               </div>
 
               <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
                 <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.shipping.classLabel' | translate }}
+                  {{ 'adminUi.products.sale.startAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.sale_start_at"
+                    [disabled]="!form.sale_enabled"
+                  />
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.sale.endAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.sale_end_at"
+                    [disabled]="!form.sale_enabled"
+                  />
+                </label>
+
+                <label
+                  class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6"
+                >
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="form.sale_auto_publish"
+                    [disabled]="!form.sale_enabled"
+                  />
+                  {{ 'adminUi.products.sale.autoPublish' | translate }}
+                </label>
+              </div>
+            </div>
+            <app-input
+              [label]="'adminUi.products.table.stock' | translate"
+              type="number"
+              [(value)]="form.stock_quantity"
+            ></app-input>
+            <details
+              id="product-wizard-publish"
+              class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              [open]="uiPrefs.mode() === 'advanced' || wizardForcesAdvancedOpen()"
+            >
+              <summary
+                class="cursor-pointer select-none text-sm font-semibold text-slate-900 dark:text-slate-50"
+              >
+                {{ 'adminUi.products.form.advancedSettings' | translate }}
+              </summary>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.form.advancedHint' | translate }}
+              </p>
+
+              <div class="mt-3 grid gap-3 md:grid-cols-2">
+                <app-input
+                  [label]="'adminUi.lowStock.thresholdLabel' | translate"
+                  [hint]="'adminUi.lowStock.thresholdHint' | translate"
+                  type="number"
+                  [(value)]="form.low_stock_threshold"
+                ></app-input>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.table.status' | translate }}
                   <select
                     class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="form.shipping_class"
+                    [(ngModel)]="form.status"
                   >
-                    <option value="standard">{{ 'adminUi.products.shipping.class.standard' | translate }}</option>
-                    <option value="bulky">{{ 'adminUi.products.shipping.class.bulky' | translate }}</option>
-                    <option value="oversize">{{ 'adminUi.products.shipping.class.oversize' | translate }}</option>
+                    <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
+                    <option value="published">{{ 'adminUi.status.published' | translate }}</option>
+                    <option value="archived">{{ 'adminUi.status.archived' | translate }}</option>
                   </select>
                 </label>
 
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6">
-                  <input type="checkbox" [(ngModel)]="form.shipping_allow_locker" />
-                  {{ 'adminUi.products.shipping.allowLocker' | translate }}
+                <label
+                  class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6"
+                >
+                  <input type="checkbox" [(ngModel)]="form.is_active" />
+                  {{ 'adminUi.products.form.active' | translate }}
                 </label>
 
-                <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  <span>{{ 'adminUi.products.shipping.disallowedCouriers' | translate }}</span>
-                  <div class="flex flex-wrap items-center gap-4 text-sm font-normal text-slate-700 dark:text-slate-200">
-                    <label class="inline-flex items-center gap-2">
-                      <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.sameday" />
-                      {{ 'adminUi.products.shipping.courier.sameday' | translate }}
-                    </label>
-                    <label class="inline-flex items-center gap-2">
-                      <input type="checkbox" [(ngModel)]="form.shipping_disallowed_couriers.fan_courier" />
-                      {{ 'adminUi.products.shipping.courier.fan_courier' | translate }}
-                    </label>
-                  </div>
-                  <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.products.shipping.disallowedHint' | translate }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </details>
-	        </div>
-          </app-form-section>
-
-	        <details
-            data-ignore-dirty
-            class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
-          >
-            <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-              <div class="min-w-0 grid gap-1">
-                <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.products.form.variantsTitle' | translate }}
-                </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.products.form.variantsHint' | translate }}
-                </p>
-              </div>
-              <div class="flex items-center gap-2">
-                <span
-                  *ngIf="variants().length"
-                  class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                <label
+                  class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6"
                 >
-                  {{ variants().length }}
-                </span>
-                <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-              </div>
-            </summary>
+                  <input type="checkbox" [(ngModel)]="form.is_featured" />
+                  {{ 'adminUi.products.form.featured' | translate }}
+                </label>
 
-            <div class="mt-3 grid gap-3">
-              <div class="flex flex-wrap items-center justify-end gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.form.variantsAdd' | translate"
-                  (action)="addVariantRow()"
-                  [disabled]="variantsBusy()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  [label]="'adminUi.products.form.variantsSave' | translate"
-                  (action)="saveVariants()"
-                  [disabled]="variantsBusy() || !editingSlug()"
-                ></app-button>
+                <app-input
+                  [label]="'adminUi.products.form.sku' | translate"
+                  [value]="form.sku"
+                  (valueChange)="onSkuChange($event)"
+                  [hint]="'adminUi.products.form.skuHint' | translate"
+                ></app-input>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.form.publishAt' | translate }}
+                  <input
+                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    type="datetime-local"
+                    [(ngModel)]="form.publish_at"
+                  />
+                </label>
+
+                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+                  <input type="checkbox" [(ngModel)]="form.is_bestseller" />
+                  {{ 'adminUi.products.form.bestseller' | translate }}
+                </label>
               </div>
 
               <div
-                *ngIf="variantsError()"
-                class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+                class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
               >
-                {{ variantsError() }}
-              </div>
-
-              <div *ngIf="variants().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.products.form.variantsEmpty' | translate }}
-              </div>
-
-              <div *ngIf="variants().length > 0" class="overflow-x-auto">
-                <table class="w-full text-sm">
-                  <thead>
-                    <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      <th class="py-2 pr-3">{{ 'adminUi.products.form.variantsName' | translate }}</th>
-                      <th class="py-2 pr-3 w-40">{{ 'adminUi.products.form.variantsDelta' | translate }}</th>
-                      <th class="py-2 pr-3 w-32">{{ 'adminUi.products.form.variantsPrice' | translate }}</th>
-                      <th class="py-2 pr-3 w-28">{{ 'adminUi.products.form.variantsStock' | translate }}</th>
-                      <th class="py-2 w-24">{{ 'adminUi.products.table.actions' | translate }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let v of variants(); let idx = index" class="border-t border-slate-200 dark:border-slate-800">
-                      <td class="py-2 pr-3">
-                        <input
-                          class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          type="text"
-                          [ngModel]="v.name"
-                          (ngModelChange)="onVariantNameChange(idx, $event)"
-                          [disabled]="variantsBusy()"
-                        />
-                      </td>
-                      <td class="py-2 pr-3">
-                        <input
-                          class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          type="number"
-                          step="0.01"
-                          inputmode="decimal"
-                          [ngModel]="v.additional_price_delta"
-                          (ngModelChange)="onVariantDeltaChange(idx, $event)"
-                          [disabled]="variantsBusy()"
-                        />
-                      </td>
-                      <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
-                        {{ formatMoneyInput(variantComputedPrice(v.additional_price_delta)) }} RON
-                      </td>
-                      <td class="py-2 pr-3">
-                        <input
-                          class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          type="number"
-                          step="1"
-                          min="0"
-                          [ngModel]="v.stock_quantity"
-                          (ngModelChange)="onVariantStockChange(idx, $event)"
-                          [disabled]="variantsBusy()"
-                        />
-                      </td>
-                      <td class="py-2">
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.products.form.variantsRemove' | translate"
-                          (action)="removeVariantRow(v)"
-                          [disabled]="variantsBusy()"
-                        ></app-button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </details>
-
-		        <app-admin-products-relationships-manager
-		          [hasEditingSlug]="!!editingSlug()"
-		          [relationshipSearch]="relationshipSearch"
-		          [relationshipSearchLoading]="relationshipSearchLoading()"
-		          [relationshipSearchResults]="relationshipSearchResults()"
-		          [relationshipsRelated]="relationshipsRelated()"
-		          [relationshipsUpsells]="relationshipsUpsells()"
-		          [relationshipsLoading]="relationshipsLoading()"
-		          [relationshipsSaving]="relationshipsSaving()"
-		          [relationshipsError]="relationshipsError()"
-		          [relationshipsMessage]="relationshipsMessage()"
-		          (relationshipSearchChanged)="onRelationshipSearchChange($event)"
-		          (addRequested)="addRelationship($event.item, $event.kind)"
-		          (moveRequested)="moveRelationship($event.kind, $event.index, $event.direction)"
-		          (removeRequested)="removeRelationship($event.id, $event.kind)"
-		          (saveRequested)="saveRelationships()"
-		        ></app-admin-products-relationships-manager>
-
-			        <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-                  <div class="min-w-0 grid gap-1">
-                    <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.products.priceHistory.title' | translate }}
-                    </h3>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.products.priceHistory.hint' | translate }}
-                    </p>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span
-                      *ngIf="priceHistoryChanges().length"
-                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-                    >
-                      {{ priceHistoryChanges().length }}
-                    </span>
-                    <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-                  </div>
-                </summary>
-
-                <div class="mt-3 grid gap-3">
-			          <div *ngIf="priceHistoryChart() as chart; else priceHistoryEmpty" class="grid gap-3">
-			            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-			              <svg class="h-40 w-full" [attr.viewBox]="'0 0 ' + chart.width + ' ' + chart.height" preserveAspectRatio="none">
-			                <rect
-			                  *ngIf="chart.saleRect"
-			                  [attr.x]="chart.saleRect.x"
-			                  [attr.y]="chart.pad"
-			                  [attr.width]="chart.saleRect.width"
-			                  [attr.height]="chart.height - chart.pad * 2"
-			                  fill="rgba(99, 102, 241, 0.12)"
-			                ></rect>
-			                <line
-			                  *ngIf="chart.nowX !== null"
-			                  [attr.x1]="chart.nowX"
-			                  [attr.x2]="chart.nowX"
-			                  [attr.y1]="chart.pad"
-			                  [attr.y2]="chart.height - chart.pad"
-			                  stroke="rgba(100, 116, 139, 0.6)"
-			                  stroke-width="1"
-			                  stroke-dasharray="4 4"
-			                ></line>
-			                <polyline
-			                  [attr.points]="chart.polyline"
-			                  fill="none"
-			                  stroke="rgba(99, 102, 241, 0.9)"
-			                  stroke-width="2"
-			                  stroke-linejoin="round"
-			                  stroke-linecap="round"
-			                ></polyline>
-			                <circle
-			                  *ngFor="let dot of chart.dots"
-			                  [attr.cx]="dot.x"
-			                  [attr.cy]="dot.y"
-			                  r="2.5"
-			                  fill="rgba(99, 102, 241, 0.95)"
-			                ></circle>
-			              </svg>
-			            </div>
-
-			            <div class="flex flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300">
-			              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-			                {{ 'adminUi.products.priceHistory.latest' | translate }}:
-			                {{ chart.latest | localizedCurrency : editingCurrency() }}
-			              </span>
-			              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-			                {{ 'adminUi.products.priceHistory.min' | translate }}:
-			                {{ chart.min | localizedCurrency : editingCurrency() }}
-			              </span>
-			              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900">
-			                {{ 'adminUi.products.priceHistory.max' | translate }}:
-			                {{ chart.max | localizedCurrency : editingCurrency() }}
-			              </span>
-			              <span
-			                *ngIf="form.sale_start_at && form.sale_end_at"
-			                class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
-			              >
-			                {{ 'adminUi.products.priceHistory.saleWindow' | translate }}:
-			                {{ form.sale_start_at }} → {{ form.sale_end_at }}
-			              </span>
-			            </div>
-			          </div>
-
-			          <ng-template #priceHistoryEmpty>
-			            <div class="text-sm text-slate-600 dark:text-slate-300">
-			              {{ 'adminUi.products.priceHistory.empty' | translate }}
-			            </div>
-			          </ng-template>
-
-			          <div
-			            *ngIf="priceHistoryChanges().length > 0"
-			            class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-			          >
-			            <table class="w-full text-left text-sm">
-			              <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
-			                <tr>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.when' | translate }}</th>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.user' | translate }}</th>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.from' | translate }}</th>
-			                  <th class="px-3 py-2">{{ 'adminUi.products.priceHistory.table.to' | translate }}</th>
-			                </tr>
-			              </thead>
-			              <tbody>
-			                <tr *ngFor="let change of priceHistoryChanges()" class="border-t border-slate-200 dark:border-slate-800">
-			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ change.at | date: 'short' }}</td>
-			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ change.user || '—' }}</td>
-			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-			                    {{ change.before | localizedCurrency : editingCurrency() }}
-			                  </td>
-			                  <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-			                    {{ change.after | localizedCurrency : editingCurrency() }}
-			                  </td>
-			                </tr>
-			              </tbody>
-			            </table>
-			          </div>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.products.badges.title' | translate }}
+                  </p>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.badges.hint' | translate }}
+                  </span>
                 </div>
-			        </details>
 
-			        <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-			            <div class="min-w-0 grid gap-1">
-			              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-			                {{ 'adminUi.products.audit.title' | translate }}
-			              </h3>
-			              <p class="text-xs text-slate-500 dark:text-slate-400">
-			                {{ 'adminUi.products.audit.hint' | translate }}
-			              </p>
-			            </div>
-			            <div class="flex items-center gap-2">
-			              <span
-			                *ngIf="auditEntries().length"
-			                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-			              >
-			                {{ auditEntries().length }}
-			              </span>
-			              <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-			            </div>
-			          </summary>
-
-			          <div class="mt-3 grid gap-3">
-			            <div class="flex flex-wrap items-center justify-end gap-2">
-			              <app-button
-			                size="sm"
-			                variant="ghost"
-			                [label]="'adminUi.actions.refresh' | translate"
-			                (action)="refreshAudit()"
-			                [disabled]="auditBusy() || !editingSlug()"
-			              ></app-button>
-			            </div>
-
-			            <div
-			              *ngIf="auditError()"
-			              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-			            >
-			              {{ auditError() }}
-			            </div>
-
-			            <div *ngIf="auditBusy()" class="text-sm text-slate-600 dark:text-slate-300">
-			              {{ 'adminUi.actions.loading' | translate }}
-			            </div>
-
-			            <div *ngIf="!auditBusy() && auditEntries().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-			              {{ 'adminUi.products.audit.empty' | translate }}
-			            </div>
-
-			            <div
-			              *ngIf="auditEntries().length > 0"
-			              class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-			            >
-			              <table class="w-full text-sm">
-			                <thead class="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/20 dark:text-slate-400">
-			                  <tr>
-			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.when' | translate }}</th>
-			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.action' | translate }}</th>
-			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.user' | translate }}</th>
-			                    <th class="px-3 py-2">{{ 'adminUi.products.audit.details' | translate }}</th>
-			                  </tr>
-			                </thead>
-			                <tbody>
-			                  <tr *ngFor="let entry of auditEntries()" class="border-t border-slate-200 dark:border-slate-800">
-			                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">{{ entry.created_at | date: 'short' }}</td>
-			                    <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">{{ entry.action }}</td>
-			                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-			                      {{ entry.user_email || entry.user_id || '—' }}
-			                    </td>
-			                    <td class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
-			                      <div *ngIf="entry.payload?.changes as changes; else auditFallback" class="grid gap-1">
-			                        <div *ngFor="let item of changes | keyvalue" class="grid gap-1 sm:grid-cols-[160px_1fr] sm:gap-3">
-			                          <span class="font-semibold text-slate-700 dark:text-slate-200">{{ item.key }}</span>
-			                          <span class="truncate">
-			                            {{ formatAuditValue(item.value?.before) }} → {{ formatAuditValue(item.value?.after) }}
-			                          </span>
-			                        </div>
-			                      </div>
-			                      <ng-template #auditFallback>
-			                        <span *ngIf="entry.payload as payload; else auditEmpty">{{ formatAuditValue(payload) }}</span>
-			                        <ng-template #auditEmpty>—</ng-template>
-			                      </ng-template>
-			                    </td>
-			                  </tr>
-			                </tbody>
-			              </table>
-			            </div>
-			          </div>
-			        </details>
-
-			        <details
-			          data-ignore-dirty
-			          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
-			        >
-			          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-			            <div class="min-w-0 grid gap-1">
-			              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-			                {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
-			              </h3>
-			              <p class="text-xs text-slate-500 dark:text-slate-400">
-			                {{ 'adminUi.products.form.stockLedgerHint' | translate }}
-			              </p>
-			            </div>
-			            <div class="flex items-center gap-2">
-			              <span
-			                *ngIf="stockAdjustments().length"
-			                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-			              >
-			                {{ stockAdjustments().length }}
-			              </span>
-			              <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-			            </div>
-			          </summary>
-
-			          <div class="mt-3 grid gap-3">
-			            <div
-			              *ngIf="stockAdjustmentsError()"
-			              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-			            >
-			              {{ stockAdjustmentsError() }}
-			            </div>
-
-			            <div class="grid gap-3 items-end md:grid-cols-5">
-			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-			                {{ 'adminUi.products.form.stockLedgerTarget' | translate }}
-			                <select
-			                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-			                  [(ngModel)]="stockAdjustTarget"
-			                  [disabled]="stockAdjustBusy() || !editingSlug()"
-			                >
-			                  <option value="">{{ 'adminUi.products.form.stockLedgerTargetProduct' | translate }}</option>
-			                  <option *ngFor="let v of variantsWithIds()" [value]="v.id">{{ v.name }}</option>
-			                </select>
-			              </label>
-
-			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-			                {{ 'adminUi.products.form.stockLedgerReason' | translate }}
-			                <select
-			                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-			                  [(ngModel)]="stockAdjustReason"
-			                  [disabled]="stockAdjustBusy() || !editingSlug()"
-			                >
-			                  <option value="restock">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
-			                  <option value="damage">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
-			                  <option value="manual_correction">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
-			                </select>
-			              </label>
-
-			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-			                {{ 'adminUi.products.form.stockLedgerDelta' | translate }}
-			                <input
-			                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-			                  type="number"
-			                  step="1"
-			                  [(ngModel)]="stockAdjustDelta"
-			                  [disabled]="stockAdjustBusy() || !editingSlug()"
-			                />
-			              </label>
-
-			              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2">
-			                {{ 'adminUi.products.form.stockLedgerNote' | translate }}
-			                <input
-			                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-			                  type="text"
-			                  [(ngModel)]="stockAdjustNote"
-			                  [disabled]="stockAdjustBusy() || !editingSlug()"
-			                />
-			              </label>
-			            </div>
-
-			            <div class="flex items-center gap-2">
-			              <app-button
-			                size="sm"
-			                [label]="'adminUi.products.form.stockLedgerApply' | translate"
-			                (action)="applyStockAdjustment()"
-			                [disabled]="stockAdjustBusy() || !editingSlug()"
-			              ></app-button>
-			              <span *ngIf="stockAdjustBusy()" class="text-sm text-slate-600 dark:text-slate-300">
-			                {{ 'adminUi.products.form.stockLedgerApplying' | translate }}
-			              </span>
-			            </div>
-
-                  <div class="grid gap-3 items-end md:grid-cols-4">
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.products.form.stockLedgerExportFrom' | translate }}
-                      <input
-                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        type="date"
-                        [(ngModel)]="stockLedgerExportFrom"
-                        [disabled]="stockLedgerExporting() || !editingSlug()"
-                      />
+                <div class="mt-3 grid gap-4">
+                  <div class="grid gap-3 md:grid-cols-3 items-end">
+                    <label
+                      class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6"
+                    >
+                      <input type="checkbox" [(ngModel)]="form.badges.new.enabled" />
+                      {{ 'adminUi.products.badges.new' | translate }}
                     </label>
 
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.products.form.stockLedgerExportTo' | translate }}
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {{ 'adminUi.products.badges.startAt' | translate }}
                       <input
-                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        type="date"
-                        [(ngModel)]="stockLedgerExportTo"
-                        [disabled]="stockLedgerExporting() || !editingSlug()"
-                      />
-                    </label>
-
-                    <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                      {{ 'adminUi.products.form.stockLedgerExportReason' | translate }}
-                      <select
                         class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        [(ngModel)]="stockLedgerExportReason"
-                        [disabled]="stockLedgerExporting() || !editingSlug()"
-                      >
-                        <option value="all">{{ 'adminUi.products.form.stockLedgerExportAllReasons' | translate }}</option>
-                        <option value="restock">{{ 'adminUi.products.form.stockReason.restock' | translate }}</option>
-                        <option value="damage">{{ 'adminUi.products.form.stockReason.damage' | translate }}</option>
-                        <option value="manual_correction">{{ 'adminUi.products.form.stockReason.manual_correction' | translate }}</option>
-                      </select>
+                        type="datetime-local"
+                        [(ngModel)]="form.badges.new.start_at"
+                        [disabled]="!form.badges.new.enabled"
+                      />
                     </label>
 
-                    <div class="flex items-center justify-end gap-2">
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {{ 'adminUi.products.badges.endAt' | translate }}
+                      <input
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="datetime-local"
+                        [(ngModel)]="form.badges.new.end_at"
+                        [disabled]="!form.badges.new.enabled"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="grid gap-3 md:grid-cols-3 items-end">
+                    <label
+                      class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6"
+                    >
+                      <input type="checkbox" [(ngModel)]="form.badges.limited.enabled" />
+                      {{ 'adminUi.products.badges.limited' | translate }}
+                    </label>
+
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {{ 'adminUi.products.badges.startAt' | translate }}
+                      <input
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="datetime-local"
+                        [(ngModel)]="form.badges.limited.start_at"
+                        [disabled]="!form.badges.limited.enabled"
+                      />
+                    </label>
+
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {{ 'adminUi.products.badges.endAt' | translate }}
+                      <input
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="datetime-local"
+                        [(ngModel)]="form.badges.limited.end_at"
+                        [disabled]="!form.badges.limited.enabled"
+                      />
+                    </label>
+                  </div>
+
+                  <div class="grid gap-3 md:grid-cols-3 items-end">
+                    <label
+                      class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6"
+                    >
+                      <input type="checkbox" [(ngModel)]="form.badges.handmade.enabled" />
+                      {{ 'adminUi.products.badges.handmade' | translate }}
+                    </label>
+
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {{ 'adminUi.products.badges.startAt' | translate }}
+                      <input
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="datetime-local"
+                        [(ngModel)]="form.badges.handmade.start_at"
+                        [disabled]="!form.badges.handmade.enabled"
+                      />
+                    </label>
+
+                    <label
+                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
+                    >
+                      {{ 'adminUi.products.badges.endAt' | translate }}
+                      <input
+                        class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="datetime-local"
+                        [(ngModel)]="form.badges.handmade.end_at"
+                        [disabled]="!form.badges.handmade.enabled"
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+              >
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    {{ 'adminUi.products.shipping.title' | translate }}
+                  </p>
+                  <span class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ 'adminUi.products.shipping.hint' | translate }}
+                  </span>
+                </div>
+
+                <div class="mt-3 grid gap-3 md:grid-cols-4 items-end">
+                  <app-input
+                    [label]="'adminUi.products.shipping.weight' | translate"
+                    type="number"
+                    inputMode="numeric"
+                    [value]="form.weight_grams"
+                    (valueChange)="form.weight_grams = String($event ?? '')"
+                    [min]="0"
+                    [hint]="'adminUi.products.shipping.weightUnit' | translate"
+                  ></app-input>
+
+                  <app-input
+                    [label]="'adminUi.products.shipping.width' | translate"
+                    type="number"
+                    inputMode="decimal"
+                    [value]="form.width_cm"
+                    (valueChange)="form.width_cm = String($event ?? '')"
+                    [min]="0"
+                    [step]="0.01"
+                    [hint]="'adminUi.products.shipping.cm' | translate"
+                  ></app-input>
+
+                  <app-input
+                    [label]="'adminUi.products.shipping.height' | translate"
+                    type="number"
+                    inputMode="decimal"
+                    [value]="form.height_cm"
+                    (valueChange)="form.height_cm = String($event ?? '')"
+                    [min]="0"
+                    [step]="0.01"
+                    [hint]="'adminUi.products.shipping.cm' | translate"
+                  ></app-input>
+
+                  <app-input
+                    [label]="'adminUi.products.shipping.depth' | translate"
+                    type="number"
+                    inputMode="decimal"
+                    [value]="form.depth_cm"
+                    (valueChange)="form.depth_cm = String($event ?? '')"
+                    [min]="0"
+                    [step]="0.01"
+                    [hint]="'adminUi.products.shipping.cm' | translate"
+                  ></app-input>
+                </div>
+
+                <div class="mt-3 grid gap-3 md:grid-cols-3 items-end">
+                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {{ 'adminUi.products.shipping.classLabel' | translate }}
+                    <select
+                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      [(ngModel)]="form.shipping_class"
+                    >
+                      <option value="standard">
+                        {{ 'adminUi.products.shipping.class.standard' | translate }}
+                      </option>
+                      <option value="bulky">
+                        {{ 'adminUi.products.shipping.class.bulky' | translate }}
+                      </option>
+                      <option value="oversize">
+                        {{ 'adminUi.products.shipping.class.oversize' | translate }}
+                      </option>
+                    </select>
+                  </label>
+
+                  <label
+                    class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 pt-6"
+                  >
+                    <input type="checkbox" [(ngModel)]="form.shipping_allow_locker" />
+                    {{ 'adminUi.products.shipping.allowLocker' | translate }}
+                  </label>
+
+                  <div class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    <span>{{ 'adminUi.products.shipping.disallowedCouriers' | translate }}</span>
+                    <div
+                      class="flex flex-wrap items-center gap-4 text-sm font-normal text-slate-700 dark:text-slate-200"
+                    >
+                      <label class="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          [(ngModel)]="form.shipping_disallowed_couriers.sameday"
+                        />
+                        {{ 'adminUi.products.shipping.courier.sameday' | translate }}
+                      </label>
+                      <label class="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          [(ngModel)]="form.shipping_disallowed_couriers.fan_courier"
+                        />
+                        {{ 'adminUi.products.shipping.courier.fan_courier' | translate }}
+                      </label>
+                    </div>
+                    <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      {{ 'adminUi.products.shipping.disallowedHint' | translate }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+        </app-form-section>
+
+        <details
+          data-ignore-dirty
+          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+        >
+          <summary
+            class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+          >
+            <div class="min-w-0 grid gap-1">
+              <h3
+                class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200"
+              >
+                {{ 'adminUi.products.form.variantsTitle' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.form.variantsHint' | translate }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                *ngIf="variants().length"
+                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {{ variants().length }}
+              </span>
+              <span
+                class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400"
+                >▸</span
+              >
+            </div>
+          </summary>
+
+          <div class="mt-3 grid gap-3">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.form.variantsAdd' | translate"
+                (action)="addVariantRow()"
+                [disabled]="variantsBusy()"
+              ></app-button>
+              <app-button
+                size="sm"
+                [label]="'adminUi.products.form.variantsSave' | translate"
+                (action)="saveVariants()"
+                [disabled]="variantsBusy() || !editingSlug()"
+              ></app-button>
+            </div>
+
+            <div
+              *ngIf="variantsError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ variantsError() }}
+            </div>
+
+            <div *ngIf="variants().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.products.form.variantsEmpty' | translate }}
+            </div>
+
+            <div *ngIf="variants().length > 0" class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr
+                    class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >
+                    <th class="py-2 pr-3">
+                      {{ 'adminUi.products.form.variantsName' | translate }}
+                    </th>
+                    <th class="py-2 pr-3 w-40">
+                      {{ 'adminUi.products.form.variantsDelta' | translate }}
+                    </th>
+                    <th class="py-2 pr-3 w-32">
+                      {{ 'adminUi.products.form.variantsPrice' | translate }}
+                    </th>
+                    <th class="py-2 pr-3 w-28">
+                      {{ 'adminUi.products.form.variantsStock' | translate }}
+                    </th>
+                    <th class="py-2 w-24">{{ 'adminUi.products.table.actions' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let v of variants(); let idx = index"
+                    class="border-t border-slate-200 dark:border-slate-800"
+                  >
+                    <td class="py-2 pr-3">
+                      <input
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="text"
+                        [ngModel]="v.name"
+                        (ngModelChange)="onVariantNameChange(idx, $event)"
+                        [disabled]="variantsBusy()"
+                      />
+                    </td>
+                    <td class="py-2 pr-3">
+                      <input
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="number"
+                        step="0.01"
+                        inputmode="decimal"
+                        [ngModel]="v.additional_price_delta"
+                        (ngModelChange)="onVariantDeltaChange(idx, $event)"
+                        [disabled]="variantsBusy()"
+                      />
+                    </td>
+                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                      {{ formatMoneyInput(variantComputedPrice(v.additional_price_delta)) }} RON
+                    </td>
+                    <td class="py-2 pr-3">
+                      <input
+                        class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                        type="number"
+                        step="1"
+                        min="0"
+                        [ngModel]="v.stock_quantity"
+                        (ngModelChange)="onVariantStockChange(idx, $event)"
+                        [disabled]="variantsBusy()"
+                      />
+                    </td>
+                    <td class="py-2">
                       <app-button
                         size="sm"
                         variant="ghost"
-                        [label]="
-                          (stockLedgerExporting() ? 'adminUi.products.form.stockLedgerExporting' : 'adminUi.products.form.stockLedgerExport') | translate
-                        "
-                        (action)="exportStockLedgerCsv()"
-                        [disabled]="stockLedgerExporting() || !editingSlug()"
+                        [label]="'adminUi.products.form.variantsRemove' | translate"
+                        (action)="removeVariantRow(v)"
+                        [disabled]="variantsBusy()"
                       ></app-button>
-                    </div>
-                  </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
 
-			            <div
-			              *ngIf="stockLedgerExportError()"
-			              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-			            >
-			              {{ stockLedgerExportError() }}
-			            </div>
+        <app-admin-products-relationships-manager
+          [hasEditingSlug]="!!editingSlug()"
+          [relationshipSearch]="relationshipSearch"
+          [relationshipSearchLoading]="relationshipSearchLoading()"
+          [relationshipSearchResults]="relationshipSearchResults()"
+          [relationshipsRelated]="relationshipsRelated()"
+          [relationshipsUpsells]="relationshipsUpsells()"
+          [relationshipsLoading]="relationshipsLoading()"
+          [relationshipsSaving]="relationshipsSaving()"
+          [relationshipsError]="relationshipsError()"
+          [relationshipsMessage]="relationshipsMessage()"
+          (relationshipSearchChanged)="onRelationshipSearchChange($event)"
+          (addRequested)="addRelationship($event.item, $event.kind)"
+          (moveRequested)="moveRelationship($event.kind, $event.index, $event.direction)"
+          (removeRequested)="removeRelationship($event.id, $event.kind)"
+          (saveRequested)="saveRelationships()"
+        ></app-admin-products-relationships-manager>
 
-			            <div *ngIf="stockAdjustments().length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-			              {{ 'adminUi.products.form.stockLedgerEmpty' | translate }}
-			            </div>
+        <details
+          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+        >
+          <summary
+            class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+          >
+            <div class="min-w-0 grid gap-1">
+              <h3
+                class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200"
+              >
+                {{ 'adminUi.products.priceHistory.title' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.priceHistory.hint' | translate }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                *ngIf="priceHistoryChanges().length"
+                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {{ priceHistoryChanges().length }}
+              </span>
+              <span
+                class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400"
+                >▸</span
+              >
+            </div>
+          </summary>
 
-			            <div *ngIf="stockAdjustments().length > 0" class="overflow-x-auto">
-			              <table class="w-full text-sm">
-			                <thead>
-			                  <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerWhen' | translate }}</th>
-			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerItem' | translate }}</th>
-			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerReason' | translate }}</th>
-			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerDelta' | translate }}</th>
-			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerBefore' | translate }}</th>
-			                    <th class="py-2 pr-3">{{ 'adminUi.products.form.stockLedgerAfter' | translate }}</th>
-			                    <th class="py-2">{{ 'adminUi.products.form.stockLedgerNote' | translate }}</th>
-			                  </tr>
-			                </thead>
-			                <tbody>
-			                  <tr *ngFor="let row of stockAdjustments()" class="border-t border-slate-200 dark:border-slate-800">
-			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ formatTimestamp(row.created_at) }}</td>
-			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockAdjustmentTargetLabel(row) }}</td>
-			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ stockReasonLabel(row.reason) }}</td>
-			                    <td class="py-2 pr-3 font-semibold" [class.text-emerald-700]="row.delta > 0" [class.text-rose-700]="row.delta < 0">
-			                      {{ row.delta > 0 ? '+' + row.delta : row.delta }}
-			                    </td>
-			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.before_quantity }}</td>
-			                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">{{ row.after_quantity }}</td>
-			                    <td class="py-2 text-slate-600 dark:text-slate-300">{{ row.note || '—' }}</td>
-			                  </tr>
-			                </tbody>
-			              </table>
-			            </div>
-			          </div>
-			        </details>
+          <div class="mt-3 grid gap-3">
+            <div *ngIf="priceHistoryChart() as chart; else priceHistoryEmpty" class="grid gap-3">
+              <div
+                class="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+              >
+                <svg
+                  class="h-40 w-full"
+                  [attr.viewBox]="'0 0 ' + chart.width + ' ' + chart.height"
+                  preserveAspectRatio="none"
+                >
+                  <rect
+                    *ngIf="chart.saleRect"
+                    [attr.x]="chart.saleRect.x"
+                    [attr.y]="chart.pad"
+                    [attr.width]="chart.saleRect.width"
+                    [attr.height]="chart.height - chart.pad * 2"
+                    fill="rgba(99, 102, 241, 0.12)"
+                  ></rect>
+                  <line
+                    *ngIf="chart.nowX !== null"
+                    [attr.x1]="chart.nowX"
+                    [attr.x2]="chart.nowX"
+                    [attr.y1]="chart.pad"
+                    [attr.y2]="chart.height - chart.pad"
+                    stroke="rgba(100, 116, 139, 0.6)"
+                    stroke-width="1"
+                    stroke-dasharray="4 4"
+                  ></line>
+                  <polyline
+                    [attr.points]="chart.polyline"
+                    fill="none"
+                    stroke="rgba(99, 102, 241, 0.9)"
+                    stroke-width="2"
+                    stroke-linejoin="round"
+                    stroke-linecap="round"
+                  ></polyline>
+                  <circle
+                    *ngFor="let dot of chart.dots"
+                    [attr.cx]="dot.x"
+                    [attr.cy]="dot.y"
+                    r="2.5"
+                    fill="rgba(99, 102, 241, 0.95)"
+                  ></circle>
+                </svg>
+              </div>
 
-          <div id="product-wizard-content" class="h-0 scroll-mt-24"></div>
+              <div class="flex flex-wrap gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <span
+                  class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  {{ 'adminUi.products.priceHistory.latest' | translate }}:
+                  {{ chart.latest | localizedCurrency: editingCurrency() }}
+                </span>
+                <span
+                  class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  {{ 'adminUi.products.priceHistory.min' | translate }}:
+                  {{ chart.min | localizedCurrency: editingCurrency() }}
+                </span>
+                <span
+                  class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  {{ 'adminUi.products.priceHistory.max' | translate }}:
+                  {{ chart.max | localizedCurrency: editingCurrency() }}
+                </span>
+                <span
+                  *ngIf="form.sale_start_at && form.sale_end_at"
+                  class="rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  {{ 'adminUi.products.priceHistory.saleWindow' | translate }}:
+                  {{ form.sale_start_at }} → {{ form.sale_end_at }}
+                </span>
+              </div>
+            </div>
 
-	        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	          {{ 'adminUi.products.form.shortDescription' | translate }}
-	          <textarea
-	            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            <ng-template #priceHistoryEmpty>
+              <div class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.products.priceHistory.empty' | translate }}
+              </div>
+            </ng-template>
+
+            <div
+              *ngIf="priceHistoryChanges().length > 0"
+              class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+            >
+              <table class="w-full text-left text-sm">
+                <thead
+                  class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600 dark:bg-slate-950/40 dark:text-slate-300"
+                >
+                  <tr>
+                    <th class="px-3 py-2">
+                      {{ 'adminUi.products.priceHistory.table.when' | translate }}
+                    </th>
+                    <th class="px-3 py-2">
+                      {{ 'adminUi.products.priceHistory.table.user' | translate }}
+                    </th>
+                    <th class="px-3 py-2">
+                      {{ 'adminUi.products.priceHistory.table.from' | translate }}
+                    </th>
+                    <th class="px-3 py-2">
+                      {{ 'adminUi.products.priceHistory.table.to' | translate }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let change of priceHistoryChanges()"
+                    class="border-t border-slate-200 dark:border-slate-800"
+                  >
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ change.at | date: 'short' }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ change.user || '—' }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ change.before | localizedCurrency: editingCurrency() }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ change.after | localizedCurrency: editingCurrency() }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+
+        <details
+          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+        >
+          <summary
+            class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+          >
+            <div class="min-w-0 grid gap-1">
+              <h3
+                class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200"
+              >
+                {{ 'adminUi.products.audit.title' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.audit.hint' | translate }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                *ngIf="auditEntries().length"
+                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {{ auditEntries().length }}
+              </span>
+              <span
+                class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400"
+                >▸</span
+              >
+            </div>
+          </summary>
+
+          <div class="mt-3 grid gap-3">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.refresh' | translate"
+                (action)="refreshAudit()"
+                [disabled]="auditBusy() || !editingSlug()"
+              ></app-button>
+            </div>
+
+            <div
+              *ngIf="auditError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ auditError() }}
+            </div>
+
+            <div *ngIf="auditBusy()" class="text-sm text-slate-600 dark:text-slate-300">
+              {{ 'adminUi.actions.loading' | translate }}
+            </div>
+
+            <div
+              *ngIf="!auditBusy() && auditEntries().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
+              {{ 'adminUi.products.audit.empty' | translate }}
+            </div>
+
+            <div
+              *ngIf="auditEntries().length > 0"
+              class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+            >
+              <table class="w-full text-sm">
+                <thead
+                  class="bg-slate-100 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-950/20 dark:text-slate-400"
+                >
+                  <tr>
+                    <th class="px-3 py-2">{{ 'adminUi.products.audit.when' | translate }}</th>
+                    <th class="px-3 py-2">{{ 'adminUi.products.audit.action' | translate }}</th>
+                    <th class="px-3 py-2">{{ 'adminUi.products.audit.user' | translate }}</th>
+                    <th class="px-3 py-2">{{ 'adminUi.products.audit.details' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let entry of auditEntries()"
+                    class="border-t border-slate-200 dark:border-slate-800"
+                  >
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ entry.created_at | date: 'short' }}
+                    </td>
+                    <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-50">
+                      {{ entry.action }}
+                    </td>
+                    <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      {{ entry.user_email || entry.user_id || '—' }}
+                    </td>
+                    <td class="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">
+                      <div
+                        *ngIf="entry.payload?.changes as changes; else auditFallback"
+                        class="grid gap-1"
+                      >
+                        <div
+                          *ngFor="let item of changes | keyvalue"
+                          class="grid gap-1 sm:grid-cols-[160px_1fr] sm:gap-3"
+                        >
+                          <span class="font-semibold text-slate-700 dark:text-slate-200">{{
+                            item.key
+                          }}</span>
+                          <span class="truncate">
+                            {{ formatAuditValue(item.value?.before) }} →
+                            {{ formatAuditValue(item.value?.after) }}
+                          </span>
+                        </div>
+                      </div>
+                      <ng-template #auditFallback>
+                        <span *ngIf="entry.payload as payload; else auditEmpty">{{
+                          formatAuditValue(payload)
+                        }}</span>
+                        <ng-template #auditEmpty>—</ng-template>
+                      </ng-template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+
+        <details
+          data-ignore-dirty
+          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+        >
+          <summary
+            class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+          >
+            <div class="min-w-0 grid gap-1">
+              <h3
+                class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200"
+              >
+                {{ 'adminUi.products.form.stockLedgerTitle' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.form.stockLedgerHint' | translate }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                *ngIf="stockAdjustments().length"
+                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {{ stockAdjustments().length }}
+              </span>
+              <span
+                class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400"
+                >▸</span
+              >
+            </div>
+          </summary>
+
+          <div class="mt-3 grid gap-3">
+            <div
+              *ngIf="stockAdjustmentsError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ stockAdjustmentsError() }}
+            </div>
+
+            <div class="grid gap-3 items-end md:grid-cols-5">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.stockLedgerTarget' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="stockAdjustTarget"
+                  [disabled]="stockAdjustBusy() || !editingSlug()"
+                >
+                  <option value="">
+                    {{ 'adminUi.products.form.stockLedgerTargetProduct' | translate }}
+                  </option>
+                  <option *ngFor="let v of variantsWithIds()" [value]="v.id">{{ v.name }}</option>
+                </select>
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.stockLedgerReason' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="stockAdjustReason"
+                  [disabled]="stockAdjustBusy() || !editingSlug()"
+                >
+                  <option value="restock">
+                    {{ 'adminUi.products.form.stockReason.restock' | translate }}
+                  </option>
+                  <option value="damage">
+                    {{ 'adminUi.products.form.stockReason.damage' | translate }}
+                  </option>
+                  <option value="manual_correction">
+                    {{ 'adminUi.products.form.stockReason.manual_correction' | translate }}
+                  </option>
+                </select>
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.stockLedgerDelta' | translate }}
+                <input
+                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="number"
+                  step="1"
+                  [(ngModel)]="stockAdjustDelta"
+                  [disabled]="stockAdjustBusy() || !editingSlug()"
+                />
+              </label>
+
+              <label
+                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
+              >
+                {{ 'adminUi.products.form.stockLedgerNote' | translate }}
+                <input
+                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="text"
+                  [(ngModel)]="stockAdjustNote"
+                  [disabled]="stockAdjustBusy() || !editingSlug()"
+                />
+              </label>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <app-button
+                size="sm"
+                [label]="'adminUi.products.form.stockLedgerApply' | translate"
+                (action)="applyStockAdjustment()"
+                [disabled]="stockAdjustBusy() || !editingSlug()"
+              ></app-button>
+              <span *ngIf="stockAdjustBusy()" class="text-sm text-slate-600 dark:text-slate-300">
+                {{ 'adminUi.products.form.stockLedgerApplying' | translate }}
+              </span>
+            </div>
+
+            <div class="grid gap-3 items-end md:grid-cols-4">
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.stockLedgerExportFrom' | translate }}
+                <input
+                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="date"
+                  [(ngModel)]="stockLedgerExportFrom"
+                  [disabled]="stockLedgerExporting() || !editingSlug()"
+                />
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.stockLedgerExportTo' | translate }}
+                <input
+                  class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  type="date"
+                  [(ngModel)]="stockLedgerExportTo"
+                  [disabled]="stockLedgerExporting() || !editingSlug()"
+                />
+              </label>
+
+              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                {{ 'adminUi.products.form.stockLedgerExportReason' | translate }}
+                <select
+                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  [(ngModel)]="stockLedgerExportReason"
+                  [disabled]="stockLedgerExporting() || !editingSlug()"
+                >
+                  <option value="all">
+                    {{ 'adminUi.products.form.stockLedgerExportAllReasons' | translate }}
+                  </option>
+                  <option value="restock">
+                    {{ 'adminUi.products.form.stockReason.restock' | translate }}
+                  </option>
+                  <option value="damage">
+                    {{ 'adminUi.products.form.stockReason.damage' | translate }}
+                  </option>
+                  <option value="manual_correction">
+                    {{ 'adminUi.products.form.stockReason.manual_correction' | translate }}
+                  </option>
+                </select>
+              </label>
+
+              <div class="flex items-center justify-end gap-2">
+                <app-button
+                  size="sm"
+                  variant="ghost"
+                  [label]="
+                    (stockLedgerExporting()
+                      ? 'adminUi.products.form.stockLedgerExporting'
+                      : 'adminUi.products.form.stockLedgerExport'
+                    ) | translate
+                  "
+                  (action)="exportStockLedgerCsv()"
+                  [disabled]="stockLedgerExporting() || !editingSlug()"
+                ></app-button>
+              </div>
+            </div>
+
+            <div
+              *ngIf="stockLedgerExportError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ stockLedgerExportError() }}
+            </div>
+
+            <div
+              *ngIf="stockAdjustments().length === 0"
+              class="text-sm text-slate-600 dark:text-slate-300"
+            >
+              {{ 'adminUi.products.form.stockLedgerEmpty' | translate }}
+            </div>
+
+            <div *ngIf="stockAdjustments().length > 0" class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr
+                    class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                  >
+                    <th class="py-2 pr-3">
+                      {{ 'adminUi.products.form.stockLedgerWhen' | translate }}
+                    </th>
+                    <th class="py-2 pr-3">
+                      {{ 'adminUi.products.form.stockLedgerItem' | translate }}
+                    </th>
+                    <th class="py-2 pr-3">
+                      {{ 'adminUi.products.form.stockLedgerReason' | translate }}
+                    </th>
+                    <th class="py-2 pr-3">
+                      {{ 'adminUi.products.form.stockLedgerDelta' | translate }}
+                    </th>
+                    <th class="py-2 pr-3">
+                      {{ 'adminUi.products.form.stockLedgerBefore' | translate }}
+                    </th>
+                    <th class="py-2 pr-3">
+                      {{ 'adminUi.products.form.stockLedgerAfter' | translate }}
+                    </th>
+                    <th class="py-2">{{ 'adminUi.products.form.stockLedgerNote' | translate }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="let row of stockAdjustments()"
+                    class="border-t border-slate-200 dark:border-slate-800"
+                  >
+                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                      {{ formatTimestamp(row.created_at) }}
+                    </td>
+                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                      {{ stockAdjustmentTargetLabel(row) }}
+                    </td>
+                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                      {{ stockReasonLabel(row.reason) }}
+                    </td>
+                    <td
+                      class="py-2 pr-3 font-semibold"
+                      [class.text-emerald-700]="row.delta > 0"
+                      [class.text-rose-700]="row.delta < 0"
+                    >
+                      {{ row.delta > 0 ? '+' + row.delta : row.delta }}
+                    </td>
+                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                      {{ row.before_quantity }}
+                    </td>
+                    <td class="py-2 pr-3 text-slate-700 dark:text-slate-200">
+                      {{ row.after_quantity }}
+                    </td>
+                    <td class="py-2 text-slate-600 dark:text-slate-300">{{ row.note || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </details>
+
+        <div id="product-wizard-content" class="h-0 scroll-mt-24"></div>
+
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          {{ 'adminUi.products.form.shortDescription' | translate }}
+          <textarea
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             rows="2"
             maxlength="280"
             [(ngModel)]="form.short_description"
@@ -2648,161 +3351,218 @@ type PriceHistoryChart = {
           </span>
         </label>
 
-	        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	          {{ 'adminUi.products.form.description' | translate }}
-	          <textarea
-	            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	            rows="4"
-	            [(ngModel)]="form.long_description"
-              (ngModelChange)="onDescriptionChange()"
-	          ></textarea>
-	        </label>
+        <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+          {{ 'adminUi.products.form.description' | translate }}
+          <textarea
+            class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            rows="4"
+            [(ngModel)]="form.long_description"
+            (ngModelChange)="onDescriptionChange()"
+          ></textarea>
+        </label>
 
-          <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.products.markdownPreview.title' | translate }}
-              </p>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="(descriptionPreviewOpen() ? 'adminUi.actions.hide' : 'adminUi.actions.preview') | translate"
-                (action)="toggleDescriptionPreview()"
-              ></app-button>
-            </div>
-
-            <div *ngIf="descriptionPreviewOpen()" class="grid gap-2">
-              <div
-                *ngIf="descriptionPreviewSanitized()"
-                class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-              >
-                {{ 'adminUi.products.markdownPreview.sanitizedWarning' | translate }}
-              </div>
-              <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="descriptionPreviewHtml()"></div>
-            </div>
+        <div
+          class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <p
+              class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+            >
+              {{ 'adminUi.products.markdownPreview.title' | translate }}
+            </p>
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="
+                (descriptionPreviewOpen() ? 'adminUi.actions.hide' : 'adminUi.actions.preview')
+                  | translate
+              "
+              (action)="toggleDescriptionPreview()"
+            ></app-button>
           </div>
 
-	        <details
-	          data-ignore-dirty
-	          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
-	        >
-	          <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-	            <div class="min-w-0 grid gap-1">
-	              <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.translations.title' | translate }}
-	              </h3>
-	              <p class="text-xs text-slate-500 dark:text-slate-400">
-	                {{ 'adminUi.products.translations.hint' | translate }}
-	              </p>
-	            </div>
-	            <div class="flex items-center gap-2">
-	              <span class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
-	                {{ (translationExists.ro ? 1 : 0) + (translationExists.en ? 1 : 0) }}/2
-	              </span>
-	              <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-	            </div>
-	          </summary>
+          <div *ngIf="descriptionPreviewOpen()" class="grid gap-2">
+            <div
+              *ngIf="descriptionPreviewSanitized()"
+              class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              {{ 'adminUi.products.markdownPreview.sanitizedWarning' | translate }}
+            </div>
+            <div
+              class="markdown text-sm text-slate-700 dark:text-slate-200"
+              [innerHTML]="descriptionPreviewHtml()"
+            ></div>
+          </div>
+        </div>
 
-	          <div class="mt-3 grid gap-3">
-	            <div
-	              *ngIf="translationError()"
-	              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-	            >
-	              {{ translationError() }}
-	            </div>
+        <details
+          data-ignore-dirty
+          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+        >
+          <summary
+            class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+          >
+            <div class="min-w-0 grid gap-1">
+              <h3
+                class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200"
+              >
+                {{ 'adminUi.products.translations.title' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.translations.hint' | translate }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span
+                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {{ (translationExists.ro ? 1 : 0) + (translationExists.en ? 1 : 0) }}/2
+              </span>
+              <span
+                class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400"
+                >▸</span
+              >
+            </div>
+          </summary>
 
-              <div class="grid gap-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <div class="grid gap-1">
-                  <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-                    {{ 'adminUi.products.translations.diffTitle' | translate }}
-                  </p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.products.translations.diffHint' | translate }}
-                  </p>
-                </div>
+          <div class="mt-3 grid gap-3">
+            <div
+              *ngIf="translationError()"
+              class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
+            >
+              {{ translationError() }}
+            </div>
 
-                <div class="mt-3 grid gap-2">
-                  <div
-                    class="grid grid-cols-[140px_1fr_1fr_120px] gap-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
-                  >
-                    <span>{{ 'adminUi.products.translations.diffHeaders.field' | translate }}</span>
-                    <span>RO</span>
-                    <span>EN</span>
-                    <span>{{ 'adminUi.products.translations.diffHeaders.status' | translate }}</span>
-                  </div>
-
-                  <div
-                    *ngFor="let row of translationDiffRows(); trackBy: trackByTranslationDiffRow"
-                    class="grid grid-cols-[140px_1fr_1fr_120px] items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/20"
-                  >
-                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{ row.labelKey | translate }}</span>
-                    <span class="text-xs" [ngClass]="row.roMissing ? 'text-slate-400 dark:text-slate-400' : 'text-slate-700 dark:text-slate-200'">
-                      {{ row.roSnippet }}
-                    </span>
-                    <span class="text-xs" [ngClass]="row.enMissing ? 'text-slate-400 dark:text-slate-400' : 'text-slate-700 dark:text-slate-200'">
-                      {{ row.enSnippet }}
-                    </span>
-                    <span
-                      class="text-xs font-semibold"
-                      [ngClass]="{
-                        'text-rose-700 dark:text-rose-300': row.tone === 'error',
-                        'text-amber-700 dark:text-amber-300': row.tone === 'warn',
-                        'text-slate-500 dark:text-slate-300': row.tone === 'neutral'
-                      }"
-                    >
-                      {{ row.statusKey | translate }}
-                    </span>
-                  </div>
-                </div>
+            <div
+              class="grid gap-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <div class="grid gap-1">
+                <p
+                  class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+                >
+                  {{ 'adminUi.products.translations.diffTitle' | translate }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.translations.diffHint' | translate }}
+                </p>
               </div>
 
-	            <div class="grid gap-4 lg:grid-cols-2">
-	              <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	              <div class="flex items-center justify-between gap-3">
-	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
-	                <div class="flex items-center gap-2">
-	                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveTranslation('ro')"></app-button>
-	                  <app-button
-	                    *ngIf="translationExists.ro"
-	                    size="sm"
-	                    variant="ghost"
-	                    [label]="'adminUi.actions.delete' | translate"
-	                    (action)="deleteTranslation('ro')"
-	                  ></app-button>
-	                </div>
-	              </div>
+              <div class="mt-3 grid gap-2">
+                <div
+                  class="grid grid-cols-[140px_1fr_1fr_120px] gap-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+                >
+                  <span>{{ 'adminUi.products.translations.diffHeaders.field' | translate }}</span>
+                  <span>RO</span>
+                  <span>EN</span>
+                  <span>{{ 'adminUi.products.translations.diffHeaders.status' | translate }}</span>
+                </div>
 
-	              <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="translations.ro.name"></app-input>
+                <div
+                  *ngFor="let row of translationDiffRows(); trackBy: trackByTranslationDiffRow"
+                  class="grid grid-cols-[140px_1fr_1fr_120px] items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <span class="text-xs font-semibold text-slate-700 dark:text-slate-200">{{
+                    row.labelKey | translate
+                  }}</span>
+                  <span
+                    class="text-xs"
+                    [ngClass]="
+                      row.roMissing
+                        ? 'text-slate-400 dark:text-slate-400'
+                        : 'text-slate-700 dark:text-slate-200'
+                    "
+                  >
+                    {{ row.roSnippet }}
+                  </span>
+                  <span
+                    class="text-xs"
+                    [ngClass]="
+                      row.enMissing
+                        ? 'text-slate-400 dark:text-slate-400'
+                        : 'text-slate-700 dark:text-slate-200'
+                    "
+                  >
+                    {{ row.enSnippet }}
+                  </span>
+                  <span
+                    class="text-xs font-semibold"
+                    [ngClass]="{
+                      'text-rose-700 dark:text-rose-300': row.tone === 'error',
+                      'text-amber-700 dark:text-amber-300': row.tone === 'warn',
+                      'text-slate-500 dark:text-slate-300': row.tone === 'neutral',
+                    }"
+                  >
+                    {{ row.statusKey | translate }}
+                  </span>
+                </div>
+              </div>
+            </div>
 
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.form.shortDescription' | translate }}
-	                <textarea
-	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  rows="2"
-	                  maxlength="280"
-	                  [(ngModel)]="translations.ro.short_description"
-	                ></textarea>
-	              </label>
+            <div class="grid gap-4 lg:grid-cols-2">
+              <div
+                class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      [label]="'adminUi.actions.save' | translate"
+                      (action)="saveTranslation('ro')"
+                    ></app-button>
+                    <app-button
+                      *ngIf="translationExists.ro"
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.delete' | translate"
+                      (action)="deleteTranslation('ro')"
+                    ></app-button>
+                  </div>
+                </div>
 
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.form.description' | translate }}
-	                <textarea
-	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  rows="4"
-	                  [(ngModel)]="translations.ro.long_description"
+                <app-input
+                  [label]="'adminUi.products.table.name' | translate"
+                  [(value)]="translations.ro.name"
+                ></app-input>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.form.shortDescription' | translate }}
+                  <textarea
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    rows="2"
+                    maxlength="280"
+                    [(ngModel)]="translations.ro.short_description"
+                  ></textarea>
+                </label>
+
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.form.description' | translate }}
+                  <textarea
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    rows="4"
+                    [(ngModel)]="translations.ro.long_description"
                     (ngModelChange)="onTranslationDescriptionChange('ro')"
-	                ></textarea>
-	              </label>
+                  ></textarea>
+                </label>
 
-                <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                <div
+                  class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
                   <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    <p
+                      class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.products.markdownPreview.title' | translate }}
                     </p>
                     <app-button
                       size="sm"
                       variant="ghost"
-                      [label]="(translationPreviewOpen.ro ? 'adminUi.actions.hide' : 'adminUi.actions.preview') | translate"
+                      [label]="
+                        (translationPreviewOpen.ro
+                          ? 'adminUi.actions.hide'
+                          : 'adminUi.actions.preview'
+                        ) | translate
+                      "
                       (action)="toggleTranslationPreview('ro')"
                     ></app-button>
                   </div>
@@ -2814,57 +3574,78 @@ type PriceHistoryChart = {
                     >
                       {{ 'adminUi.products.markdownPreview.sanitizedWarning' | translate }}
                     </div>
-                    <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="translationPreviewHtml.ro"></div>
+                    <div
+                      class="markdown text-sm text-slate-700 dark:text-slate-200"
+                      [innerHTML]="translationPreviewHtml.ro"
+                    ></div>
                   </div>
                 </div>
-	              </div>
+              </div>
 
-	              <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-	              <div class="flex items-center justify-between gap-3">
-	                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
-	                <div class="flex items-center gap-2">
-	                  <app-button size="sm" [label]="'adminUi.actions.save' | translate" (action)="saveTranslation('en')"></app-button>
-	                  <app-button
-	                    *ngIf="translationExists.en"
-	                    size="sm"
-	                    variant="ghost"
-	                    [label]="'adminUi.actions.delete' | translate"
-	                    (action)="deleteTranslation('en')"
-	                  ></app-button>
-	                </div>
-	              </div>
+              <div
+                class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
+                  <div class="flex items-center gap-2">
+                    <app-button
+                      size="sm"
+                      [label]="'adminUi.actions.save' | translate"
+                      (action)="saveTranslation('en')"
+                    ></app-button>
+                    <app-button
+                      *ngIf="translationExists.en"
+                      size="sm"
+                      variant="ghost"
+                      [label]="'adminUi.actions.delete' | translate"
+                      (action)="deleteTranslation('en')"
+                    ></app-button>
+                  </div>
+                </div>
 
-	              <app-input [label]="'adminUi.products.table.name' | translate" [(value)]="translations.en.name"></app-input>
+                <app-input
+                  [label]="'adminUi.products.table.name' | translate"
+                  [(value)]="translations.en.name"
+                ></app-input>
 
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.form.shortDescription' | translate }}
-	                <textarea
-	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  rows="2"
-	                  maxlength="280"
-	                  [(ngModel)]="translations.en.short_description"
-	                ></textarea>
-	              </label>
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.form.shortDescription' | translate }}
+                  <textarea
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    rows="2"
+                    maxlength="280"
+                    [(ngModel)]="translations.en.short_description"
+                  ></textarea>
+                </label>
 
-	              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-	                {{ 'adminUi.products.form.description' | translate }}
-	                <textarea
-	                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-	                  rows="4"
-	                  [(ngModel)]="translations.en.long_description"
+                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {{ 'adminUi.products.form.description' | translate }}
+                  <textarea
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    rows="4"
+                    [(ngModel)]="translations.en.long_description"
                     (ngModelChange)="onTranslationDescriptionChange('en')"
-	                ></textarea>
-	              </label>
+                  ></textarea>
+                </label>
 
-                <div class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20">
+                <div
+                  class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
                   <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                    <p
+                      class="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300"
+                    >
                       {{ 'adminUi.products.markdownPreview.title' | translate }}
                     </p>
                     <app-button
                       size="sm"
                       variant="ghost"
-                      [label]="(translationPreviewOpen.en ? 'adminUi.actions.hide' : 'adminUi.actions.preview') | translate"
+                      [label]="
+                        (translationPreviewOpen.en
+                          ? 'adminUi.actions.hide'
+                          : 'adminUi.actions.preview'
+                        ) | translate
+                      "
                       (action)="toggleTranslationPreview('en')"
                     ></app-button>
                   </div>
@@ -2876,241 +3657,305 @@ type PriceHistoryChart = {
                     >
                       {{ 'adminUi.products.markdownPreview.sanitizedWarning' | translate }}
                     </div>
-                    <div class="markdown text-sm text-slate-700 dark:text-slate-200" [innerHTML]="translationPreviewHtml.en"></div>
+                    <div
+                      class="markdown text-sm text-slate-700 dark:text-slate-200"
+                      [innerHTML]="translationPreviewHtml.en"
+                    ></div>
                   </div>
                 </div>
-	              </div>
-	            </div>
-	          </div>
-	        </details>
-
-            <details class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20">
-              <summary class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden">
-                <div class="min-w-0 grid gap-1">
-                  <h3 class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.products.seoPreview.title' | translate }}
-                  </h3>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.products.seoPreview.hint' | translate }}
-                  </p>
-                </div>
-                <span class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400">▸</span>
-              </summary>
-
-              <div class="mt-3 grid gap-4 lg:grid-cols-2">
-                <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
-
-                  <div class="grid gap-2">
-                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.products.seoPreview.cardTitle' | translate }}
-                    </p>
-                    <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
-                      <div class="h-14 w-14 rounded bg-slate-100 overflow-hidden flex items-center justify-center dark:bg-slate-800">
-                        <img *ngIf="seoPreviewImageUrl() as url; else seoImgPlaceholder" [src]="url" alt="" class="h-full w-full object-cover" />
-                        <ng-template #seoImgPlaceholder>
-                          <span class="text-xs text-slate-500 dark:text-slate-400">—</span>
-                        </ng-template>
-                      </div>
-                      <div class="min-w-0 grid gap-1">
-                        <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ seoPreviewName('ro') }}</p>
-                        <p class="text-sm text-slate-700 dark:text-slate-200">
-                          <ng-container *ngIf="previewSalePrice() as sale; else seoBasePriceRo">
-                            <span class="font-semibold text-rose-700 dark:text-rose-300">{{ sale | localizedCurrency: 'RON' }}</span>
-                            <span class="ml-2 line-through text-slate-500 dark:text-slate-400">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
-                          </ng-container>
-                          <ng-template #seoBasePriceRo>
-                            <span class="font-semibold">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
-                          </ng-template>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="grid gap-2">
-                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.products.seoPreview.snippetTitle' | translate }}
-                    </p>
-                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
-                      <p class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                        {{ seoPreviewTitle('ro') }}
-                      </p>
-                      <p class="text-xs text-emerald-700 dark:text-emerald-300">
-                        {{ seoPreviewUrl() }}
-                      </p>
-                      <p class="text-sm text-slate-700 dark:text-slate-200">
-                        {{ seoPreviewDescription('ro') }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
-
-                  <div class="grid gap-2">
-                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.products.seoPreview.cardTitle' | translate }}
-                    </p>
-                    <div class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
-                      <div class="h-14 w-14 rounded bg-slate-100 overflow-hidden flex items-center justify-center dark:bg-slate-800">
-                        <img *ngIf="seoPreviewImageUrl() as url; else seoImgPlaceholderEn" [src]="url" alt="" class="h-full w-full object-cover" />
-                        <ng-template #seoImgPlaceholderEn>
-                          <span class="text-xs text-slate-500 dark:text-slate-400">—</span>
-                        </ng-template>
-                      </div>
-                      <div class="min-w-0 grid gap-1">
-                        <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">{{ seoPreviewName('en') }}</p>
-                        <p class="text-sm text-slate-700 dark:text-slate-200">
-                          <ng-container *ngIf="previewSalePrice() as sale; else seoBasePriceEn">
-                            <span class="font-semibold text-rose-700 dark:text-rose-300">{{ sale | localizedCurrency: 'RON' }}</span>
-                            <span class="ml-2 line-through text-slate-500 dark:text-slate-400">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
-                          </ng-container>
-                          <ng-template #seoBasePriceEn>
-                            <span class="font-semibold">{{ previewBasePrice() | localizedCurrency: 'RON' }}</span>
-                          </ng-template>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="grid gap-2">
-                    <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      {{ 'adminUi.products.seoPreview.snippetTitle' | translate }}
-                    </p>
-                    <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20">
-                      <p class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
-                        {{ seoPreviewTitle('en') }}
-                      </p>
-                      <p class="text-xs text-emerald-700 dark:text-emerald-300">
-                        {{ seoPreviewUrl() }}
-                      </p>
-                      <p class="text-sm text-slate-700 dark:text-slate-200">
-                        {{ seoPreviewDescription('en') }}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </details>
-
-		        <div id="product-wizard-save" class="grid gap-2">
-              <div class="flex flex-wrap items-center gap-2">
-		            <app-button
-                  [label]="editorSaving() ? ('adminUi.common.saving' | translate) : ('adminUi.products.form.save' | translate)"
-                  (action)="save()"
-                  [disabled]="editorSaving()"
-                ></app-button>
-
-                <ng-container *ngIf="editorMessage()">
-                  <span
-                    class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-                  >
-                    {{ 'adminUi.products.successFeedback.saved' | translate }}
-                  </span>
-                  <span
-                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    {{ successStatusLabelKey() | translate }}
-                  </span>
-                  <span
-                    class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  >
-                    {{ successVisibilityLabelKey() | translate }}
-                  </span>
-                </ng-container>
-              </div>
-
-              <div *ngIf="editorMessage() && editingSlug() as slug" class="flex flex-wrap items-center gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.successFeedback.cta.images' | translate"
-                  (action)="scrollToImagesSection()"
-                ></app-button>
-                <app-button
-                  *ngIf="savedStatus() !== 'published'"
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.successFeedback.cta.publish' | translate"
-                  (action)="startPublishWizard()"
-                ></app-button>
-                <app-button
-                  *ngIf="savedIsVisible()"
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.successFeedback.cta.view' | translate"
-                  [routerLink]="['/products', slug]"
-                ></app-button>
-              </div>
-		        </div>
-
-	        <app-admin-products-image-manager
-	          [hasEditingSlug]="!!editingSlug()"
-	          [images]="images"
-	          [editingImageId]="editingImageId"
-	          [imageOrderBusy]="imageOrderBusy"
-	          [imageOrderError]="imageOrderError"
-	          [imageMetaBusy]="imageMetaBusy"
-	          [imageMetaError]="imageMetaError"
-	          [deleteImageConfirmBusy]="deleteImageConfirmBusy"
-	          [deletedImagesOpen]="deletedImagesOpen"
-	          [deletedImagesBusy]="deletedImagesBusy"
-	          [deletedImagesError]="deletedImagesError"
-	          [deletedImages]="deletedImages"
-		          [restoringDeletedImage]="restoringDeletedImage"
-		          [imageMeta]="imageMeta"
-		          [imageStats]="imageStats"
-		          [uploads]="imageUploads"
-		          (toggleDeletedImagesRequested)="toggleDeletedImages()"
-		          (uploadRequested)="onUpload($event)"
-		          (retryUploadRequested)="retryImageUpload($event)"
-		          (removeUploadRequested)="removeImageUpload($event)"
-		          (makePrimaryRequested)="makeImagePrimary($event)"
-		          (toggleMetaRequested)="toggleImageMeta($event)"
-		          (deleteRequested)="openDeleteImageConfirm($event)"
-		          (reprocessRequested)="reprocessImage()"
-	          (saveMetaRequested)="saveImageMeta()"
-	          (restoreRequested)="restoreDeletedImage($event)"
-		        ></app-admin-products-image-manager>
-		      </section>
-
-	        <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
-
-        <div *ngIf="selected.size > 0 && view === 'active'" class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6">
-          <div class="max-w-6xl mx-auto">
-            <div
-              class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-sm text-slate-700 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-none"
-            >
-              <div class="font-medium">
-                {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.bulkActions' | translate"
-                  (action)="scrollToBulkActions()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.products.bulk.clearSelection' | translate"
-                  [disabled]="bulkBusy() || inlineBusy()"
-                  (action)="clearSelection()"
-                ></app-button>
               </div>
             </div>
           </div>
+        </details>
+
+        <details
+          class="group rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/20"
+        >
+          <summary
+            class="flex items-start justify-between gap-4 cursor-pointer select-none [&::-webkit-details-marker]:hidden"
+          >
+            <div class="min-w-0 grid gap-1">
+              <h3
+                class="text-sm font-semibold tracking-wide uppercase text-slate-700 dark:text-slate-200"
+              >
+                {{ 'adminUi.products.seoPreview.title' | translate }}
+              </h3>
+              <p class="text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.products.seoPreview.hint' | translate }}
+              </p>
+            </div>
+            <span
+              class="text-slate-500 transition-transform group-open:rotate-90 dark:text-slate-400"
+              >▸</span
+            >
+          </summary>
+
+          <div class="mt-3 grid gap-4 lg:grid-cols-2">
+            <div
+              class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
+
+              <div class="grid gap-2">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.seoPreview.cardTitle' | translate }}
+                </p>
+                <div
+                  class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <div
+                    class="h-14 w-14 rounded bg-slate-100 overflow-hidden flex items-center justify-center dark:bg-slate-800"
+                  >
+                    <img
+                      *ngIf="seoPreviewImageUrl() as url; else seoImgPlaceholder"
+                      [src]="url"
+                      alt=""
+                      class="h-full w-full object-cover"
+                    />
+                    <ng-template #seoImgPlaceholder>
+                      <span class="text-xs text-slate-500 dark:text-slate-400">—</span>
+                    </ng-template>
+                  </div>
+                  <div class="min-w-0 grid gap-1">
+                    <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                      {{ seoPreviewName('ro') }}
+                    </p>
+                    <p class="text-sm text-slate-700 dark:text-slate-200">
+                      <ng-container *ngIf="previewSalePrice() as sale; else seoBasePriceRo">
+                        <span class="font-semibold text-rose-700 dark:text-rose-300">{{
+                          sale | localizedCurrency: 'RON'
+                        }}</span>
+                        <span class="ml-2 line-through text-slate-500 dark:text-slate-400">{{
+                          previewBasePrice() | localizedCurrency: 'RON'
+                        }}</span>
+                      </ng-container>
+                      <ng-template #seoBasePriceRo>
+                        <span class="font-semibold">{{
+                          previewBasePrice() | localizedCurrency: 'RON'
+                        }}</span>
+                      </ng-template>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-2">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.seoPreview.snippetTitle' | translate }}
+                </p>
+                <div
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <p class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                    {{ seoPreviewTitle('ro') }}
+                  </p>
+                  <p class="text-xs text-emerald-700 dark:text-emerald-300">
+                    {{ seoPreviewUrl() }}
+                  </p>
+                  <p class="text-sm text-slate-700 dark:text-slate-200">
+                    {{ seoPreviewDescription('ro') }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            >
+              <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
+
+              <div class="grid gap-2">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.seoPreview.cardTitle' | translate }}
+                </p>
+                <div
+                  class="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <div
+                    class="h-14 w-14 rounded bg-slate-100 overflow-hidden flex items-center justify-center dark:bg-slate-800"
+                  >
+                    <img
+                      *ngIf="seoPreviewImageUrl() as url; else seoImgPlaceholderEn"
+                      [src]="url"
+                      alt=""
+                      class="h-full w-full object-cover"
+                    />
+                    <ng-template #seoImgPlaceholderEn>
+                      <span class="text-xs text-slate-500 dark:text-slate-400">—</span>
+                    </ng-template>
+                  </div>
+                  <div class="min-w-0 grid gap-1">
+                    <p class="font-semibold text-slate-900 dark:text-slate-50 truncate">
+                      {{ seoPreviewName('en') }}
+                    </p>
+                    <p class="text-sm text-slate-700 dark:text-slate-200">
+                      <ng-container *ngIf="previewSalePrice() as sale; else seoBasePriceEn">
+                        <span class="font-semibold text-rose-700 dark:text-rose-300">{{
+                          sale | localizedCurrency: 'RON'
+                        }}</span>
+                        <span class="ml-2 line-through text-slate-500 dark:text-slate-400">{{
+                          previewBasePrice() | localizedCurrency: 'RON'
+                        }}</span>
+                      </ng-container>
+                      <ng-template #seoBasePriceEn>
+                        <span class="font-semibold">{{
+                          previewBasePrice() | localizedCurrency: 'RON'
+                        }}</span>
+                      </ng-template>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid gap-2">
+                <p class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {{ 'adminUi.products.seoPreview.snippetTitle' | translate }}
+                </p>
+                <div
+                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/20"
+                >
+                  <p class="text-sm font-medium text-indigo-700 dark:text-indigo-300">
+                    {{ seoPreviewTitle('en') }}
+                  </p>
+                  <p class="text-xs text-emerald-700 dark:text-emerald-300">
+                    {{ seoPreviewUrl() }}
+                  </p>
+                  <p class="text-sm text-slate-700 dark:text-slate-200">
+                    {{ seoPreviewDescription('en') }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <div id="product-wizard-save" class="grid gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <app-button
+              [label]="
+                editorSaving()
+                  ? ('adminUi.common.saving' | translate)
+                  : ('adminUi.products.form.save' | translate)
+              "
+              (action)="save()"
+              [disabled]="editorSaving()"
+            ></app-button>
+
+            <ng-container *ngIf="editorMessage()">
+              <span
+                class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+              >
+                {{ 'adminUi.products.successFeedback.saved' | translate }}
+              </span>
+              <span
+                class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              >
+                {{ successStatusLabelKey() | translate }}
+              </span>
+              <span
+                class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              >
+                {{ successVisibilityLabelKey() | translate }}
+              </span>
+            </ng-container>
+          </div>
+
+          <div
+            *ngIf="editorMessage() && editingSlug() as slug"
+            class="flex flex-wrap items-center gap-2"
+          >
+            <app-button
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.products.successFeedback.cta.images' | translate"
+              (action)="scrollToImagesSection()"
+            ></app-button>
+            <app-button
+              *ngIf="savedStatus() !== 'published'"
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.products.successFeedback.cta.publish' | translate"
+              (action)="startPublishWizard()"
+            ></app-button>
+            <app-button
+              *ngIf="savedIsVisible()"
+              size="sm"
+              variant="ghost"
+              [label]="'adminUi.products.successFeedback.cta.view' | translate"
+              [routerLink]="['/products', slug]"
+            ></app-button>
+          </div>
         </div>
-	    </div>
-	  `
+
+        <app-admin-products-image-manager
+          [hasEditingSlug]="!!editingSlug()"
+          [images]="images"
+          [editingImageId]="editingImageId"
+          [imageOrderBusy]="imageOrderBusy"
+          [imageOrderError]="imageOrderError"
+          [imageMetaBusy]="imageMetaBusy"
+          [imageMetaError]="imageMetaError"
+          [deleteImageConfirmBusy]="deleteImageConfirmBusy"
+          [deletedImagesOpen]="deletedImagesOpen"
+          [deletedImagesBusy]="deletedImagesBusy"
+          [deletedImagesError]="deletedImagesError"
+          [deletedImages]="deletedImages"
+          [restoringDeletedImage]="restoringDeletedImage"
+          [imageMeta]="imageMeta"
+          [imageStats]="imageStats"
+          [uploads]="imageUploads"
+          (toggleDeletedImagesRequested)="toggleDeletedImages()"
+          (uploadRequested)="onUpload($event)"
+          (retryUploadRequested)="retryImageUpload($event)"
+          (removeUploadRequested)="removeImageUpload($event)"
+          (makePrimaryRequested)="makeImagePrimary($event)"
+          (toggleMetaRequested)="toggleImageMeta($event)"
+          (deleteRequested)="openDeleteImageConfirm($event)"
+          (reprocessRequested)="reprocessImage()"
+          (saveMetaRequested)="saveImageMeta()"
+          (restoreRequested)="restoreDeletedImage($event)"
+        ></app-admin-products-image-manager>
+      </section>
+
+      <div *ngIf="selected.size > 0 && view === 'active'" class="h-24"></div>
+
+      <div
+        *ngIf="selected.size > 0 && view === 'active'"
+        class="fixed inset-x-0 bottom-4 z-40 px-4 sm:px-6"
+      >
+        <div class="max-w-6xl mx-auto">
+          <div
+            class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 text-sm text-slate-700 shadow-lg backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200 dark:shadow-none"
+          >
+            <div class="font-medium">
+              {{ 'adminUi.products.bulk.selected' | translate: { count: selected.size } }}
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.actions.bulkActions' | translate"
+                (action)="scrollToBulkActions()"
+              ></app-button>
+              <app-button
+                size="sm"
+                variant="ghost"
+                [label]="'adminUi.products.bulk.clearSelection' | translate"
+                [disabled]="bulkBusy() || inlineBusy()"
+                (action)="clearSelection()"
+              ></app-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `,
 })
 export class AdminProductsComponent implements OnInit, OnDestroy {
   crumbs = [
     { label: 'nav.home', url: '/' },
     { label: 'nav.admin', url: '/admin/dashboard' },
-    { label: 'adminUi.products.title' }
+    { label: 'adminUi.products.title' },
   ];
 
   readonly productRowHeight = 96;
@@ -3148,27 +3993,35 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   private productSearchSub: Subscription | null = null;
   private productFilterDebounceHandle: number | null = null;
 
-	  editorOpen = signal(false);
-	  editingSlug = signal<string | null>(null);
-	  editingCurrency = signal('RON');
-	  editorError = signal<string | null>(null);
-	  editorMessage = signal<string | null>(null);
-    editorDirty = signal(false);
-    editorSaving = signal(false);
-    editorLastSavedAt = signal<string | null>(null);
-    lastSavedState = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
-	  wizardKind = signal<ProductWizardKind | null>(null);
-	  wizardStep = signal(0);
-    private wizardAdvanceAfterSave = false;
-    private wizardExitAfterPublish = false;
-    statusConfirmOpen = signal(false);
-    statusConfirmBusy = signal(false);
-    statusConfirmPrev = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
-    statusConfirmTarget = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
+  editorOpen = signal(false);
+  editingSlug = signal<string | null>(null);
+  editingCurrency = signal('RON');
+  editorError = signal<string | null>(null);
+  editorMessage = signal<string | null>(null);
+  editorDirty = signal(false);
+  editorSaving = signal(false);
+  editorLastSavedAt = signal<string | null>(null);
+  lastSavedState = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
+  wizardKind = signal<ProductWizardKind | null>(null);
+  wizardStep = signal(0);
+  private wizardAdvanceAfterSave = false;
+  private wizardExitAfterPublish = false;
+  statusConfirmOpen = signal(false);
+  statusConfirmBusy = signal(false);
+  statusConfirmPrev = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
+  statusConfirmTarget = signal<{ status: ProductForm['status']; isActive: boolean } | null>(null);
   deleteImageConfirmOpen = signal(false);
   deleteImageConfirmBusy = signal(false);
   deleteImageConfirmTarget = signal<{ id: string; url: string; alt: string } | null>(null);
-  images = signal<Array<{ id: string; url: string; alt_text?: string | null; caption?: string | null; sort_order?: number | null }>>([]);
+  images = signal<
+    Array<{
+      id: string;
+      url: string;
+      alt_text?: string | null;
+      caption?: string | null;
+      sort_order?: number | null;
+    }>
+  >([]);
   imageOrderBusy = signal(false);
   imageOrderError = signal<string | null>(null);
   deletedImagesOpen = signal(false);
@@ -3180,19 +4033,20 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   imageMetaBusy = signal(false);
   imageMetaError = signal<string | null>(null);
   imageMeta: ImageMetaByLang = this.blankImageMetaByLang();
-	  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
-	  imageStats: AdminProductImageOptimizationStats | null = null;
-	  imageUploads = signal<AdminProductImageUploadItem[]>([]);
-	  private readonly imageUploadFiles = new Map<string, File>();
-	  private imageUploadActiveId: string | null = null;
-	  private imageUploadSub: Subscription | null = null;
-	  adminCategories = signal<Array<{ id: string; name: string }>>([]);
+  imageMetaExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
+  imageStats: AdminProductImageOptimizationStats | null = null;
+  imageUploads = signal<AdminProductImageUploadItem[]>([]);
+  private readonly imageUploadFiles = new Map<string, File>();
+  private imageUploadActiveId: string | null = null;
+  private imageUploadSub: Subscription | null = null;
+  adminCategories = signal<Array<{ id: string; name: string }>>([]);
   createCategoryOpen = signal(false);
   createCategoryBusy = signal(false);
   createCategoryError = signal<string | null>(null);
   createCategoryName = '';
   createCategoryParentId = '';
-  private createCategoryContext: 'filters' | 'product_form' | 'manager' | 'bulk_assign' = 'product_form';
+  private createCategoryContext: 'filters' | 'product_form' | 'manager' | 'bulk_assign' =
+    'product_form';
   categoryManagerOpen = signal(false);
   categoryManagerSlug = '';
   categoryManagerParentId = '';
@@ -3258,22 +4112,28 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   bulkPriceMode: 'percent' | 'amount' = 'percent';
   bulkPriceDirection: 'increase' | 'decrease' = 'increase';
   bulkPriceValue = '';
-  bulkPricePreview: { old_min: string; old_max: string; new_min: string; new_max: string; currency: string } | null = null;
+  bulkPricePreview: {
+    old_min: string;
+    old_max: string;
+    new_min: string;
+    new_max: string;
+    currency: string;
+  } | null = null;
 
   translationLoading = signal(false);
   translationError = signal<string | null>(null);
   translationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
   translations: Record<'en' | 'ro', ProductTranslationForm> = {
     en: this.blankTranslationForm(),
-    ro: this.blankTranslationForm()
+    ro: this.blankTranslationForm(),
   };
 
-	  editingProductId = signal<string | null>(null);
-	  auditEntries = signal<AdminProductAuditEntry[]>([]);
-	  auditBusy = signal(false);
-	  auditError = signal<string | null>(null);
-	  priceHistoryChanges = signal<PriceChangeEvent[]>([]);
-	  priceHistoryChart = signal<PriceHistoryChart | null>(null);
+  editingProductId = signal<string | null>(null);
+  auditEntries = signal<AdminProductAuditEntry[]>([]);
+  auditBusy = signal(false);
+  auditError = signal<string | null>(null);
+  priceHistoryChanges = signal<PriceChangeEvent[]>([]);
+  priceHistoryChart = signal<PriceHistoryChart | null>(null);
 
   csvImportOpen = signal(false);
   csvImportFile = signal<File | null>(null);
@@ -3328,12 +4188,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     private readonly markdown: MarkdownService,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    public favorites: AdminFavoritesService
+    public favorites: AdminFavoritesService,
   ) {}
 
   ngOnInit(): void {
     this.favorites.init();
-    this.tableLayout.set(loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults));
+    this.tableLayout.set(
+      loadAdminTableLayout(this.tableLayoutStorageKey(), this.tableColumns, this.tableDefaults),
+    );
     const state = history.state;
     const editSlug = typeof state?.editProductSlug === 'string' ? state.editProductSlug : '';
     this.pendingEditProductSlug = editSlug.trim() ? editSlug.trim() : null;
@@ -3404,7 +4266,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     if (!el) return;
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     setTimeout(() => {
-      const focusable = el.querySelector<HTMLElement>('select, input, button, [href], [tabindex]:not([tabindex="-1"])');
+      const focusable = el.querySelector<HTMLElement>(
+        'select, input, button, [href], [tabindex]:not([tabindex="-1"])',
+      );
       focusable?.focus();
     }, 0);
   }
@@ -3414,7 +4278,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   }
 
   successVisibilityLabelKey(): string {
-    return this.savedIsVisible() ? 'adminUi.products.successFeedback.visible' : 'adminUi.products.successFeedback.hidden';
+    return this.savedIsVisible()
+      ? 'adminUi.products.successFeedback.visible'
+      : 'adminUi.products.successFeedback.hidden';
   }
 
   savedStatus(): ProductForm['status'] {
@@ -3459,7 +4325,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   openProductSearch(): void {
     const needle = (this.q || '').trim();
     const shouldOpen =
-      needle.length >= 2 || this.productSearchLoading() || !!this.productSearchError() || this.productSearchResults().length > 0;
+      needle.length >= 2 ||
+      this.productSearchLoading() ||
+      !!this.productSearchError() ||
+      this.productSearchResults().length > 0;
     if (!shouldOpen) return;
     if (this.productSearchBlurHandle !== null) {
       clearTimeout(this.productSearchBlurHandle);
@@ -3568,10 +4437,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         category_slug: this.categorySlug || undefined,
         missing_translations: this.translationFilter === 'missing_any' ? true : undefined,
         missing_translation_lang:
-          this.translationFilter === 'missing_en' ? 'en' : this.translationFilter === 'missing_ro' ? 'ro' : undefined,
+          this.translationFilter === 'missing_en'
+            ? 'en'
+            : this.translationFilter === 'missing_ro'
+              ? 'ro'
+              : undefined,
         deleted: this.view === 'deleted' ? true : undefined,
         page: 1,
-        limit: 8
+        limit: 8,
       })
       .subscribe({
         next: (res) => {
@@ -3587,7 +4460,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           this.productSearchLoading.set(false);
           this.productSearchActiveIndex.set(-1);
           this.productSearchError.set(this.t('adminUi.products.errors.loadList'));
-        }
+        },
       });
     sub.add(() => {
       if (this.productSearchSub === sub) this.productSearchSub = null;
@@ -3666,14 +4539,17 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   savedViews(): AdminFavoriteItem[] {
     return this.favorites
       .items()
-      .filter((item) => item?.type === 'filter' && (item?.state)?.['adminFilterScope'] === 'products');
+      .filter(
+        (item) => item?.type === 'filter' && item?.state?.['adminFilterScope'] === 'products',
+      );
   }
 
   applySavedView(key: string): void {
     this.selectedSavedViewKey = key;
     if (!key) return;
     const view = this.savedViews().find((item) => item.key === key);
-    const filters = view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
+    const filters =
+      view?.state && typeof view.state === 'object' ? (view.state as any).adminFilters : null;
     if (!filters || typeof filters !== 'object') return;
 
     this.q = String(filters.q ?? '');
@@ -3681,7 +4557,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.categorySlug = String(filters.categorySlug ?? '');
     this.translationFilter = (filters.translationFilter ?? 'all') as ProductTranslationFilter;
     this.view = (filters.view ?? 'active') as ProductView;
-    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    const nextLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit)
+        ? filters.limit
+        : this.limit;
     this.limit = nextLimit;
     this.page = 1;
     this.clearSelection();
@@ -3701,7 +4580,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const name = (window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? '').trim();
+    const name = (
+      window.prompt(this.translate.instant('adminUi.favorites.savedViews.prompt')) ?? ''
+    ).trim();
     if (!name) {
       this.toast.error(this.translate.instant('adminUi.favorites.savedViews.errors.nameRequired'));
       return;
@@ -3714,7 +4595,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       label: name,
       subtitle: '',
       url: '/admin/products',
-      state: { adminFilterScope: 'products', adminFilters: filters }
+      state: { adminFilterScope: 'products', adminFilters: filters },
     });
     this.selectedSavedViewKey = key;
   }
@@ -3730,7 +4611,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.categorySlug = String(filters.categorySlug ?? '');
     this.translationFilter = (filters.translationFilter ?? 'all') as ProductTranslationFilter;
     this.view = (filters.view ?? 'active') as ProductView;
-    const nextLimit = typeof filters.limit === 'number' && Number.isFinite(filters.limit) ? filters.limit : this.limit;
+    const nextLimit =
+      typeof filters.limit === 'number' && Number.isFinite(filters.limit)
+        ? filters.limit
+        : this.limit;
     this.limit = nextLimit;
     this.page = 1;
     this.selectedSavedViewKey = this.currentViewFavoriteKey();
@@ -3750,7 +4634,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       categorySlug: this.categorySlug,
       translationFilter: this.translationFilter,
       view: this.view,
-      limit: this.limit
+      limit: this.limit,
     };
   }
 
@@ -3857,7 +4741,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           this.translate.instant('adminUi.products.bulk.status.success', { count }),
           this.translate.instant('adminUi.actions.undo'),
           () => this.undoBulkStatusChange(undoPayload),
-          { tone: 'success', durationMs: 8000 }
+          { tone: 'success', durationMs: 8000 },
         );
         this.clearSelection();
         this.load();
@@ -3866,7 +4750,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         this.bulkBusy.set(false);
         this.bulkStatusConfirmBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -3877,7 +4761,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         this.toast.success(this.translate.instant('adminUi.products.bulk.status.undoSuccess'));
         this.load();
       },
-      error: () => this.toast.error(this.translate.instant('adminUi.products.bulk.status.undoError'))
+      error: () =>
+        this.toast.error(this.translate.instant('adminUi.products.bulk.status.undoError')),
     });
   }
 
@@ -3923,7 +4808,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.createCategoryBusy.set(false);
         this.createCategoryError.set(err?.error?.detail || this.t('adminUi.categories.errors.add'));
-      }
+      },
     });
   }
 
@@ -3937,7 +4822,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       sort_order: cat.sort_order ?? undefined,
       thumbnail_url: cat.thumbnail_url ?? null,
       banner_url: cat.banner_url ?? null,
-      is_visible: cat.is_visible
+      is_visible: cat.is_visible,
     };
     const nextCategories = [...currentCategories];
     const existingIdx = nextCategories.findIndex((c) => c.id === nextCategory.id);
@@ -4028,9 +4913,11 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.categoryManagerUpdateBusy.set(false);
-        this.categoryManagerUpdateError.set(err?.error?.detail || this.t('adminUi.categories.errors.updateParent'));
+        this.categoryManagerUpdateError.set(
+          err?.error?.detail || this.t('adminUi.categories.errors.updateParent'),
+        );
         this.categoryManagerParentId = prevParentId || '';
-      }
+      },
     });
   }
 
@@ -4070,7 +4957,11 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   mergeTargetOptions(source: Category): Category[] {
     const parentId = (source.parent_id ?? '').trim() || null;
     return this.categories()
-      .filter((candidate) => ((candidate.parent_id ?? '').trim() || null) === parentId && candidate.slug !== source.slug)
+      .filter(
+        (candidate) =>
+          ((candidate.parent_id ?? '').trim() || null) === parentId &&
+          candidate.slug !== source.slug,
+      )
       .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
   }
 
@@ -4104,7 +4995,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.mergePreviewLoading.set(false);
         this.mergeError.set(this.t('adminUi.storefront.categories.mergePreviewError'));
-      }
+      },
     });
   }
 
@@ -4134,8 +5025,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       this.translate.instant('adminUi.storefront.categories.confirmMerge', {
         source: cat.name,
         target: targetName,
-        count: preview.product_count
-      })
+        count: preview.product_count,
+      }),
     );
     if (!confirmed) return;
 
@@ -4152,14 +5043,15 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.mergeSaving.set(false);
         this.mergeError.set(this.t('adminUi.storefront.categories.mergeError'));
-      }
+      },
     });
   }
 
   private mergeReasonKey(reason: string | null | undefined): string {
     if (reason === 'same_category') return 'adminUi.storefront.categories.mergeReasonSame';
     if (reason === 'different_parent') return 'adminUi.storefront.categories.mergeReasonParent';
-    if (reason === 'source_has_children') return 'adminUi.storefront.categories.mergeReasonChildren';
+    if (reason === 'source_has_children')
+      return 'adminUi.storefront.categories.mergeReasonChildren';
     return 'adminUi.storefront.categories.mergeNotAllowed';
   }
 
@@ -4182,7 +5074,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.deletePreviewLoading.set(false);
         this.deleteError.set(this.t('adminUi.storefront.categories.deletePreviewError'));
-      }
+      },
     });
   }
 
@@ -4201,7 +5093,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const confirmed = confirm(this.translate.instant('adminUi.storefront.categories.confirmDelete', { name: cat.name }));
+    const confirmed = confirm(
+      this.translate.instant('adminUi.storefront.categories.confirmDelete', { name: cat.name }),
+    );
     if (!confirmed) return;
 
     this.deleteSaving.set(true);
@@ -4217,7 +5111,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.deleteSaving.set(false);
         this.deleteError.set(this.t('adminUi.storefront.categories.deleteError'));
-      }
+      },
     });
   }
 
@@ -4236,11 +5130,12 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   private refreshCategoryLists(): void {
     this.catalog.listCategories(undefined, { include_hidden: true }).subscribe({
       next: (cats) => this.categories.set(cats || []),
-      error: () => this.categories.set([])
+      error: () => this.categories.set([]),
     });
     this.admin.getCategories().subscribe({
-      next: (cats) => this.adminCategories.set((cats || []).map((c) => ({ id: c.id, name: c.name }))),
-      error: () => this.adminCategories.set([])
+      next: (cats) =>
+        this.adminCategories.set((cats || []).map((c) => ({ id: c.id, name: c.name }))),
+      error: () => this.adminCategories.set([]),
     });
   }
 
@@ -4274,7 +5169,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.categoryImportBusy.set(false);
         this.categoryImportError.set(err?.error?.detail || this.t('adminUi.categories.csv.error'));
-      }
+      },
     });
   }
 
@@ -4293,7 +5188,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           this.translate.instant('adminUi.products.quickStatus.success', { name: displayName }),
           this.translate.instant('adminUi.actions.undo'),
           () => this.undoQuickStatusChange(productId, prevStatus),
-          { tone: 'success', durationMs: 8000 }
+          { tone: 'success', durationMs: 8000 },
         );
         if (this.selected.has(productId)) {
           const nextSelected = new Set(this.selected);
@@ -4306,7 +5201,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.quickStatusBusyId.set(null);
         this.toast.error(this.translate.instant('adminUi.products.quickStatus.error'));
-      }
+      },
     });
   }
 
@@ -4316,7 +5211,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         this.toast.success(this.translate.instant('adminUi.products.quickStatus.undoSuccess'));
         this.load();
       },
-      error: () => this.toast.error(this.translate.instant('adminUi.products.quickStatus.undoError'))
+      error: () =>
+        this.toast.error(this.translate.instant('adminUi.products.quickStatus.undoError')),
     });
   }
 
@@ -4356,7 +5252,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const payload = Array.from(this.selected).map((id) => ({
       product_id: id,
       sale_type: this.bulkSaleType,
-      sale_value: parsed
+      sale_value: parsed,
     }));
     this.bulkBusy.set(true);
     this.admin.bulkUpdateProducts(payload).subscribe({
@@ -4369,7 +5265,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -4378,7 +5274,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const payload = Array.from(this.selected).map((id) => ({
       product_id: id,
       sale_type: null,
-      sale_value: null
+      sale_value: null,
     }));
     this.bulkBusy.set(true);
     this.admin.bulkUpdateProducts(payload).subscribe({
@@ -4391,7 +5287,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -4399,7 +5295,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.bulkError.set(null);
     const payload = Array.from(this.selected).map((id) => ({
       product_id: id,
-      status: 'published'
+      status: 'published',
     }));
     this.bulkBusy.set(true);
     this.admin.bulkUpdateProducts(payload).subscribe({
@@ -4412,7 +5308,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -4425,7 +5321,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     }
     const payload = Array.from(this.selected).map((id) => ({
       product_id: id,
-      category_id: categoryId
+      category_id: categoryId,
     }));
     this.bulkBusy.set(true);
     this.admin.bulkUpdateProducts(payload).subscribe({
@@ -4438,14 +5334,18 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
   applyScheduleToSelected(): void {
     this.bulkError.set(null);
-    const publishDate = this.bulkPublishScheduledFor ? new Date(this.bulkPublishScheduledFor) : null;
-    const unpublishDate = this.bulkUnpublishScheduledFor ? new Date(this.bulkUnpublishScheduledFor) : null;
+    const publishDate = this.bulkPublishScheduledFor
+      ? new Date(this.bulkPublishScheduledFor)
+      : null;
+    const unpublishDate = this.bulkUnpublishScheduledFor
+      ? new Date(this.bulkUnpublishScheduledFor)
+      : null;
 
     if (
       (publishDate && Number.isNaN(publishDate.getTime())) ||
@@ -4471,7 +5371,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const payload = Array.from(this.selected).map((id) => ({
       product_id: id,
       ...(publishIso ? { publish_scheduled_for: publishIso } : {}),
-      ...(unpublishIso ? { unpublish_scheduled_for: unpublishIso } : {})
+      ...(unpublishIso ? { unpublish_scheduled_for: unpublishIso } : {}),
     }));
     this.bulkBusy.set(true);
     this.admin.bulkUpdateProducts(payload).subscribe({
@@ -4484,7 +5384,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -4492,7 +5392,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.bulkError.set(null);
     const payload = Array.from(this.selected).map((id) => ({
       product_id: id,
-      publish_scheduled_for: null
+      publish_scheduled_for: null,
     }));
     this.bulkBusy.set(true);
     this.admin.bulkUpdateProducts(payload).subscribe({
@@ -4505,7 +5405,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -4513,7 +5413,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.bulkError.set(null);
     const payload = Array.from(this.selected).map((id) => ({
       product_id: id,
-      unpublish_scheduled_for: null
+      unpublish_scheduled_for: null,
     }));
     this.bulkBusy.set(true);
     this.admin.bulkUpdateProducts(payload).subscribe({
@@ -4526,7 +5426,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -4538,13 +5438,15 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.inlineStockError = '';
     this.inlineSaleError = '';
 
-    const basePrice = typeof product.base_price === 'number' ? product.base_price : Number(product.base_price || 0);
+    const basePrice =
+      typeof product.base_price === 'number' ? product.base_price : Number(product.base_price || 0);
     this.inlineBasePrice = this.formatMoneyInput(Number.isFinite(basePrice) ? basePrice : 0);
     this.inlineStockQuantity = String(Number(product.stock_quantity || 0));
 
     const rawSaleType = (product.sale_type || '').toString();
     const saleType: 'percent' | 'amount' = rawSaleType === 'amount' ? 'amount' : 'percent';
-    const saleValueNum = typeof product.sale_value === 'number' ? product.sale_value : Number(product.sale_value ?? 0);
+    const saleValueNum =
+      typeof product.sale_value === 'number' ? product.sale_value : Number(product.sale_value ?? 0);
     const saleEnabled = Boolean(rawSaleType && Number.isFinite(saleValueNum) && saleValueNum > 0);
     this.inlineSaleEnabled = saleEnabled;
     this.inlineSaleType = saleType;
@@ -4671,8 +5573,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           base_price: basePrice,
           stock_quantity: stockQuantity,
           sale_type,
-          sale_value
-        }
+          sale_value,
+        },
       ])
       .subscribe({
         next: () => {
@@ -4684,7 +5586,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         error: () => {
           this.inlineBusy.set(false);
           this.inlineError = this.t('adminUi.products.inline.errors.save');
-        }
+        },
       });
   }
 
@@ -4709,7 +5611,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const direction = this.bulkPriceDirection === 'decrease' ? -1 : 1;
     const payload: Array<{ product_id: string; base_price: number }> = [];
     for (const product of selectedItems) {
-      const base = typeof product.base_price === 'number' ? product.base_price : Number(product.base_price || 0);
+      const base =
+        typeof product.base_price === 'number'
+          ? product.base_price
+          : Number(product.base_price || 0);
       let nextPrice = base;
       if (this.bulkPriceMode === 'percent') {
         nextPrice = base + (base * delta * direction) / 100;
@@ -4735,7 +5640,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.bulkBusy.set(false);
         this.bulkError.set(this.t('adminUi.products.bulk.error'));
-      }
+      },
     });
   }
 
@@ -4776,21 +5681,22 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       old_max: this.formatMoneyInput(maxOld),
       new_min: this.formatMoneyInput(minNew),
       new_max: this.formatMoneyInput(maxNew),
-      currency
+      currency,
     };
   }
 
   exportProductsCsv(): void {
     this.admin.exportProductsCsv().subscribe({
       next: (blob) => this.downloadBlob(blob, 'products.csv'),
-      error: () => this.toast.error(this.t('adminUi.products.csv.errors.export'))
+      error: () => this.toast.error(this.t('adminUi.products.csv.errors.export')),
     });
   }
 
   downloadCategoriesCsv(template: boolean): void {
     this.admin.exportCategoriesCsv(template).subscribe({
-      next: (blob) => this.downloadBlob(blob, template ? 'categories-template.csv' : 'categories.csv'),
-      error: () => this.toast.error(this.t('adminUi.categories.csv.exportError'))
+      next: (blob) =>
+        this.downloadBlob(blob, template ? 'categories-template.csv' : 'categories.csv'),
+      error: () => this.toast.error(this.t('adminUi.categories.csv.exportError')),
     });
   }
 
@@ -4841,7 +5747,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.csvImportBusy.set(false);
         this.csvImportError.set(this.t('adminUi.products.csv.errors.import'));
-      }
+      },
     });
   }
 
@@ -4869,7 +5775,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   }
 
   private refreshDescriptionPreview(): void {
-    const { html, sanitized } = this.markdown.renderWithSanitizationReport(this.form.long_description || '');
+    const { html, sanitized } = this.markdown.renderWithSanitizationReport(
+      this.form.long_description || '',
+    );
     this.descriptionPreviewHtml.set(html);
     this.descriptionPreviewSanitized.set(sanitized);
   }
@@ -4914,7 +5822,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   }
 
   wizardTitleKey(): string {
-    return this.wizardKind() === 'publish' ? 'adminUi.products.wizard.publishTitle' : 'adminUi.products.wizard.createTitle';
+    return this.wizardKind() === 'publish'
+      ? 'adminUi.products.wizard.publishTitle'
+      : 'adminUi.products.wizard.createTitle';
   }
 
   wizardStepDescriptionKey(): string {
@@ -5014,69 +5924,74 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 
   markEditorDirtyFromEvent(event: Event): void {
     const target = event?.target as HTMLElement | null;
-    if (target && typeof (target as any).closest === 'function' && target.closest('[data-ignore-dirty]')) return;
+    if (
+      target &&
+      typeof (target as any).closest === 'function' &&
+      target.closest('[data-ignore-dirty]')
+    )
+      return;
     this.markEditorDirty();
   }
 
-		  startNew(): void {
-        this.exitWizard();
-		    this.editorOpen.set(true);
-		    this.editingSlug.set(null);
-		    this.editingProductId.set(null);
-		    this.editingCurrency.set('RON');
-		    this.editorError.set(null);
-		    this.editorMessage.set(null);
-        this.editorDirty.set(false);
-        this.editorSaving.set(false);
-        this.editorLastSavedAt.set(null);
-        this.lastSavedState.set(null);
-        this.loadedTagSlugs = [];
-		    this.resetDuplicateCheck();
-		    this.resetRelationships();
-		    this.resetAudit();
-	        this.resetMarkdownPreview();
-			    this.images.set([]);
-		    this.resetDeletedImages();
-			    this.resetImageMeta();
-	        this.resetImageUploads();
-			    this.form = this.blankForm();
-	        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
-			    this.basePriceError = '';
-			    this.saleValueError = '';
-	    this.resetTranslations();
+  startNew(): void {
+    this.exitWizard();
+    this.editorOpen.set(true);
+    this.editingSlug.set(null);
+    this.editingProductId.set(null);
+    this.editingCurrency.set('RON');
+    this.editorError.set(null);
+    this.editorMessage.set(null);
+    this.editorDirty.set(false);
+    this.editorSaving.set(false);
+    this.editorLastSavedAt.set(null);
+    this.lastSavedState.set(null);
+    this.loadedTagSlugs = [];
+    this.resetDuplicateCheck();
+    this.resetRelationships();
+    this.resetAudit();
+    this.resetMarkdownPreview();
+    this.images.set([]);
+    this.resetDeletedImages();
+    this.resetImageMeta();
+    this.resetImageUploads();
+    this.form = this.blankForm();
+    this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
+    this.basePriceError = '';
+    this.saleValueError = '';
+    this.resetTranslations();
     this.resetVariants();
     this.resetStockLedger();
     const first = this.adminCategories()[0];
     if (first) this.form.category_id = first.id;
   }
 
-		  closeEditor(): void {
-        if (this.editorSaving()) return;
-        if (this.editorDirty() && !window.confirm(this.t('account.unsaved.confirmDiscard'))) return;
-        this.exitWizard();
-		    this.editorOpen.set(false);
-		    this.editingSlug.set(null);
-		    this.editingProductId.set(null);
-		    this.editingCurrency.set('RON');
-		    this.editorError.set(null);
-		    this.editorMessage.set(null);
-        this.editorDirty.set(false);
-        this.editorSaving.set(false);
-        this.editorLastSavedAt.set(null);
-        this.lastSavedState.set(null);
-        this.loadedTagSlugs = [];
-		    this.resetDuplicateCheck();
-		    this.resetRelationships();
-		    this.resetAudit();
-	        this.resetMarkdownPreview();
-			    this.images.set([]);
-		    this.resetDeletedImages();
-			    this.resetImageMeta();
-	        this.resetImageUploads();
-			    this.basePriceError = '';
-			    this.saleValueError = '';
-		    this.resetTranslations();
-	    this.resetVariants();
+  closeEditor(): void {
+    if (this.editorSaving()) return;
+    if (this.editorDirty() && !window.confirm(this.t('account.unsaved.confirmDiscard'))) return;
+    this.exitWizard();
+    this.editorOpen.set(false);
+    this.editingSlug.set(null);
+    this.editingProductId.set(null);
+    this.editingCurrency.set('RON');
+    this.editorError.set(null);
+    this.editorMessage.set(null);
+    this.editorDirty.set(false);
+    this.editorSaving.set(false);
+    this.editorLastSavedAt.set(null);
+    this.lastSavedState.set(null);
+    this.loadedTagSlugs = [];
+    this.resetDuplicateCheck();
+    this.resetRelationships();
+    this.resetAudit();
+    this.resetMarkdownPreview();
+    this.images.set([]);
+    this.resetDeletedImages();
+    this.resetImageMeta();
+    this.resetImageUploads();
+    this.basePriceError = '';
+    this.saleValueError = '';
+    this.resetTranslations();
+    this.resetVariants();
     this.resetStockLedger();
   }
 
@@ -5088,31 +6003,31 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.editorDirty.set(false);
   }
 
-		  edit(slug: string): void {
-        this.exitWizard();
-		    this.editorOpen.set(true);
-		    this.editorError.set(null);
-		    this.editorMessage.set(null);
-        this.editorDirty.set(false);
-        this.editorSaving.set(false);
-        this.editorLastSavedAt.set(null);
-        this.lastSavedState.set(null);
-		    this.editingSlug.set(slug);
-		    this.editingProductId.set(null);
-		    this.editingCurrency.set('RON');
-		    this.resetDuplicateCheck();
-		    this.resetRelationships();
-		    this.resetAudit();
-	        this.resetMarkdownPreview();
-			    this.basePriceError = '';
-			    this.saleValueError = '';
-			    this.resetTranslations();
-			    this.resetDeletedImages();
-			    this.resetImageMeta();
-	        this.resetImageUploads();
-			    this.resetVariants();
-		    this.resetStockLedger();
-	    this.admin.getProduct(slug).subscribe({
+  edit(slug: string): void {
+    this.exitWizard();
+    this.editorOpen.set(true);
+    this.editorError.set(null);
+    this.editorMessage.set(null);
+    this.editorDirty.set(false);
+    this.editorSaving.set(false);
+    this.editorLastSavedAt.set(null);
+    this.lastSavedState.set(null);
+    this.editingSlug.set(slug);
+    this.editingProductId.set(null);
+    this.editingCurrency.set('RON');
+    this.resetDuplicateCheck();
+    this.resetRelationships();
+    this.resetAudit();
+    this.resetMarkdownPreview();
+    this.basePriceError = '';
+    this.saleValueError = '';
+    this.resetTranslations();
+    this.resetDeletedImages();
+    this.resetImageMeta();
+    this.resetImageUploads();
+    this.resetVariants();
+    this.resetStockLedger();
+    this.admin.getProduct(slug).subscribe({
       next: (prod: any) => {
         const name = (prod?.name || '').toString().trim();
         this.recent.add({
@@ -5121,20 +6036,31 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           label: name || slug,
           subtitle: slug,
           url: '/admin/products',
-          state: { editProductSlug: slug }
+          state: { editProductSlug: slug },
         });
         this.editingProductId.set(prod?.id ? String(prod.id) : null);
         this.editingCurrency.set((prod?.currency || 'RON').toString() || 'RON');
-        const basePrice = typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
-        const weightGramsRaw = typeof prod.weight_grams === 'number' ? prod.weight_grams : Number(prod.weight_grams ?? NaN);
-        const widthRaw = typeof prod.width_cm === 'number' ? prod.width_cm : Number(prod.width_cm ?? NaN);
-        const heightRaw = typeof prod.height_cm === 'number' ? prod.height_cm : Number(prod.height_cm ?? NaN);
-        const depthRaw = typeof prod.depth_cm === 'number' ? prod.depth_cm : Number(prod.depth_cm ?? NaN);
+        const basePrice =
+          typeof prod.base_price === 'number' ? prod.base_price : Number(prod.base_price || 0);
+        const weightGramsRaw =
+          typeof prod.weight_grams === 'number'
+            ? prod.weight_grams
+            : Number(prod.weight_grams ?? NaN);
+        const widthRaw =
+          typeof prod.width_cm === 'number' ? prod.width_cm : Number(prod.width_cm ?? NaN);
+        const heightRaw =
+          typeof prod.height_cm === 'number' ? prod.height_cm : Number(prod.height_cm ?? NaN);
+        const depthRaw =
+          typeof prod.depth_cm === 'number' ? prod.depth_cm : Number(prod.depth_cm ?? NaN);
         const shippingClassRaw = (prod.shipping_class || '').toString();
         const shippingClass: 'standard' | 'bulky' | 'oversize' =
-          shippingClassRaw === 'bulky' || shippingClassRaw === 'oversize' ? shippingClassRaw : 'standard';
+          shippingClassRaw === 'bulky' || shippingClassRaw === 'oversize'
+            ? shippingClassRaw
+            : 'standard';
         const disallowedCouriers = Array.isArray(prod.shipping_disallowed_couriers)
-          ? prod.shipping_disallowed_couriers.map((c: any) => (c ?? '').toString().trim().toLowerCase()).filter(Boolean)
+          ? prod.shipping_disallowed_couriers
+              .map((c: any) => (c ?? '').toString().trim().toLowerCase())
+              .filter(Boolean)
           : [];
         const disallowedSet = new Set(disallowedCouriers);
         const rawSaleType = (prod.sale_type || '').toString();
@@ -5149,7 +6075,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         const badgesState: Record<ProductBadgeKey, BadgeForm> = {
           new: { enabled: false, start_at: '', end_at: '' },
           limited: { enabled: false, start_at: '', end_at: '' },
-          handmade: { enabled: false, start_at: '', end_at: '' }
+          handmade: { enabled: false, start_at: '', end_at: '' },
         };
         const rawBadges = Array.isArray(prod.badges) ? prod.badges : [];
         for (const raw of rawBadges) {
@@ -5164,7 +6090,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           name: prod.name || '',
           category_id: prod.category_id || '',
           base_price: this.formatMoneyInput(Number.isFinite(basePrice) ? basePrice : 0),
-          weight_grams: Number.isFinite(weightGramsRaw) && weightGramsRaw >= 0 ? String(Math.round(weightGramsRaw)) : '',
+          weight_grams:
+            Number.isFinite(weightGramsRaw) && weightGramsRaw >= 0
+              ? String(Math.round(weightGramsRaw))
+              : '',
           width_cm: Number.isFinite(widthRaw) && widthRaw >= 0 ? String(widthRaw) : '',
           height_cm: Number.isFinite(heightRaw) && heightRaw >= 0 ? String(heightRaw) : '',
           depth_cm: Number.isFinite(depthRaw) && depthRaw >= 0 ? String(depthRaw) : '',
@@ -5172,7 +6101,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           shipping_allow_locker: prod.shipping_allow_locker !== false,
           shipping_disallowed_couriers: {
             sameday: disallowedSet.has('sameday'),
-            fan_courier: disallowedSet.has('fan_courier')
+            fan_courier: disallowedSet.has('fan_courier'),
           },
           sale_enabled: saleEnabled,
           sale_type: saleType,
@@ -5186,8 +6115,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           sale_auto_publish: !!prod.sale_auto_publish,
           stock_quantity: Number(prod.stock_quantity || 0),
           low_stock_threshold:
-            prod.low_stock_threshold === null || prod.low_stock_threshold === undefined ? '' : String(prod.low_stock_threshold),
-          status: (prod.status) || 'draft',
+            prod.low_stock_threshold === null || prod.low_stock_threshold === undefined
+              ? ''
+              : String(prod.low_stock_threshold),
+          status: prod.status || 'draft',
           is_active: prod.is_active !== false,
           is_featured: !!prod.is_featured,
           sku: (prod.sku || '').toString(),
@@ -5195,52 +6126,54 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           long_description: (prod.long_description || '').toString(),
           publish_at: prod.publish_at ? this.toLocalDateTime(prod.publish_at) : '',
           is_bestseller: tagSlugs.includes('bestseller'),
-          badges: badgesState
+          badges: badgesState,
         };
         this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
         const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
-        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+        nextImages.sort(
+          (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0),
+        );
         this.images.set(nextImages);
         this.setVariantsFromProduct(prod);
         const productId = this.editingProductId();
         if (productId) this.loadStockAdjustments(productId);
         this.loadTranslations((prod.slug || slug).toString());
-		        this.loadRelationships((prod.slug || slug).toString());
-		        this.loadAudit((prod.slug || slug).toString());
-		        this.scheduleDuplicateCheck();
-		      },
-	      error: () => this.editorError.set(this.t('adminUi.products.errors.load'))
-		    });
-		  }
+        this.loadRelationships((prod.slug || slug).toString());
+        this.loadAudit((prod.slug || slug).toString());
+        this.scheduleDuplicateCheck();
+      },
+      error: () => this.editorError.set(this.t('adminUi.products.errors.load')),
+    });
+  }
 
-	  restoreProduct(product: AdminProductListItem): void {
-	    const id = (product?.id || '').toString();
-	    if (!id) return;
-	    this.restoringProductId.set(id);
-	    this.productsApi.restore(id).subscribe({
-	      next: () => {
-	        this.toast.success(this.t('adminUi.products.trash.success.restore'));
-	        this.restoringProductId.set(null);
-	        this.clearSelection();
-	        this.load();
-	      },
-	      error: () => {
-	        this.restoringProductId.set(null);
-	        this.toast.error(this.t('adminUi.products.trash.errors.restore'));
-	      }
-	    });
-	  }
+  restoreProduct(product: AdminProductListItem): void {
+    const id = (product?.id || '').toString();
+    if (!id) return;
+    this.restoringProductId.set(id);
+    this.productsApi.restore(id).subscribe({
+      next: () => {
+        this.toast.success(this.t('adminUi.products.trash.success.restore'));
+        this.restoringProductId.set(null);
+        this.clearSelection();
+        this.load();
+      },
+      error: () => {
+        this.restoringProductId.set(null);
+        this.toast.error(this.t('adminUi.products.trash.errors.restore'));
+      },
+    });
+  }
 
-	  refreshAudit(): void {
-	    const slug = this.editingSlug();
-	    if (!slug) return;
-	    this.loadAudit(slug);
-	  }
+  refreshAudit(): void {
+    const slug = this.editingSlug();
+    if (!slug) return;
+    this.loadAudit(slug);
+  }
 
-	  onNameChange(next: string | number): void {
-	    this.form.name = String(next ?? '');
-	    this.scheduleDuplicateCheck();
-	  }
+  onNameChange(next: string | number): void {
+    this.form.name = String(next ?? '');
+    this.scheduleDuplicateCheck();
+  }
 
   onSkuChange(next: string | number): void {
     this.form.sku = String(next ?? '');
@@ -5257,7 +6190,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   duplicateHasWarnings(): boolean {
     const dup = this.duplicateCheck();
     if (!dup) return false;
-    const slugTaken = Boolean(dup.slug_base && dup.suggested_slug && dup.slug_base !== dup.suggested_slug);
+    const slugTaken = Boolean(
+      dup.slug_base && dup.suggested_slug && dup.slug_base !== dup.suggested_slug,
+    );
     return slugTaken || (dup.sku_matches?.length ?? 0) > 0 || (dup.name_matches?.length ?? 0) > 0;
   }
 
@@ -5375,7 +6310,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     }
 
     if (value > 100) return null;
-    const discounted = Math.max(0, Math.round((base * (1 - value / 100)) * 100) / 100);
+    const discounted = Math.max(0, Math.round(base * (1 - value / 100) * 100) / 100);
     return discounted < base ? discounted : null;
   }
 
@@ -5483,7 +6418,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       done: () => {
         this.statusConfirmBusy.set(false);
         this.closeStatusConfirm();
-      }
+      },
     });
   }
 
@@ -5579,17 +6514,25 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const width_cm = parseDim(this.form.width_cm);
     const height_cm = parseDim(this.form.height_cm);
     const depth_cm = parseDim(this.form.depth_cm);
-    if ([width_cm, height_cm, depth_cm].some((val) => typeof val === 'number' && Number.isNaN(val))) {
+    if (
+      [width_cm, height_cm, depth_cm].some((val) => typeof val === 'number' && Number.isNaN(val))
+    ) {
       this.editorError.set(this.t('adminUi.products.shipping.dimensionsHint'));
       opts?.done?.(false);
       return;
     }
 
     const shipping_disallowed_couriers: string[] = [];
-    if (this.form.shipping_disallowed_couriers?.sameday) shipping_disallowed_couriers.push('sameday');
-    if (this.form.shipping_disallowed_couriers?.fan_courier) shipping_disallowed_couriers.push('fan_courier');
+    if (this.form.shipping_disallowed_couriers?.sameday)
+      shipping_disallowed_couriers.push('sameday');
+    if (this.form.shipping_disallowed_couriers?.fan_courier)
+      shipping_disallowed_couriers.push('fan_courier');
 
-    const badges: Array<{ badge: ProductBadgeKey; start_at: string | null; end_at: string | null }> = [];
+    const badges: Array<{
+      badge: ProductBadgeKey;
+      start_at: string | null;
+      end_at: string | null;
+    }> = [];
     for (const badge of ['new', 'limited', 'handmade'] as const) {
       const state = this.form.badges?.[badge];
       if (!state?.enabled) continue;
@@ -5613,7 +6556,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       badges.push({
         badge,
         start_at: startDate ? startDate.toISOString() : null,
-        end_at: endDate ? endDate.toISOString() : null
+        end_at: endDate ? endDate.toISOString() : null,
       });
     }
 
@@ -5630,8 +6573,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       shipping_disallowed_couriers,
       sale_type,
       sale_value,
-      sale_start_at: this.form.sale_enabled && this.form.sale_start_at ? new Date(this.form.sale_start_at).toISOString() : null,
-      sale_end_at: this.form.sale_enabled && this.form.sale_end_at ? new Date(this.form.sale_end_at).toISOString() : null,
+      sale_start_at:
+        this.form.sale_enabled && this.form.sale_start_at
+          ? new Date(this.form.sale_start_at).toISOString()
+          : null,
+      sale_end_at:
+        this.form.sale_enabled && this.form.sale_end_at
+          ? new Date(this.form.sale_end_at).toISOString()
+          : null,
       sale_auto_publish: this.form.sale_enabled ? this.form.sale_auto_publish : false,
       stock_quantity: Number(this.form.stock_quantity),
       low_stock_threshold,
@@ -5643,7 +6592,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       short_description: this.buildShortDescription(),
       publish_at: this.form.publish_at ? new Date(this.form.publish_at).toISOString() : null,
       tags: this.buildTags(),
-      badges
+      badges,
     };
 
     const slug = this.editingSlug();
@@ -5665,35 +6614,37 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         }
         if (Array.isArray(prod?.images)) {
           const nextImages = [...prod.images];
-          nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+          nextImages.sort(
+            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0),
+          );
           this.images.set(nextImages);
         }
-	        if (prod?.status) this.form.status = prod.status;
-          if (typeof prod?.is_active === 'boolean') this.form.is_active = prod.is_active;
-          this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
-	        if (newSlug) this.loadTranslations(newSlug);
-	        if (newSlug) this.loadRelationships(newSlug);
-          if (newSlug) this.loadAudit(newSlug);
-	        this.load();
-          opts?.done?.(true);
-          if (this.wizardExitAfterPublish) {
-            this.wizardExitAfterPublish = false;
-            this.wizardAdvanceAfterSave = false;
-            this.exitWizard();
-          } else if (this.wizardAdvanceAfterSave && this.wizardCurrentStepId() === 'save') {
-            this.wizardAdvanceAfterSave = false;
-            this.wizardNext();
-          } else {
-            this.wizardAdvanceAfterSave = false;
-          }
-	      },
-	      error: () => {
-          this.editorSaving.set(false);
-          this.editorError.set(this.t('adminUi.products.errors.save'));
-          opts?.done?.(false);
+        if (prod?.status) this.form.status = prod.status;
+        if (typeof prod?.is_active === 'boolean') this.form.is_active = prod.is_active;
+        this.lastSavedState.set({ status: this.form.status, isActive: this.form.is_active });
+        if (newSlug) this.loadTranslations(newSlug);
+        if (newSlug) this.loadRelationships(newSlug);
+        if (newSlug) this.loadAudit(newSlug);
+        this.load();
+        opts?.done?.(true);
+        if (this.wizardExitAfterPublish) {
+          this.wizardExitAfterPublish = false;
+          this.wizardAdvanceAfterSave = false;
+          this.exitWizard();
+        } else if (this.wizardAdvanceAfterSave && this.wizardCurrentStepId() === 'save') {
+          this.wizardAdvanceAfterSave = false;
+          this.wizardNext();
+        } else {
+          this.wizardAdvanceAfterSave = false;
         }
-	    });
-	  }
+      },
+      error: () => {
+        this.editorSaving.set(false);
+        this.editorError.set(this.t('adminUi.products.errors.save'));
+        opts?.done?.(false);
+      },
+    });
+  }
 
   variantsWithIds(): VariantRow[] {
     return this.variants().filter((v) => Boolean(v.id));
@@ -5779,7 +6730,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 
     this.variantsBusy.set(true);
     this.admin
-      .updateProductVariants(slug, { variants: payloadVariants, delete_variant_ids: Array.from(this.pendingVariantDeletes) })
+      .updateProductVariants(slug, {
+        variants: payloadVariants,
+        delete_variant_ids: Array.from(this.pendingVariantDeletes),
+      })
       .subscribe({
         next: (updated) => {
           this.variantsBusy.set(false);
@@ -5788,9 +6742,11 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
             (updated || []).map((variant) => ({
               id: String(variant.id),
               name: String(variant.name || ''),
-              additional_price_delta: this.formatMoneyInput(Number(variant.additional_price_delta ?? 0)),
+              additional_price_delta: this.formatMoneyInput(
+                Number(variant.additional_price_delta ?? 0),
+              ),
               stock_quantity: Number(variant.stock_quantity ?? 0),
-            }))
+            })),
           );
           this.toast.success(this.t('adminUi.products.form.variantsSaved'));
           const productId = this.editingProductId();
@@ -5799,7 +6755,11 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         error: (err) => {
           this.variantsBusy.set(false);
           const detail = err?.error?.detail;
-          this.variantsError.set(typeof detail === 'string' && detail.trim() ? detail.trim() : this.t('adminUi.products.form.variantsSaveError'));
+          this.variantsError.set(
+            typeof detail === 'string' && detail.trim()
+              ? detail.trim()
+              : this.t('adminUi.products.form.variantsSaveError'),
+          );
         },
       });
   }
@@ -5873,7 +6833,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           this.stockAdjustBusy.set(false);
           const detail = err?.error?.detail;
           this.stockAdjustmentsError.set(
-            typeof detail === 'string' && detail.trim() ? detail.trim() : this.t('adminUi.products.form.stockLedgerApplyError')
+            typeof detail === 'string' && detail.trim()
+              ? detail.trim()
+              : this.t('adminUi.products.form.stockLedgerApplyError'),
           );
         },
       });
@@ -5883,7 +6845,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.stockAdjustmentsError.set(null);
     this.admin.listStockAdjustments({ product_id: productId, limit: 50, offset: 0 }).subscribe({
       next: (rows) => this.stockAdjustments.set(Array.isArray(rows) ? rows : []),
-      error: () => this.stockAdjustmentsError.set(this.t('adminUi.products.form.stockLedgerLoadError')),
+      error: () =>
+        this.stockAdjustmentsError.set(this.t('adminUi.products.form.stockLedgerLoadError')),
     });
   }
 
@@ -5909,8 +6872,15 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       .subscribe({
         next: (blob) => {
           const slug = (this.editingSlug() || '').trim() || productId.slice(0, 8);
-          const parts = [slug, fromDate || 'all', toDate || 'all', reason === 'all' ? 'all' : reason];
-          const safe = parts.map((p) => (p || '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')).filter(Boolean);
+          const parts = [
+            slug,
+            fromDate || 'all',
+            toDate || 'all',
+            reason === 'all' ? 'all' : reason,
+          ];
+          const safe = parts
+            .map((p) => (p || '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, ''))
+            .filter(Boolean);
           const filename = `stock-adjustments-${safe.join('-') || slug}.csv`;
 
           const url = URL.createObjectURL(blob);
@@ -5938,7 +6908,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         name: String(variant.name || ''),
         additional_price_delta: this.formatMoneyInput(Number(variant.additional_price_delta ?? 0)),
         stock_quantity: Number(variant.stock_quantity ?? 0),
-      }))
+      })),
     );
   }
 
@@ -5999,23 +6969,31 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
             const items = Array.isArray(rows) ? rows : [];
             const byId = new Map(items.map((p) => [String(p.id), p]));
             const filteredRelatedIds = relatedIds.filter((id) => byId.has(id));
-            const filteredUpsellIds = upsellIds.filter((id) => byId.has(id) && !filteredRelatedIds.includes(id));
-            if (filteredRelatedIds.length !== relatedIds.length) this.relationshipsRelatedIds.set(filteredRelatedIds);
-            if (filteredUpsellIds.length !== upsellIds.length) this.relationshipsUpsellIds.set(filteredUpsellIds);
-            this.relationshipsRelated.set(filteredRelatedIds.map((id) => byId.get(id)!).filter(Boolean));
-            this.relationshipsUpsells.set(filteredUpsellIds.map((id) => byId.get(id)!).filter(Boolean));
+            const filteredUpsellIds = upsellIds.filter(
+              (id) => byId.has(id) && !filteredRelatedIds.includes(id),
+            );
+            if (filteredRelatedIds.length !== relatedIds.length)
+              this.relationshipsRelatedIds.set(filteredRelatedIds);
+            if (filteredUpsellIds.length !== upsellIds.length)
+              this.relationshipsUpsellIds.set(filteredUpsellIds);
+            this.relationshipsRelated.set(
+              filteredRelatedIds.map((id) => byId.get(id)!).filter(Boolean),
+            );
+            this.relationshipsUpsells.set(
+              filteredUpsellIds.map((id) => byId.get(id)!).filter(Boolean),
+            );
             this.relationshipsLoading.set(false);
           },
           error: () => {
             this.relationshipsLoading.set(false);
             this.relationshipsError.set(this.t('adminUi.products.relationships.errors.load'));
-          }
+          },
         });
       },
       error: () => {
         this.relationshipsLoading.set(false);
         this.relationshipsError.set(this.t('adminUi.products.relationships.errors.load'));
-      }
+      },
     });
   }
 
@@ -6045,9 +7023,12 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         if (requestId !== this.relationshipSearchRequestId) return;
         const rows = Array.isArray(res?.items) ? res.items : [];
         const currentProductId = this.editingProductId();
-        const selected = new Set([...this.relationshipsRelatedIds(), ...this.relationshipsUpsellIds()]);
+        const selected = new Set([
+          ...this.relationshipsRelatedIds(),
+          ...this.relationshipsUpsellIds(),
+        ]);
         this.relationshipSearchResults.set(
-          rows.filter((p) => String(p.id) !== currentProductId && !selected.has(String(p.id)))
+          rows.filter((p) => String(p.id) !== currentProductId && !selected.has(String(p.id))),
         );
         this.relationshipSearchLoading.set(false);
       },
@@ -6055,7 +7036,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         if (requestId !== this.relationshipSearchRequestId) return;
         this.relationshipSearchResults.set([]);
         this.relationshipSearchLoading.set(false);
-      }
+      },
     });
   }
 
@@ -6075,7 +7056,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       this.relationshipsUpsellIds.set([...upsellIds, id]);
       this.relationshipsUpsells.set([...this.relationshipsUpsells(), item]);
     }
-    this.relationshipSearchResults.set(this.relationshipSearchResults().filter((p) => String(p.id) !== id));
+    this.relationshipSearchResults.set(
+      this.relationshipSearchResults().filter((p) => String(p.id) !== id),
+    );
   }
 
   removeRelationship(id: string, kind: 'related' | 'upsell'): void {
@@ -6133,7 +7116,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         error: () => {
           this.relationshipsSaving.set(false);
           this.relationshipsError.set(this.t('adminUi.products.relationships.errors.save'));
-        }
+        },
       });
   }
 
@@ -6156,7 +7139,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     const fields: Array<{ field: TranslationDiffField; labelKey: string }> = [
       { field: 'name', labelKey: 'adminUi.products.table.name' },
       { field: 'short_description', labelKey: 'adminUi.products.form.shortDescription' },
-      { field: 'long_description', labelKey: 'adminUi.products.form.description' }
+      { field: 'long_description', labelKey: 'adminUi.products.form.description' },
     ];
 
     return fields.map(({ field, labelKey }) => {
@@ -6192,7 +7175,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         roMissing,
         enMissing,
         statusKey,
-        tone
+        tone,
       };
     });
   }
@@ -6228,7 +7211,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       short_description: this.translations[lang].short_description.trim()
         ? this.translations[lang].short_description.trim().slice(0, 280)
         : null,
-      long_description: this.translations[lang].long_description.trim() ? this.translations[lang].long_description.trim() : null
+      long_description: this.translations[lang].long_description.trim()
+        ? this.translations[lang].long_description.trim()
+        : null,
     };
 
     this.admin.upsertProductTranslation(slug, lang, payload).subscribe({
@@ -6240,11 +7225,11 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           short_description: (updated.short_description || '').toString(),
           long_description: (updated.long_description || '').toString(),
           meta_title: (updated.meta_title || '').toString(),
-          meta_description: (updated.meta_description || '').toString()
+          meta_description: (updated.meta_description || '').toString(),
         };
         this.toast.success(this.t('adminUi.products.translations.success.save'));
       },
-      error: () => this.translationError.set(this.t('adminUi.products.translations.errors.save'))
+      error: () => this.translationError.set(this.t('adminUi.products.translations.errors.save')),
     });
   }
 
@@ -6258,7 +7243,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         this.translations[lang] = this.blankTranslationForm();
         this.toast.success(this.t('adminUi.products.translations.success.delete'));
       },
-      error: () => this.translationError.set(this.t('adminUi.products.translations.errors.delete'))
+      error: () => this.translationError.set(this.t('adminUi.products.translations.errors.delete')),
     });
   }
 
@@ -6295,7 +7280,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     for (const file of files) {
       const id = this.newImageUploadId();
       this.imageUploadFiles.set(id, file);
-      next.push({ id, fileName: file.name, bytes: file.size, status: 'queued', progress: 0, error: null });
+      next.push({
+        id,
+        fileName: file.name,
+        bytes: file.size,
+        status: 'queued',
+        progress: 0,
+        error: null,
+      });
     }
 
     this.imageUploads.set([...existing, ...next]);
@@ -6321,7 +7313,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       this.imageUploads().map((item) => {
         if (item.id !== id) return item;
         return { ...item, ...patch };
-      })
+      }),
     );
   }
 
@@ -6334,7 +7326,11 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 
     const file = this.imageUploadFiles.get(next.id) ?? null;
     if (!file) {
-      this.updateImageUpload(next.id, { status: 'error', error: this.t('adminUi.products.errors.image'), progress: 0 });
+      this.updateImageUpload(next.id, {
+        status: 'error',
+        error: this.t('adminUi.products.errors.image'),
+        progress: 0,
+      });
       return;
     }
 
@@ -6347,7 +7343,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         if (this.imageUploadActiveId !== uploadId) return;
         if (event.type === HttpEventType.UploadProgress) {
           const match = this.imageUploads().find((item) => item.id === uploadId);
-          const total = typeof event.total === 'number' && event.total > 0 ? event.total : match?.bytes || null;
+          const total =
+            typeof event.total === 'number' && event.total > 0 ? event.total : match?.bytes || null;
           const progress = total ? Math.round((event.loaded / total) * 100) : 0;
           this.updateImageUpload(uploadId, { progress: Math.max(0, Math.min(99, progress)) });
           return;
@@ -6355,7 +7352,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         if (event.type === HttpEventType.Response) {
           const prod: any = event.body;
           const nextImages = Array.isArray(prod?.images) ? [...prod.images] : [];
-          nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+          nextImages.sort(
+            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0),
+          );
           this.images.set(nextImages);
           this.updateImageUpload(uploadId, { status: 'success', progress: 100 });
           this.imageUploadFiles.delete(uploadId);
@@ -6364,7 +7363,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: (err) => {
         if (this.imageUploadActiveId !== uploadId) return;
         const requestId = extractRequestId(err);
-        const message = requestId ? `${this.t('adminUi.products.errors.image')} (${requestId})` : this.t('adminUi.products.errors.image');
+        const message = requestId
+          ? `${this.t('adminUi.products.errors.image')} (${requestId})`
+          : this.t('adminUi.products.errors.image');
         this.updateImageUpload(uploadId, { status: 'error', error: message });
         this.imageUploadSub = null;
         this.imageUploadActiveId = null;
@@ -6375,7 +7376,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         this.imageUploadSub = null;
         this.imageUploadActiveId = null;
         this.maybeStartImageUpload();
-      }
+      },
     });
   }
 
@@ -6398,7 +7399,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.imageOrderBusy.set(true);
     this.imageOrderError.set(null);
 
-    forkJoin(updates.map((row) => this.admin.reorderProductImage(slug, row.id, row.sort_order))).subscribe({
+    forkJoin(
+      updates.map((row) => this.admin.reorderProductImage(slug, row.id, row.sort_order)),
+    ).subscribe({
       next: () => {
         this.imageOrderBusy.set(false);
         for (const row of updates) {
@@ -6411,7 +7414,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.imageOrderBusy.set(false);
         this.imageOrderError.set(this.t('adminUi.storefront.products.images.reorderError'));
-      }
+      },
     });
   }
 
@@ -6440,7 +7443,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       done: (ok) => {
         this.deleteImageConfirmBusy.set(false);
         if (ok) this.closeDeleteImageConfirm();
-      }
+      },
     });
   }
 
@@ -6457,7 +7460,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           this.resetImageMeta();
         }
         const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
-        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+        nextImages.sort(
+          (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0),
+        );
         this.images.set(nextImages);
         if (this.deletedImagesOpen()) {
           this.loadDeletedImages(slug);
@@ -6467,7 +7472,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.toast.error(this.t('adminUi.products.errors.deleteImage'));
         opts?.done?.(false);
-      }
+      },
     });
   }
 
@@ -6491,7 +7496,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       next: (prod: any) => {
         this.toast.success(this.t('adminUi.products.success.imageRestore'));
         const nextImages = Array.isArray(prod.images) ? [...prod.images] : [];
-        nextImages.sort((a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0));
+        nextImages.sort(
+          (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0),
+        );
         this.images.set(nextImages);
         this.restoringDeletedImage.set(null);
         this.loadDeletedImages(slug);
@@ -6499,7 +7506,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.restoringDeletedImage.set(null);
         this.deletedImagesError.set(this.t('adminUi.products.errors.restoreImage'));
-      }
+      },
     });
   }
 
@@ -6537,8 +7544,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       ops.push(
         this.admin.upsertProductImageTranslation(slug, imageId, lang, {
           alt_text: alt || null,
-          caption: caption || null
-        })
+          caption: caption || null,
+        }),
       );
     });
 
@@ -6556,7 +7563,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.imageMetaBusy.set(false);
         this.imageMetaError.set(this.t('adminUi.products.form.imageMetaSaveError'));
-      }
+      },
     });
   }
 
@@ -6575,7 +7582,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.imageMetaBusy.set(false);
         this.imageMetaError.set(this.t('adminUi.products.form.imageReprocessError'));
-      }
+      },
     });
   }
 
@@ -6595,7 +7602,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   formatAuditValue(value: unknown): string {
     if (value === null || value === undefined) return '—';
     if (typeof value === 'string') return value;
-    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
+    if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint')
+      return String(value);
     if (value instanceof Date) return value.toISOString();
     try {
       return JSON.stringify(value);
@@ -6615,10 +7623,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         category_slug: this.categorySlug || undefined,
         missing_translations: this.translationFilter === 'missing_any' ? true : undefined,
         missing_translation_lang:
-          this.translationFilter === 'missing_en' ? 'en' : this.translationFilter === 'missing_ro' ? 'ro' : undefined,
+          this.translationFilter === 'missing_en'
+            ? 'en'
+            : this.translationFilter === 'missing_ro'
+              ? 'ro'
+              : undefined,
         deleted: this.view === 'deleted' ? true : undefined,
         page: this.page,
-        limit: this.limit
+        limit: this.limit,
       })
       .subscribe({
         next: (res) => {
@@ -6631,7 +7643,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           this.error.set(this.t('adminUi.products.errors.loadList'));
           this.errorRequestId.set(extractRequestId(err));
           this.loading.set(false);
-        }
+        },
       });
   }
 
@@ -6639,12 +7651,12 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     this.load();
   }
 
-	  private loadCategories(): void {
-	    this.catalog.listCategories(undefined, { include_hidden: true }).subscribe({
-	      next: (cats) => this.categories.set(cats || []),
-	      error: () => this.categories.set([])
-	    });
-	  }
+  private loadCategories(): void {
+    this.catalog.listCategories(undefined, { include_hidden: true }).subscribe({
+      next: (cats) => this.categories.set(cats || []),
+      error: () => this.categories.set([]),
+    });
+  }
 
   private loadAdminCategories(): void {
     this.admin.getCategories().subscribe({
@@ -6659,7 +7671,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.adminCategories.set([]);
         this.openPendingEditor();
-      }
+      },
     });
   }
 
@@ -6677,8 +7689,10 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   }
 
   statusPillClass(status: string): string {
-    if (status === 'published') return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
-    if (status === 'archived') return 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100';
+    if (status === 'published')
+      return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100';
+    if (status === 'archived')
+      return 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100';
     return 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-100';
   }
 
@@ -6760,8 +7774,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       badges: {
         new: { enabled: false, start_at: '', end_at: '' },
         limited: { enabled: false, start_at: '', end_at: '' },
-        handmade: { enabled: false, start_at: '', end_at: '' }
-      }
+        handmade: { enabled: false, start_at: '', end_at: '' },
+      },
     };
   }
 
@@ -6771,7 +7785,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       short_description: '',
       long_description: '',
       meta_title: '',
-      meta_description: ''
+      meta_description: '',
     };
   }
 
@@ -6877,7 +7891,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 
     const dots = dotsSource.map((p) => ({
       x: Math.round(toX(p.t) * 10) / 10,
-      y: Math.round(toY(p.v) * 10) / 10
+      y: Math.round(toY(p.v) * 10) / 10,
     }));
 
     const nowX = Math.round(toX(now) * 10) / 10;
@@ -6886,7 +7900,8 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
     if (saleStart !== null && saleEnd !== null && saleEnd > saleStart) {
       const left = Math.max(pad, Math.min(width - pad, toX(saleStart)));
       const right = Math.max(pad, Math.min(width - pad, toX(saleEnd)));
-      if (right > left) saleRect = { x: Math.round(left * 10) / 10, width: Math.round((right - left) * 10) / 10 };
+      if (right > left)
+        saleRect = { x: Math.round(left * 10) / 10, width: Math.round((right - left) * 10) / 10 };
     }
 
     const latest = asc.length > 0 ? asc[asc.length - 1].after : (currentBase ?? 0);
@@ -6903,13 +7918,14 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       max: rawMax,
       latest,
       nowX: Number.isFinite(nowX) ? nowX : null,
-      saleRect
+      saleRect,
     };
   }
 
   private parseAuditMoney(value: unknown): number | null {
     if (value === null || value === undefined) return null;
-    if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
+    if (typeof value === 'number')
+      return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
     if (typeof value === 'string') {
       const parsed = Number(value);
       return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : null;
@@ -6973,7 +7989,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.deletedImagesBusy.set(false);
         this.deletedImagesError.set(this.t('adminUi.products.errors.loadDeletedImages'));
-      }
+      },
     });
   }
 
@@ -6995,9 +8011,15 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 
     forkJoin({
       translations: this.admin.getProductImageTranslations(slug, imageId),
-      stats: this.admin.getProductImageStats(slug, imageId)
+      stats: this.admin.getProductImageStats(slug, imageId),
     }).subscribe({
-      next: ({ translations, stats }: { translations: AdminProductImageTranslation[]; stats: AdminProductImageOptimizationStats }) => {
+      next: ({
+        translations,
+        stats,
+      }: {
+        translations: AdminProductImageTranslation[];
+        stats: AdminProductImageOptimizationStats;
+      }) => {
         const mapped: ImageMetaByLang = this.blankImageMetaByLang();
         const exists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
         for (const t of translations || []) {
@@ -7005,7 +8027,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
           exists[t.lang] = true;
           mapped[t.lang] = {
             alt_text: (t.alt_text || '').toString(),
-            caption: (t.caption || '').toString()
+            caption: (t.caption || '').toString(),
           };
         }
         this.imageMetaExists = exists;
@@ -7016,7 +8038,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.imageMetaBusy.set(false);
         this.imageMetaError.set(this.t('adminUi.products.form.imageMetaLoadError'));
-      }
+      },
     });
   }
 
@@ -7033,7 +8055,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.auditBusy.set(false);
         this.auditError.set(this.t('adminUi.products.audit.errors.load'));
-      }
+      },
     });
   }
 
@@ -7044,7 +8066,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       next: (items) => {
         const mapped: Record<'en' | 'ro', ProductTranslationForm> = {
           en: this.blankTranslationForm(),
-          ro: this.blankTranslationForm()
+          ro: this.blankTranslationForm(),
         };
         const exists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
         for (const t of items || []) {
@@ -7055,7 +8077,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
             short_description: (t.short_description || '').toString(),
             long_description: (t.long_description || '').toString(),
             meta_title: (t.meta_title || '').toString(),
-            meta_description: (t.meta_description || '').toString()
+            meta_description: (t.meta_description || '').toString(),
           };
         }
         this.translationExists = exists;
@@ -7070,7 +8092,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
       error: () => {
         this.translationError.set(this.t('adminUi.products.translations.errors.load'));
         this.translationLoading.set(false);
-      }
+      },
     });
   }
 
@@ -7092,7 +8114,9 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
   }
 
   private buildTags(): string[] {
-    const seen = new Set<string>(this.loadedTagSlugs.map((t) => (t ?? '').toString().trim().toLowerCase()).filter(Boolean));
+    const seen = new Set<string>(
+      this.loadedTagSlugs.map((t) => (t ?? '').toString().trim().toLowerCase()).filter(Boolean),
+    );
     if (this.form.is_bestseller) {
       seen.add('bestseller');
     } else {

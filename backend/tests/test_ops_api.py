@@ -51,7 +51,12 @@ def create_admin_token(session_factory) -> str:
         async with session_factory() as session:
             user = await create_user(
                 session,
-                UserCreate(email="admin-ops@example.com", password="pass123", name="Admin", username="admin_ops"),
+                UserCreate(
+                    email="admin-ops@example.com",
+                    password="pass123",
+                    name="Admin",
+                    username="admin_ops",
+                ),
             )
             user.email_verified = True
             user.role = UserRole.admin
@@ -77,10 +82,14 @@ def list_admin_audit_actions(session_factory) -> list[AdminAuditLog]:
     async def _list() -> list[AdminAuditLog]:
         async with session_factory() as session:
             rows = (
-                await session.execute(
-                    select(AdminAuditLog).order_by(AdminAuditLog.created_at.asc())
+                (
+                    await session.execute(
+                        select(AdminAuditLog).order_by(AdminAuditLog.created_at.asc())
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return list(rows)
 
     return asyncio.run(_list())
@@ -135,7 +144,9 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
     data = simulated.json()
     assert "total_ron" in data
 
-    deleted = client.delete(f"/api/v1/ops/admin/banners/{uuid.UUID(banner_id)}", headers=auth_headers(token))
+    deleted = client.delete(
+        f"/api/v1/ops/admin/banners/{uuid.UUID(banner_id)}", headers=auth_headers(token)
+    )
     assert deleted.status_code == 204, deleted.text
 
     def seed_stripe_webhook() -> None:
@@ -160,9 +171,14 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
 
     listed_hooks = client.get("/api/v1/ops/admin/webhooks", headers=auth_headers(token))
     assert listed_hooks.status_code == 200, listed_hooks.text
-    assert any(row["provider"] == "stripe" and row["event_id"] == "evt_test" for row in listed_hooks.json())
+    assert any(
+        row["provider"] == "stripe" and row["event_id"] == "evt_test"
+        for row in listed_hooks.json()
+    )
 
-    failure_stats = client.get("/api/v1/ops/admin/webhooks/stats?since_hours=24", headers=auth_headers(token))
+    failure_stats = client.get(
+        "/api/v1/ops/admin/webhooks/stats?since_hours=24", headers=auth_headers(token)
+    )
     assert failure_stats.status_code == 200, failure_stats.text
     assert failure_stats.json()["failed"] == 1
 
@@ -220,13 +236,17 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
 
     seed_webhook_backlog_rows()
 
-    backlog_stats = client.get("/api/v1/ops/admin/webhooks/backlog?since_hours=24", headers=auth_headers(token))
+    backlog_stats = client.get(
+        "/api/v1/ops/admin/webhooks/backlog?since_hours=24", headers=auth_headers(token)
+    )
     assert backlog_stats.status_code == 200, backlog_stats.text
     assert backlog_stats.json()["pending"] == 3
     assert backlog_stats.json()["pending_recent"] == 1
     assert backlog_stats.json()["since_hours"] == 24
 
-    detail = client.get("/api/v1/ops/admin/webhooks/stripe/evt_test", headers=auth_headers(token))
+    detail = client.get(
+        "/api/v1/ops/admin/webhooks/stripe/evt_test", headers=auth_headers(token)
+    )
     assert detail.status_code == 200, detail.text
     assert detail.json()["payload"]["id"] == "evt_test"
 
@@ -264,11 +284,17 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
 
     seed_email_failure()
 
-    email_stats = client.get("/api/v1/ops/admin/email-failures/stats?since_hours=24", headers=auth_headers(token))
+    email_stats = client.get(
+        "/api/v1/ops/admin/email-failures/stats?since_hours=24",
+        headers=auth_headers(token),
+    )
     assert email_stats.status_code == 200, email_stats.text
     assert email_stats.json()["failed"] == 1
 
-    email_rows = client.get("/api/v1/ops/admin/email-failures?limit=10&since_hours=24", headers=auth_headers(token))
+    email_rows = client.get(
+        "/api/v1/ops/admin/email-failures?limit=10&since_hours=24",
+        headers=auth_headers(token),
+    )
     assert email_rows.status_code == 200, email_rows.text
     assert any(row["to_email"] == "customer@example.com" for row in email_rows.json())
 
@@ -278,7 +304,9 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
         headers=auth_headers(token),
     )
     assert filtered_email_rows.status_code == 200, filtered_email_rows.text
-    assert all(row["to_email"] == "customer@example.com" for row in filtered_email_rows.json())
+    assert all(
+        row["to_email"] == "customer@example.com" for row in filtered_email_rows.json()
+    )
 
     filtered_email_rows_none = client.get(
         "/api/v1/ops/admin/email-failures",
@@ -300,14 +328,21 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
 
     sent_only_events = client.get(
         "/api/v1/ops/admin/email-events",
-        params={"limit": 10, "since_hours": 24, "to_email": "customer@example.com", "status": "sent"},
+        params={
+            "limit": 10,
+            "since_hours": 24,
+            "to_email": "customer@example.com",
+            "status": "sent",
+        },
         headers=auth_headers(token),
     )
     assert sent_only_events.status_code == 200, sent_only_events.text
     assert sent_only_events.json()
     assert all(row["status"] == "sent" for row in sent_only_events.json())
 
-    retried = client.post("/api/v1/ops/admin/webhooks/stripe/evt_test/retry", headers=auth_headers(token))
+    retried = client.post(
+        "/api/v1/ops/admin/webhooks/stripe/evt_test/retry", headers=auth_headers(token)
+    )
     assert retried.status_code == 200, retried.text
     assert retried.json()["status"] == "processed"
 
@@ -320,7 +355,10 @@ def test_ops_banners_and_shipping_simulation(test_app: Dict[str, object]) -> Non
 
     assert action_rows["ops.banner.create"].actor_user_id is not None
     assert action_rows["ops.banner.create"].data["banner_id"] == banner_id
-    assert set(action_rows["ops.banner.update"].data["changed_fields"]) == {"is_active", "message_en"}
+    assert set(action_rows["ops.banner.update"].data["changed_fields"]) == {
+        "is_active",
+        "message_en",
+    }
     assert action_rows["ops.banner.update"].data["banner_id"] == banner_id
     assert action_rows["ops.banner.delete"].data["banner_id"] == banner_id
     assert action_rows["ops.webhook.retry"].data["provider"] == "stripe"

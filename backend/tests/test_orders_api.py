@@ -16,7 +16,14 @@ from app.db.session import get_session
 from app.models.address import Address
 from app.models.catalog import Category, Product, ProductStatus
 from app.models.cart import Cart, CartItem
-from app.models.coupons_v2 import Coupon, CouponRedemption, CouponReservation, CouponVisibility, Promotion, PromotionDiscountType
+from app.models.coupons_v2 import (
+    Coupon,
+    CouponRedemption,
+    CouponReservation,
+    CouponVisibility,
+    Promotion,
+    PromotionDiscountType,
+)
 from app.models.email_event import EmailDeliveryEvent
 from app.models.order import Order, OrderEvent, OrderStatus, OrderItem
 from app.models.passkeys import UserPasskey
@@ -65,7 +72,9 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_user_token(session_factory, email="buyer@example.com", admin: bool = False):
     async def create_and_token():
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email=email, password="orderpass", name="Buyer"))
+            user = await create_user(
+                session, UserCreate(email=email, password="orderpass", name="Buyer")
+            )
             user.email_verified = True
             if admin:
                 user.role = UserRole.admin
@@ -93,7 +102,12 @@ def test_order_create_requires_verified_email(test_app: Dict[str, object]) -> No
 
     async def create_unverified_user():
         async with SessionLocal() as session:
-            user = await create_user(session, UserCreate(email="unverified@example.com", password="orderpass", name="Buyer"))
+            user = await create_user(
+                session,
+                UserCreate(
+                    email="unverified@example.com", password="orderpass", name="Buyer"
+                ),
+            )
             # Ensure user is not verified
             user.email_verified = False
             await session.commit()
@@ -107,7 +121,8 @@ def test_order_create_requires_verified_email(test_app: Dict[str, object]) -> No
     async def seed_shipping():
         async with SessionLocal() as session:
             method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0),
             )
             return method.id
 
@@ -182,7 +197,9 @@ def test_list_my_orders_pagination_and_filters(test_app: Dict[str, object]) -> N
 
     order_ids = asyncio.run(seed_orders())
 
-    page1 = client.get("/api/v1/orders/me", params={"page": 1, "limit": 2}, headers=auth_headers(token))
+    page1 = client.get(
+        "/api/v1/orders/me", params={"page": 1, "limit": 2}, headers=auth_headers(token)
+    )
     assert page1.status_code == 200, page1.text
     body = page1.json()
     assert body["meta"]["total_items"] == 3
@@ -193,7 +210,9 @@ def test_list_my_orders_pagination_and_filters(test_app: Dict[str, object]) -> N
     assert len(body["items"]) == 2
     assert body["items"][0]["id"] == str(order_ids[2])  # newest
 
-    page2 = client.get("/api/v1/orders/me", params={"page": 2, "limit": 2}, headers=auth_headers(token))
+    page2 = client.get(
+        "/api/v1/orders/me", params={"page": 2, "limit": 2}, headers=auth_headers(token)
+    )
     assert page2.status_code == 200, page2.text
     body2 = page2.json()
     assert body2["meta"]["total_items"] == 3
@@ -202,7 +221,9 @@ def test_list_my_orders_pagination_and_filters(test_app: Dict[str, object]) -> N
     assert len(body2["items"]) == 1
     assert body2["items"][0]["id"] == str(order_ids[0])
 
-    status_filtered = client.get("/api/v1/orders/me", params={"status": "paid"}, headers=auth_headers(token))
+    status_filtered = client.get(
+        "/api/v1/orders/me", params={"status": "paid"}, headers=auth_headers(token)
+    )
     assert status_filtered.status_code == 200, status_filtered.text
     status_body = status_filtered.json()
     assert status_body["meta"]["total_items"] == 1
@@ -211,7 +232,9 @@ def test_list_my_orders_pagination_and_filters(test_app: Dict[str, object]) -> N
     assert len(status_body["items"]) == 1
     assert status_body["items"][0]["reference_code"] == "REF-BBB"
 
-    q_filtered = client.get("/api/v1/orders/me", params={"q": "XYZ"}, headers=auth_headers(token))
+    q_filtered = client.get(
+        "/api/v1/orders/me", params={"q": "XYZ"}, headers=auth_headers(token)
+    )
     assert q_filtered.status_code == 200, q_filtered.text
     q_body = q_filtered.json()
     assert q_body["meta"]["total_items"] == 1
@@ -241,7 +264,9 @@ def test_order_cancel_request_flow(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    token, user_id = create_user_token(SessionLocal, email="buyer-cancelreq@example.com")
+    token, user_id = create_user_token(
+        SessionLocal, email="buyer-cancelreq@example.com"
+    )
 
     async def seed_order(status: OrderStatus) -> UUID:
         async with SessionLocal() as session:
@@ -271,7 +296,9 @@ def test_order_cancel_request_flow(test_app: Dict[str, object]) -> None:
         json={"reason": "Please cancel"},
     )
     assert first.status_code == 200, first.text
-    assert any(evt["event"] == "cancel_requested" for evt in first.json().get("events", []))
+    assert any(
+        evt["event"] == "cancel_requested" for evt in first.json().get("events", [])
+    )
 
     duplicate = client.post(
         f"/api/v1/orders/{eligible_order_id_str}/cancel-request",
@@ -305,7 +332,9 @@ def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
             )
             cart = Cart(user_id=user_id)
             cart.items = [
-                CartItem(product=product, quantity=1, unit_price_at_add=Decimal("20.00")),
+                CartItem(
+                    product=product, quantity=1, unit_price_at_add=Decimal("20.00")
+                ),
             ]
             session.add(cart)
             await session.commit()
@@ -315,7 +344,9 @@ def seed_cart_with_product(session_factory, user_id: UUID) -> UUID:
     return asyncio.run(seed())
 
 
-def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_order_search_and_detail(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
@@ -326,7 +357,9 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     monkeypatch.setattr(email_service, "send_new_order_notification", fake_email)
 
     token, user_id = create_user_token(SessionLocal, email="buyer@example.com")
-    admin_token, _ = create_user_token(SessionLocal, email="admin@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin@example.com", admin=True
+    )
     seed_cart_with_product(SessionLocal, user_id)
 
     async def seed_addresses() -> tuple[UUID, UUID]:
@@ -359,7 +392,8 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     async def seed_shipping():
         async with SessionLocal() as session:
             method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0),
             )
             return method.id
 
@@ -432,7 +466,9 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert any(item["id"] == order_id for item in by_user_payload["items"])
     assert any(item["id"] == order_two_id for item in by_user_payload["items"])
 
-    masked_detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    masked_detail = client.get(
+        f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token)
+    )
     assert masked_detail.status_code == 200, masked_detail.text
     masked = masked_detail.json()
     assert masked["customer_email"] != "buyer@example.com"
@@ -441,7 +477,9 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert masked["billing_address"]["line1"] == "***"
 
     detail = client.get(
-        f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token), params={"include_pii": True}
+        f"/api/v1/orders/admin/{order_id}",
+        headers=auth_headers(admin_token),
+        params={"include_pii": True},
     )
     assert detail.status_code == 200, detail.text
     data = detail.json()
@@ -515,15 +553,22 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
 
     async def seed_payment_retries() -> None:
         async with SessionLocal() as session:
-            db_order = (await session.execute(select(Order).where(Order.id == UUID(order_id)))).scalar_one()
+            db_order = (
+                await session.execute(select(Order).where(Order.id == UUID(order_id)))
+            ).scalar_one()
             db_order.payment_retry_count = 2
             session.add(db_order)
             await session.commit()
 
     asyncio.run(seed_payment_retries())
-    detail_retry = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    detail_retry = client.get(
+        f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token)
+    )
     assert detail_retry.status_code == 200, detail_retry.text
-    retry_signals = {signal["code"]: signal for signal in (detail_retry.json().get("fraud_signals") or [])}
+    retry_signals = {
+        signal["code"]: signal
+        for signal in (detail_retry.json().get("fraud_signals") or [])
+    }
     assert retry_signals["payment_retries"]["data"]["count"] == 2
 
     tagged = client.post(
@@ -535,7 +580,9 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     tagged_data = tagged.json()
     assert tagged_data["tags"] == ["vip"]
 
-    tags_list = client.get("/api/v1/orders/admin/tags", headers=auth_headers(admin_token))
+    tags_list = client.get(
+        "/api/v1/orders/admin/tags", headers=auth_headers(admin_token)
+    )
     assert tags_list.status_code == 200, tags_list.text
     assert "vip" in tags_list.json()["items"]
 
@@ -589,17 +636,23 @@ def test_admin_order_search_and_detail(test_app: Dict[str, object], monkeypatch:
     assert any(item["id"] == order_id for item in tag_test.json()["items"])
 
 
-def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
+def test_order_create_and_admin_updates(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
     token, user_id = create_user_token(SessionLocal)
-    admin_token, _ = create_user_token(SessionLocal, email="admin@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin@example.com", admin=True
+    )
     _, owner_id = create_user_token(SessionLocal, email="owner@example.com", admin=True)
 
     async def promote_owner() -> None:
         async with SessionLocal() as session:
-            owner = (await session.execute(select(User).where(User.id == owner_id))).scalar_one()
+            owner = (
+                await session.execute(select(User).where(User.id == owner_id))
+            ).scalar_one()
             owner.role = UserRole.owner
             owner.email_verified = True
             owner.preferred_language = "en"
@@ -612,16 +665,23 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     async def seed_shipping():
         async with SessionLocal() as session:
             method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0),
             )
             return method.id
 
     shipping_method_id = asyncio.run(seed_shipping())
 
     sent = {"count": 0, "shipped": 0, "delivered": 0, "refund": 0}
-    refund_meta: dict[str, str | None] = {"to": None, "requested_by": None, "note": None}
+    refund_meta: dict[str, str | None] = {
+        "to": None,
+        "requested_by": None,
+        "note": None,
+    }
 
-    async def fake_send_order_confirmation(to_email, order, items=None, lang=None, *, receipt_share_days=None):
+    async def fake_send_order_confirmation(
+        to_email, order, items=None, lang=None, *, receipt_share_days=None
+    ):
         sent["count"] += 1
         return True
 
@@ -634,7 +694,12 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
         return True
 
     async def fake_send_refund_requested_notification(
-        to_email, order, customer_email=None, requested_by_email=None, note=None, lang=None
+        to_email,
+        order,
+        customer_email=None,
+        requested_by_email=None,
+        note=None,
+        lang=None,
     ):
         sent["refund"] += 1
         refund_meta["to"] = to_email
@@ -642,10 +707,20 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
         refund_meta["note"] = note
         return True
 
-    email_service.send_order_confirmation = fake_send_order_confirmation  # type: ignore[assignment]
-    email_service.send_shipping_update = fake_send_shipping_update  # type: ignore[assignment]
-    email_service.send_delivery_confirmation = fake_send_delivery_confirmation  # type: ignore[assignment]
-    email_service.send_refund_requested_notification = fake_send_refund_requested_notification  # type: ignore[assignment]
+    monkeypatch.setattr(
+        email_service, "send_order_confirmation", fake_send_order_confirmation
+    )
+    monkeypatch.setattr(
+        email_service, "send_shipping_update", fake_send_shipping_update
+    )
+    monkeypatch.setattr(
+        email_service, "send_delivery_confirmation", fake_send_delivery_confirmation
+    )
+    monkeypatch.setattr(
+        email_service,
+        "send_refund_requested_notification",
+        fake_send_refund_requested_notification,
+    )
 
     res = client.post(
         "/api/v1/orders",
@@ -682,7 +757,10 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
             return str(order.id)
 
     stripe_order_id = asyncio.run(seed_stripe_pending_payment_order())
-    retry = client.post(f"/api/v1/orders/admin/{stripe_order_id}/retry-payment", headers=auth_headers(admin_token))
+    retry = client.post(
+        f"/api/v1/orders/admin/{stripe_order_id}/retry-payment",
+        headers=auth_headers(admin_token),
+    )
     assert retry.status_code == 200
     assert retry.json()["payment_retry_count"] == 1
     assert any(evt["event"] == "payment_retry" for evt in retry.json()["events"])
@@ -813,12 +891,15 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert refund.status_code == 200
     assert refund.json()["status"] == "refunded"
     assert any(evt["event"] == "refund_requested" for evt in refund.json()["events"])
+
     async def assert_coupon_voided() -> None:
         async with SessionLocal() as session:
             redemption = (
                 (
                     await session.execute(
-                        select(CouponRedemption).where(CouponRedemption.order_id == UUID(order_id))
+                        select(CouponRedemption).where(
+                            CouponRedemption.order_id == UUID(order_id)
+                        )
                     )
                 )
                 .scalars()
@@ -834,11 +915,16 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     assert refund_meta["requested_by"] == "admin@example.com"
     assert refund_meta["note"] == "Customer requested refund"
 
-    events = client.get(f"/api/v1/orders/admin/{order_id}/events", headers=auth_headers(admin_token))
+    events = client.get(
+        f"/api/v1/orders/admin/{order_id}/events", headers=auth_headers(admin_token)
+    )
     assert events.status_code == 200
     assert len(events.json()) >= 4
 
-    packing = client.get(f"/api/v1/orders/admin/{order_id}/packing-slip", headers=auth_headers(admin_token))
+    packing = client.get(
+        f"/api/v1/orders/admin/{order_id}/packing-slip",
+        headers=auth_headers(admin_token),
+    )
     assert packing.status_code == 200
     assert packing.headers.get("content-type", "").startswith("application/pdf")
     assert packing.headers.get("content-disposition", "").startswith("attachment;")
@@ -852,7 +938,9 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     )
     assert batch_packing.status_code == 200
     assert batch_packing.headers.get("content-type", "").startswith("application/pdf")
-    assert batch_packing.headers.get("content-disposition", "").startswith("attachment;")
+    assert batch_packing.headers.get("content-disposition", "").startswith(
+        "attachment;"
+    )
     assert batch_packing.content.startswith(b"%PDF")
 
     pick_list_csv = client.post(
@@ -871,20 +959,28 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     )
     assert pick_list_pdf.status_code == 200, pick_list_pdf.text
     assert pick_list_pdf.headers.get("content-type", "").startswith("application/pdf")
-    assert pick_list_pdf.headers.get("content-disposition", "").startswith("attachment;")
+    assert pick_list_pdf.headers.get("content-disposition", "").startswith(
+        "attachment;"
+    )
     assert pick_list_pdf.content.startswith(b"%PDF")
 
-    receipt = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(token))
+    receipt = client.get(
+        f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(token)
+    )
     assert receipt.status_code == 200
     assert receipt.headers.get("content-type", "").startswith("application/pdf")
     assert receipt.headers.get("content-disposition", "").startswith("attachment;")
     assert receipt.content.startswith(b"%PDF")
 
     other_token, _ = create_user_token(SessionLocal, email="otherbuyer@example.com")
-    forbidden = client.get(f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(other_token))
+    forbidden = client.get(
+        f"/api/v1/orders/{order_id}/receipt", headers=auth_headers(other_token)
+    )
     assert forbidden.status_code == 404
 
-    token = create_receipt_token(order_id=order_id, expires_at=datetime.now(timezone.utc) + timedelta(days=1))
+    token = create_receipt_token(
+        order_id=order_id, expires_at=datetime.now(timezone.utc) + timedelta(days=1)
+    )
     public_json = client.get(f"/api/v1/orders/receipt/{token}")
     assert public_json.status_code == 200
     assert public_json.json()["order_id"] == order_id
@@ -897,7 +993,10 @@ def test_order_create_and_admin_updates(test_app: Dict[str, object]) -> None:
     bad_token = client.get("/api/v1/orders/receipt/invalid-token")
     assert bad_token.status_code == 403
 
-    delivery = client.post(f"/api/v1/orders/admin/{order_id}/delivery-email", headers=auth_headers(admin_token))
+    delivery = client.post(
+        f"/api/v1/orders/admin/{order_id}/delivery-email",
+        headers=auth_headers(admin_token),
+    )
     assert delivery.status_code == 200
 
     assert sent["delivered"] == 1
@@ -915,7 +1014,9 @@ def test_admin_order_email_events_endpoint(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin-email-events@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin-email-events@example.com", admin=True
+    )
     _, user_id = create_user_token(SessionLocal, email="buyer-email-events@example.com")
 
     async def seed() -> tuple[str, str]:
@@ -949,7 +1050,10 @@ def test_admin_order_email_events_endpoint(test_app: Dict[str, object]) -> None:
 
     order_id, event_id = asyncio.run(seed())
 
-    masked = client.get(f"/api/v1/orders/admin/{order_id}/email-events", headers=auth_headers(admin_token))
+    masked = client.get(
+        f"/api/v1/orders/admin/{order_id}/email-events",
+        headers=auth_headers(admin_token),
+    )
     assert masked.status_code == 200, masked.text
     rows = masked.json()
     assert len(rows) == 1
@@ -972,7 +1076,9 @@ def test_admin_order_tag_stats_and_rename(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin-tags@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin-tags@example.com", admin=True
+    )
     _, user_id = create_user_token(SessionLocal, email="buyer-tags@example.com")
 
     async def seed_order() -> str:
@@ -1004,7 +1110,9 @@ def test_admin_order_tag_stats_and_rename(test_app: Dict[str, object]) -> None:
     assert tagged.status_code == 200, tagged.text
     assert tagged.json()["tags"] == ["vip"]
 
-    stats = client.get("/api/v1/orders/admin/tags/stats", headers=auth_headers(admin_token))
+    stats = client.get(
+        "/api/v1/orders/admin/tags/stats", headers=auth_headers(admin_token)
+    )
     assert stats.status_code == 200, stats.text
     items = stats.json()["items"]
     vip_row = next((row for row in items if row.get("tag") == "vip"), None)
@@ -1021,7 +1129,9 @@ def test_admin_order_tag_stats_and_rename(test_app: Dict[str, object]) -> None:
     assert rename.json()["to_tag"] == "priority"
     assert int(rename.json()["total"] or 0) >= 1
 
-    detail = client.get(f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token))
+    detail = client.get(
+        f"/api/v1/orders/admin/{order_id}", headers=auth_headers(admin_token)
+    )
     assert detail.status_code == 200, detail.text
     assert detail.json()["tags"] == ["priority"]
 
@@ -1042,14 +1152,22 @@ def test_admin_order_tag_stats_and_rename(test_app: Dict[str, object]) -> None:
     assert any(item["id"] == order_id for item in new_search.json()["items"])
 
 
-def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_partial_refunds(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin-refunds@example.com", admin=True)
-    customer_token, customer_id = create_user_token(SessionLocal, email="buyer-refunds@example.com")
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin-refunds@example.com", admin=True
+    )
+    customer_token, customer_id = create_user_token(
+        SessionLocal, email="buyer-refunds@example.com"
+    )
 
-    async def seed_paid_order(*, payment_method: str, intent_id: str | None = None) -> tuple[str, str]:
+    async def seed_paid_order(
+        *, payment_method: str, intent_id: str | None = None
+    ) -> tuple[str, str]:
         async with SessionLocal() as session:
             category = Category(slug=f"refund-cat-{payment_method}", name="Refunds")
             product = Product(
@@ -1090,7 +1208,9 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
                 subtotal=Decimal("100.00"),
             )
             session.add(item)
-            session.add(OrderEvent(order_id=order.id, event="payment_captured", note="seed"))
+            session.add(
+                OrderEvent(order_id=order.id, event="payment_captured", note="seed")
+            )
             await session.commit()
             return str(order.id), str(item.id)
 
@@ -1100,7 +1220,12 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     forbidden = client.post(
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(customer_token),
-        json={"password": "orderpass", "amount": "10.00", "note": "Nope", "process_payment": False},
+        json={
+            "password": "orderpass",
+            "amount": "10.00",
+            "note": "Nope",
+            "process_payment": False,
+        },
     )
     assert forbidden.status_code == 403
 
@@ -1118,7 +1243,9 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     )
     assert partial.status_code == 200, partial.text
     assert partial.json()["status"] == "paid"
-    assert any(evt["event"] == "refund_partial" for evt in partial.json().get("events", []))
+    assert any(
+        evt["event"] == "refund_partial" for evt in partial.json().get("events", [])
+    )
     refunds = partial.json().get("refunds") or []
     assert len(refunds) == 1
     assert refunds[0]["provider"] == "manual"
@@ -1155,7 +1282,12 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     too_much = client.post(
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(admin_token),
-        json={"password": "orderpass", "amount": "95.00", "note": "Too much", "process_payment": False},
+        json={
+            "password": "orderpass",
+            "amount": "95.00",
+            "note": "Too much",
+            "process_payment": False,
+        },
     )
     assert too_much.status_code == 400
 
@@ -1163,22 +1295,33 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     final = client.post(
         f"/api/v1/orders/admin/{order_id}/refunds",
         headers=auth_headers(admin_token),
-        json={"password": "orderpass", "amount": "90.00", "note": "Complete refund", "process_payment": False},
+        json={
+            "password": "orderpass",
+            "amount": "90.00",
+            "note": "Complete refund",
+            "process_payment": False,
+        },
     )
     assert final.status_code == 200
     assert final.json()["status"] == "refunded"
     assert len(final.json().get("refunds") or []) == 2
 
     # Stripe sync path (monkeypatched)
-    stripe_order_id, stripe_item_id = asyncio.run(seed_paid_order(payment_method="stripe", intent_id="pi_test_123"))
+    stripe_order_id, stripe_item_id = asyncio.run(
+        seed_paid_order(payment_method="stripe", intent_id="pi_test_123")
+    )
     called: dict[str, object] = {}
 
-    async def fake_refund_payment_intent(intent: str, *, amount_cents: int | None = None) -> dict:
+    async def fake_refund_payment_intent(
+        intent: str, *, amount_cents: int | None = None
+    ) -> dict:
         called["intent"] = intent
         called["amount_cents"] = amount_cents
         return {"id": "re_test_123"}
 
-    monkeypatch.setattr(payments_service, "refund_payment_intent", fake_refund_payment_intent)
+    monkeypatch.setattr(
+        payments_service, "refund_payment_intent", fake_refund_payment_intent
+    )
 
     stripe_refund = client.post(
         f"/api/v1/orders/admin/{stripe_order_id}/refunds",
@@ -1200,24 +1343,31 @@ def test_admin_partial_refunds(test_app: Dict[str, object], monkeypatch: pytest.
     assert payload["refunds"][0]["provider_refund_id"] == "re_test_123"
 
 
-def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]) -> None:
+def test_capture_void_export_and_reorder(
+    monkeypatch: pytest.MonkeyPatch, test_app: Dict[str, object]
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
     token, user_id = create_user_token(SessionLocal, email="buyer2@example.com")
-    admin_token, _ = create_user_token(SessionLocal, email="admin2@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin2@example.com", admin=True
+    )
     seed_cart_with_product(SessionLocal, user_id)
 
     async def seed_shipping():
         async with SessionLocal() as session:
             method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Express", rate_flat=10.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Express", rate_flat=10.0, rate_per_kg=0),
             )
             return method.id
 
     shipping_method_id = asyncio.run(seed_shipping())
 
-    async def fake_email(to_email, order, items=None, lang=None, *, receipt_share_days=None):
+    async def fake_email(
+        to_email, order, items=None, lang=None, *, receipt_share_days=None
+    ):
         return True
 
     monkeypatch.setattr(email_service, "send_order_confirmation", fake_email)
@@ -1233,7 +1383,9 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
 
     async def attach_intent():
         async with SessionLocal() as session:
-            result = await session.execute(select(Order).where(Order.id == UUID(order_id)))
+            result = await session.execute(
+                select(Order).where(Order.id == UUID(order_id))
+            )
             db_order = result.scalar_one()
             db_order.stripe_payment_intent_id = "pi_test_123"
             await session.commit()
@@ -1303,12 +1455,15 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert capture.json()["status"] == "pending_acceptance"
     assert capture.json()["stripe_payment_intent_id"] == "pi_test_123"
     assert any(evt["event"] == "payment_captured" for evt in capture.json()["events"])
+
     async def assert_coupon_redeemed() -> None:
         async with SessionLocal() as session:
             redemption = (
                 (
                     await session.execute(
-                        select(CouponRedemption).where(CouponRedemption.order_id == UUID(order_id))
+                        select(CouponRedemption).where(
+                            CouponRedemption.order_id == UUID(order_id)
+                        )
                     )
                 )
                 .scalars()
@@ -1338,12 +1493,15 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     assert void.status_code == 200
     assert void.json()["status"] == "cancelled"
     assert any(evt["event"] == "payment_voided" for evt in void.json()["events"])
+
     async def assert_coupon_voided() -> None:
         async with SessionLocal() as session:
             redemption = (
                 (
                     await session.execute(
-                        select(CouponRedemption).where(CouponRedemption.order_id == UUID(order_id))
+                        select(CouponRedemption).where(
+                            CouponRedemption.order_id == UUID(order_id)
+                        )
                     )
                 )
                 .scalars()
@@ -1355,7 +1513,9 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
 
     asyncio.run(assert_coupon_voided())
 
-    export_resp = client.get("/api/v1/orders/admin/export", headers=auth_headers(admin_token))
+    export_resp = client.get(
+        "/api/v1/orders/admin/export", headers=auth_headers(admin_token)
+    )
     assert export_resp.status_code == 200
     assert "text/csv" in export_resp.headers.get("content-type", "")
     assert "reference_code" in export_resp.text
@@ -1376,7 +1536,9 @@ def test_capture_void_export_and_reorder(monkeypatch: pytest.MonkeyPatch, test_a
     )
     assert export_invalid.status_code == 400
 
-    reorder_resp = client.post(f"/api/v1/orders/{order_id}/reorder", headers=auth_headers(token))
+    reorder_resp = client.post(
+        f"/api/v1/orders/{order_id}/reorder", headers=auth_headers(token)
+    )
     assert reorder_resp.status_code == 200
     assert len(reorder_resp.json()["items"]) == 1
     assert reorder_resp.json()["items"][0]["product_id"]
@@ -1386,14 +1548,19 @@ def test_admin_order_shipments_crud(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    token, user_id = create_user_token(SessionLocal, email="buyer-shipments@example.com")
-    admin_token, _ = create_user_token(SessionLocal, email="admin-shipments@example.com", admin=True)
+    token, user_id = create_user_token(
+        SessionLocal, email="buyer-shipments@example.com"
+    )
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin-shipments@example.com", admin=True
+    )
     seed_cart_with_product(SessionLocal, user_id)
 
     async def seed_shipping() -> UUID:
         async with SessionLocal() as session:
             method = await order_service.create_shipping_method(
-                session, ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0)
+                session,
+                ShippingMethodCreate(name="Standard", rate_flat=5.0, rate_per_kg=0),
             )
             return method.id
 
@@ -1409,7 +1576,11 @@ def test_admin_order_shipments_crud(test_app: Dict[str, object]) -> None:
 
     created = client.post(
         f"/api/v1/orders/admin/{order_id}/shipments",
-        json={"tracking_number": "TRACK1", "courier": "sameday", "tracking_url": "https://example.com/track/1"},
+        json={
+            "tracking_number": "TRACK1",
+            "courier": "sameday",
+            "tracking_url": "https://example.com/track/1",
+        },
         headers=auth_headers(admin_token),
     )
     assert created.status_code == 200, created.text
@@ -1433,7 +1604,10 @@ def test_admin_order_shipments_crud(test_app: Dict[str, object]) -> None:
     )
     assert updated.status_code == 200, updated.text
     updated_shipments = updated.json().get("shipments") or []
-    assert any(s["id"] == shipment_id and s["tracking_url"] == "https://example.com/track/new" for s in updated_shipments)
+    assert any(
+        s["id"] == shipment_id and s["tracking_url"] == "https://example.com/track/new"
+        for s in updated_shipments
+    )
 
     duplicate = client.post(
         f"/api/v1/orders/admin/{order_id}/shipments",
@@ -1466,7 +1640,9 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
     monkeypatch.setattr(email_service, "send_delivery_confirmation", fake_email)
 
     _token, user_id = create_user_token(SessionLocal, email="buyer-paycap@example.com")
-    admin_token, _ = create_user_token(SessionLocal, email="admin-paycap@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin-paycap@example.com", admin=True
+    )
 
     async def seed_stripe_order() -> UUID:
         async with SessionLocal() as session:
@@ -1501,7 +1677,11 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
 
     async def seed_capture_event() -> None:
         async with SessionLocal() as session:
-            session.add(OrderEvent(order_id=stripe_order_id, event="payment_captured", note="test"))
+            session.add(
+                OrderEvent(
+                    order_id=stripe_order_id, event="payment_captured", note="test"
+                )
+            )
             await session.commit()
 
     asyncio.run(seed_capture_event())
@@ -1519,13 +1699,18 @@ def test_admin_accept_requires_payment_capture_and_cancel_reason(
         headers=auth_headers(admin_token),
         json={"status": "cancelled"},
     )
-    assert cancel_paid_missing_reason.status_code == 400, cancel_paid_missing_reason.text
+    assert cancel_paid_missing_reason.status_code == 400, (
+        cancel_paid_missing_reason.text
+    )
     assert "Cancel reason is required" in cancel_paid_missing_reason.text
 
     cancel_paid = client.patch(
         f"/api/v1/orders/admin/{stripe_order_id_str}",
         headers=auth_headers(admin_token),
-        json={"status": "cancelled", "cancel_reason": "Customer requested cancellation"},
+        json={
+            "status": "cancelled",
+            "cancel_reason": "Customer requested cancellation",
+        },
     )
     assert cancel_paid.status_code == 200, cancel_paid.text
     assert cancel_paid.json()["status"] == "cancelled"
@@ -1592,7 +1777,9 @@ def test_admin_cancel_restores_stock_for_committed_orders(
     monkeypatch.setattr(email_service, "send_order_cancelled_update", fake_email)
 
     _, user_id = create_user_token(SessionLocal, email="buyer-stock@example.com")
-    admin_token, _ = create_user_token(SessionLocal, email="admin-stock@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin-stock@example.com", admin=True
+    )
 
     async def seed_order_with_stock() -> tuple[UUID, UUID]:
         async with SessionLocal() as session:
@@ -1657,7 +1844,10 @@ def test_admin_cancel_restores_stock_for_committed_orders(
     cancel = client.patch(
         f"/api/v1/orders/admin/{order_id}",
         headers=auth_headers(admin_token),
-        json={"status": "cancelled", "cancel_reason": "Customer requested cancellation"},
+        json={
+            "status": "cancelled",
+            "cancel_reason": "Customer requested cancellation",
+        },
     )
     assert cancel.status_code == 200, cancel.text
     assert cancel.json()["status"] == "cancelled"
@@ -1671,10 +1861,14 @@ def test_admin_shipping_label_upload_download_and_delete(
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
     token, user_id = create_user_token(SessionLocal, email="buyer2@example.com")
-    admin_token, _ = create_user_token(SessionLocal, email="admin2@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin2@example.com", admin=True
+    )
 
     async def seed_order() -> UUID:
         async with SessionLocal() as session:
@@ -1716,7 +1910,9 @@ def test_admin_shipping_label_upload_download_and_delete(
 
     async def get_label_path() -> str:
         async with SessionLocal() as session:
-            o = (await session.execute(select(Order).where(Order.id == order_id))).scalar_one()
+            o = (
+                await session.execute(select(Order).where(Order.id == order_id))
+            ).scalar_one()
             assert o.shipping_label_path
             return str(o.shipping_label_path)
 
@@ -1755,13 +1951,19 @@ def test_admin_shipping_label_upload_download_and_delete(
     assert missing.status_code == 404
 
 
-def test_admin_batch_shipping_labels_zip(test_app: Dict[str, object], tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_admin_batch_shipping_labels_zip(
+    test_app: Dict[str, object], tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    monkeypatch.setattr(settings, "private_media_root", str(tmp_path / "private_uploads"))
+    monkeypatch.setattr(
+        settings, "private_media_root", str(tmp_path / "private_uploads")
+    )
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin-batch-labels@example.com", admin=True)
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin-batch-labels@example.com", admin=True
+    )
 
     async def seed_orders() -> tuple[UUID, UUID]:
         async with SessionLocal() as session:
@@ -1801,7 +2003,9 @@ def test_admin_batch_shipping_labels_zip(test_app: Dict[str, object], tmp_path, 
         json={"order_ids": [str(first_id), str(second_id)]},
     )
     assert missing_all.status_code == 404
-    assert str(first_id) in (missing_all.json().get("detail") or {}).get("missing_shipping_label_order_ids", [])
+    assert str(first_id) in (missing_all.json().get("detail") or {}).get(
+        "missing_shipping_label_order_ids", []
+    )
 
     upload_first = client.post(
         f"/api/v1/orders/admin/{first_id}/shipping-label",
@@ -1816,7 +2020,9 @@ def test_admin_batch_shipping_labels_zip(test_app: Dict[str, object], tmp_path, 
         json={"order_ids": [str(first_id), str(second_id)]},
     )
     assert missing_one.status_code == 404
-    assert str(second_id) in (missing_one.json().get("detail") or {}).get("missing_shipping_label_order_ids", [])
+    assert str(second_id) in (missing_one.json().get("detail") or {}).get(
+        "missing_shipping_label_order_ids", []
+    )
 
     upload_second = client.post(
         f"/api/v1/orders/admin/{second_id}/shipping-label",

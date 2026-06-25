@@ -9,8 +9,12 @@ import pytest
 
 
 def _load_module():
-    module_path = Path(__file__).resolve().parents[1] / "sync_severe_issues_to_project.py"
-    spec = importlib.util.spec_from_file_location("sync_severe_issues_to_project", module_path)
+    module_path = (
+        Path(__file__).resolve().parents[1] / "sync_severe_issues_to_project.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "sync_severe_issues_to_project", module_path
+    )
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -75,7 +79,9 @@ def test_run_sync_missing_token_safe_skip(tmp_path) -> None:
         status_name="Todo",
         dry_run=False,
         allow_skip_missing_token=True,
-        request_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected call")),
+        request_fn=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("unexpected call")
+        ),
     )
 
     assert summary["skipped_run"] is True
@@ -90,7 +96,9 @@ def test_run_sync_adds_missing_issue_and_sets_lane_and_status(tmp_path) -> None:
 
     calls: list[tuple[str, dict[str, object]]] = []
 
-    def fake_request(_token: str, query: str, variables: dict[str, object]) -> dict[str, object]:
+    def fake_request(
+        _token: str, query: str, variables: dict[str, object]
+    ) -> dict[str, object]:
         if "query ResolveProject" in query:
             return _project_payload()
         if "query ProjectItems" in query:
@@ -107,7 +115,9 @@ def test_run_sync_adds_missing_issue_and_sets_lane_and_status(tmp_path) -> None:
             return {"addProjectV2ItemById": {"item": {"id": "ITEM_220"}}}
         if "mutation SetSingleSelect" in query:
             calls.append(("set", variables))
-            return {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "ITEM_220"}}}
+            return {
+                "updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "ITEM_220"}}
+            }
         raise AssertionError(f"Unexpected query: {query[:80]}")
 
     summary = module.run_sync(
@@ -139,7 +149,9 @@ def test_run_sync_updates_existing_and_preserves_done_status(tmp_path) -> None:
 
     set_calls: list[dict[str, object]] = []
 
-    def fake_request(_token: str, query: str, variables: dict[str, object]) -> dict[str, object]:
+    def fake_request(
+        _token: str, query: str, variables: dict[str, object]
+    ) -> dict[str, object]:
         if "query ResolveProject" in query:
             return _project_payload()
         if "query ProjectItems" in query:
@@ -149,7 +161,11 @@ def test_run_sync_updates_existing_and_preserves_done_status(tmp_path) -> None:
                         "nodes": [
                             {
                                 "id": "ITEM_221",
-                                "content": {"__typename": "Issue", "id": "ISSUE_221", "number": 221},
+                                "content": {
+                                    "__typename": "Issue",
+                                    "id": "ISSUE_221",
+                                    "number": 221,
+                                },
                                 "fieldValues": {
                                     "nodes": [
                                         {
@@ -176,7 +192,9 @@ def test_run_sync_updates_existing_and_preserves_done_status(tmp_path) -> None:
             raise AssertionError("Should not add an existing issue")
         if "mutation SetSingleSelect" in query:
             set_calls.append(variables)
-            return {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "ITEM_221"}}}
+            return {
+                "updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "ITEM_221"}}
+            }
         raise AssertionError(f"Unexpected query: {query[:80]}")
 
     summary = module.run_sync(
@@ -200,20 +218,29 @@ def test_run_sync_updates_existing_and_preserves_done_status(tmp_path) -> None:
     assert set_calls[0]["fieldId"] == "F_LANE"
 
 
-def test_run_sync_dedupes_duplicate_issue_numbers_and_resolves_missing_node_id(tmp_path) -> None:
+def test_run_sync_dedupes_duplicate_issue_numbers_and_resolves_missing_node_id(
+    tmp_path,
+) -> None:
     module = _load_module()
     issues_path = tmp_path / "artifacts" / "audit-evidence" / "severe.json"
     _write_issues(
         issues_path,
         [
             {"issue_number": 500, "severity": "s2", "route": "/shop"},
-            {"issue_number": 500, "severity": "s2", "route": "/shop", "surface": "storefront"},
+            {
+                "issue_number": 500,
+                "severity": "s2",
+                "route": "/shop",
+                "surface": "storefront",
+            },
         ],
     )
 
     lookup_calls = {"issue_lookup": 0}
 
-    def fake_request(_token: str, query: str, variables: dict[str, object]) -> dict[str, object]:
+    def fake_request(
+        _token: str, query: str, variables: dict[str, object]
+    ) -> dict[str, object]:
         if "query ResolveProject" in query:
             return _project_payload()
         if "query ProjectItems" in query:
@@ -231,7 +258,9 @@ def test_run_sync_dedupes_duplicate_issue_numbers_and_resolves_missing_node_id(t
         if "mutation AddProjectItem" in query:
             return {"addProjectV2ItemById": {"item": {"id": "ITEM_500"}}}
         if "mutation SetSingleSelect" in query:
-            return {"updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "ITEM_500"}}}
+            return {
+                "updateProjectV2ItemFieldValue": {"projectV2Item": {"id": "ITEM_500"}}
+            }
         raise AssertionError(f"Unexpected query: {query[:80]}")
 
     summary = module.run_sync(
@@ -255,7 +284,9 @@ def test_run_sync_dedupes_duplicate_issue_numbers_and_resolves_missing_node_id(t
 def test_resolve_project_errors_when_lane_field_missing() -> None:
     module = _load_module()
 
-    def fake_request(_token: str, _query: str, _variables: dict[str, object]) -> dict[str, object]:
+    def fake_request(
+        _token: str, _query: str, _variables: dict[str, object]
+    ) -> dict[str, object]:
         return _project_payload(include_lane=False)
 
     with pytest.raises(RuntimeError, match="Roadmap Lane"):

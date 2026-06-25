@@ -8,7 +8,10 @@ test.beforeEach(async ({ page }) => {
 
 test('paypal payment option is available when enabled', async ({ page }) => {
   const cartLoad = page.waitForResponse(
-    (res) => res.url().includes('/api/v1/cart') && res.request().method() === 'GET' && res.status() === 200
+    (res) =>
+      res.url().includes('/api/v1/cart') &&
+      res.request().method() === 'GET' &&
+      res.status() === 200,
   );
   await page.goto('/checkout');
   await cartLoad;

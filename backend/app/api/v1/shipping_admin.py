@@ -29,7 +29,11 @@ def _run_to_read(run: ShippingLockerSyncRun) -> SamedaySyncRunRead:
         deactivated_count=int(run.deactivated_count or 0),
         candidate_count=int(run.candidate_count or 0),
         normalized_count=int(run.normalized_count or 0),
-        normalization_ratio=float(run.normalization_ratio) if run.normalization_ratio is not None else None,
+        normalization_ratio=(
+            float(run.normalization_ratio)
+            if run.normalization_ratio is not None
+            else None
+        ),
         schema_signature=run.schema_signature,
         schema_drift_detected=bool(run.schema_drift_detected),
         failure_kind=run.failure_kind,
@@ -70,7 +74,9 @@ async def list_sameday_sync_runs(
     session: AsyncSession = Depends(get_session),
     _: User = Depends(require_admin_section("ops")),
 ) -> SamedaySyncRunListResponse:
-    rows, total = await sameday_easybox_mirror.list_sync_runs(session, page=page, limit=limit)
+    rows, total = await sameday_easybox_mirror.list_sync_runs(
+        session, page=page, limit=limit
+    )
     return SamedaySyncRunListResponse(
         items=[_run_to_read(row) for row in rows],
         meta={"page": int(page), "limit": int(limit), "total": int(total)},

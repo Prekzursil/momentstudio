@@ -47,7 +47,9 @@ def auth_headers(token: str) -> dict[str, str]:
 def create_user_token(session_factory, email="cart@example.com"):
     async def create_and_token():
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email=email, password="cartpass", name="Cart User"))
+            user = await create_user(
+                session, UserCreate(email=email, password="cartpass", name="Cart User")
+            )
             from app.services.auth import issue_tokens_for_user
 
             tokens = await issue_tokens_for_user(session, user)
@@ -179,7 +181,10 @@ def test_guest_cart_and_merge(test_app: Dict[str, object]) -> None:
     )
     assert res.status_code == 201
 
-    merge_res = client.post("/api/v1/cart/merge", headers={**auth_headers(token), "X-Session-Id": session_id})
+    merge_res = client.post(
+        "/api/v1/cart/merge",
+        headers={**auth_headers(token), "X-Session-Id": session_id},
+    )
     assert merge_res.status_code == 200
     assert len(merge_res.json()["items"]) == 1
     assert merge_res.json()["items"][0]["quantity"] == 1
@@ -216,6 +221,7 @@ def test_max_quantity_promo_and_abandoned_job(test_app: Dict[str, object]) -> No
                 session,
                 PromoCodeCreate(code="SAVE10", percentage_off=10),
             )
+
     asyncio.run(seed_promo())
     promo = client.post("/api/v1/cart/promo/validate", json={"code": "SAVE10"})
     assert promo.status_code == 200
@@ -225,6 +231,7 @@ def test_max_quantity_promo_and_abandoned_job(test_app: Dict[str, object]) -> No
     async def run_job():
         async with SessionLocal() as session:
             return await cart_service.run_abandoned_cart_job(session, max_age_hours=0)
+
     count = asyncio.run(run_job())
     assert count >= 0
 

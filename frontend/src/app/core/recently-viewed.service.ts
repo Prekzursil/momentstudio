@@ -1,7 +1,10 @@
 import { Injectable } from '@angular/core';
 import { Product } from './catalog.service';
 
-export type RecentlyViewedProduct = Pick<Product, 'id' | 'slug' | 'name' | 'base_price' | 'currency' | 'images'>;
+export type RecentlyViewedProduct = Pick<
+  Product,
+  'id' | 'slug' | 'name' | 'base_price' | 'currency' | 'images'
+>;
 
 @Injectable({ providedIn: 'root' })
 export class RecentlyViewedService {
@@ -22,9 +25,9 @@ export class RecentlyViewedService {
         name: product.name,
         base_price: product.base_price,
         currency: product.currency || 'RON',
-        images: Array.isArray(product.images) ? product.images : []
+        images: Array.isArray(product.images) ? product.images : [],
       },
-      ...filtered
+      ...filtered,
     ];
     const sliced = next.slice(0, this.maxItems);
     this.write(sliced);
@@ -65,7 +68,9 @@ export class RecentlyViewedService {
       const base_price = Number.isFinite(basePriceRaw) ? basePriceRaw : 0;
       const currencyRaw = typeof item.currency === 'string' ? item.currency.trim() : '';
       const currency = currencyRaw || 'RON';
-      const images = Array.isArray(item.images) ? item.images.filter((img: any) => img && typeof img.url === 'string') : [];
+      const images = Array.isArray(item.images)
+        ? item.images.filter((img: any) => img && typeof img.url === 'string')
+        : [];
 
       normalized.push({ id, slug, name, base_price, currency, images });
     }
@@ -101,6 +106,7 @@ export class RecentlyViewedService {
   }
 
   private readCookie(name: string): string | null {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return null;
     const prefix = `${name}=`;
     const cookies = document.cookie ? document.cookie.split(';') : [];
@@ -114,6 +120,7 @@ export class RecentlyViewedService {
   }
 
   private writeCookie(name: string, value: string, days: number): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     const expires = new Date();
     expires.setDate(expires.getDate() + days);

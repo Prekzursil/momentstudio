@@ -4,15 +4,13 @@ module.exports = function (config) {
       // Prefer Playwright's bundled Chromium in environments without system Chrome.
       const { chromium } = require('playwright');
       process.env.CHROME_BIN = chromium.executablePath();
-    } catch (_) {
+    } catch {
       // Fall back to system Chrome resolution via karma-chrome-launcher.
     }
   }
 
   const enableJUnitReporter = process.env.KARMA_JUNIT === '1' || process.env.CI === 'true';
-  const reporters = enableJUnitReporter
-    ? ['progress', 'kjhtml', 'junit']
-    : ['progress', 'kjhtml'];
+  const reporters = enableJUnitReporter ? ['progress', 'kjhtml', 'junit'] : ['progress', 'kjhtml'];
 
   config.set({
     basePath: '',
@@ -23,16 +21,16 @@ module.exports = function (config) {
       require('karma-jasmine-html-reporter'),
       require('karma-coverage'),
       require('karma-junit-reporter'),
-      require('@angular-devkit/build-angular/plugins/karma')
+      require('@angular-devkit/build-angular/plugins/karma'),
     ],
     client: {
-      clearContext: false
+      clearContext: false,
     },
     reporters,
     junitReporter: {
       outputDir: 'test-results',
       outputFile: 'karma.junit.xml',
-      useBrowserName: false
+      useBrowserName: false,
     },
     port: 9876,
     listenAddress: '127.0.0.1',
@@ -42,11 +40,34 @@ module.exports = function (config) {
     customLaunchers: {
       ChromeHeadlessNoSandbox: {
         base: 'ChromeHeadless',
-        flags: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
-      }
+        flags: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+      },
     },
     browsers: ['ChromeHeadlessNoSandbox'],
     singleRun: false,
-    restartOnFileChange: true
+    restartOnFileChange: true,
+    // Lean-charter coverage gate: the `test:coverage` script (ng test
+    // --code-coverage) makes the Angular karma builder emit istanbul coverage.
+    // We surface a machine-readable per-file summary for CI parsing and enforce
+    // the lean 100% threshold across all axes. A run below 100% exits non-zero
+    // (the gate is intentionally red until every source file is covered).
+    coverageReporter: {
+      dir: require('path').join(__dirname, 'coverage'),
+      subdir: '.',
+      reporters: [
+        { type: 'html' },
+        { type: 'lcovonly' },
+        { type: 'json-summary' },
+        { type: 'text-summary' },
+      ],
+      check: {
+        global: {
+          statements: 100,
+          branches: 100,
+          functions: 100,
+          lines: 100,
+        },
+      },
+    },
   });
 };

@@ -32,4 +32,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_column("promotions", "first_order_only")
-

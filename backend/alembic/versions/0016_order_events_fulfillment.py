@@ -19,18 +19,38 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("order_items", sa.Column("shipped_quantity", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column(
+        "order_items",
+        sa.Column("shipped_quantity", sa.Integer(), nullable=False, server_default="0"),
+    )
     op.alter_column("order_items", "shipped_quantity", server_default=None)
-    op.add_column("orders", sa.Column("payment_retry_count", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column(
+        "orders",
+        sa.Column(
+            "payment_retry_count", sa.Integer(), nullable=False, server_default="0"
+        ),
+    )
     op.alter_column("orders", "payment_retry_count", server_default=None)
 
     op.create_table(
         "order_events",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("order_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("orders.id"), nullable=False),
+        sa.Column(
+            "id", postgresql.UUID(as_uuid=True), primary_key=True, nullable=False
+        ),
+        sa.Column(
+            "order_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("orders.id"),
+            nullable=False,
+        ),
         sa.Column("event", sa.String(length=50), nullable=False),
         sa.Column("note", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
 
 

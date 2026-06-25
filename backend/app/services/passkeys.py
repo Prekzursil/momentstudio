@@ -43,7 +43,11 @@ def rp_name() -> str:
 
 
 def allowed_origins() -> list[str]:
-    origins = [o.rstrip("/") for o in (settings.webauthn_allowed_origins or []) if isinstance(o, str) and o.strip()]
+    origins = [
+        o.rstrip("/")
+        for o in (settings.webauthn_allowed_origins or [])
+        if isinstance(o, str) and o.strip()
+    ]
     front = (settings.frontend_origin or "").rstrip("/")
     if front and front not in origins:
         origins.append(front)
@@ -96,15 +100,22 @@ def _jsonify_webauthn_options(value: object) -> object:
 
 async def list_passkeys(session: AsyncSession, user_id) -> list[UserPasskey]:
     result = await session.execute(
-        select(UserPasskey).where(UserPasskey.user_id == user_id).order_by(UserPasskey.created_at.desc())
+        select(UserPasskey)
+        .where(UserPasskey.user_id == user_id)
+        .order_by(UserPasskey.created_at.desc())
     )
     return list(result.scalars().all())
 
 
-async def generate_registration_options_for_user(session: AsyncSession, user: User) -> tuple[dict, bytes]:
+async def generate_registration_options_for_user(
+    session: AsyncSession, user: User
+) -> tuple[dict, bytes]:
     existing = await list_passkeys(session, user.id)
     exclude = [
-        PublicKeyCredentialDescriptor(type=PublicKeyCredentialType.PUBLIC_KEY, id=base64url_to_bytes(p.credential_id))
+        PublicKeyCredentialDescriptor(
+            type=PublicKeyCredentialType.PUBLIC_KEY,
+            id=base64url_to_bytes(p.credential_id),
+        )
         for p in existing
     ]
 
@@ -145,12 +156,21 @@ async def register_passkey(
             require_user_verification=True,
         )
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey registration") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid passkey registration",
+        ) from exc
 
     credential_id = bytes_to_base64url(verified.credential_id)
-    existing = (await session.execute(select(UserPasskey).where(UserPasskey.credential_id == credential_id))).scalar_one_or_none()
+    existing = (
+        await session.execute(
+            select(UserPasskey).where(UserPasskey.credential_id == credential_id)
+        )
+    ).scalar_one_or_none()
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Passkey already registered")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Passkey already registered"
+        )
 
     passkey = UserPasskey(
         user_id=user.id,
@@ -159,8 +179,16 @@ async def register_passkey(
         public_key=verified.credential_public_key,
         sign_count=int(verified.sign_count),
         aaguid=(verified.aaguid or "").strip()[:64] or None,
-        credential_type=str(getattr(verified.credential_type, "value", verified.credential_type)),
-        device_type=str(getattr(verified.credential_device_type, "value", verified.credential_device_type)),
+        credential_type=str(
+            getattr(verified.credential_type, "value", verified.credential_type)
+        ),
+        device_type=str(
+            getattr(
+                verified.credential_device_type,
+                "value",
+                verified.credential_device_type,
+            )
+        ),
         backed_up=bool(getattr(verified, "credential_backed_up", False)),
     )
     session.add(passkey)
@@ -169,12 +197,17 @@ async def register_passkey(
     return passkey
 
 
-async def generate_authentication_options_for_user(session: AsyncSession, user: User | None) -> tuple[dict, bytes]:
+async def generate_authentication_options_for_user(
+    session: AsyncSession, user: User | None
+) -> tuple[dict, bytes]:
     allow = None
     if user is not None:
         creds = await list_passkeys(session, user.id)
         allow = [
-            PublicKeyCredentialDescriptor(type=PublicKeyCredentialType.PUBLIC_KEY, id=base64url_to_bytes(p.credential_id))
+            PublicKeyCredentialDescriptor(
+                type=PublicKeyCredentialType.PUBLIC_KEY,
+                id=base64url_to_bytes(p.credential_id),
+            )
             for p in creds
         ]
 
@@ -198,26 +231,42 @@ async def verify_passkey_authentication(
 ) -> tuple[User, UserPasskey]:
     cred_id_b64 = (credential.get("rawId") or credential.get("id") or "").strip()
     if not cred_id_b64:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential"
+        )
 
     # `rawId` is preferred; allow `id` for compatibility with different serializers.
     try:
         credential_id_bytes = base64url_to_bytes(cred_id_b64)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential"
+        ) from exc
     if not credential_id_bytes:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credential"
+        )
     credential_id = bytes_to_base64url(credential_id_bytes)
 
-    passkey = (await session.execute(select(UserPasskey).where(UserPasskey.credential_id == credential_id))).scalar_one_or_none()
+    passkey = (
+        await session.execute(
+            select(UserPasskey).where(UserPasskey.credential_id == credential_id)
+        )
+    ).scalar_one_or_none()
     if not passkey:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey"
+        )
     if user_id and str(passkey.user_id) != str(user_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey"
+        )
 
     user = await session.get(User, passkey.user_id)
     if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown passkey"
+        )
 
     try:
         verified = verify_authentication_response(
@@ -230,9 +279,13 @@ async def verify_passkey_authentication(
             require_user_verification=True,
         )
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey assertion") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid passkey assertion"
+        ) from exc
 
-    passkey.sign_count = int(getattr(verified, "new_sign_count", passkey.sign_count or 0))
+    passkey.sign_count = int(
+        getattr(verified, "new_sign_count", passkey.sign_count or 0)
+    )
     passkey.last_used_at = datetime.now(timezone.utc)
     session.add(passkey)
     await session.commit()

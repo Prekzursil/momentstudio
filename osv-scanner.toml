@@ -1,0 +1,19 @@
+# osv-scanner configuration for the lean dependency gate (pinned tool: osv-scanner 2.3.8).
+# The gate runs `osv-scanner scan source --config=osv-scanner.toml --recursive .`
+# (per the reusable-quality.yml gate-deps step) over the repo's lockfiles
+# (backend Python + frontend npm) and must report 0 actionable CVEs.
+#
+# POLICY: ignore entries are allowed ONLY for a genuinely-unfixable vuln (no
+# non-breaking upgrade) OR one that is provably not reachable in THIS product,
+# each with a reason + dated review note (greppable). We do NOT use a baseline
+# file — clean-zero is reached by upgrading where a safe fix exists, and only by
+# a reasoned per-CVE ignore where it does not (Dependabot drives the upgrades).
+#
+# Lockfiles in this monorepo:
+#   - backend/requirements.txt          (pinned Python deps)
+#   - backend/requirements-ci.txt       (pinned Python CI deps)
+#   - frontend/package-lock.json        (Angular/TypeScript npm tree)
+#
+# This file intentionally carries no IgnoredVulns at adoption time. Add a dated,
+# reasoned entry here only for a future vuln that is genuinely unfixable or
+# provably unreachable in this product.

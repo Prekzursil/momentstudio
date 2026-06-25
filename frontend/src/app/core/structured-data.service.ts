@@ -4,7 +4,8 @@ import { Injectable, inject } from '@angular/core';
 @Injectable({ providedIn: 'root' })
 export class StructuredDataService {
   private readonly document = inject(DOCUMENT);
-  private readonly managedSelector = 'script[type="application/ld+json"][data-seo-route-schema="true"]';
+  private readonly managedSelector =
+    'script[type="application/ld+json"][data-seo-route-schema="true"]';
   private readonly idPrefix = 'seo-route-schema-';
 
   setRouteSchemas(schemas: ReadonlyArray<Record<string, unknown>>): void {
@@ -24,7 +25,9 @@ export class StructuredDataService {
   }
 
   clearRouteSchemas(): void {
-    this.document.querySelectorAll<HTMLScriptElement>(this.managedSelector).forEach((node) => node.remove());
+    this.document
+      .querySelectorAll<HTMLScriptElement>(this.managedSelector)
+      .forEach((node) => node.remove());
   }
 
   private upsertScript(id: string): HTMLScriptElement {

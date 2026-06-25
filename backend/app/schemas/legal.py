@@ -12,4 +12,3 @@ class LegalConsentDocStatus(BaseModel):
 class LegalConsentStatusResponse(BaseModel):
     docs: list[LegalConsentDocStatus]
     satisfied: bool
-

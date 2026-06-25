@@ -177,7 +177,7 @@
 }
 
 .toastui-editor-dark .toastui-editor-popup-add-table .toastui-editor-table-description {
-  color: #eee
+  color: #eee;
 }
 
 .toastui-editor-dark .toastui-editor-md-tab-container {
@@ -196,7 +196,6 @@
   background-color: #121212;
   color: #eee;
 }
-
 
 .toastui-editor-dark .toastui-editor-context-menu .menu-group {
   border-bottom-color: #303238;
@@ -290,7 +289,9 @@
   border-color: #327491;
 }
 
-.toastui-editor-dark .toastui-editor-custom-block.ProseMirror-selectednode .toastui-editor-custom-block-view {
+.toastui-editor-dark
+  .toastui-editor-custom-block.ProseMirror-selectednode
+  .toastui-editor-custom-block-view {
   color: #fff;
   border-color: #327491;
 }
@@ -397,7 +398,8 @@
   color: #55575f;
 }
 
-.toastui-editor-dark .toastui-editor-md-link.toastui-editor-md-link-url.toastui-editor-md-marked-text {
+.toastui-editor-dark
+  .toastui-editor-md-link.toastui-editor-md-link-url.toastui-editor-md-marked-text {
   color: #777980;
 }
 
@@ -406,7 +408,8 @@
   color: #b3b5bc;
 }
 
-.toastui-editor-dark .toastui-editor-md-link.toastui-editor-md-link-desc.toastui-editor-md-marked-text,
+.toastui-editor-dark
+  .toastui-editor-md-link.toastui-editor-md-link-desc.toastui-editor-md-marked-text,
 .toastui-editor-dark .toastui-editor-md-list-item-style.toastui-editor-md-list-item-odd {
   color: #4b96e6;
 }

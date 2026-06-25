@@ -4,7 +4,13 @@ import { ApiService } from './api.service';
 import { parseMoney } from '../shared/money';
 import { map } from 'rxjs/operators';
 
-export type SortOption = 'recommended' | 'newest' | 'price_asc' | 'price_desc' | 'name_asc' | 'name_desc';
+export type SortOption =
+  | 'recommended'
+  | 'newest'
+  | 'price_asc'
+  | 'price_desc'
+  | 'name_asc'
+  | 'name_desc';
 export type CatalogLang = 'en' | 'ro';
 
 export interface Category {
@@ -127,43 +133,48 @@ export class CatalogService {
 
   private normalizeProduct(raw: any): Product {
     return {
-      ...(raw ?? {}),
+      ...raw,
       base_price: parseMoney(raw?.base_price),
       sale_price: raw?.sale_price == null ? null : parseMoney(raw.sale_price),
-      sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value)
+      sale_value: raw?.sale_value == null ? null : parseMoney(raw.sale_value),
     } as Product;
   }
 
   listCategories(lang?: CatalogLang, opts?: { include_hidden?: boolean }): Observable<Category[]> {
-    return this.api.get<Category[]>('/catalog/categories', { lang, include_hidden: opts?.include_hidden });
+    return this.api.get<Category[]>('/catalog/categories', {
+      lang,
+      include_hidden: opts?.include_hidden,
+    });
   }
 
   listProducts(params: ProductFilterParams): Observable<ProductListResponse> {
     return this.api
       .get<ProductListResponse>('/catalog/products', {
-      category_slug: params.category_slug,
-      on_sale: params.on_sale,
-      search: params.search,
-      min_price: params.min_price,
-      max_price: params.max_price,
-      is_featured: params.is_featured,
-      include_unpublished: params.include_unpublished,
-      lang: params.lang,
-      tags: params.tags?.length ? params.tags : undefined,
-      sort: params.sort,
-      page: params.page ?? 1,
-      limit: params.limit ?? 12
-    })
+        category_slug: params.category_slug,
+        on_sale: params.on_sale,
+        search: params.search,
+        min_price: params.min_price,
+        max_price: params.max_price,
+        is_featured: params.is_featured,
+        include_unpublished: params.include_unpublished,
+        lang: params.lang,
+        tags: params.tags?.length ? params.tags : undefined,
+        sort: params.sort,
+        page: params.page ?? 1,
+        limit: params.limit ?? 12,
+      })
       .pipe(
         map((res: any) => ({
-          ...(res ?? {}),
-          items: (res?.items ?? []).map((p: any) => this.normalizeProduct(p))
-        }))
+          ...res,
+          items: (res?.items ?? []).map((p: any) => this.normalizeProduct(p)),
+        })),
       );
   }
 
   getProduct(slug: string, lang?: CatalogLang): Observable<Product> {
-    return this.api.get<Product>(`/catalog/products/${slug}`, { lang }).pipe(map((p: any) => this.normalizeProduct(p)));
+    return this.api
+      .get<Product>(`/catalog/products/${slug}`, { lang })
+      .pipe(map((p: any) => this.normalizeProduct(p)));
   }
 
   getRelatedProducts(slug: string, lang?: CatalogLang): Observable<Product[]> {
@@ -191,14 +202,17 @@ export class CatalogService {
   }
 
   getProductPriceBounds(
-    params: Pick<ProductFilterParams, 'category_slug' | 'on_sale' | 'search' | 'is_featured' | 'tags'>
+    params: Pick<
+      ProductFilterParams,
+      'category_slug' | 'on_sale' | 'search' | 'is_featured' | 'tags'
+    >,
   ): Observable<ProductPriceBounds> {
     return this.api.get<ProductPriceBounds>('/catalog/products/price-bounds', {
       category_slug: params.category_slug,
       on_sale: params.on_sale,
       search: params.search,
       is_featured: params.is_featured,
-      tags: params.tags?.length ? params.tags : undefined
+      tags: params.tags?.length ? params.tags : undefined,
     });
   }
 
@@ -206,10 +220,10 @@ export class CatalogService {
     return this.api.get<FeaturedCollection[]>('/catalog/collections/featured', { lang }).pipe(
       map((rows: any) =>
         (rows ?? []).map((c: any) => ({
-          ...(c ?? {}),
-          products: (c?.products ?? []).map((p: any) => this.normalizeProduct(p))
-        }))
-      )
+          ...c,
+          products: (c?.products ?? []).map((p: any) => this.normalizeProduct(p)),
+        })),
+      ),
     );
   }
 }

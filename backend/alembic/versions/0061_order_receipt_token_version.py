@@ -21,11 +21,12 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "orders",
-        sa.Column("receipt_token_version", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column(
+            "receipt_token_version", sa.Integer(), nullable=False, server_default="0"
+        ),
     )
     op.alter_column("orders", "receipt_token_version", server_default=None)
 
 
 def downgrade() -> None:
     op.drop_column("orders", "receipt_token_version")
-

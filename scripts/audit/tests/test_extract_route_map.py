@@ -43,4 +43,6 @@ def test_extract_route_map_sorting_semantics() -> None:
     route_map = module.extract_route_map(fixture)
     routes = route_map["routes"]
 
-    assert routes == sorted(routes, key=lambda item: (item["surface"], item["full_path"]))
+    assert routes == sorted(
+        routes, key=lambda item: (item["surface"], item["full_path"])
+    )

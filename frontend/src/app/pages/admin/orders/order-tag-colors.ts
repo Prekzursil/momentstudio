@@ -1,6 +1,23 @@
-export type TagColor = 'slate' | 'indigo' | 'violet' | 'emerald' | 'amber' | 'rose' | 'sky' | 'teal';
+export type TagColor =
+  | 'slate'
+  | 'indigo'
+  | 'violet'
+  | 'emerald'
+  | 'amber'
+  | 'rose'
+  | 'sky'
+  | 'teal';
 
-export const TAG_COLOR_PALETTE: TagColor[] = ['slate', 'indigo', 'violet', 'emerald', 'amber', 'rose', 'sky', 'teal'];
+export const TAG_COLOR_PALETTE: TagColor[] = [
+  'slate',
+  'indigo',
+  'violet',
+  'emerald',
+  'amber',
+  'rose',
+  'sky',
+  'teal',
+];
 
 export const TAG_COLOR_STORAGE_KEY = 'admin.orders.tagColors.v1';
 
@@ -16,7 +33,8 @@ const TAG_COLOR_CLASSES: Record<TagColor, string> = {
     'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-500/40 dark:bg-violet-950/30 dark:text-violet-100',
   sky: 'border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-500/40 dark:bg-sky-950/30 dark:text-sky-100',
   teal: 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-500/40 dark:bg-teal-950/30 dark:text-teal-100',
-  slate: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100'
+  slate:
+    'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-100',
 };
 
 export function normalizeTagKey(tag: string): string {

@@ -47,10 +47,14 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_user_token(session_factory, *, email: str, role: UserRole = UserRole.customer) -> str:
+def create_user_token(
+    session_factory, *, email: str, role: UserRole = UserRole.customer
+) -> str:
     async def create_and_token():
         async with session_factory() as session:
-            user = await create_user(session, UserCreate(email=email, password="password123", name="User"))
+            user = await create_user(
+                session, UserCreate(email=email, password="password123", name="User")
+            )
             user.role = role
             if role in (UserRole.admin, UserRole.owner):
                 session.add(
@@ -74,11 +78,21 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
-    admin2_token = create_user_token(SessionLocal, email="admin2@example.com", role=UserRole.admin)
-    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
-    flagger_token = create_user_token(SessionLocal, email="flagger@example.com", role=UserRole.customer)
-    flagger2_token = create_user_token(SessionLocal, email="flagger2@example.com", role=UserRole.customer)
+    admin_token = create_user_token(
+        SessionLocal, email="admin@example.com", role=UserRole.admin
+    )
+    admin2_token = create_user_token(
+        SessionLocal, email="admin2@example.com", role=UserRole.admin
+    )
+    user_token = create_user_token(
+        SessionLocal, email="user@example.com", role=UserRole.customer
+    )
+    flagger_token = create_user_token(
+        SessionLocal, email="flagger@example.com", role=UserRole.customer
+    )
+    flagger2_token = create_user_token(
+        SessionLocal, email="flagger2@example.com", role=UserRole.customer
+    )
 
     prefs = client.patch(
         "/api/v1/auth/me/notifications",
@@ -140,7 +154,10 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     rss_ro = client.get("/api/v1/blog/rss.xml", params={"lang": "ro"})
     assert rss_ro.status_code == 200, rss_ro.text
-    assert "<description>Ultimele articole de pe momentstudio.</description>" in rss_ro.text
+    assert (
+        "<description>Ultimele articole de pe momentstudio.</description>"
+        in rss_ro.text
+    )
     assert "<language>ro-RO</language>" in rss_ro.text
     assert "/api/v1/blog/rss.xml?lang=ro" in rss_ro.text
 
@@ -191,7 +208,7 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert og_304.headers.get("ETag") == etag
 
     # Weak ETag normalization: allow match even without the W/ prefix.
-    normalized = etag[2:] if etag.startswith('W/') else etag
+    normalized = etag[2:] if etag.startswith("W/") else etag
     og_304_norm = client.get(
         "/api/v1/blog/posts/first-post/og.png",
         params={"lang": "en"},
@@ -234,22 +251,30 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     author_id = author.get("id")
     assert author_id, third_detail.json()
 
-    filtered_author = client.get("/api/v1/blog/posts", params={"lang": "en", "author_id": author_id})
+    filtered_author = client.get(
+        "/api/v1/blog/posts", params={"lang": "en", "author_id": author_id}
+    )
     assert filtered_author.status_code == 200, filtered_author.text
     assert filtered_author.json()["meta"]["total_items"] == 1
     assert filtered_author.json()["items"][0]["slug"] == "third-post"
 
-    neighbors_first = client.get("/api/v1/blog/posts/first-post/neighbors", params={"lang": "en"})
+    neighbors_first = client.get(
+        "/api/v1/blog/posts/first-post/neighbors", params={"lang": "en"}
+    )
     assert neighbors_first.status_code == 200, neighbors_first.text
     assert neighbors_first.json()["previous"]["slug"] == "second-post"
     assert neighbors_first.json()["next"] is None
 
-    neighbors_second = client.get("/api/v1/blog/posts/second-post/neighbors", params={"lang": "en"})
+    neighbors_second = client.get(
+        "/api/v1/blog/posts/second-post/neighbors", params={"lang": "en"}
+    )
     assert neighbors_second.status_code == 200, neighbors_second.text
     assert neighbors_second.json()["previous"]["slug"] == "third-post"
     assert neighbors_second.json()["next"]["slug"] == "first-post"
 
-    filtered_tag = client.get("/api/v1/blog/posts", params={"lang": "en", "tag": "ceramics"})
+    filtered_tag = client.get(
+        "/api/v1/blog/posts", params={"lang": "en", "tag": "ceramics"}
+    )
     assert filtered_tag.status_code == 200, filtered_tag.text
     assert filtered_tag.json()["meta"]["total_items"] == 1
     assert filtered_tag.json()["items"][0]["slug"] == "first-post"
@@ -267,8 +292,12 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
             "body_markdown": "This is expired.",
             "status": "published",
             "lang": "en",
-            "published_at": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
-            "published_until": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
+            "published_at": (
+                datetime.now(timezone.utc) - timedelta(days=2)
+            ).isoformat(),
+            "published_until": (
+                datetime.now(timezone.utc) - timedelta(days=1)
+            ).isoformat(),
         },
         headers=auth_headers(admin_token),
     )
@@ -276,7 +305,9 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     expired_listing = client.get("/api/v1/blog/posts", params={"lang": "en"})
     assert expired_listing.status_code == 200, expired_listing.text
     assert expired_listing.json()["meta"]["total_items"] == 3
-    expired_detail = client.get("/api/v1/blog/posts/expired-post", params={"lang": "en"})
+    expired_detail = client.get(
+        "/api/v1/blog/posts/expired-post", params={"lang": "en"}
+    )
     assert expired_detail.status_code == 404, expired_detail.text
 
     # Scheduling: published posts with a future published_at should not be visible yet.
@@ -297,11 +328,19 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     listing_after_schedule = client.get("/api/v1/blog/posts", params={"lang": "en"})
     assert listing_after_schedule.status_code == 200, listing_after_schedule.text
     assert listing_after_schedule.json()["meta"]["total_items"] == 3
-    assert {i["slug"] for i in listing_after_schedule.json()["items"]} == {"first-post", "second-post", "third-post"}
+    assert {i["slug"] for i in listing_after_schedule.json()["items"]} == {
+        "first-post",
+        "second-post",
+        "third-post",
+    }
 
-    scheduled_detail = client.get("/api/v1/blog/posts/scheduled-post", params={"lang": "en"})
+    scheduled_detail = client.get(
+        "/api/v1/blog/posts/scheduled-post", params={"lang": "en"}
+    )
     assert scheduled_detail.status_code == 404, scheduled_detail.text
-    scheduled_og = client.get("/api/v1/blog/posts/scheduled-post/og.png", params={"lang": "en"})
+    scheduled_og = client.get(
+        "/api/v1/blog/posts/scheduled-post/og.png", params={"lang": "en"}
+    )
     assert scheduled_og.status_code == 404, scheduled_og.text
 
     sitemap = client.get("/api/v1/sitemap.xml")
@@ -325,17 +364,28 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert minted_json["url"].startswith("http://localhost:4200/blog/scheduled-post?")
     assert f"preview={token}" in minted_json["url"]
     assert "lang=en" in minted_json["url"]
-    assert datetime.fromisoformat(minted_json["expires_at"]) > datetime.now(timezone.utc)
+    assert datetime.fromisoformat(minted_json["expires_at"]) > datetime.now(
+        timezone.utc
+    )
 
-    preview = client.get("/api/v1/blog/posts/scheduled-post/preview", params={"lang": "en", "token": token})
+    preview = client.get(
+        "/api/v1/blog/posts/scheduled-post/preview",
+        params={"lang": "en", "token": token},
+    )
     assert preview.status_code == 200, preview.text
     assert preview.json()["title"] == "Scheduled"
 
-    og_preview = client.get("/api/v1/blog/posts/scheduled-post/og-preview.png", params={"lang": "en", "token": token})
+    og_preview = client.get(
+        "/api/v1/blog/posts/scheduled-post/og-preview.png",
+        params={"lang": "en", "token": token},
+    )
     assert og_preview.status_code == 200, og_preview.text
     assert og_preview.headers.get("content-type", "").startswith("image/png")
 
-    invalid_preview = client.get("/api/v1/blog/posts/scheduled-post/preview", params={"lang": "en", "token": "nope"})
+    invalid_preview = client.get(
+        "/api/v1/blog/posts/scheduled-post/preview",
+        params={"lang": "en", "token": "nope"},
+    )
     assert invalid_preview.status_code == 403, invalid_preview.text
 
     wrong = client.get("/api/v1/blog/posts/first-post/preview", params={"token": token})
@@ -348,7 +398,10 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
             "title": "Salut (v2)",
             "body_markdown": "Postare RO v2",
             "published_at": past_v3,
-            "meta": {"summary": {"ro": "Rezumat RO v2", "en": "Summary EN v2"}, "tags": ["Ceramics"]},
+            "meta": {
+                "summary": {"ro": "Rezumat RO v2", "en": "Summary EN v2"},
+                "tags": ["Ceramics"],
+            },
         },
         headers=auth_headers(admin_token),
     )
@@ -361,24 +414,39 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     )
     assert update_tr.status_code == 200, update_tr.text
 
-    versions = client.get("/api/v1/content/admin/blog.first-post/versions", headers=auth_headers(admin_token))
+    versions = client.get(
+        "/api/v1/content/admin/blog.first-post/versions",
+        headers=auth_headers(admin_token),
+    )
     assert versions.status_code == 200, versions.text
     versions_json = versions.json()
     assert versions_json[0]["version"] == 4
     assert versions_json[-1]["version"] == 1
 
-    v2 = client.get("/api/v1/content/admin/blog.first-post/versions/2", headers=auth_headers(admin_token))
+    v2 = client.get(
+        "/api/v1/content/admin/blog.first-post/versions/2",
+        headers=auth_headers(admin_token),
+    )
     assert v2.status_code == 200, v2.text
 
-    rolled = client.post("/api/v1/content/admin/blog.first-post/versions/2/rollback", headers=auth_headers(admin_token))
+    rolled = client.post(
+        "/api/v1/content/admin/blog.first-post/versions/2/rollback",
+        headers=auth_headers(admin_token),
+    )
     assert rolled.status_code == 200, rolled.text
     rolled_json = rolled.json()
     assert rolled_json["title"] == v2.json()["title"]
     assert rolled_json["body_markdown"] == v2.json()["body_markdown"]
     assert rolled_json["meta"] == v2.json()["meta"]
-    assert datetime.fromisoformat(rolled_json["published_at"]) == datetime.fromisoformat(v2.json()["published_at"])
+    assert datetime.fromisoformat(
+        rolled_json["published_at"]
+    ) == datetime.fromisoformat(v2.json()["published_at"])
 
-    rolled_en = client.get("/api/v1/content/admin/blog.first-post", params={"lang": "en"}, headers=auth_headers(admin_token))
+    rolled_en = client.get(
+        "/api/v1/content/admin/blog.first-post",
+        params={"lang": "en"},
+        headers=auth_headers(admin_token),
+    )
     assert rolled_en.status_code == 200, rolled_en.text
     assert rolled_en.json()["title"] == "Hello"
     assert rolled_en.json()["body_markdown"] == "Post EN"
@@ -462,7 +530,9 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     )
     assert flagged2.status_code == 201, flagged2.text
 
-    flagged_list = client.get("/api/v1/blog/admin/comments/flagged", headers=auth_headers(admin_token))
+    flagged_list = client.get(
+        "/api/v1/blog/admin/comments/flagged", headers=auth_headers(admin_token)
+    )
     assert flagged_list.status_code == 200, flagged_list.text
     assert flagged_list.json()["meta"]["total_items"] == 1
     flagged_item = flagged_list.json()["items"][0]
@@ -476,7 +546,9 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     )
     assert resolved.status_code == 200, resolved.text
     assert resolved.json()["resolved"] == 2
-    flagged_list_after = client.get("/api/v1/blog/admin/comments/flagged", headers=auth_headers(admin_token))
+    flagged_list_after = client.get(
+        "/api/v1/blog/admin/comments/flagged", headers=auth_headers(admin_token)
+    )
     assert flagged_list_after.status_code == 200, flagged_list_after.text
     assert flagged_list_after.json()["meta"]["total_items"] == 0
 
@@ -490,7 +562,9 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
 
     comments_hidden = client.get("/api/v1/blog/posts/first-post/comments")
     assert comments_hidden.status_code == 200, comments_hidden.text
-    comments_hidden_by_id = {item["id"]: item for item in comments_hidden.json()["items"]}
+    comments_hidden_by_id = {
+        item["id"]: item for item in comments_hidden.json()["items"]
+    }
     assert comments_hidden_by_id[comment_id]["is_hidden"] is True
     assert comments_hidden_by_id[comment_id]["body"] == ""
 
@@ -502,7 +576,9 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     assert unhidden.json()["is_hidden"] is False
 
     # Delete by author
-    deleted = client.delete(f"/api/v1/blog/comments/{comment_id}", headers=auth_headers(user_token))
+    deleted = client.delete(
+        f"/api/v1/blog/comments/{comment_id}", headers=auth_headers(user_token)
+    )
     assert deleted.status_code == 204, deleted.text
 
     comments_after = client.get("/api/v1/blog/posts/first-post/comments")
@@ -523,8 +599,13 @@ def test_blog_posts_list_detail_and_comments(test_app: Dict[str, object]) -> Non
     listing_after_unpublish = client.get("/api/v1/blog/posts", params={"lang": "en"})
     assert listing_after_unpublish.status_code == 200, listing_after_unpublish.text
     assert listing_after_unpublish.json()["meta"]["total_items"] == 2
-    assert {i["slug"] for i in listing_after_unpublish.json()["items"]} == {"first-post", "third-post"}
-    detail_unpublished = client.get("/api/v1/blog/posts/second-post", params={"lang": "en"})
+    assert {i["slug"] for i in listing_after_unpublish.json()["items"]} == {
+        "first-post",
+        "third-post",
+    }
+    detail_unpublished = client.get(
+        "/api/v1/blog/posts/second-post", params={"lang": "en"}
+    )
     assert detail_unpublished.status_code == 404, detail_unpublished.text
     sitemap_after_unpublish = client.get("/api/v1/sitemap.xml")
     assert sitemap_after_unpublish.status_code == 200
@@ -537,8 +618,12 @@ def test_blog_comment_spam_controls(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
-    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+    admin_token = create_user_token(
+        SessionLocal, email="admin@example.com", role=UserRole.admin
+    )
+    user_token = create_user_token(
+        SessionLocal, email="user@example.com", role=UserRole.customer
+    )
 
     create_post = client.post(
         "/api/v1/content/admin/blog.first-post",
@@ -596,12 +681,18 @@ def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
-    user_token = create_user_token(SessionLocal, email="user@example.com", role=UserRole.customer)
+    admin_token = create_user_token(
+        SessionLocal, email="admin@example.com", role=UserRole.admin
+    )
+    user_token = create_user_token(
+        SessionLocal, email="user@example.com", role=UserRole.customer
+    )
 
     async def verify_user() -> None:
         async with SessionLocal() as session:
-            user = await session.scalar(select(User).where(User.email == "user@example.com"))
+            user = await session.scalar(
+                select(User).where(User.email == "user@example.com")
+            )
             assert user is not None
             user.email_verified = True
             session.add(user)
@@ -622,7 +713,10 @@ def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
     )
     assert create_post.status_code == 201, create_post.text
 
-    initial = client.get("/api/v1/blog/posts/first-post/comment-subscription", headers=auth_headers(user_token))
+    initial = client.get(
+        "/api/v1/blog/posts/first-post/comment-subscription",
+        headers=auth_headers(user_token),
+    )
     assert initial.status_code == 200, initial.text
     assert initial.json()["enabled"] is False
 
@@ -634,7 +728,10 @@ def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
     assert enabled.status_code == 200, enabled.text
     assert enabled.json()["enabled"] is True
 
-    after_enable = client.get("/api/v1/blog/posts/first-post/comment-subscription", headers=auth_headers(user_token))
+    after_enable = client.get(
+        "/api/v1/blog/posts/first-post/comment-subscription",
+        headers=auth_headers(user_token),
+    )
     assert after_enable.status_code == 200, after_enable.text
     assert after_enable.json()["enabled"] is True
 
@@ -647,11 +744,15 @@ def test_blog_comment_subscription_toggle(test_app: Dict[str, object]) -> None:
     assert disabled.json()["enabled"] is False
 
 
-def test_blog_view_count_deduped_per_session_and_skips_bots(test_app: Dict[str, object]) -> None:
+def test_blog_view_count_deduped_per_session_and_skips_bots(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin)
+    admin_token = create_user_token(
+        SessionLocal, email="admin@example.com", role=UserRole.admin
+    )
 
     now = datetime.now(timezone.utc)
     past = (now - timedelta(days=1)).isoformat()
@@ -672,7 +773,9 @@ def test_blog_view_count_deduped_per_session_and_skips_bots(test_app: Dict[str, 
     def get_view_count() -> int:
         async def _query() -> int:
             async with SessionLocal() as session:
-                block = await session.scalar(select(ContentBlock).where(ContentBlock.key == "blog.view-post"))
+                block = await session.scalar(
+                    select(ContentBlock).where(ContentBlock.key == "blog.view-post")
+                )
                 assert block is not None
                 return int(block.view_count or 0)
 
@@ -684,7 +787,9 @@ def test_blog_view_count_deduped_per_session_and_skips_bots(test_app: Dict[str, 
     assert first.status_code == 200, first.text
     assert get_view_count() == 1
     assert client.cookies.get("blog_viewed"), "Expected de-dupe cookie to be set"
-    cookie_payload_raw = base64.urlsafe_b64decode(client.cookies["blog_viewed"].encode("utf-8")).decode("utf-8")
+    cookie_payload_raw = base64.urlsafe_b64decode(
+        client.cookies["blog_viewed"].encode("utf-8")
+    ).decode("utf-8")
     cookie_payload = json.loads(cookie_payload_raw)
     assert isinstance(cookie_payload, list) and cookie_payload
     assert "pid" in cookie_payload[0]

@@ -16,4 +16,3 @@ class AdminUserSegmentListItem(BaseModel):
 class AdminUserSegmentResponse(BaseModel):
     items: list[AdminUserSegmentListItem]
     meta: AdminPaginationMeta
-

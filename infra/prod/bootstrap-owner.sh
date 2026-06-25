@@ -36,4 +36,3 @@ fi
 
 docker compose --env-file "${env_file}" -f "${compose_file}" exec -T backend \
   python -m app.cli bootstrap-owner "$@"
-

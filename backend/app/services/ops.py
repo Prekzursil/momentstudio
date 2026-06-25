@@ -38,11 +38,15 @@ from app.services import webhook_handlers
 
 
 async def list_maintenance_banners(session: AsyncSession) -> list[MaintenanceBanner]:
-    result = await session.execute(select(MaintenanceBanner).order_by(MaintenanceBanner.starts_at.desc()))
+    result = await session.execute(
+        select(MaintenanceBanner).order_by(MaintenanceBanner.starts_at.desc())
+    )
     return list(result.scalars().unique())
 
 
-async def get_active_maintenance_banner(session: AsyncSession) -> MaintenanceBanner | None:
+async def get_active_maintenance_banner(
+    session: AsyncSession,
+) -> MaintenanceBanner | None:
     now = datetime.now(timezone.utc)
     result = await session.execute(
         select(MaintenanceBanner)
@@ -57,21 +61,27 @@ async def get_active_maintenance_banner(session: AsyncSession) -> MaintenanceBan
     return result.scalar_one_or_none()
 
 
-async def create_maintenance_banner(session: AsyncSession, banner: MaintenanceBanner) -> MaintenanceBanner:
+async def create_maintenance_banner(
+    session: AsyncSession, banner: MaintenanceBanner
+) -> MaintenanceBanner:
     session.add(banner)
     await session.commit()
     await session.refresh(banner)
     return banner
 
 
-async def update_maintenance_banner(session: AsyncSession, banner: MaintenanceBanner) -> MaintenanceBanner:
+async def update_maintenance_banner(
+    session: AsyncSession, banner: MaintenanceBanner
+) -> MaintenanceBanner:
     session.add(banner)
     await session.commit()
     await session.refresh(banner)
     return banner
 
 
-async def delete_maintenance_banner(session: AsyncSession, banner: MaintenanceBanner) -> None:
+async def delete_maintenance_banner(
+    session: AsyncSession, banner: MaintenanceBanner
+) -> None:
     await session.delete(banner)
     await session.commit()
 
@@ -99,14 +109,21 @@ async def simulate_shipping_rates(
     if shipping_method_id:
         method = await order_service.get_shipping_method(session, shipping_method_id)
         if not method:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shipping method not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Shipping method not found",
+            )
         selected_id = method.id
 
     # Current storefront rules: prefer checkout_settings.shipping_fee_ron when set; otherwise compute using shipping method.
     if checkout_settings.shipping_fee_ron is not None:
-        base_shipping = pricing.quantize_money(Decimal(checkout_settings.shipping_fee_ron), rounding=rounding)
+        base_shipping = pricing.quantize_money(
+            Decimal(checkout_settings.shipping_fee_ron), rounding=rounding
+        )
     else:
-        base_shipping = pricing.quantize_money(order_service._calculate_shipping(subtotal, method), rounding=rounding)  # type: ignore[attr-defined]
+        base_shipping = pricing.quantize_money(
+            order_service._calculate_shipping(subtotal, method), rounding=rounding
+        )  # type: ignore[attr-defined]
 
     threshold = checkout_settings.free_shipping_threshold_ron
     if threshold is not None and threshold >= 0 and taxable >= Decimal(str(threshold)):
@@ -133,19 +150,33 @@ async def simulate_shipping_rates(
             shipping_for_method = Decimal(checkout_settings.shipping_fee_ron)
         else:
             shipping_for_method = order_service._calculate_shipping(subtotal, m)  # type: ignore[attr-defined]
-        shipping_for_method = pricing.quantize_money(Decimal(shipping_for_method or 0), rounding=rounding)
-        if threshold is not None and threshold >= 0 and taxable >= Decimal(str(threshold)):
+        shipping_for_method = pricing.quantize_money(
+            Decimal(shipping_for_method or 0), rounding=rounding
+        )
+        if (
+            threshold is not None
+            and threshold >= 0
+            and taxable >= Decimal(str(threshold))
+        ):
             shipping_for_method = Decimal("0.00")
         method_rows.append(
             {
                 "id": m.id,
                 "name": m.name,
-                "rate_flat": pricing.quantize_money(Decimal(getattr(m, "rate_flat", 0) or 0), rounding=rounding)
-                if getattr(m, "rate_flat", None) is not None
-                else None,
-                "rate_per_kg": pricing.quantize_money(Decimal(getattr(m, "rate_per_kg", 0) or 0), rounding=rounding)
-                if getattr(m, "rate_per_kg", None) is not None
-                else None,
+                "rate_flat": (
+                    pricing.quantize_money(
+                        Decimal(getattr(m, "rate_flat", 0) or 0), rounding=rounding
+                    )
+                    if getattr(m, "rate_flat", None) is not None
+                    else None
+                ),
+                "rate_per_kg": (
+                    pricing.quantize_money(
+                        Decimal(getattr(m, "rate_per_kg", 0) or 0), rounding=rounding
+                    )
+                    if getattr(m, "rate_per_kg", None) is not None
+                    else None
+                ),
                 "computed_shipping_ron": shipping_for_method,
             }
         )
@@ -158,16 +189,24 @@ async def simulate_shipping_rates(
         fee_ron=breakdown.fee,
         vat_ron=breakdown.vat,
         total_ron=breakdown.total,
-        shipping_fee_ron=Decimal(checkout_settings.shipping_fee_ron) if checkout_settings.shipping_fee_ron is not None else None,
-        free_shipping_threshold_ron=Decimal(checkout_settings.free_shipping_threshold_ron)
-        if checkout_settings.free_shipping_threshold_ron is not None
-        else None,
+        shipping_fee_ron=(
+            Decimal(checkout_settings.shipping_fee_ron)
+            if checkout_settings.shipping_fee_ron is not None
+            else None
+        ),
+        free_shipping_threshold_ron=(
+            Decimal(checkout_settings.free_shipping_threshold_ron)
+            if checkout_settings.free_shipping_threshold_ron is not None
+            else None
+        ),
         selected_shipping_method_id=selected_id,
         methods=method_rows,  # type: ignore[arg-type]
     )
 
 
-def _webhook_status(*, processed_at: datetime | None, last_error: str | None) -> WebhookStatus:
+def _webhook_status(
+    *, processed_at: datetime | None, last_error: str | None
+) -> WebhookStatus:
     if last_error and last_error.strip():
         return "failed"
     if processed_at is not None:
@@ -175,15 +214,29 @@ def _webhook_status(*, processed_at: datetime | None, last_error: str | None) ->
     return "received"
 
 
-async def list_recent_webhooks(session: AsyncSession, *, limit: int = 50) -> list[WebhookEventRead]:
+async def list_recent_webhooks(
+    session: AsyncSession, *, limit: int = 50
+) -> list[WebhookEventRead]:
     limit_clean = max(1, min(int(limit or 0), 200))
     stripe_rows = (
-        (await session.execute(select(StripeWebhookEvent).order_by(StripeWebhookEvent.last_attempt_at.desc()).limit(limit_clean)))
+        (
+            await session.execute(
+                select(StripeWebhookEvent)
+                .order_by(StripeWebhookEvent.last_attempt_at.desc())
+                .limit(limit_clean)
+            )
+        )
         .scalars()
         .all()
     )
     paypal_rows = (
-        (await session.execute(select(PayPalWebhookEvent).order_by(PayPalWebhookEvent.last_attempt_at.desc()).limit(limit_clean)))
+        (
+            await session.execute(
+                select(PayPalWebhookEvent)
+                .order_by(PayPalWebhookEvent.last_attempt_at.desc())
+                .limit(limit_clean)
+            )
+        )
         .scalars()
         .all()
     )
@@ -201,7 +254,8 @@ async def list_recent_webhooks(session: AsyncSession, *, limit: int = 50) -> lis
                 processed_at=getattr(stripe_row, "processed_at", None),
                 last_error=getattr(stripe_row, "last_error", None),
                 status=_webhook_status(
-                    processed_at=getattr(stripe_row, "processed_at", None), last_error=getattr(stripe_row, "last_error", None)
+                    processed_at=getattr(stripe_row, "processed_at", None),
+                    last_error=getattr(stripe_row, "last_error", None),
                 ),
             )
         )
@@ -217,7 +271,8 @@ async def list_recent_webhooks(session: AsyncSession, *, limit: int = 50) -> lis
                 processed_at=getattr(paypal_row, "processed_at", None),
                 last_error=getattr(paypal_row, "last_error", None),
                 status=_webhook_status(
-                    processed_at=getattr(paypal_row, "processed_at", None), last_error=getattr(paypal_row, "last_error", None)
+                    processed_at=getattr(paypal_row, "processed_at", None),
+                    last_error=getattr(paypal_row, "last_error", None),
                 ),
             )
         )
@@ -226,22 +281,36 @@ async def list_recent_webhooks(session: AsyncSession, *, limit: int = 50) -> lis
     return items[:limit_clean]
 
 
-async def get_webhook_detail(session: AsyncSession, *, provider: str, event_id: str) -> WebhookEventDetail:
+async def get_webhook_detail(
+    session: AsyncSession, *, provider: str, event_id: str
+) -> WebhookEventDetail:
     provider_key = (provider or "").strip().lower()
     event_key = (event_id or "").strip()
     if provider_key not in {"stripe", "paypal"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider"
+        )
     if not event_key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id"
+        )
 
     if provider_key == "stripe":
         stripe_row = (
-            (await session.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_key)))
+            (
+                await session.execute(
+                    select(StripeWebhookEvent).where(
+                        StripeWebhookEvent.stripe_event_id == event_key
+                    )
+                )
+            )
             .scalars()
             .first()
         )
         if not stripe_row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+            )
         return WebhookEventDetail(
             provider="stripe",
             event_id=stripe_row.stripe_event_id,
@@ -252,18 +321,27 @@ async def get_webhook_detail(session: AsyncSession, *, provider: str, event_id: 
             processed_at=getattr(stripe_row, "processed_at", None),
             last_error=getattr(stripe_row, "last_error", None),
             status=_webhook_status(
-                processed_at=getattr(stripe_row, "processed_at", None), last_error=getattr(stripe_row, "last_error", None)
+                processed_at=getattr(stripe_row, "processed_at", None),
+                last_error=getattr(stripe_row, "last_error", None),
             ),
             payload=getattr(stripe_row, "payload", None),
         )
 
     paypal_row = (
-        (await session.execute(select(PayPalWebhookEvent).where(PayPalWebhookEvent.paypal_event_id == event_key)))
+        (
+            await session.execute(
+                select(PayPalWebhookEvent).where(
+                    PayPalWebhookEvent.paypal_event_id == event_key
+                )
+            )
+        )
         .scalars()
         .first()
     )
     if not paypal_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+        )
     return WebhookEventDetail(
         provider="paypal",
         event_id=paypal_row.paypal_event_id,
@@ -274,7 +352,8 @@ async def get_webhook_detail(session: AsyncSession, *, provider: str, event_id: 
         processed_at=getattr(paypal_row, "processed_at", None),
         last_error=getattr(paypal_row, "last_error", None),
         status=_webhook_status(
-            processed_at=getattr(paypal_row, "processed_at", None), last_error=getattr(paypal_row, "last_error", None)
+            processed_at=getattr(paypal_row, "processed_at", None),
+            last_error=getattr(paypal_row, "last_error", None),
         ),
         payload=getattr(paypal_row, "payload", None),
     )
@@ -312,7 +391,10 @@ async def count_webhook_backlog(session: AsyncSession, *, since_hours: int = 24)
         .select_from(StripeWebhookEvent)
         .where(
             StripeWebhookEvent.processed_at.is_(None),
-            or_(StripeWebhookEvent.last_error.is_(None), StripeWebhookEvent.last_error == ""),
+            or_(
+                StripeWebhookEvent.last_error.is_(None),
+                StripeWebhookEvent.last_error == "",
+            ),
         )
     )
     paypal_pending_total = await session.scalar(
@@ -320,13 +402,18 @@ async def count_webhook_backlog(session: AsyncSession, *, since_hours: int = 24)
         .select_from(PayPalWebhookEvent)
         .where(
             PayPalWebhookEvent.processed_at.is_(None),
-            or_(PayPalWebhookEvent.last_error.is_(None), PayPalWebhookEvent.last_error == ""),
+            or_(
+                PayPalWebhookEvent.last_error.is_(None),
+                PayPalWebhookEvent.last_error == "",
+            ),
         )
     )
     return int(stripe_pending_total or 0) + int(paypal_pending_total or 0)
 
 
-async def count_recent_webhook_backlog(session: AsyncSession, *, since_hours: int = 24) -> int:
+async def count_recent_webhook_backlog(
+    session: AsyncSession, *, since_hours: int = 24
+) -> int:
     now = datetime.now(timezone.utc)
     hours = max(1, int(since_hours or 0))
     since = now - timedelta(hours=hours)
@@ -336,7 +423,10 @@ async def count_recent_webhook_backlog(session: AsyncSession, *, since_hours: in
         .select_from(StripeWebhookEvent)
         .where(
             StripeWebhookEvent.processed_at.is_(None),
-            or_(StripeWebhookEvent.last_error.is_(None), StripeWebhookEvent.last_error == ""),
+            or_(
+                StripeWebhookEvent.last_error.is_(None),
+                StripeWebhookEvent.last_error == "",
+            ),
             StripeWebhookEvent.last_attempt_at >= since,
         )
     )
@@ -345,7 +435,10 @@ async def count_recent_webhook_backlog(session: AsyncSession, *, since_hours: in
         .select_from(PayPalWebhookEvent)
         .where(
             PayPalWebhookEvent.processed_at.is_(None),
-            or_(PayPalWebhookEvent.last_error.is_(None), PayPalWebhookEvent.last_error == ""),
+            or_(
+                PayPalWebhookEvent.last_error.is_(None),
+                PayPalWebhookEvent.last_error == "",
+            ),
             PayPalWebhookEvent.last_attempt_at >= since,
         )
     )
@@ -430,25 +523,46 @@ async def retry_webhook(
     provider_key = (provider or "").strip().lower()
     event_key = (event_id or "").strip()
     if provider_key not in {"stripe", "paypal"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider"
+        )
     if not event_key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Missing event id"
+        )
 
     now = datetime.now(timezone.utc)
 
     if provider_key == "stripe":
         stripe_row = (
-            (await session.execute(select(StripeWebhookEvent).where(StripeWebhookEvent.stripe_event_id == event_key)))
+            (
+                await session.execute(
+                    select(StripeWebhookEvent).where(
+                        StripeWebhookEvent.stripe_event_id == event_key
+                    )
+                )
+            )
             .scalars()
             .first()
         )
         if not stripe_row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
-        if bool(getattr(stripe_row, "processed_at", None)) and not (getattr(stripe_row, "last_error", None) or "").strip():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook already processed")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+            )
+        if (
+            bool(getattr(stripe_row, "processed_at", None))
+            and not (getattr(stripe_row, "last_error", None) or "").strip()
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Webhook already processed",
+            )
         payload = getattr(stripe_row, "payload", None)
         if not payload:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook payload not stored")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Webhook payload not stored",
+            )
 
         stripe_row.attempts = int(getattr(stripe_row, "attempts", 0) or 0) + 1
         stripe_row.last_attempt_at = now
@@ -456,7 +570,9 @@ async def retry_webhook(
         await session.commit()
 
         try:
-            await webhook_handlers.process_stripe_event(session, background_tasks, payload)
+            await webhook_handlers.process_stripe_event(
+                session, background_tasks, payload
+            )
             updated = await session.get(StripeWebhookEvent, stripe_row.id)
             if updated:
                 updated.processed_at = datetime.now(timezone.utc)
@@ -473,7 +589,8 @@ async def retry_webhook(
                     processed_at=getattr(updated, "processed_at", None),
                     last_error=getattr(updated, "last_error", None),
                     status=_webhook_status(
-                        processed_at=getattr(updated, "processed_at", None), last_error=getattr(updated, "last_error", None)
+                        processed_at=getattr(updated, "processed_at", None),
+                        last_error=getattr(updated, "last_error", None),
                     ),
                 )
         except HTTPException as exc:
@@ -493,22 +610,41 @@ async def retry_webhook(
                 updated.last_error = str(exc)
                 session.add(updated)
                 await session.commit()
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed") from exc
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed"
+            ) from exc
 
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed"
+        )
 
     paypal_row = (
-        (await session.execute(select(PayPalWebhookEvent).where(PayPalWebhookEvent.paypal_event_id == event_key)))
+        (
+            await session.execute(
+                select(PayPalWebhookEvent).where(
+                    PayPalWebhookEvent.paypal_event_id == event_key
+                )
+            )
+        )
         .scalars()
         .first()
     )
     if not paypal_row:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
-    if bool(getattr(paypal_row, "processed_at", None)) and not (getattr(paypal_row, "last_error", None) or "").strip():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook already processed")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+        )
+    if (
+        bool(getattr(paypal_row, "processed_at", None))
+        and not (getattr(paypal_row, "last_error", None) or "").strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook already processed"
+        )
     payload = getattr(paypal_row, "payload", None)
     if not payload:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook payload not stored")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook payload not stored"
+        )
 
     paypal_row.attempts = int(getattr(paypal_row, "attempts", 0) or 0) + 1
     paypal_row.last_attempt_at = now
@@ -554,9 +690,13 @@ async def retry_webhook(
             paypal_updated.last_error = str(exc)
             session.add(paypal_updated)
             await session.commit()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed") from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed"
+        ) from exc
 
-    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed")
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Retry failed"
+    )
 
 
 def _is_production_env() -> bool:
@@ -564,7 +704,9 @@ def _is_production_env() -> bool:
     return env in {"prod", "production", "live"}
 
 
-async def _tcp_connect_check(host: str, port: int, *, timeout_seconds: float) -> tuple[bool, str | None]:
+async def _tcp_connect_check(
+    host: str, port: int, *, timeout_seconds: float
+) -> tuple[bool, str | None]:
     cleaned_host = (host or "").strip()
     if not cleaned_host:
         return False, "Missing host"
@@ -592,7 +734,9 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
     provider = payments_provider()
     prod = _is_production_env()
 
-    smtp_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    smtp_check = OpsDiagnosticsCheck(
+        status="off", configured=False, healthy=False, message=None
+    )
     if bool(getattr(settings, "smtp_enabled", False)):
         smtp_from = (getattr(settings, "smtp_from_email", None) or "").strip()
         if not smtp_from:
@@ -615,7 +759,9 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
                 message=None if ok else (err or "SMTP connection check failed."),
             )
 
-    redis_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    redis_check = OpsDiagnosticsCheck(
+        status="off", configured=False, healthy=False, message=None
+    )
     redis_url = (getattr(settings, "redis_url", None) or "").strip()
     if redis_url:
         client = get_redis()
@@ -628,18 +774,32 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
             )
         else:
             try:
-                pong = await asyncio.wait_for(cast(Awaitable[bool], client.ping()), timeout=0.5)
+                pong = await asyncio.wait_for(
+                    cast(Awaitable[bool], client.ping()), timeout=0.5
+                )
                 ok = bool(pong)
-                redis_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=ok, message=None if ok else "Redis PING failed.")
+                redis_check = OpsDiagnosticsCheck(
+                    status="ok",
+                    configured=True,
+                    healthy=ok,
+                    message=None if ok else "Redis PING failed.",
+                )
             except Exception as exc:
-                redis_check = OpsDiagnosticsCheck(status="error", configured=True, healthy=False, message=str(exc))
+                redis_check = OpsDiagnosticsCheck(
+                    status="error", configured=True, healthy=False, message=str(exc)
+                )
 
-    storage_check = OpsDiagnosticsCheck(status="error", configured=False, healthy=False, message=None)
+    storage_check = OpsDiagnosticsCheck(
+        status="error", configured=False, healthy=False, message=None
+    )
     media_root = (getattr(settings, "media_root", None) or "").strip()
     private_root = (getattr(settings, "private_media_root", None) or "").strip()
     if media_root and private_root:
         storage_issues: list[str] = []
-        for raw_path, label in ((media_root, "media_root"), (private_root, "private_media_root")):
+        for raw_path, label in (
+            (media_root, "media_root"),
+            (private_root, "private_media_root"),
+        ):
             path = Path(raw_path)
             if not path.exists():
                 storage_issues.append(f"{label} missing")
@@ -658,13 +818,22 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
                 message=", ".join(storage_issues),
             )
         else:
-            storage_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=True, message=None)
+            storage_check = OpsDiagnosticsCheck(
+                status="ok", configured=True, healthy=True, message=None
+            )
 
-    stripe_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    stripe_check = OpsDiagnosticsCheck(
+        status="off", configured=False, healthy=False, message=None
+    )
     if provider == "real":
-        configured = stripe_payments.is_stripe_configured() and stripe_payments.is_stripe_webhook_configured()
+        configured = (
+            stripe_payments.is_stripe_configured()
+            and stripe_payments.is_stripe_webhook_configured()
+        )
         if configured:
-            stripe_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=True, message=None)
+            stripe_check = OpsDiagnosticsCheck(
+                status="ok", configured=True, healthy=True, message=None
+            )
         else:
             stripe_check = OpsDiagnosticsCheck(
                 status="error" if prod else "warning",
@@ -673,11 +842,18 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
                 message="Stripe keys/webhook secret not configured.",
             )
 
-    paypal_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    paypal_check = OpsDiagnosticsCheck(
+        status="off", configured=False, healthy=False, message=None
+    )
     if provider == "real":
-        configured = paypal_service.is_paypal_configured() and paypal_service.is_paypal_webhook_configured()
+        configured = (
+            paypal_service.is_paypal_configured()
+            and paypal_service.is_paypal_webhook_configured()
+        )
         if configured:
-            paypal_check = OpsDiagnosticsCheck(status="ok", configured=True, healthy=True, message=None)
+            paypal_check = OpsDiagnosticsCheck(
+                status="ok", configured=True, healthy=True, message=None
+            )
         else:
             paypal_check = OpsDiagnosticsCheck(
                 status="error" if prod else "warning",
@@ -686,14 +862,20 @@ async def get_diagnostics() -> OpsDiagnosticsRead:
                 message="PayPal client/webhook not configured.",
             )
 
-    netopia_check = OpsDiagnosticsCheck(status="off", configured=False, healthy=False, message=None)
+    netopia_check = OpsDiagnosticsCheck(
+        status="off", configured=False, healthy=False, message=None
+    )
     if bool(getattr(settings, "netopia_enabled", False)):
         configured, reason = netopia_service.netopia_configuration_status()
         netopia_check = OpsDiagnosticsCheck(
             status="ok" if configured else ("error" if prod else "warning"),
             configured=configured,
             healthy=configured,
-            message=None if configured else (reason or "Netopia is enabled but credentials/keys are missing."),
+            message=(
+                None
+                if configured
+                else (reason or "Netopia is enabled but credentials/keys are missing.")
+            ),
         )
 
     return OpsDiagnosticsRead(

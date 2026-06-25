@@ -1,5 +1,13 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs';
@@ -21,7 +29,7 @@ import { SkeletonComponent } from './skeleton.component';
     ModalComponent,
     SkeletonComponent,
     LocalizedCurrencyPipe,
-    ImgFallbackDirective
+    ImgFallbackDirective,
   ],
   template: `
     <app-modal
@@ -57,7 +65,9 @@ import { SkeletonComponent } from './skeleton.component';
       <div *ngIf="!loading && !error && product" class="grid gap-5">
         <div class="grid gap-4 sm:grid-cols-2 sm:items-start">
           <div class="grid gap-3">
-            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800">
+            <div
+              class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-800"
+            >
               <img
                 [src]="activeImageUrl()"
                 [alt]="product.name"
@@ -89,22 +99,35 @@ import { SkeletonComponent } from './skeleton.component';
 
           <div class="grid gap-4">
             <div class="grid gap-1">
-              <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">{{ 'product.handmade' | translate }}</p>
-              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">{{ product.name }}</h2>
+              <p class="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+                {{ 'product.handmade' | translate }}
+              </p>
+              <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ product.name }}
+              </h2>
               <div class="flex items-baseline gap-3">
                 <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                  {{ displayPrice(product) | localizedCurrency : product.currency }}
+                  {{ displayPrice(product) | localizedCurrency: product.currency }}
                 </p>
-                <p *ngIf="isOnSale(product)" class="text-sm text-slate-500 line-through dark:text-slate-300">
-                  {{ product.base_price | localizedCurrency : product.currency }}
+                <p
+                  *ngIf="isOnSale(product)"
+                  class="text-sm text-slate-500 line-through dark:text-slate-300"
+                >
+                  {{ product.base_price | localizedCurrency: product.currency }}
                 </p>
               </div>
-              <p *ngIf="product.short_description" class="text-sm text-slate-700 dark:text-slate-200">
+              <p
+                *ngIf="product.short_description"
+                class="text-sm text-slate-700 dark:text-slate-200"
+              >
                 {{ product.short_description }}
               </p>
             </div>
 
-            <label *ngIf="product.variants?.length" class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+            <label
+              *ngIf="product.variants?.length"
+              class="grid gap-1 text-sm font-medium text-slate-800 dark:text-slate-200"
+            >
               {{ 'product.variant' | translate }}
               <select
                 class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
@@ -126,7 +149,10 @@ import { SkeletonComponent } from './skeleton.component';
               />
             </label>
 
-            <p *ngIf="isOutOfStock()" class="text-sm font-semibold text-rose-700 dark:text-rose-300">
+            <p
+              *ngIf="isOutOfStock()"
+              class="text-sm font-semibold text-rose-700 dark:text-rose-300"
+            >
               {{ 'product.soldOut' | translate }}
             </p>
 
@@ -151,7 +177,7 @@ import { SkeletonComponent } from './skeleton.component';
         </div>
       </div>
     </app-modal>
-  `
+  `,
 })
 export class ProductQuickViewModalComponent implements OnChanges {
   @Input() open = false;
@@ -173,7 +199,7 @@ export class ProductQuickViewModalComponent implements OnChanges {
     private readonly cart: CartStore,
     private readonly toast: ToastService,
     private readonly translate: TranslateService,
-    private readonly cdr: ChangeDetectorRef
+    private readonly cdr: ChangeDetectorRef,
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -217,6 +243,7 @@ export class ProductQuickViewModalComponent implements OnChanges {
     const variants = product.variants ?? [];
     if (!variants.length) return null;
     const desired = this.selectedVariantId;
+    /* istanbul ignore next -- variants[0] is defined here (variants.length checked above), so the final `?? null` is unreachable */
     return variants.find((v) => v.id === desired) ?? variants[0] ?? null;
   }
 
@@ -250,12 +277,12 @@ export class ProductQuickViewModalComponent implements OnChanges {
       image: imageUrl,
       price: this.displayPrice(product),
       currency: product.currency,
-      stock: typeof stock === 'number' && Number.isFinite(stock) ? stock : 99
+      stock: typeof stock === 'number' && Number.isFinite(stock) ? stock : 99,
     });
 
     this.toast.success(
       this.translate.instant('product.addedTitle'),
-      this.translate.instant('product.addedBody', { qty, name: product.name })
+      this.translate.instant('product.addedBody', { qty, name: product.name }),
     );
   }
 
@@ -296,7 +323,7 @@ export class ProductQuickViewModalComponent implements OnChanges {
         this.error = '';
         if (Array.isArray(product.images)) {
           product.images = [...product.images].sort(
-            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0)
+            (a: any, b: any) => Number(a?.sort_order ?? 0) - Number(b?.sort_order ?? 0),
           );
         }
         this.product = product;
@@ -310,7 +337,7 @@ export class ProductQuickViewModalComponent implements OnChanges {
         this.product = null;
         this.error = this.translate.instant('product.loadErrorCopy');
         this.cdr.detectChanges();
-      }
+      },
     });
   }
 
@@ -326,4 +353,3 @@ export class ProductQuickViewModalComponent implements OnChanges {
     this.cdr.detectChanges();
   }
 }
-

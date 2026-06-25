@@ -44,7 +44,7 @@ export class SiteNavigationService {
     this.cached$ = this.api.get<ContentBlockRead>('/content/site.navigation').pipe(
       map((block) => this.parseBlock(block)),
       catchError(() => of(null)),
-      shareReplay({ bufferSize: 1, refCount: false })
+      shareReplay({ bufferSize: 1, refCount: false }),
     );
     return this.cached$;
   }
@@ -59,7 +59,8 @@ export class SiteNavigationService {
     const footerHandcraftedLinks = this.cleanLinks(meta.footer_handcrafted_links);
     const footerLegalLinks = this.cleanLinks(meta.footer_legal_links);
 
-    if (!headerLinks.length && !footerHandcraftedLinks.length && !footerLegalLinks.length) return null;
+    if (!headerLinks.length && !footerHandcraftedLinks.length && !footerLegalLinks.length)
+      return null;
     return { headerLinks, footerHandcraftedLinks, footerLegalLinks };
   }
 
@@ -75,7 +76,8 @@ export class SiteNavigationService {
       const idRaw = typeof rec['id'] === 'string' ? rec['id'].trim() : '';
 
       const labelRaw = rec['label'];
-      const labelRec = labelRaw && typeof labelRaw === 'object' ? (labelRaw as Record<string, unknown>) : {};
+      const labelRec =
+        labelRaw && typeof labelRaw === 'object' ? (labelRaw as Record<string, unknown>) : {};
       const en = typeof labelRec['en'] === 'string' ? labelRec['en'].trim() : '';
       const ro = typeof labelRec['ro'] === 'string' ? labelRec['ro'].trim() : '';
 
@@ -90,5 +92,3 @@ export class SiteNavigationService {
     return out;
   }
 }
-
-

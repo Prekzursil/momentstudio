@@ -28,7 +28,9 @@ from sqlalchemy import select
 @pytest.fixture(scope="module")
 def test_app() -> Dict[str, object]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
-    SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False, autoflush=False)
+    SessionLocal = async_sessionmaker(
+        engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
+    )
 
     async def init_models() -> None:
         async with engine.begin() as conn:
@@ -109,14 +111,28 @@ async def seed_data(session_factory):
         image = ProductImage(product_id=product.id, url="img1.jpg", sort_order=0)
         session.add(image)
 
-        address = Address(user_id=customer.id, line1="123", city="City", country="US", postal_code="00000", label="Home")
+        address = Address(
+            user_id=customer.id,
+            line1="123",
+            city="City",
+            country="US",
+            postal_code="00000",
+            label="Home",
+        )
         session.add(address)
         await session.flush()
 
         cart = Cart(user_id=customer.id)
         session.add(cart)
         await session.flush()
-        session.add(CartItem(cart_id=cart.id, product_id=product.id, quantity=1, unit_price_at_add=product.base_price))
+        session.add(
+            CartItem(
+                cart_id=cart.id,
+                product_id=product.id,
+                quantity=1,
+                unit_price_at_add=product.base_price,
+            )
+        )
 
         order = Order(
             user_id=customer.id,
@@ -131,8 +147,18 @@ async def seed_data(session_factory):
         )
         session.add(order)
         await session.flush()
-        session.add(OrderEvent(order_id=order.id, event="payment_captured", note="seed"))
-        session.add(OrderItem(order_id=order.id, product_id=product.id, quantity=1, unit_price=100, subtotal=100))
+        session.add(
+            OrderEvent(order_id=order.id, event="payment_captured", note="seed")
+        )
+        session.add(
+            OrderItem(
+                order_id=order.id,
+                product_id=product.id,
+                quantity=1,
+                unit_price=100,
+                subtotal=100,
+            )
+        )
 
         await session.commit()
         return {
@@ -151,7 +177,10 @@ def auth_headers(client: TestClient) -> dict:
     )
     assert resp.status_code == 200, resp.text
     token = resp.json()["tokens"]["access_token"]
-    return {"Authorization": f"Bearer {token}", "X-Maintenance-Bypass": settings.maintenance_bypass_token}
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Maintenance-Bypass": settings.maintenance_bypass_token,
+    }
 
 
 def test_admin_e2e_smoke(test_app: Dict[str, object], monkeypatch) -> None:
@@ -168,14 +197,22 @@ def test_admin_e2e_smoke(test_app: Dict[str, object], monkeypatch) -> None:
     assert summary.status_code == 200
 
     # Change order status
-    update = client.patch(f"/api/v1/orders/admin/{data['order_id']}", json={"status": "paid"}, headers=headers)
+    update = client.patch(
+        f"/api/v1/orders/admin/{data['order_id']}",
+        json={"status": "paid"},
+        headers=headers,
+    )
     assert update.status_code == 200
     assert update.json()["status"] == "paid"
 
     # Maintenance toggle on/off
-    on = client.post("/api/v1/admin/dashboard/maintenance", json={"enabled": True}, headers=headers)
+    on = client.post(
+        "/api/v1/admin/dashboard/maintenance", json={"enabled": True}, headers=headers
+    )
     assert on.status_code == 200 and on.json()["enabled"] is True
-    off = client.post("/api/v1/admin/dashboard/maintenance", json={"enabled": False}, headers=headers)
+    off = client.post(
+        "/api/v1/admin/dashboard/maintenance", json={"enabled": False}, headers=headers
+    )
     assert off.status_code == 200 and off.json()["enabled"] is False
 
     # Reorder category
@@ -203,7 +240,8 @@ def test_admin_e2e_smoke(test_app: Dict[str, object], monkeypatch) -> None:
     new_id = new_images[-1]["id"]
 
     delete_resp = client.delete(
-        f"/api/v1/catalog/products/{data['product_slug']}/images/{new_id}", headers=headers
+        f"/api/v1/catalog/products/{data['product_slug']}/images/{new_id}",
+        headers=headers,
     )
     assert delete_resp.status_code == 200
 
@@ -230,7 +268,9 @@ def test_admin_coupon_usage_reflected(test_app: Dict[str, object]) -> None:
 
     async def _increment_usage():
         async with session_factory() as session:
-            result = await session.execute(select(PromoCode).where(PromoCode.id == coupon_id))
+            result = await session.execute(
+                select(PromoCode).where(PromoCode.id == coupon_id)
+            )
             coupon = result.scalar_one_or_none()
             assert coupon is not None
             coupon.times_used = (coupon.times_used or 0) + 1

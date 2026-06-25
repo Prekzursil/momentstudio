@@ -23,11 +23,17 @@ depends_on: Sequence[str] | None = None
 def upgrade() -> None:
     conn = op.get_bind()
     if conn.dialect.name == "postgresql":
-        enum_exists = conn.execute(sa.text("SELECT 1 FROM pg_type WHERE typname = 'orderstatus'")).first()
+        enum_exists = conn.execute(
+            sa.text("SELECT 1 FROM pg_type WHERE typname = 'orderstatus'")
+        ).first()
         if enum_exists:
             with op.get_context().autocommit_block():
-                op.execute("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'pending_payment'")
-                op.execute("ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'pending_acceptance'")
+                op.execute(
+                    "ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'pending_payment'"
+                )
+                op.execute(
+                    "ALTER TYPE orderstatus ADD VALUE IF NOT EXISTS 'pending_acceptance'"
+                )
     # Map legacy `pending` orders into either:
     # - pending_payment: online payment not captured yet
     # - pending_acceptance: payment captured or payment not required (COD)

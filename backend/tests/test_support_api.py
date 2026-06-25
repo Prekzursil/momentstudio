@@ -44,12 +44,16 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_user_token(session_factory, *, email: str, role: UserRole, username: str) -> tuple[str, uuid.UUID]:
+def create_user_token(
+    session_factory, *, email: str, role: UserRole, username: str
+) -> tuple[str, uuid.UUID]:
     async def _create() -> tuple[str, uuid.UUID]:
         async with session_factory() as session:
             user = await create_user(
                 session,
-                UserCreate(email=email, password="pass123", name="User", username=username),
+                UserCreate(
+                    email=email, password="pass123", name="User", username=username
+                ),
             )
             user.email_verified = True
             user.role = role
@@ -72,11 +76,15 @@ def create_user_token(session_factory, *, email: str, role: UserRole, username: 
     return asyncio.run(_create())
 
 
-def test_support_contact_submission_creates_notification(test_app: Dict[str, object]) -> None:
+def test_support_contact_submission_creates_notification(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, admin_id = create_user_token(SessionLocal, email="admin@example.com", role=UserRole.admin, username="admin")
+    admin_token, admin_id = create_user_token(
+        SessionLocal, email="admin@example.com", role=UserRole.admin, username="admin"
+    )
 
     res = client.post(
         "/api/v1/support/contact",
@@ -91,14 +99,26 @@ def test_support_contact_submission_creates_notification(test_app: Dict[str, obj
     assert res.status_code == 201, res.text
     submission_id = res.json()["id"]
 
-    listed = client.get("/api/v1/support/admin/submissions", headers=auth_headers(admin_token))
+    listed = client.get(
+        "/api/v1/support/admin/submissions", headers=auth_headers(admin_token)
+    )
     assert listed.status_code == 200, listed.text
     ids = {row["id"] for row in listed.json()["items"]}
     assert submission_id in ids
 
     async def _fetch_notifications() -> list[UserNotification]:
         async with SessionLocal() as session:
-            rows = (await session.execute(select(UserNotification).where(UserNotification.user_id == admin_id))).scalars().all()
+            rows = (
+                (
+                    await session.execute(
+                        select(UserNotification).where(
+                            UserNotification.user_id == admin_id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
             return list(rows)
 
     notifications = asyncio.run(_fetch_notifications())
@@ -109,13 +129,20 @@ def test_support_admin_feedback_creates_submission(test_app: Dict[str, object]) 
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    staff_token, _ = create_user_token(SessionLocal, email="staff@example.com", role=UserRole.content, username="staff")
-    admin_token, _ = create_user_token(SessionLocal, email="admin3@example.com", role=UserRole.admin, username="admin3")
+    staff_token, _ = create_user_token(
+        SessionLocal, email="staff@example.com", role=UserRole.content, username="staff"
+    )
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin3@example.com", role=UserRole.admin, username="admin3"
+    )
 
     res = client.post(
         "/api/v1/support/admin/feedback",
         headers=auth_headers(staff_token),
-        json={"message": "Found a UX issue on the orders page", "context": "/admin/orders/123"},
+        json={
+            "message": "Found a UX issue on the orders page",
+            "context": "/admin/orders/123",
+        },
     )
     assert res.status_code == 201, res.text
     created = res.json()
@@ -151,13 +178,20 @@ def test_support_admin_update_requires_admin(test_app: Dict[str, object]) -> Non
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin2@example.com", role=UserRole.admin, username="admin2")
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin2@example.com", role=UserRole.admin, username="admin2"
+    )
 
     async def _create_customer() -> tuple[str, str]:
         async with SessionLocal() as session:
             user = await create_user(
                 session,
-                UserCreate(email="user@example.com", password="pass123", name="User", username="user2"),
+                UserCreate(
+                    email="user@example.com",
+                    password="pass123",
+                    name="User",
+                    username="user2",
+                ),
             )
             user.email_verified = True
             user.role = UserRole.customer
@@ -170,7 +204,12 @@ def test_support_admin_update_requires_admin(test_app: Dict[str, object]) -> Non
 
     created = client.post(
         "/api/v1/support/contact",
-        json={"topic": "contact", "name": "U", "email": "u@example.com", "message": "Hi"},
+        json={
+            "topic": "contact",
+            "name": "U",
+            "email": "u@example.com",
+            "message": "Hi",
+        },
     )
     assert created.status_code == 201, created.text
     submission_id = created.json()["id"]
@@ -191,11 +230,18 @@ def test_support_admin_update_requires_admin(test_app: Dict[str, object]) -> Non
     assert ok.json()["status"] == "resolved"
 
 
-def test_support_guest_reply_sends_email(test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch) -> None:
+def test_support_guest_reply_sends_email(
+    test_app: Dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin-guest@example.com", role=UserRole.admin, username="admin_guest")
+    admin_token, _ = create_user_token(
+        SessionLocal,
+        email="admin-guest@example.com",
+        role=UserRole.admin,
+        username="admin_guest",
+    )
 
     created = client.post(
         "/api/v1/support/contact",
@@ -216,7 +262,11 @@ def test_support_guest_reply_sends_email(test_app: Dict[str, object], monkeypatc
         sent.append({"to_email": to_email, **kwargs})
         return True
 
-    monkeypatch.setattr(email_service, "send_contact_submission_reply", _fake_send_contact_submission_reply)
+    monkeypatch.setattr(
+        email_service,
+        "send_contact_submission_reply",
+        _fake_send_contact_submission_reply,
+    )
 
     reply = client.post(
         f"/api/v1/support/admin/submissions/{submission_id}/messages",
@@ -229,12 +279,21 @@ def test_support_guest_reply_sends_email(test_app: Dict[str, object], monkeypatc
     assert sent[0]["reply_message"] == "Reply from staff"
 
 
-def test_support_ticket_thread_user_and_admin_reply(test_app: Dict[str, object]) -> None:
+def test_support_ticket_thread_user_and_admin_reply(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin3@example.com", role=UserRole.admin, username="admin3")
-    user_token, user_id = create_user_token(SessionLocal, email="user3@example.com", role=UserRole.customer, username="user3")
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin3@example.com", role=UserRole.admin, username="admin3"
+    )
+    user_token, user_id = create_user_token(
+        SessionLocal,
+        email="user3@example.com",
+        role=UserRole.customer,
+        username="user3",
+    )
 
     created = client.post(
         "/api/v1/support/me/submissions",
@@ -248,7 +307,9 @@ def test_support_ticket_thread_user_and_admin_reply(test_app: Dict[str, object])
     assert ticket["messages"][0]["from_admin"] is False
     assert ticket["messages"][0]["message"] == "Need help"
 
-    listed = client.get("/api/v1/support/me/submissions", headers=auth_headers(user_token))
+    listed = client.get(
+        "/api/v1/support/me/submissions", headers=auth_headers(user_token)
+    )
     assert listed.status_code == 200, listed.text
     assert any(row["id"] == ticket_id for row in listed.json())
 
@@ -264,7 +325,9 @@ def test_support_ticket_thread_user_and_admin_reply(test_app: Dict[str, object])
     assert len(admin_view["messages"]) == 1
     assert admin_view["messages"][0]["from_admin"] is True
 
-    fetched = client.get(f"/api/v1/support/me/submissions/{ticket_id}", headers=auth_headers(user_token))
+    fetched = client.get(
+        f"/api/v1/support/me/submissions/{ticket_id}", headers=auth_headers(user_token)
+    )
     assert fetched.status_code == 200, fetched.text
     thread = fetched.json()
     assert thread["id"] == ticket_id
@@ -296,18 +359,31 @@ def test_support_ticket_thread_user_and_admin_reply(test_app: Dict[str, object])
 
     async def _assert_ticket_owner() -> None:
         async with SessionLocal() as session:
-            ticket_owner_id = await session.scalar(select(UserNotification.user_id).where(UserNotification.user_id == user_id))
+            ticket_owner_id = await session.scalar(
+                select(UserNotification.user_id).where(
+                    UserNotification.user_id == user_id
+                )
+            )
             assert ticket_owner_id is not None
 
     asyncio.run(_assert_ticket_owner())
 
 
-def test_support_assignment_and_mentions_notify_staff(test_app: Dict[str, object]) -> None:
+def test_support_assignment_and_mentions_notify_staff(
+    test_app: Dict[str, object],
+) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin4@example.com", role=UserRole.admin, username="admin4")
-    _, support_id = create_user_token(SessionLocal, email="helper@example.com", role=UserRole.support, username="helper")
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin4@example.com", role=UserRole.admin, username="admin4"
+    )
+    _, support_id = create_user_token(
+        SessionLocal,
+        email="helper@example.com",
+        role=UserRole.support,
+        username="helper",
+    )
 
     created = client.post(
         "/api/v1/support/contact",
@@ -338,7 +414,9 @@ def test_support_assignment_and_mentions_notify_staff(test_app: Dict[str, object
     assert filtered.status_code == 200, filtered.text
     assert any(row["id"] == submission_id for row in filtered.json()["items"])
 
-    assignees = client.get("/api/v1/support/admin/assignees", headers=auth_headers(admin_token))
+    assignees = client.get(
+        "/api/v1/support/admin/assignees", headers=auth_headers(admin_token)
+    )
     assert assignees.status_code == 200, assignees.text
     assert any(row["id"] == str(support_id) for row in assignees.json())
 
@@ -352,7 +430,13 @@ def test_support_assignment_and_mentions_notify_staff(test_app: Dict[str, object
     async def _fetch_notifications() -> list[UserNotification]:
         async with SessionLocal() as session:
             rows = (
-                (await session.execute(select(UserNotification).where(UserNotification.user_id == support_id)))
+                (
+                    await session.execute(
+                        select(UserNotification).where(
+                            UserNotification.user_id == support_id
+                        )
+                    )
+                )
                 .scalars()
                 .all()
             )
@@ -368,7 +452,9 @@ def test_support_canned_responses_crud(test_app: Dict[str, object]) -> None:
     client: TestClient = test_app["client"]  # type: ignore[assignment]
     SessionLocal = test_app["session_factory"]  # type: ignore[assignment]
 
-    admin_token, _ = create_user_token(SessionLocal, email="admin5@example.com", role=UserRole.admin, username="admin5")
+    admin_token, _ = create_user_token(
+        SessionLocal, email="admin5@example.com", role=UserRole.admin, username="admin5"
+    )
 
     created = client.post(
         "/api/v1/support/admin/canned-responses",
@@ -383,7 +469,9 @@ def test_support_canned_responses_crud(test_app: Dict[str, object]) -> None:
     assert created.status_code == 201, created.text
     response_id = created.json()["id"]
 
-    listed = client.get("/api/v1/support/admin/canned-responses", headers=auth_headers(admin_token))
+    listed = client.get(
+        "/api/v1/support/admin/canned-responses", headers=auth_headers(admin_token)
+    )
     assert listed.status_code == 200, listed.text
     assert any(row["id"] == response_id for row in listed.json())
 
@@ -395,7 +483,9 @@ def test_support_canned_responses_crud(test_app: Dict[str, object]) -> None:
     assert disabled.status_code == 200, disabled.text
     assert disabled.json()["is_active"] is False
 
-    active_only = client.get("/api/v1/support/admin/canned-responses", headers=auth_headers(admin_token))
+    active_only = client.get(
+        "/api/v1/support/admin/canned-responses", headers=auth_headers(admin_token)
+    )
     assert active_only.status_code == 200, active_only.text
     assert all(row["id"] != response_id for row in active_only.json())
 

@@ -67,7 +67,9 @@ class MaintenanceBannerPublic(BaseModel):
 
 class ShippingSimulationRequest(BaseModel):
     subtotal_ron: Decimal = Field(gt=0, max_digits=10, decimal_places=2)
-    discount_ron: Decimal = Field(default=Decimal("0.00"), ge=0, max_digits=10, decimal_places=2)
+    discount_ron: Decimal = Field(
+        default=Decimal("0.00"), ge=0, max_digits=10, decimal_places=2
+    )
     shipping_method_id: UUID | None = None
     country: str | None = Field(default=None, max_length=80)
     postal_code: str | None = Field(default=None, max_length=20)

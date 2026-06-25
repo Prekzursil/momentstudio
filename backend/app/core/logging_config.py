@@ -71,7 +71,9 @@ def _json_safe(value: Any) -> Any:
 class JsonFormatter(logging.Formatter):
     """Minimal JSON formatter for structured logs."""
 
-    def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - simple serialization
+    def format(
+        self, record: logging.LogRecord
+    ) -> str:  # pragma: no cover - simple serialization
         ts = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
         base: dict[str, Any] = {
             "ts": ts,
@@ -104,7 +106,9 @@ def configure_logging(json_logs: bool = False) -> None:
         handler.setFormatter(JsonFormatter())
     else:
         handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(name)s [%(request_id)s] %(message)s")
+            logging.Formatter(
+                "%(asctime)s [%(levelname)s] %(name)s [%(request_id)s] %(message)s"
+            )
         )
 
     logging.basicConfig(level=logging.INFO, handlers=[handler], force=True)

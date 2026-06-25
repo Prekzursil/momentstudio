@@ -40,7 +40,7 @@ export const RO_COUNTIES = [
   'Tulcea',
   'Vâlcea',
   'Vaslui',
-  'Vrancea'
+  'Vrancea',
 ];
 
 export const RO_CITIES = [
@@ -83,5 +83,5 @@ export const RO_CITIES = [
   'Timișoara',
   'Tulcea',
   'Vaslui',
-  'Zalău'
+  'Zalău',
 ];

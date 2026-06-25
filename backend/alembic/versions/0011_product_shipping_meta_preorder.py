@@ -18,14 +18,25 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.add_column("products", sa.Column("allow_backorder", sa.Boolean(), nullable=False, server_default=sa.false()))
-    op.add_column("products", sa.Column("restock_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "products",
+        sa.Column(
+            "allow_backorder", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+    )
+    op.add_column(
+        "products", sa.Column("restock_at", sa.DateTime(timezone=True), nullable=True)
+    )
     op.add_column("products", sa.Column("weight_grams", sa.Integer(), nullable=True))
     op.add_column("products", sa.Column("width_cm", sa.Numeric(7, 2), nullable=True))
     op.add_column("products", sa.Column("height_cm", sa.Numeric(7, 2), nullable=True))
     op.add_column("products", sa.Column("depth_cm", sa.Numeric(7, 2), nullable=True))
-    op.add_column("products", sa.Column("meta_title", sa.String(length=180), nullable=True))
-    op.add_column("products", sa.Column("meta_description", sa.String(length=300), nullable=True))
+    op.add_column(
+        "products", sa.Column("meta_title", sa.String(length=180), nullable=True)
+    )
+    op.add_column(
+        "products", sa.Column("meta_description", sa.String(length=300), nullable=True)
+    )
     op.alter_column("products", "allow_backorder", server_default=None)
 
 

@@ -22,7 +22,9 @@ def _png_bytes(size: tuple[int, int] = (1, 1)) -> bytes:
     return buf.getvalue()
 
 
-def test_save_upload_accepts_valid_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_save_upload_accepts_valid_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
     upload = DummyUpload(_png_bytes(), filename="test.png", content_type="image/png")
 
@@ -33,7 +35,9 @@ def test_save_upload_accepts_valid_image(tmp_path: Path, monkeypatch: pytest.Mon
     assert (tmp_path / saved_name).exists()
 
 
-def test_save_upload_normalizes_extension_to_detected_mime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_save_upload_normalizes_extension_to_detected_mime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
     upload = DummyUpload(_png_bytes(), filename="test.jpg", content_type="image/png")
 
@@ -42,10 +46,14 @@ def test_save_upload_normalizes_extension_to_detected_mime(tmp_path: Path, monke
     assert saved_name.endswith(".png")
 
 
-def test_save_upload_rejects_image_over_pixel_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_save_upload_rejects_image_over_pixel_limit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
     monkeypatch.setattr(settings, "upload_image_max_pixels", 1)
-    upload = DummyUpload(_png_bytes((2, 1)), filename="test.png", content_type="image/png")
+    upload = DummyUpload(
+        _png_bytes((2, 1)), filename="test.png", content_type="image/png"
+    )
 
     with pytest.raises(HTTPException) as exc:
         save_upload(upload, root=tmp_path)
@@ -54,9 +62,13 @@ def test_save_upload_rejects_image_over_pixel_limit(tmp_path: Path, monkeypatch:
     assert exc.value.detail == "Image too large"
 
 
-def test_save_upload_rejects_non_image_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_save_upload_rejects_non_image_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
-    upload = DummyUpload(b"definitely-not-an-image", filename="bad.png", content_type="image/png")
+    upload = DummyUpload(
+        b"definitely-not-an-image", filename="bad.png", content_type="image/png"
+    )
 
     with pytest.raises(HTTPException) as exc:
         save_upload(upload, root=tmp_path)
@@ -65,7 +77,9 @@ def test_save_upload_rejects_non_image_bytes(tmp_path: Path, monkeypatch: pytest
     assert exc.value.detail == "Invalid file type"
 
 
-def test_save_upload_rejects_disallowed_actual_mime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_save_upload_rejects_disallowed_actual_mime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(settings, "media_root", str(tmp_path))
     upload = DummyUpload(_png_bytes(), filename="test.png", content_type="image/jpeg")
 

@@ -11,24 +11,24 @@ describe('AdminComponent content first-paint init', () => {
     queryParams: Subject<Record<string, unknown>>;
   };
 
-  function createRouteStub(
-    section: string,
-    query: Record<string, unknown> = {}
-  ): RouteStub {
+  function createRouteStub(section: string, query: Record<string, unknown> = {}): RouteStub {
     return {
       snapshot: { data: { section }, queryParams: query },
       data: new Subject<Record<string, unknown>>(),
-      queryParams: new Subject<Record<string, unknown>>()
+      queryParams: new Subject<Record<string, unknown>>(),
     };
   }
 
-  function createComponent(routeStub: RouteStub): { component: AdminComponent; admin: jasmine.SpyObj<any> } {
+  function createComponent(routeStub: RouteStub): {
+    component: AdminComponent;
+    admin: jasmine.SpyObj<any>;
+  } {
     const admin = jasmine.createSpyObj('AdminService', ['content']);
     const component = new AdminComponent(
       {
         snapshot: routeStub.snapshot,
         data: routeStub.data.asObservable(),
-        queryParams: routeStub.queryParams.asObservable()
+        queryParams: routeStub.queryParams.asObservable(),
       } as unknown as ActivatedRoute,
       admin as any,
       {} as any,
@@ -40,7 +40,7 @@ describe('AdminComponent content first-paint init', () => {
       jasmine.createSpyObj('ToastService', ['success', 'error']) as any,
       { instant: (k: string) => k } as any,
       { render: (value: string) => value } as any,
-      { bypassSecurityTrustHtml: (value: string) => value } as unknown as DomSanitizer
+      { bypassSecurityTrustHtml: (value: string) => value } as unknown as DomSanitizer,
     );
 
     return { component, admin };

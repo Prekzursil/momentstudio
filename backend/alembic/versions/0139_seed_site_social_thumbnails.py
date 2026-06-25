@@ -62,9 +62,9 @@ def upgrade() -> None:
 
     row = (
         conn.execute(
-            sa.select(content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta).where(
-                content_blocks.c.key == "site.social"
-            )
+            sa.select(
+                content_blocks.c.id, content_blocks.c.version, content_blocks.c.meta
+            ).where(content_blocks.c.key == "site.social")
         )
         .mappings()
         .first()
@@ -73,6 +73,7 @@ def upgrade() -> None:
         return
 
     meta = _as_dict(row["meta"])
+
     def patch_page_list(key: str) -> bool:
         local_changed = False
         pages = _as_list(meta.get(key))
@@ -102,12 +103,21 @@ def upgrade() -> None:
     if not changed:
         return
 
-    conn.execute(sa.update(content_blocks).where(content_blocks.c.id == row["id"]).values(meta=meta, updated_at=now))
+    conn.execute(
+        sa.update(content_blocks)
+        .where(content_blocks.c.id == row["id"])
+        .values(meta=meta, updated_at=now)
+    )
 
     current_version = int(row.get("version") or 1)
     conn.execute(
         sa.update(versions)
-        .where(sa.and_(versions.c.content_block_id == row["id"], versions.c.version == current_version))
+        .where(
+            sa.and_(
+                versions.c.content_block_id == row["id"],
+                versions.c.version == current_version,
+            )
+        )
         .values(meta=meta)
     )
 

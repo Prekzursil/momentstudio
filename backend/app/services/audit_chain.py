@@ -15,11 +15,15 @@ from app.models.user import AdminAuditLog
 
 
 def _canonical_json(value: Any) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str
+    )
 
 
 def _hash_bytes(prev_hash: str, material: str) -> str:
-    secret = (settings.audit_hash_chain_secret or settings.secret_key or "").encode("utf-8")
+    secret = (settings.audit_hash_chain_secret or settings.secret_key or "").encode(
+        "utf-8"
+    )
     hasher = hashlib.sha256()
     hasher.update(secret)
     hasher.update(b"\n")
@@ -45,7 +49,9 @@ async def _locked_chain_state(session: AsyncSession, entity: str) -> AuditChainS
     return state
 
 
-async def _apply_hash_chain(session: AsyncSession, entity: str, payload: dict[str, Any]) -> tuple[str | None, str]:
+async def _apply_hash_chain(
+    session: AsyncSession, entity: str, payload: dict[str, Any]
+) -> tuple[str | None, str]:
     state = await _locked_chain_state(session, entity)
     prev = state.tail_hash
     digest = _hash_bytes(prev or "", _canonical_json(payload))
@@ -66,7 +72,9 @@ async def add_product_audit_log(
     user_id: UUID | None,
     payload: str | None,
 ) -> ProductAuditLog:
-    audit = ProductAuditLog(product_id=product_id, action=action, user_id=user_id, payload=payload)
+    audit = ProductAuditLog(
+        product_id=product_id, action=action, user_id=user_id, payload=payload
+    )
     if hash_chain_enabled():
         audit.created_at = datetime.now(timezone.utc)
         prev, digest = await _apply_hash_chain(
@@ -95,7 +103,12 @@ async def add_content_audit_log(
     version: int,
     user_id: UUID | None,
 ) -> ContentAuditLog:
-    audit = ContentAuditLog(content_block_id=content_block_id, action=action, version=version, user_id=user_id)
+    audit = ContentAuditLog(
+        content_block_id=content_block_id,
+        action=action,
+        version=version,
+        user_id=user_id,
+    )
     if hash_chain_enabled():
         audit.created_at = datetime.now(timezone.utc)
         prev, digest = await _apply_hash_chain(
@@ -139,8 +152,12 @@ async def add_admin_audit_log(
                 "id": str(audit.id),
                 "created_at": audit.created_at.isoformat(),
                 "action": audit.action,
-                "actor_user_id": str(audit.actor_user_id) if audit.actor_user_id else None,
-                "subject_user_id": str(audit.subject_user_id) if audit.subject_user_id else None,
+                "actor_user_id": (
+                    str(audit.actor_user_id) if audit.actor_user_id else None
+                ),
+                "subject_user_id": (
+                    str(audit.subject_user_id) if audit.subject_user_id else None
+                ),
                 "data": audit.data,
             },
         )
@@ -148,4 +165,3 @@ async def add_admin_audit_log(
         audit.chain_hash = digest
     session.add(audit)
     return audit
-
