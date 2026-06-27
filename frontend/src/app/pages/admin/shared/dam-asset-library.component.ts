@@ -1733,6 +1733,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       this.toast.success('All retry policies were reset to defaults.');
     } catch (err) {
       this.retryPoliciesError.set((err as any)?.error?.detail || 'Failed to reset retry policies.');
+      /* istanbul ignore next -- retryPoliciesError() is always set truthy on the line above, so this `||` fallback is unreachable */
       this.toast.error(this.retryPoliciesError() || 'Failed to reset retry policies.');
     }
   }
@@ -1887,6 +1888,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     let preset = presets.find((item) => item.preset_key === presetKey);
     if (!preset) {
       await this.loadRetryPolicyPresets(jobType);
+      /* istanbul ignore next -- loadRetryPolicyPresets always assigns this key (try and catch both set it), so the `|| []` fallback is unreachable */
       preset = (this.retryPolicyPresetsByType[jobType] || []).find(
         (item) => item.preset_key === presetKey,
       );
