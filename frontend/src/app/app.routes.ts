@@ -13,8 +13,11 @@ import { appConfig } from './core/app-config';
 
 const NOINDEX_ROBOTS = 'noindex,nofollow';
 
-const mockCheckoutRoutes: Routes =
-  appConfig.appEnv === 'production'
+// Pure factory so the production env-gate is unit-testable: the inline
+// module-load ternary could only ever observe one arm in a single test run
+// (the bundled module body runs once), leaving the other branch uncoverable.
+export function buildMockCheckoutRoutes(appEnv: string): Routes {
+  return appEnv === 'production'
     ? []
     : [
         {
@@ -32,6 +35,9 @@ const mockCheckoutRoutes: Routes =
           data: { robots: NOINDEX_ROBOTS },
         },
       ];
+}
+
+const mockCheckoutRoutes: Routes = buildMockCheckoutRoutes(appConfig.appEnv);
 
 export const routes: Routes = [
   { path: '', component: HomeComponent, title: 'meta.titles.home' },
