@@ -64,7 +64,6 @@ audit:deep:
       - "^audit/.+"
   - changed-files:
       - any-glob-to-any-file:
-          - "scripts/audit/**"
           - ".github/workflows/audit-*.yml"
           - ".github/copilot-instructions.md"
           - ".github/instructions/**"
@@ -74,7 +73,6 @@ audit:ux:
       - any-glob-to-any-file:
           - "frontend/src/app/pages/**"
           - "frontend/src/app/shared/**"
-          - "scripts/audit/**"
 
 audit:ia:
   - changed-files:
@@ -82,7 +80,6 @@ audit:ia:
           - "frontend/src/app/app.routes.ts"
           - "frontend/src/app/app.component.ts"
           - "frontend/src/app/pages/admin/**"
-          - "scripts/audit/**"
 
 audit:seo:
   - changed-files:
@@ -91,12 +88,10 @@ audit:seo:
           - "frontend/src/app/core/seo-*.ts"
           - "frontend/src/app/core/route-robots.service.ts"
           - "frontend/e2e/seo-public-routes.spec.ts"
-          - "scripts/audit/**"
 
 audit:correctness:
   - changed-files:
       - any-glob-to-any-file:
-          - "scripts/audit/**"
           - "backend/tests/**"
           - "frontend/src/**/*.spec.ts"
 
