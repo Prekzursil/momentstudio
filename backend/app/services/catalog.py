@@ -770,7 +770,6 @@ def _compute_sale_price(
     if value <= 0:
         return None
 
-    discount = Decimal("0.00")
     if sale_type == "percent":
         if value >= 100:
             discount = base
@@ -2969,8 +2968,6 @@ async def import_categories_csv(
         existing_slugs = set(existing_slug_result.scalars().all())
         created = len(file_slugs - existing_slugs)
         updated = len(file_slugs & existing_slugs)
-    else:
-        existing_slugs = set()
 
     if rows:
         parent_candidates = {

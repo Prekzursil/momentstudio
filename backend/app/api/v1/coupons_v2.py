@@ -1540,8 +1540,6 @@ async def _run_bulk_segment_job(engine: AsyncEngine, *, job_id: UUID) -> None:
                     ).scalar_one()
                 )
                 job.total_candidates = total
-            else:
-                total = int(getattr(job, "total_candidates", 0) or 0)
             job.processed = 0
             job.created = 0
             job.restored = 0
