@@ -1247,7 +1247,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
     const promo = offer.coupon.promotion;
     if (!promo) return offer.coupon.code;
 
-    let label = this.translate.instant('account.coupons.coupon');
+    let label: string;
     if (promo.discount_type === 'free_shipping') {
       label = this.translate.instant('account.coupons.freeShipping');
     } else if (promo.discount_type === 'amount') {

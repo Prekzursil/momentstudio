@@ -212,7 +212,7 @@ describe('ModalComponent behavior', () => {
     const ioCallbacks: IntersectionObserverCallback[] = [];
     const moCallbacks: MutationCallback[] = [];
     const fakeIO = class {
-      constructor(cb: IntersectionObserverCallback) {
+      constructor(cb: IntersectionObserverCallback, _options?: IntersectionObserverInit) {
         ioCallbacks.push(cb);
       }
       observe() {}

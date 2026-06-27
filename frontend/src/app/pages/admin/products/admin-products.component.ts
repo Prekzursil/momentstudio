@@ -5615,7 +5615,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
         typeof product.base_price === 'number'
           ? product.base_price
           : Number(product.base_price || 0);
-      let nextPrice = base;
+      let nextPrice: number;
       if (this.bulkPriceMode === 'percent') {
         nextPrice = base + (base * delta * direction) / 100;
       } else {
@@ -5661,7 +5661,7 @@ export class AdminProductsComponent implements OnInit, OnDestroy {
 
     const newPrices: number[] = [];
     for (const base of oldPrices) {
-      let nextPrice = base;
+      let nextPrice: number;
       if (this.bulkPriceMode === 'percent') {
         nextPrice = base + (base * delta * direction) / 100;
       } else {
