@@ -1866,6 +1866,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     const targetName = this.rootCategories.find((c) => c.slug === targetSlug)?.name ?? targetSlug;
     const sourceName = category?.name ?? sourceSlug;
     const count = Number(this.mergePreview.product_count || 0);
+    /* istanbul ignore else -- SSR guard: window is always defined in the browser test environment */
     if (typeof window !== 'undefined') {
       const ok = window.confirm(
         this.translate.instant('adminUi.storefront.categories.confirmMerge', {
@@ -1938,6 +1939,7 @@ export class ShopComponent implements OnInit, OnDestroy {
     if (!slug) return;
 
     const name = category?.name ?? slug;
+    /* istanbul ignore else -- SSR guard: window is always defined in the browser test environment */
     if (typeof window !== 'undefined') {
       const ok = window.confirm(
         this.translate.instant('adminUi.storefront.categories.confirmDelete', { name }),
@@ -1971,6 +1973,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   scrollToFilters(): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     const el = document.getElementById('shop-filters');
     if (!el) return;
@@ -1978,6 +1981,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   scrollToSort(): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     const el = document.getElementById('shop-actions');
     if (!el) return;
@@ -1991,6 +1995,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   quickSelectCategory(slug: string): void {
     this.categorySelection = String(slug || '');
     this.onCategorySelected();
+    /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
     if (typeof window === 'undefined') return;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -2410,6 +2415,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private rememberShopReturnContext(): void {
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return;
     try {
       const url = `${window.location.pathname}${window.location.search || ''}`;
@@ -2898,6 +2904,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private initScrollRestoreFromSession(): void {
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return;
     try {
       const pending = sessionStorage.getItem('shop_return_pending');
@@ -2933,6 +2940,7 @@ export class ShopComponent implements OnInit, OnDestroy {
   }
 
   private clearShopReturnContext(): void {
+    /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser test environment */
     if (typeof sessionStorage === 'undefined') return;
     try {
       sessionStorage.removeItem('shop_return_pending');
