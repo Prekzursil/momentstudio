@@ -3022,7 +3022,10 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
       widthPct = Math.max(widthPct, 1);
       widthPct = Math.min(widthPct, 100 - leftPct);
 
-      const conflictNames = Array.from(conflicts.get(row.promotion.id)?.names ?? []);
+      const conflictNames = Array.from(
+        /* istanbul ignore next -- defensive: conflicts is seeded from this same `visible` array, so .get() and .names are always present (?? [] is unreachable) */
+        conflicts.get(row.promotion.id)?.names ?? [],
+      );
       const preview = conflictNames.slice(0, 6);
       const conflictNamesLabel =
         conflictNames.length > preview.length
@@ -3774,6 +3777,7 @@ export class AdminCouponsComponent implements OnInit, OnDestroy {
     for (let idx = 0; idx < lines.length; idx += 1) {
       const rawLine = (lines[idx] || '').trim();
       if (!rawLine) continue;
+      /* istanbul ignore next -- defensive: rawLine is non-empty here, so String.split always yields index 0 (?? '' is unreachable) */
       const firstCell = rawLine.split(/[,;\t]/)[0] ?? '';
       const cell = firstCell.trim().replace(/^"|"$/g, '');
       if (!cell) continue;
