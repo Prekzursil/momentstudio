@@ -21,6 +21,7 @@ export class AdminClientErrorLoggerService {
   init(): void {
     if (this.initialized) return;
     this.initialized = true;
+    // istanbul ignore if -- SSR guard: window is undefined only during server-side rendering, unreachable in the browser/Karma test env
     if (typeof window === 'undefined') return;
 
     this.updateEnabled(this.router.url);
@@ -73,7 +74,9 @@ export class AdminClientErrorLoggerService {
     stack: string | null,
     context?: Record<string, any> | null,
   ): AdminClientErrorIn {
+    // istanbul ignore next -- SSR guard: location is always defined in the browser/Karma test env; the null branch only runs under server-side rendering
     const url = typeof location !== 'undefined' ? location.href : null;
+    // istanbul ignore next -- SSR guard: navigator is always defined in the browser/Karma test env; the null branch only runs under server-side rendering
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null;
     return {
       kind,
