@@ -515,6 +515,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   private readonly injector = inject(Injector);
   private pendingGoAt: number | null = null;
+  /* istanbul ignore next -- SSR guard: window is always defined in the browser test environment */
   isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
   mobileSidebarOpen = false;
   navQuery = '';
@@ -920,7 +921,9 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       .map((key) => ({
         key,
         labelKey: this.groupLabelKey[key],
-        items: grouped.get(key) ?? [],
+        items:
+          grouped.get(key) ??
+          /* istanbul ignore next -- defensive: grouped is pre-seeded with every group key, so get() is never nullish */ [],
       }))
       .filter((group) => group.items.length > 0);
   }
@@ -1001,6 +1004,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     const raw = (url || '').trim();
     if (!raw.startsWith('/admin')) return;
     const normalized = raw.split('?')[0].split('#')[0];
+    /* istanbul ignore next -- defensive: raw is guaranteed to start with /admin here, so normalized is never empty */
     if (!normalized) return;
     if (/^\/admin\/orders\/[^/]+$/.test(normalized)) return;
 
@@ -1009,6 +1013,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     );
     if (!candidates.length) return;
     const match = candidates.sort((a, b) => b.path.length - a.path.length)[0];
+    /* istanbul ignore next -- defensive: candidates is non-empty (guarded above), so match is always defined */
     if (!match) return;
 
     const label = this.navLabel(match);
