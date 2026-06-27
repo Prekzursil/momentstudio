@@ -1011,6 +1011,7 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   downloadReceipt(order: Order): void {
+    /* istanbul ignore next -- SSR guard: window and document are always defined in the browser test environment */
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     if (this.downloadingReceiptId) return;
     this.downloadingReceiptId = order.id;
@@ -1041,6 +1042,7 @@ export class AccountState implements OnInit, OnDestroy {
   private receiptCopiedTimer: number | null = null;
 
   copyReceiptLink(order: Order): void {
+    /* istanbul ignore next -- SSR guard: navigator is always defined in the browser test environment */
     if (typeof navigator === 'undefined') return;
     const existing = this.receiptShares()[order.id];
     const expiresAt = existing?.expires_at ? new Date(existing.expires_at) : null;
@@ -1059,6 +1061,7 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   shareReceipt(order: Order): void {
+    /* istanbul ignore next -- SSR guard: navigator is always defined in the browser test environment */
     if (typeof navigator === 'undefined') return;
     if (this.sharingReceiptId) return;
 
@@ -2065,6 +2068,7 @@ export class AccountState implements OnInit, OnDestroy {
     const end = this.parseTimestampMs(status?.scheduled_for);
     if (!start || !end || end <= start) return 0;
     const pct = ((this.now() - start) / (end - start)) * 100;
+    /* istanbul ignore next -- defensive: end > start > 0 is guaranteed above, so pct is always finite */
     if (!Number.isFinite(pct)) return 0;
     return Math.min(100, Math.max(0, pct));
   }
@@ -2138,6 +2142,7 @@ export class AccountState implements OnInit, OnDestroy {
     try {
       return new Date(value).toLocaleString();
     } catch {
+      /* istanbul ignore next -- defensive: Date.toLocaleString does not throw for any string input */
       return value;
     }
   }
@@ -2898,7 +2903,7 @@ export class AccountState implements OnInit, OnDestroy {
       localStorage.setItem(GOOGLE_FLOW_KEY, 'link');
     }
     this.auth.startGoogleLink().subscribe({
-      next: (url) => {
+      next: /* istanbul ignore next -- redirects the browser; cannot run in the Karma test harness */ (url) => {
         window.location.href = url;
       },
       error: (err) => {
@@ -2952,7 +2957,11 @@ export class AccountState implements OnInit, OnDestroy {
   private defaultShippingAddress(): Address | null {
     const addresses = this.addresses();
     if (!addresses.length) return null;
-    return addresses.find((a) => a.is_default_shipping) ?? addresses[0] ?? null;
+    return (
+      addresses.find((a) => a.is_default_shipping) ??
+      addresses[0] ??
+      /* istanbul ignore next -- addresses[0] is always defined here (the empty-list case returned above) */ null
+    );
   }
 
   private formatMoney(amount: number, currency: string): string {
@@ -2962,7 +2971,7 @@ export class AccountState implements OnInit, OnDestroy {
         currency: currency || 'RON',
       }).format(amount);
     } catch {
-      return `${amount.toFixed(2)} ${currency || ''}`.trim();
+      return `${amount.toFixed(2)} ${currency || /* istanbul ignore next -- the catch only runs for a truthy invalid currency code */ ''}`.trim();
     }
   }
 
