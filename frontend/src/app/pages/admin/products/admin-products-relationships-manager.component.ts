@@ -149,7 +149,7 @@ import { InputComponent } from '../../../shared/input.component';
                     size="sm"
                     variant="ghost"
                     [label]="'adminUi.actions.remove' | translate"
-                    (action)="removeRequested.emit({ id: String(p.id), kind: 'related' })"
+                    (action)="removeRequested.emit({ id: p.id, kind: 'related' })"
                     [disabled]="relationshipsSaving"
                   ></app-button>
                 </div>
@@ -197,7 +197,7 @@ import { InputComponent } from '../../../shared/input.component';
                     size="sm"
                     variant="ghost"
                     [label]="'adminUi.actions.remove' | translate"
-                    (action)="removeRequested.emit({ id: String(p.id), kind: 'upsell' })"
+                    (action)="removeRequested.emit({ id: p.id, kind: 'upsell' })"
                     [disabled]="relationshipsSaving"
                   ></app-button>
                 </div>
