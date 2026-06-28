@@ -391,3 +391,293 @@ describe('AdminComponent — pure helpers and getters', () => {
     expect(c.fxAuditActionLabel('totally-unknown-action')).toBeTruthy();
   });
 });
+
+describe('AdminComponent — value normalisation helpers', () => {
+  let c: any;
+
+  beforeEach(() => {
+    c = createComponent().component as any;
+  });
+
+  it('safePageRecordKey rejects invalid and prototype-polluting keys', () => {
+    expect(c.safePageRecordKey('page.about')).toBe('page.about');
+    expect(c.safePageRecordKey('page.My-Custom_1')).toBe('page.My-Custom_1');
+    expect(c.safePageRecordKey('not-a-page')).toBe('page.about');
+    expect(c.safePageRecordKey('')).toBe('page.about');
+    expect(c.safePageRecordKey('page.__proto__')).toBe('page.about');
+    expect(c.safePageRecordKey('page.x.prototype')).toBe('page.about');
+    expect(c.safePageRecordKey('page.x.constructor')).toBe('page.about');
+  });
+
+  it('safeRecordKey enforces an allow-list and falls back', () => {
+    expect(c.safeRecordKey('home.sections')).toBe('home.sections');
+    expect(c.safeRecordKey('bad key!')).toBe('unknown');
+    expect(c.safeRecordKey('bad key!', 'fb')).toBe('fb');
+    expect(c.safeRecordKey('__proto__')).toBe('unknown');
+    expect(c.safeRecordKey('prototype')).toBe('unknown');
+    expect(c.safeRecordKey('constructor')).toBe('unknown');
+    expect(c.safeRecordKey('a.__proto__')).toBe('unknown');
+    expect(c.safeRecordKey('a.prototype')).toBe('unknown');
+    expect(c.safeRecordKey('a.constructor')).toBe('unknown');
+  });
+
+  it('setRecordValue/setPageRecordValue/deleteRecordValue use the safe key', () => {
+    const rec: Record<string, number> = {};
+    c.setRecordValue(rec, 'good.key', 1);
+    expect(rec['good.key']).toBe(1);
+    c.setRecordValue(rec, 'bad key!', 2, 'fallbackKey');
+    expect(rec['fallbackKey']).toBe(2);
+    c.deleteRecordValue(rec, 'good.key');
+    expect(rec['good.key']).toBeUndefined();
+
+    const pageRec: Record<string, string> = {};
+    c.setPageRecordValue(pageRec, 'page.about', 'v');
+    expect(pageRec['page.about']).toBe('v');
+  });
+
+  it('toLocalizedText handles strings, localized objects and junk', () => {
+    expect(c.toLocalizedText('  hi  ')).toEqual({ en: 'hi', ro: 'hi' });
+    expect(c.toLocalizedText({ en: ' a ', ro: ' b ' })).toEqual({ en: 'a', ro: 'b' });
+    expect(c.toLocalizedText({ en: 5 })).toEqual({ en: '', ro: '' });
+    expect(c.toLocalizedText(null)).toEqual({ en: '', ro: '' });
+    expect(c.toLocalizedText(42)).toEqual({ en: '', ro: '' });
+  });
+
+  it('toFocalValue clamps and falls back', () => {
+    expect(c.toFocalValue(40)).toBe(40);
+    expect(c.toFocalValue('30')).toBe(30);
+    expect(c.toFocalValue(-10)).toBe(0);
+    expect(c.toFocalValue(150)).toBe(100);
+    expect(c.toFocalValue('abc')).toBe(50);
+    expect(c.toFocalValue('abc', 25)).toBe(25);
+    expect(c.toFocalValue(33.6)).toBe(34);
+  });
+
+  it('toBooleanValue parses booleans, numbers and string aliases', () => {
+    expect(c.toBooleanValue(true)).toBe(true);
+    expect(c.toBooleanValue(false)).toBe(false);
+    expect(c.toBooleanValue(1)).toBe(true);
+    expect(c.toBooleanValue(0)).toBe(false);
+    for (const v of ['1', 'true', 'yes', 'on', 'TRUE']) expect(c.toBooleanValue(v)).toBe(true);
+    for (const v of ['0', 'false', 'no', 'off']) expect(c.toBooleanValue(v)).toBe(false);
+    expect(c.toBooleanValue('maybe')).toBe(false);
+    expect(c.toBooleanValue('maybe', true)).toBe(true);
+    expect(c.toBooleanValue({}, true)).toBe(true);
+  });
+
+  it('toCmsBlockLayout normalises each axis and defaults', () => {
+    expect(c.toCmsBlockLayout(null)).toEqual(c.defaultCmsBlockLayout());
+    expect(
+      c.toCmsBlockLayout({ spacing: 'lg', background: 'accent', align: 'center', maxWidth: 'wide' }),
+    ).toEqual({ spacing: 'lg', background: 'accent', align: 'center', max_width: 'wide' });
+    expect(
+      c.toCmsBlockLayout({ spacing: 'xxl', background: 'rainbow', align: 'top', max_width: 'huge' }),
+    ).toEqual({ spacing: 'none', background: 'none', align: 'left', max_width: 'full' });
+    expect(c.toCmsBlockLayout({ max_width: 'narrow' }).max_width).toBe('narrow');
+    expect(c.toCmsBlockLayout({ max_width: 'prose' }).max_width).toBe('prose');
+    expect(c.toCmsBlockLayout({ spacing: 'sm' }).spacing).toBe('sm');
+    expect(c.toCmsBlockLayout({ background: 'muted' }).background).toBe('muted');
+  });
+
+  it('focalPosition formats a CSS object-position value', () => {
+    expect(c.focalPosition(20, 80)).toBe('20% 80%');
+    expect(c.focalPosition('x', 'y')).toBe('50% 50%');
+  });
+
+  it('toSlideDraft maps known fields and uses image fallback', () => {
+    expect(c.toSlideDraft(null)).toEqual(c.emptySlideDraft());
+    const d = c.toSlideDraft({
+      image: ' /a.png ',
+      variant: 'full',
+      size: 'L',
+      text_style: 'light',
+      cta_url: ' /go ',
+      focal_x: 10,
+      focal_y: 90,
+    });
+    expect(d.image_url).toBe('/a.png');
+    expect(d.variant).toBe('full');
+    expect(d.size).toBe('L');
+    expect(d.text_style).toBe('light');
+    expect(d.cta_url).toBe('/go');
+    expect(d.focal_x).toBe(10);
+    const d2 = c.toSlideDraft({ image_url: 'b', size: 'S' });
+    expect(d2.image_url).toBe('b');
+    expect(d2.size).toBe('S');
+    const d3 = c.toSlideDraft({ size: 'XL' });
+    expect(d3.size).toBe('M');
+    expect(d3.variant).toBe('split');
+  });
+
+  it('serializeSlideDraft trims urls and clamps focal points', () => {
+    const slide = { ...c.emptySlideDraft(), image_url: ' /x ', cta_url: ' /y ', focal_x: 200, focal_y: -5 };
+    const out = c.serializeSlideDraft(slide);
+    expect(out['image_url']).toBe('/x');
+    expect(out['cta_url']).toBe('/y');
+    expect(out['focal_x']).toBe(100);
+    expect(out['focal_y']).toBe(0);
+  });
+
+  it('toCarouselSettingsDraft applies defaults and explicit overrides', () => {
+    expect(c.toCarouselSettingsDraft(null)).toEqual(c.defaultCarouselSettings());
+    const s = c.toCarouselSettingsDraft({
+      autoplay: true,
+      interval_ms: 3000,
+      show_dots: false,
+      show_arrows: false,
+      pause_on_hover: false,
+    });
+    expect(s).toEqual({
+      autoplay: true,
+      interval_ms: 3000,
+      show_dots: false,
+      show_arrows: false,
+      pause_on_hover: false,
+    });
+    expect(c.toCarouselSettingsDraft({ interval_ms: '2500' }).interval_ms).toBe(2500);
+    expect(c.toCarouselSettingsDraft({ interval_ms: -1 }).interval_ms).toBe(5000);
+    expect(c.toCarouselSettingsDraft({ interval_ms: 'bad' }).interval_ms).toBe(5000);
+  });
+});
+
+describe('AdminComponent — parsePageBlocksDraft', () => {
+  let c: any;
+  beforeEach(() => { c = createComponent().component as any; });
+
+  it('returns an empty list for missing or empty block arrays', () => {
+    expect(c.parsePageBlocksDraft(null)).toEqual([]);
+    expect(c.parsePageBlocksDraft({})).toEqual([]);
+    expect(c.parsePageBlocksDraft({ blocks: [] })).toEqual([]);
+    expect(c.parsePageBlocksDraft({ blocks: 'nope' })).toEqual([]);
+  });
+
+  it('skips invalid entries, unknown types and duplicate keys', () => {
+    const blocks = [
+      null,
+      'string',
+      { type: 'unknown' },
+      { type: 'text', key: 'dup', body_markdown: 'a' },
+      { type: 'text', key: 'dup', body_markdown: 'b' },
+      { type: '   ' },
+    ];
+    const out = c.parsePageBlocksDraft({ blocks });
+    expect(out.length).toBe(1);
+    expect(out[0].key).toBe('dup');
+    expect(out[0].body_markdown).toEqual({ en: 'a', ro: 'a' });
+  });
+
+  it('auto-generates keys and honours the enabled flag', () => {
+    const out = c.parsePageBlocksDraft({ blocks: [{ type: 'text' }, { type: 'cta', enabled: false }] });
+    expect(out[0].key).toBe('text_1');
+    expect(out[0].enabled).toBe(true);
+    expect(out[1].key).toBe('cta_2');
+    expect(out[1].enabled).toBe(false);
+  });
+
+  it('parses every supported block type with rich content', () => {
+    const blocks = [
+      { type: 'columns', columns: [{ title: 'c1' }, { title: 'c2' }, { title: 'c3' }, { title: 'c4' }], columns_breakpoint: 'lg' },
+      { type: 'cta', cta_label: 'Go', cta_url: ' /go ', cta_new_tab: 'yes' },
+      { type: 'faq', items: [{ question: 'q1' }, null, { question: 'q2' }] },
+      { type: 'testimonials', items: [{ author: 'a1' }, 'bad'] },
+      { type: 'product_grid', source: 'COLLECTION', collection_slug: ' col ', product_slugs: ['x', 'x', 'y'], limit: '99' },
+      { type: 'form', form_type: 'NEWSLETTER', topic: 'support' },
+      { type: 'image', url: ' /img ', link_url: ' /l ', focal_x: 12, focal_y: 88 },
+      { type: 'gallery', images: [{ url: ' /g ' }, { url: '' }, null] },
+      { type: 'banner', slide: { image: '/b' } },
+      { type: 'carousel', slides: [{ image: '/s1' }], settings: { autoplay: true } },
+    ];
+    const out = c.parsePageBlocksDraft({ blocks });
+    const byType: Record<string, any> = {};
+    for (const b of out) byType[b.type] = b;
+
+    expect(byType['columns'].columns.length).toBe(3); // capped at 3
+    expect(byType['columns'].columns_breakpoint).toBe('lg');
+    expect(byType['cta'].cta_url).toBe('/go');
+    expect(byType['cta'].cta_new_tab).toBe(true);
+    expect(byType['faq'].faq_items.length).toBe(2);
+    expect(byType['testimonials'].testimonials.length).toBe(1);
+    expect(byType['product_grid'].product_grid_source).toBe('collection');
+    expect(byType['product_grid'].product_grid_collection_slug).toBe('col');
+    expect(byType['product_grid'].product_grid_product_slugs).toBe('x\ny'); // de-duped
+    expect(byType['product_grid'].product_grid_limit).toBe(24); // clamped
+    expect(byType['form'].form_type).toBe('newsletter');
+    expect(byType['form'].form_topic).toBe('support');
+    expect(byType['image'].url).toBe('/img');
+    expect(byType['image'].focal_x).toBe(12);
+    expect(byType['gallery'].images.length).toBe(1);
+    expect(byType['banner'].slide.image_url).toBe('/b');
+    expect(byType['carousel'].slides.length).toBe(1);
+    expect(byType['carousel'].settings.autoplay).toBe(true);
+  });
+
+  it('handles product_grid with comma/newline string slugs and defaults', () => {
+    const out = c.parsePageBlocksDraft({
+      blocks: [{ type: 'product_grid', source: 'products', product_slugs: 'a, b\nc', limit: 'bad' }],
+    });
+    expect(out[0].product_grid_source).toBe('products');
+    expect(out[0].product_grid_product_slugs).toBe('a\nb\nc');
+    expect(out[0].product_grid_limit).toBe(6);
+  });
+
+  it('falls back to defaults for columns under two and unknown breakpoint', () => {
+    const out = c.parsePageBlocksDraft({ blocks: [{ type: 'columns', columns: [{ title: 'only' }], columns_breakpoint: 'xl' }] });
+    expect(out[0].columns.length).toBe(2); // default kept
+    expect(out[0].columns_breakpoint).toBe('md');
+  });
+});
+
+describe('AdminComponent — contentTitleForKey and page block mutators', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('contentTitleForKey prefers known content page titles then defaults', () => {
+    c.contentPages = [{ key: 'page.about', title: 'About Us' }];
+    expect(c.contentTitleForKey('page.about')).toBe('About Us');
+    expect(c.contentTitleForKey('page.unknown-key')).toBe('page.unknown-key');
+    expect(c.contentTitleForKey('')).toBe('Content');
+  });
+
+  it('setPageInsertDragActive toggles the drag flag', () => {
+    c.setPageInsertDragActive(true);
+    expect(c.pageInsertDragActive).toBe(true);
+    c.setPageInsertDragActive(false);
+    expect(c.pageInsertDragActive).toBe(false);
+  });
+
+  it('setPageImageBlockUrl updates the matching block url and focal point', () => {
+    c.pageBlocks['page.about'] = [
+      { key: 'b1', type: 'image', url: '', focal_x: 50, focal_y: 50 },
+      { key: 'b2', type: 'image', url: 'keep', focal_x: 50, focal_y: 50 },
+    ];
+    c.setPageImageBlockUrl('page.about', 'b1', { url: ' /pic.png ', focal_x: 10, focal_y: 20 });
+    expect(c.pageBlocks['page.about'][0].url).toBe('/pic.png');
+    expect(c.pageBlocks['page.about'][0].focal_x).toBe(10);
+    expect(c.pageBlocks['page.about'][1].url).toBe('keep');
+    expect(h.toast.success).toHaveBeenCalled();
+  });
+
+  it('setPageImageBlockUrl ignores empty asset urls', () => {
+    c.pageBlocks['page.about'] = [{ key: 'b1', type: 'image', url: 'orig' }];
+    c.setPageImageBlockUrl('page.about', 'b1', { url: '   ' });
+    expect(c.pageBlocks['page.about'][0].url).toBe('orig');
+  });
+
+  it('setPageBannerSlideImage only touches matching banner blocks', () => {
+    c.pageBlocks['page.about'] = [
+      { key: 'b1', type: 'banner', slide: { image_url: '', focal_x: 50, focal_y: 50 } },
+      { key: 'b2', type: 'image', url: '' },
+    ];
+    c.setPageBannerSlideImage('page.about', 'b1', { url: '/banner.jpg', focal_x: 5, focal_y: 95 });
+    expect(c.pageBlocks['page.about'][0].slide.image_url).toBe('/banner.jpg');
+    c.setPageBannerSlideImage('page.about', 'b1', { url: '' });
+    expect(c.pageBlocks['page.about'][0].slide.image_url).toBe('/banner.jpg');
+  });
+
+  it('addPageCarouselSlide appends a blank slide to a carousel block', () => {
+    c.pageBlocks['page.about'] = [{ key: 'b1', type: 'carousel', slides: [] }];
+    c.addPageCarouselSlide('page.about', 'b1');
+    expect(c.pageBlocks['page.about'][0].slides.length).toBe(1);
+  });
+});
