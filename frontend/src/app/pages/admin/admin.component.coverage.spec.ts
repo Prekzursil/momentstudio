@@ -2195,3 +2195,111 @@ describe('AdminComponent — markdown editor helpers', () => {
     expect(editor.insertMarkdown).toHaveBeenCalledWith('{{collection:coll}}');
   });
 });
+
+describe('AdminComponent — blog image markdown, a11y and writing aids', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; c.blogForm = { body_markdown: '', reading_time_minutes: '' }; });
+
+  it('insertBlogImageMarkdown appends an image snippet', () => {
+    c.blogForm.body_markdown = 'Intro';
+    c.insertBlogImageMarkdown('/img.png', 'Logo\n');
+    expect(c.blogForm.body_markdown).toContain('![Logo](/img.png)');
+    c.insertBlogImageMarkdown('/x.png', null);
+    expect(c.blogForm.body_markdown).toContain('![image](/x.png)');
+  });
+
+  it('blogA11yIssues flags missing or generic alt text', () => {
+    c.blogForm.body_markdown = '![](a.png) ![photo](b.png) ![Good alt](c.png) ![x]()';
+    const issues = c.blogA11yIssues();
+    expect(issues.map((i: any) => i.url)).toEqual(['a.png', 'b.png']);
+  });
+
+  it('suggestAltFromUrl derives readable text from a filename', () => {
+    expect(c.suggestAltFromUrl('https://x.com/photos/my-cool_pic.jpg?v=2#h')).toBe('my cool pic');
+    expect(c.suggestAltFromUrl('')).toBe('image');
+  });
+
+  it('promptFixBlogImageAlt updates the targeted image alt', () => {
+    const promptSpy = spyOn(window, 'prompt').and.returnValue('Descriptive');
+    c.blogForm.body_markdown = '![](a.png) ![](b.png)';
+    c.promptFixBlogImageAlt(1);
+    expect(c.blogForm.body_markdown).toContain('![Descriptive](b.png)');
+    expect(c.blogA11yOpen).toBe(true);
+
+    promptSpy.and.returnValue(''); // cancel keeps content
+    const before = c.blogForm.body_markdown;
+    c.promptFixBlogImageAlt(0);
+    expect(c.blogForm.body_markdown).toBe(before);
+  });
+
+  it('setBlogMarkdownImageAlt ignores blank alt text', () => {
+    c.blogForm.body_markdown = '![](a.png)';
+    c.setBlogMarkdownImageAlt(0, '   ');
+    expect(c.blogForm.body_markdown).toBe('![](a.png)');
+  });
+
+  it('blogWritingAids counts words and headings, applyBlogReadingTimeEstimate sets minutes', () => {
+    c.blogForm.body_markdown = '# Title\n\nsome words here for counting purposes.';
+    const aids = c.blogWritingAids();
+    expect(aids.words).toBeGreaterThan(0);
+    expect(aids.minutes).toBeGreaterThan(0);
+    expect(aids.headings.length).toBe(1);
+    c.applyBlogReadingTimeEstimate();
+    expect(c.blogForm.reading_time_minutes).toBe(String(aids.minutes));
+
+    c.blogForm.body_markdown = '';
+    c.applyBlogReadingTimeEstimate(); // 0 minutes → no-op
+    expect(c.blogWritingAids().minutes).toBe(0);
+  });
+
+  it('onBlogImageDragOver only reacts to file drags', () => {
+    const noFiles = { dataTransfer: { types: ['text/plain'] }, preventDefault: jasmine.createSpy('pd') } as any;
+    c.onBlogImageDragOver(noFiles);
+    expect(noFiles.preventDefault).not.toHaveBeenCalled();
+    const withFiles = { dataTransfer: { types: ['Files'], dropEffect: '' }, preventDefault: jasmine.createSpy('pd') } as any;
+    c.onBlogImageDragOver(withFiles);
+    expect(withFiles.preventDefault).toHaveBeenCalled();
+    expect(withFiles.dataTransfer.dropEffect).toBe('copy');
+  });
+
+  it('onBlogImageDrop uploads dropped images and inserts markdown', async () => {
+    const ta = document.createElement('textarea');
+    c.blogForm.body_markdown = '';
+    c.selectedBlogKey = 'blog.a';
+    c.blogImageLayout = 'default';
+    const file = new File(['x'], 'pic.png', { type: 'image/png' });
+    const ev = {
+      dataTransfer: { files: [file], types: ['Files'] },
+      preventDefault: jasmine.createSpy('pd'),
+      stopPropagation: jasmine.createSpy('sp'),
+    } as any;
+    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', sort_order: 0 }] }));
+    await c.onBlogImageDrop(ta, ev);
+    expect(c.blogImages.length).toBe(1);
+    expect(h.toast.success).toHaveBeenCalled();
+  });
+
+  it('onBlogImageDrop ignores non-image drops and missing keys', async () => {
+    const ta = document.createElement('textarea');
+    const noImg = { dataTransfer: { files: [], types: [] }, preventDefault: jasmine.createSpy('pd'), stopPropagation: jasmine.createSpy('sp') } as any;
+    await c.onBlogImageDrop(ta, noImg);
+    expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+
+    c.selectedBlogKey = null;
+    const file = new File(['x'], 'pic.png', { type: 'image/png' });
+    const ev = { dataTransfer: { files: [file], types: ['Files'] }, preventDefault: jasmine.createSpy('pd'), stopPropagation: jasmine.createSpy('sp') } as any;
+    await c.onBlogImageDrop(ta, ev);
+    expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+  });
+
+  it('onBlogImageDrop reports an upload error', async () => {
+    const ta = document.createElement('textarea');
+    c.selectedBlogKey = 'blog.a';
+    const file = new File(['x'], 'pic.png', { type: 'image/png' });
+    const ev = { dataTransfer: { files: [file], types: ['Files'] }, preventDefault: jasmine.createSpy('pd'), stopPropagation: jasmine.createSpy('sp') } as any;
+    h.admin.uploadContentImage.and.returnValue(throwError(() => new Error('x')));
+    await c.onBlogImageDrop(ta, ev);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+});
