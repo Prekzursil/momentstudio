@@ -4115,3 +4115,128 @@ describe('AdminComponent — lifecycle and section orchestration', () => {
     expect(h.admin.transferOwner).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — blog meta, info save, social thumbnails, content', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('getBlogSummary reads localized or base-language summaries', () => {
+    c.blogBaseLang = 'en';
+    expect(c.getBlogSummary({ summary: { en: 'Hi', ro: 'Salut' } }, 'ro')).toBe('Salut');
+    expect(c.getBlogSummary({ summary: 'Plain' }, 'en')).toBe('Plain');
+    expect(c.getBlogSummary({ summary: 'Plain' }, 'ro')).toBe(''); // not base lang
+    expect(c.getBlogSummary({}, 'en')).toBe('');
+  });
+
+  it('buildBlogMeta serialises tags, summary, cover and pin info', () => {
+    c.blogBaseLang = 'en';
+    c.blogMeta = { summary: { en: 'old' } };
+    c.blogForm = {
+      tags: 'a, b', series: 'S', cover_image_url: '/c', cover_fit: 'contain',
+      reading_time_minutes: '5', summary: 'New summary', pinned: true, pin_order: '3',
+    };
+    const meta = c.buildBlogMeta('ro');
+    expect(meta.tags).toEqual(['a', 'b']);
+    expect(meta.series).toBe('S');
+    expect(meta.cover_fit).toBe('contain');
+    expect(meta.reading_time_minutes).toBe(5);
+    expect(meta.summary).toEqual({ en: 'old', ro: 'New summary' });
+    expect(meta.pinned).toBe(true);
+    expect(meta.pin_order).toBe(3);
+
+    c.blogForm = { tags: '', series: '', cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', summary: '', pinned: false, pin_order: '1' };
+    const meta2 = c.buildBlogMeta('en');
+    expect('tags' in meta2).toBe(false);
+    expect('pinned' in meta2).toBe(false);
+  });
+
+  it('saveInfo and saveInfoBoth persist content', () => {
+    spyOn(c, 'loadContentPages');
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveInfo('page.about', 'Body', 'en');
+    expect(c.infoMessage).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveInfoBoth('page.about', { en: 'E', ro: 'R' });
+    expect(c.infoMessage).toBeTruthy();
+
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveInfo('page.about', 'Body', 'en');
+    expect(c.infoError).toBeTruthy();
+  });
+
+  it('togglePageNeedsTranslation updates and reports', () => {
+    spyOn(c, 'loadContentPages');
+    h.admin.updateContentTranslationStatus.and.returnValue(of({ needs_translation_en: true, needs_translation_ro: false }));
+    c.togglePageNeedsTranslation('page.about', 'en', checkboxEvent(true));
+    expect(c.pageBlocksNeedsTranslationEn['page.about']).toBe(true);
+    expect(h.toast.success).toHaveBeenCalled();
+
+    h.admin.updateContentTranslationStatus.and.returnValue(throwError(() => ({ error: { detail: 'd' } })));
+    c.togglePageNeedsTranslation('page.about', 'ro', checkboxEvent(false));
+    expect(h.toast.error).toHaveBeenCalledWith('d');
+  });
+
+  it('fetchSocialThumbnail validates url and updates the page', () => {
+    c.socialForm = { instagram_pages: [{ url: '', label: '', thumbnail_url: '' }], facebook_pages: [] };
+    c.fetchSocialThumbnail('instagram', 0); // no url
+    expect(h.admin.fetchSocialThumbnail).not.toHaveBeenCalled();
+
+    c.socialForm.instagram_pages = [{ url: '/ig', label: 'IG', thumbnail_url: '' }];
+    h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '/thumb.jpg' }));
+    c.fetchSocialThumbnail('instagram', 0);
+    expect(c.socialForm.instagram_pages[0].thumbnail_url).toBe('/thumb.jpg');
+
+    h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '' }));
+    c.fetchSocialThumbnail('instagram', 0);
+    const key = (c as any).socialThumbKey('instagram', 0);
+    expect(c.socialThumbErrors[key]).toBeTruthy();
+
+    h.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({ error: { detail: 'fail' } })));
+    c.fetchSocialThumbnail('instagram', 0);
+    expect(c.socialThumbErrors[key]).toBe('fail');
+  });
+
+  it('selectContent loads a content block and saveContent persists it', () => {
+    h.admin.getContent.and.returnValue(of({ key: 'site.x', title: 'T', body_markdown: 'B', status: 'draft', version: 1 }));
+    c.selectContent({ key: 'site.x', title: 'T' });
+    expect(c.contentForm.body_markdown).toBe('B');
+
+    spyOn(c, 'reloadContentBlocks');
+    c.selectedContent = { key: 'site.x' };
+    c.contentForm = { title: 'T2', body_markdown: 'B2', status: 'published' };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveContent();
+    expect(c.selectedContent).toBeNull();
+    expect(h.toast.success).toHaveBeenCalled();
+
+    c.selectedContent = { key: 'site.x' };
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveContent();
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.cancelContent();
+    expect(c.selectedContent).toBeNull();
+  });
+
+  it('selectContent reports a load error', () => {
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.selectContent({ key: 'site.x', title: 'T' });
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('pruneBlogBulkSelection drops keys no longer present', () => {
+    c.contentBlocks = [{ key: 'blog.a' }];
+    c.blogBulkSelection = new Set(['blog.a', 'blog.gone']);
+    (c as any).pruneBlogBulkSelection();
+    expect(Array.from(c.blogBulkSelection)).toEqual(['blog.a']);
+  });
+
+  it('syncContentVersions remembers each block version', () => {
+    (c as any).syncContentVersions([{ key: 'k1', version: 3 }, { key: 'k2', version: 0 }]);
+    expect((c as any).contentVersions['k1']).toBe(3);
+    expect((c as any).contentVersions['k2']).toBeUndefined();
+  });
+});
