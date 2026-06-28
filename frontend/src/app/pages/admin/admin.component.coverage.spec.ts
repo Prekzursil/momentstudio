@@ -2754,3 +2754,170 @@ describe('AdminComponent — navigation editor', () => {
     expect(h.admin.getContent).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — reusable blocks and content pages', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.reusableBlocks = [];
+    c.reusableBlocksMeta = {};
+    c.reusableBlocksExists = true;
+    c.pageBlocks = {};
+  });
+
+  it('visibleContentPages respects the hidden toggle', () => {
+    c.contentPages = [{ key: 'a', hidden: false }, { key: 'b', hidden: true }];
+    c.showHiddenPages = false;
+    expect(c.visibleContentPages().map((p: any) => p.key)).toEqual(['a']);
+    c.showHiddenPages = true;
+    expect(c.visibleContentPages().length).toBe(2);
+  });
+
+  it('loadContentPages sorts and maps translation flags then errors', () => {
+    spyOn(c, 'loadPageBlocks'); // ensureSelectedPageIsVisible may trigger a reload
+    h.admin.listContentPages.and.returnValue(of([
+      { key: 'page.b', slug: 'b', needs_translation_en: true },
+      { key: 'page.a', slug: 'a' },
+    ]));
+    c.loadContentPages();
+    expect(c.contentPages[0].slug).toBe('a');
+    expect(c.pageBlocksNeedsTranslationEn['page.b']).toBe(true);
+    h.admin.listContentPages.and.returnValue(throwError(() => new Error('x')));
+    c.loadContentPages();
+    expect(c.contentPagesError).toBeTruthy();
+  });
+
+  it('parseReusableBlocks keeps valid snippets and de-dupes', () => {
+    const parsed = c.parseReusableBlocks({ snippets: [
+      { id: 'a', title: 'A', block: { type: 'text' } },
+      { id: 'a', title: 'dup', block: { type: 'text' } },
+      { id: '', title: 'no id', block: {} },
+      { id: 'b', title: 'B', block: null },
+      null,
+    ] });
+    expect(parsed.map((b: any) => b.id)).toEqual(['a']);
+    expect(c.parseReusableBlocks({})).toEqual([]);
+  });
+
+  it('slugifyReusableBlockId normalises to a slug', () => {
+    expect(c.slugifyReusableBlockId('Héllo World!')).toBe('hello-world');
+    expect(c.slugifyReusableBlockId('   ')).toBe('');
+  });
+
+  it('deepCloneJson clones and tolerates cyclic input', () => {
+    const obj = { a: 1, b: { c: 2 } };
+    const clone = c.deepCloneJson(obj);
+    expect(clone).toEqual(obj);
+    expect(clone).not.toBe(obj);
+    const cyclic: any = {}; cyclic.self = cyclic;
+    expect(c.deepCloneJson(cyclic)).toBe(cyclic); // returns original on failure
+  });
+
+  it('filteredReusableBlocks sorts and filters by query', () => {
+    c.reusableBlocks = [{ id: 'z', title: 'Zeta' }, { id: 'a', title: 'Alpha' }];
+    c.reusableBlocksQuery = '';
+    expect(c.filteredReusableBlocks().map((b: any) => b.id)).toEqual(['a', 'z']);
+    c.reusableBlocksQuery = 'alph';
+    expect(c.filteredReusableBlocks().map((b: any) => b.id)).toEqual(['a']);
+  });
+
+  it('savePageBlockAsReusable prompts for a title and persists', () => {
+    const promptSpy = spyOn(window, 'prompt').and.returnValue('My Block');
+    c.pageBlocks['page.about'] = [{ key: 'b1', type: 'text', title: { en: 'Hello', ro: '' }, layout: {} }];
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { snippets: [{ id: 'my-block', title: 'My Block', block: { type: 'text' } }] } }));
+    c.savePageBlockAsReusable('page.about', 'b1');
+    expect(c.reusableBlocks.length).toBe(1);
+    expect(h.toast.success).toHaveBeenCalled();
+
+    // cancel via empty prompt
+    promptSpy.and.returnValue('');
+    h.admin.updateContentBlock.calls.reset();
+    c.savePageBlockAsReusable('page.about', 'b1');
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+
+    // missing target
+    c.savePageBlockAsReusable('page.about', 'ghost');
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+  });
+
+  it('savePageBlockAsReusable confirms overwrite of an existing id', () => {
+    spyOn(window, 'prompt').and.returnValue('Existing');
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.reusableBlocks = [{ id: 'existing', title: 'Existing', block: { type: 'text' } }];
+    c.pageBlocks['page.about'] = [{ key: 'b1', type: 'text', title: {}, layout: {} }];
+    c.savePageBlockAsReusable('page.about', 'b1');
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled(); // declined
+
+    confirmSpy.and.returnValue(true);
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { snippets: [] } }));
+    c.savePageBlockAsReusable('page.about', 'b1');
+    expect(h.admin.updateContentBlock).toHaveBeenCalled();
+  });
+
+  it('persistReusableBlocks creates when block does not yet exist and handles conflict', () => {
+    c.reusableBlocksExists = false;
+    h.admin.createContent.and.returnValue(of({ version: 1, meta: { snippets: [] } }));
+    c.persistReusableBlocks([{ id: 'a', title: 'A', block: { type: 'text' } }], { successKey: 'k' });
+    expect(h.admin.createContent).toHaveBeenCalled();
+    expect(c.reusableBlocksExists).toBe(true);
+
+    c.reusableBlocksExists = true;
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.persistReusableBlocks([], {});
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    c.persistReusableBlocks([], {});
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('insertReusableBlockIntoPage clones a snippet into a page', () => {
+    c.reusableBlocks = [{ id: 'r1', title: 'R', block: { type: 'text', layout: {} } }];
+    c.pageBlocks['page.about'] = [];
+    c.insertReusableBlockIntoPage('page.about', 'r1');
+    expect(c.pageBlocks['page.about'].length).toBe(1);
+    expect(c.pageBlocks['page.about'][0].type).toBe('text');
+    c.insertReusableBlockIntoPage('page.about', 'missing'); // no-op
+    expect(c.pageBlocks['page.about'].length).toBe(1);
+  });
+
+  it('deleteReusableBlock confirms before removing', () => {
+    c.reusableBlocks = [{ id: 'r1', title: 'R', block: {} }];
+    c.reusableBlocksExists = true;
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.deleteReusableBlock('r1');
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+    confirmSpy.and.returnValue(true);
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { snippets: [] } }));
+    c.deleteReusableBlock('r1');
+    expect(h.toast.success).toHaveBeenCalled();
+    c.deleteReusableBlock('ghost'); // no-op
+  });
+
+  it('loadReusableBlocks maps snippets and handles 404 vs error', () => {
+    h.admin.getContent.and.returnValue(of({ version: 2, meta: { snippets: [{ id: 'a', title: 'A', block: { type: 'text' } }] } }));
+    c.loadReusableBlocks();
+    expect(c.reusableBlocks.length).toBe(1);
+    expect(c.reusableBlocksExists).toBe(true);
+
+    h.admin.getContent.and.returnValue(throwError(() => ({ status: 404 })));
+    c.loadReusableBlocks();
+    expect(c.reusableBlocksExists).toBe(false);
+
+    h.admin.getContent.and.returnValue(throwError(() => ({ status: 500 })));
+    c.loadReusableBlocks();
+    expect(c.reusableBlocksError).toBeTruthy();
+  });
+
+  it('onPageBlocksKeyChange switches the active page key and resets preview', () => {
+    spyOn(c, 'loadPageBlocks');
+    c.pageBlocksKey = 'page.about';
+    c.onPageBlocksKeyChange('page.about'); // unchanged → no-op
+    expect(c.loadPageBlocks).not.toHaveBeenCalled();
+    c.onPageBlocksKeyChange('page.contact');
+    expect(c.pageBlocksKey).toBe('page.contact');
+    expect(c.pagePreviewToken).toBeNull();
+    expect(c.loadPageBlocks).toHaveBeenCalledWith('page.contact');
+  });
+});
