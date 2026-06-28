@@ -2604,3 +2604,153 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
     expect(c.infoLang).toBe('ro');
   });
 });
+
+describe('AdminComponent — navigation editor', () => {
+  let h: Harness;
+  let c: any;
+  const link = (id: string) => ({ id, url: '/u', label: { en: 'E', ro: 'R' } });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.navigationForm = { header_links: [], footer_handcrafted_links: [], footer_legal_links: [] };
+  });
+
+  it('parseNavigationLinks keeps complete links and de-dupes ids', () => {
+    const parsed = c.parseNavigationLinks([
+      { id: 'a', url: '/x', label: { en: 'E', ro: 'R' } },
+      { id: 'a', url: '/y', label: { en: 'E', ro: 'R' } }, // dup id
+      { url: '/z', label: { en: 'E', ro: 'R' } }, // auto id
+      { url: '', label: { en: 'E', ro: 'R' } }, // missing url
+      null,
+    ]);
+    expect(parsed.length).toBe(2);
+    expect(parsed[1].id).toBe('nav_3');
+    expect(c.parseNavigationLinks('nope')).toEqual([]);
+  });
+
+  it('loadNavigation maps meta and falls back to defaults on error', () => {
+    h.admin.getContent.and.returnValue(of({ version: 2, meta: { header_links: [{ id: 'h', url: '/', label: { en: 'Home', ro: 'Acasa' } }] } }));
+    c.loadNavigation();
+    expect(c.navigationForm.header_links.length).toBe(1);
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.loadNavigation();
+    expect(c.navigationForm.header_links.length).toBeGreaterThan(0); // defaults
+  });
+
+  it('addNavigationLink / removeNavigationLink manage all three lists', () => {
+    c.addNavigationLink('header');
+    c.addNavigationLink('footer_handcrafted');
+    c.addNavigationLink('footer_legal');
+    expect(c.navigationForm.header_links.length).toBe(1);
+    expect(c.navigationForm.footer_handcrafted_links.length).toBe(1);
+    expect(c.navigationForm.footer_legal_links.length).toBe(1);
+
+    const hid = c.navigationForm.header_links[0].id;
+    c.removeNavigationLink('header', hid);
+    expect(c.navigationForm.header_links.length).toBe(0);
+    c.removeNavigationLink('footer_handcrafted', c.navigationForm.footer_handcrafted_links[0].id);
+    expect(c.navigationForm.footer_handcrafted_links.length).toBe(0);
+    c.removeNavigationLink('footer_legal', c.navigationForm.footer_legal_links[0].id);
+    expect(c.navigationForm.footer_legal_links.length).toBe(0);
+    c.removeNavigationLink('header', '  '); // guard
+  });
+
+  it('moveNavigationLink reorders within bounds', () => {
+    c.navigationForm.header_links = [link('a'), link('b'), link('c')];
+    c.moveNavigationLink('header', 'a', 1);
+    expect(c.navigationForm.header_links.map((l: any) => l.id)).toEqual(['b', 'a', 'c']);
+    c.moveNavigationLink('header', 'a', 99); // out of range
+    c.moveNavigationLink('header', '  '); // guard
+    c.navigationForm.footer_legal_links = [link('x'), link('y')];
+    c.moveNavigationLink('footer_legal', 'y', -1);
+    expect(c.navigationForm.footer_legal_links.map((l: any) => l.id)).toEqual(['y', 'x']);
+  });
+
+  it('resetNavigationDefaults requires confirmation', () => {
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.resetNavigationDefaults();
+    expect(c.navigationForm.header_links.length).toBe(0);
+    confirmSpy.and.returnValue(true);
+    c.resetNavigationDefaults();
+    expect(c.navigationForm.header_links.length).toBeGreaterThan(0);
+  });
+
+  it('navigation drag lifecycle reorders and guards mismatches', () => {
+    c.navigationForm.header_links = [link('a'), link('b'), link('c')];
+    c.onNavigationDragStart('header', 'a');
+    expect(c.draggingNavId).toBe('a');
+    const ev = dragEvent();
+    c.onNavigationDragOver(ev);
+    expect(ev.preventDefault).toHaveBeenCalled();
+
+    c.onNavigationDrop('header', 'c');
+    expect(c.navigationForm.header_links.map((l: any) => l.id)).toEqual(['b', 'c', 'a']);
+    expect(c.draggingNavId).toBeNull();
+
+    c.onNavigationDragStart('header', 'a');
+    c.onNavigationDrop('footer_legal', 'x'); // list mismatch → reset
+    expect(c.draggingNavId).toBeNull();
+
+    c.onNavigationDragStart('header', 'ghost');
+    c.onNavigationDrop('header', 'b'); // from missing
+    expect(c.draggingNavId).toBeNull();
+  });
+
+  it('saveNavigation rejects invalid links and persists otherwise', () => {
+    c.navigationForm.header_links = [{ id: 'a', url: '/x', label: { en: 'E', ro: '' } }]; // invalid
+    c.saveNavigation();
+    expect(c.navigationError).toBeTruthy();
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+
+    c.navigationForm = {
+      header_links: [link('a'), { id: '', url: '', label: { en: '', ro: '' } }], // blank skipped
+      footer_handcrafted_links: [],
+      footer_legal_links: [],
+    };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveNavigation();
+    expect(c.navigationMessage).toBeTruthy();
+
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
+    c.navigationForm = { header_links: [link('a')], footer_handcrafted_links: [], footer_legal_links: [] };
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveNavigation();
+    expect(c.navigationError).toBeTruthy();
+
+    c.navigationForm = { header_links: [link('a')], footer_handcrafted_links: [], footer_legal_links: [] };
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    c.saveNavigation();
+    expect(c.navigationMessage).toBeTruthy();
+  });
+
+  it('saveSocial sanitises pages and persists with fallbacks', () => {
+    c.socialForm = {
+      phone: ' 123 ', email: ' a@b.c ',
+      instagram_pages: [{ label: 'IG', url: '/ig', thumbnail_url: '' }, { label: '', url: '/x', thumbnail_url: '' }],
+      facebook_pages: [],
+    };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveSocial();
+    const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+    expect(payload.meta.instagram_pages.length).toBe(1); // blank label dropped
+    expect(c.socialMessage).toBeTruthy();
+
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveSocial();
+    expect(c.socialError).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    c.saveSocial();
+    expect(c.socialMessage).toBeTruthy();
+  });
+
+  it('selectSeoLang switches language and reloads', () => {
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '' }));
+    c.selectSeoLang('ro');
+    expect(c.seoLang).toBe('ro');
+    expect(h.admin.getContent).toHaveBeenCalled();
+  });
+});
