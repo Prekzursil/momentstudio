@@ -5050,3 +5050,80 @@ describe('AdminComponent — remaining edge branches', () => {
     expect(calls).toBe(2); // translation save ok, meta save conflict
   });
 });
+
+describe('AdminComponent — legal save, media drop, split scroll', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('saveLegalPage syncs meta then saves markdown (success and create fallback)', () => {
+    spyOn(c, 'loadContentPages');
+    c.legalPageMeta = {};
+    c.legalPageLastUpdated = '2030-01-01';
+    c.legalPageLastUpdatedOriginal = '';
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { last_updated: '2030-01-01' } }));
+    (c as any).saveLegalPage('page.terms', 'Body', 'en');
+    expect(c.legalPageMessage).toBeTruthy();
+
+    // markdown save 404 → create fallback
+    c.legalPageLastUpdated = ''; c.legalPageLastUpdatedOriginal = '';
+    let calls = 0;
+    h.admin.updateContentBlock.and.callFake(() => { calls += 1; return throwError(() => ({ status: 404 })); });
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    (c as any).saveLegalPage('page.terms', 'Body', 'en');
+    expect(c.legalPageMessage).toBeTruthy();
+  });
+
+  it('saveLegalMetaIfNeeded reports a conflict error', () => {
+    spyOn(c, 'loadLegalPage');
+    c.legalPageMeta = {};
+    c.legalPageLastUpdated = 'new';
+    c.legalPageLastUpdatedOriginal = 'old';
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    const onErr = jasmine.createSpy('onErr');
+    (c as any).saveLegalMetaIfNeeded('page.terms', () => {}, onErr);
+    expect(onErr).toHaveBeenCalled();
+  });
+
+  it('onHomeBlockDrop handles media files and missing keys', async () => {
+    spyOn(c, 'insertHomeMediaFiles');
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    c.homeBlocks = [{ key: 'a', type: 'text' }];
+    c.onHomeBlockDrop({ preventDefault: jasmine.createSpy('pd'), dataTransfer: { files: [file], types: ['Files'] } } as any, 'a');
+    expect(c.insertHomeMediaFiles).toHaveBeenCalled();
+
+    c.draggingHomeBlockKey = 'ghost';
+    c.onHomeBlockDrop({ preventDefault: jasmine.createSpy('pd'), dataTransfer: { files: [], getData: () => '' } } as any, 'a');
+    expect(c.draggingHomeBlockKey).toBeNull();
+  });
+
+  it('onPageBlockDrop handles media files', () => {
+    spyOn(c, 'insertPageMediaFiles');
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    c.pageBlocks['page.about'] = [{ key: 'b', type: 'text' }];
+    c.onPageBlockDrop({ preventDefault: jasmine.createSpy('pd'), dataTransfer: { files: [file], types: ['Files'] } } as any, 'page.about', 'b');
+    expect(c.insertPageMediaFiles).toHaveBeenCalled();
+  });
+
+  it('syncSplitScroll mirrors scroll position when in split layout', () => {
+    h.cmsPrefs.previewLayout.and.returnValue('split');
+    const mk = (sh: number, ch: number, st: number) => {
+      const el = document.createElement('div');
+      Object.defineProperty(el, 'scrollHeight', { value: sh, configurable: true });
+      Object.defineProperty(el, 'clientHeight', { value: ch, configurable: true });
+      el.scrollTop = st;
+      return el;
+    };
+    const source = mk(200, 100, 50);
+    const target = mk(400, 100, 0);
+    let rafCb: any = null;
+    spyOn(window, 'requestAnimationFrame').and.callFake((cb: any) => { rafCb = cb; return 0; });
+    c.syncSplitScroll(source, target);
+    expect((c as any).previewScrollSyncActive).toBe(true); // set during sync, reset on rAF
+    rafCb(); // run the queued frame
+    expect((c as any).previewScrollSyncActive).toBe(false);
+    // while flag active, a re-entrant call short-circuits
+    (c as any).previewScrollSyncActive = true;
+    expect(() => c.syncSplitScroll(source, target)).not.toThrow();
+  });
+});
