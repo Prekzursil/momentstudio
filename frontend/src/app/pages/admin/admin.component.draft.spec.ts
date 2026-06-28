@@ -152,6 +152,25 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       mgr.initFromServer({ a: 1 });
       expect(mgr.hasRestorableAutosave).toBe(false);
     });
+
+    it('ignores a non-string ts (coerced to empty then rejected)', () => {
+      const { component } = createComponent();
+      const mgr = freshManager(component);
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ v: 1, ts: 123, state_json: JSON.stringify({ a: 9 }) }),
+      );
+      mgr.initFromServer({ a: 1 });
+      expect(mgr.hasRestorableAutosave).toBe(false);
+    });
+
+    it('ignores a non-string state_json (coerced to empty then rejected)', () => {
+      const { component } = createComponent();
+      const mgr = freshManager(component);
+      localStorage.setItem(storageKey, JSON.stringify({ v: 1, ts: '2024-01-01', state_json: 123 }));
+      mgr.initFromServer({ a: 1 });
+      expect(mgr.hasRestorableAutosave).toBe(false);
+    });
   });
 
   describe('observe + debounced commit', () => {
