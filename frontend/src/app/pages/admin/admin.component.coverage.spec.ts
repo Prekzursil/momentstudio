@@ -64,7 +64,7 @@ function makeAdminSpy(): any {
     'previewFindReplaceContent', 'applyFindReplaceContent', 'linkCheckContent',
     'fetchSocialThumbnail', 'sendScheduledReport', 'createPagePreviewToken',
     'createHomePreviewToken', 'listFeaturedCollections', 'createFeaturedCollection',
-    'updateFeaturedCollection', 'reorderCategories',
+    'updateFeaturedCollection', 'reorderCategories', 'listContentRedirects',
   ];
   const spy: any = jasmine.createSpyObj('AdminService', methods);
   for (const m of methods) spy[m].and.returnValue(of(undefined));
@@ -2919,5 +2919,171 @@ describe('AdminComponent — reusable blocks and content pages', () => {
     expect(c.pageBlocksKey).toBe('page.contact');
     expect(c.pagePreviewToken).toBeNull();
     expect(c.loadPageBlocks).toHaveBeenCalledWith('page.contact');
+  });
+});
+
+describe('AdminComponent — content redirects, find/replace, link check', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.redirectsMeta = { page: 1, limit: 20, total_pages: 1, total_items: 0 };
+    h.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
+  });
+
+  it('loadContentRedirects resets page, stores results and handles errors', () => {
+    h.admin.listContentRedirects.and.returnValue(of({ items: [{ id: 'r1' }], meta: { page: 2, total_pages: 3, total_items: 5, limit: 20 } }));
+    c.loadContentRedirects(true);
+    expect(c.redirects.length).toBe(1);
+    expect(c.redirectsMeta.total_pages).toBe(3);
+    h.admin.listContentRedirects.and.returnValue(throwError(() => new Error('x')));
+    c.loadContentRedirects();
+    expect(c.redirectsError).toBeTruthy();
+  });
+
+  it('setRedirectsPage clamps and reloads only on change', () => {
+    spyOn(c, 'loadContentRedirects');
+    c.redirectsMeta = { page: 1, limit: 20, total_pages: 3 };
+    c.setRedirectsPage(1); // unchanged
+    expect(c.loadContentRedirects).not.toHaveBeenCalled();
+    c.setRedirectsPage(99); // clamps to 3
+    expect(c.redirectsMeta.page).toBe(3);
+    expect(c.loadContentRedirects).toHaveBeenCalled();
+  });
+
+  it('deleteContentRedirect guards id and confirmation', () => {
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.deleteContentRedirect('  ');
+    expect(h.admin.deleteContentRedirect).not.toHaveBeenCalled();
+    c.deleteContentRedirect('r1'); // declined
+    expect(h.admin.deleteContentRedirect).not.toHaveBeenCalled();
+    confirmSpy.and.returnValue(true);
+    spyOn(c, 'loadContentRedirects');
+    h.admin.deleteContentRedirect.and.returnValue(of({}));
+    c.deleteContentRedirect('r1');
+    expect(h.toast.success).toHaveBeenCalled();
+    h.admin.deleteContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'd' } })));
+    c.deleteContentRedirect('r1');
+    expect(h.toast.error).toHaveBeenCalledWith('d');
+  });
+
+  it('createContentRedirect validates fields and reports outcomes', () => {
+    spyOn(c, 'loadContentRedirects');
+    c.redirectCreateSaving = false;
+    c.redirectCreateFrom = ''; c.redirectCreateTo = 'x';
+    c.createContentRedirect();
+    expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
+
+    c.redirectCreateFrom = 'a'; c.redirectCreateTo = 'b';
+    h.admin.upsertContentRedirect.and.returnValue(of({}));
+    c.createContentRedirect();
+    expect(c.redirectCreateFrom).toBe('');
+    expect(h.toast.success).toHaveBeenCalled();
+
+    c.redirectCreateFrom = 'a'; c.redirectCreateTo = 'b';
+    h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'dup' } })));
+    c.createContentRedirect();
+    expect(h.toast.error).toHaveBeenCalledWith('dup');
+
+    c.redirectCreateSaving = true;
+    c.createContentRedirect(); // busy guard
+  });
+
+  it('importContentRedirects handles file selection and outcomes', () => {
+    spyOn(c, 'loadContentRedirects');
+    c.importContentRedirects({ target: { files: [], value: 'x' } } as any); // no file
+    expect(h.admin.importContentRedirects).not.toHaveBeenCalled();
+
+    const file = new File(['csv'], 'r.csv', { type: 'text/csv' });
+    h.admin.importContentRedirects.and.returnValue(of({ created: 1 }));
+    c.importContentRedirects({ target: { files: [file], value: 'x' } } as any);
+    expect(c.redirectsImportResult).toEqual({ created: 1 } as any);
+
+    h.admin.importContentRedirects.and.returnValue(throwError(() => ({ error: { detail: 'bad' } })));
+    c.importContentRedirects({ target: { files: [file], value: 'x' } } as any);
+    expect(h.toast.error).toHaveBeenCalledWith('bad');
+  });
+
+  it('findReplaceKeyPrefix maps each scope', () => {
+    c.findReplaceScope = 'blog'; expect(c.findReplaceKeyPrefix()).toBe('blog.');
+    c.findReplaceScope = 'home'; expect(c.findReplaceKeyPrefix()).toBe('home.');
+    c.findReplaceScope = 'site'; expect(c.findReplaceKeyPrefix()).toBe('site.');
+    c.findReplaceScope = 'pages'; expect(c.findReplaceKeyPrefix()).toBe('page.');
+    c.findReplaceScope = 'all'; expect(c.findReplaceKeyPrefix()).toBeUndefined();
+  });
+
+  it('previewFindReplace validates input and stores preview', () => {
+    c.findReplaceFind = '';
+    c.previewFindReplace();
+    expect(h.admin.previewFindReplaceContent).not.toHaveBeenCalled();
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.findReplaceFind = 'foo';
+    c.findReplaceScope = 'blog';
+    h.admin.previewFindReplaceContent.and.returnValue(of({ total_items: 2, total_matches: 5 }));
+    c.previewFindReplace();
+    expect(c.findReplacePreview.total_matches).toBe(5);
+    expect(c.findReplacePreviewKey).toBeTruthy();
+
+    h.admin.previewFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'e' } })));
+    c.previewFindReplace();
+    expect(c.findReplaceError).toBe('e');
+  });
+
+  it('applyFindReplace requires a matching preview and confirmation', () => {
+    c.findReplaceFind = '';
+    c.applyFindReplace();
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.findReplaceFind = 'foo';
+    c.findReplaceScope = 'blog';
+    c.findReplacePreview = null;
+    c.applyFindReplace(); // no preview
+    expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
+
+    // create a matching preview first
+    h.admin.previewFindReplaceContent.and.returnValue(of({ total_items: 1, total_matches: 2 }));
+    c.previewFindReplace();
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.applyFindReplace(); // declined
+    expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
+
+    confirmSpy.and.returnValue(true);
+    h.admin.applyFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'oops' } })));
+    c.applyFindReplace();
+    expect(h.toast.error).toHaveBeenCalledWith('oops'); // error handler toasts the detail
+    expect(c.findReplaceApplying).toBe(false);
+
+    // success path with a fresh preview
+    c.previewFindReplace();
+    h.admin.applyFindReplaceContent.and.returnValue(of({ updated_blocks: 1, total_replacements: 2 }));
+    c.applyFindReplace();
+    expect(c.findReplaceApplyResult).toBeTruthy();
+  });
+
+  it('runLinkCheck validates key and stores issues', () => {
+    c.runLinkCheck('   ');
+    expect(h.admin.linkCheckContent).not.toHaveBeenCalled();
+    h.admin.linkCheckContent.and.returnValue(of({ issues: [{ url: '/x' }] }));
+    c.runLinkCheck('blog.a');
+    expect(c.linkCheckIssues.length).toBe(1);
+    h.admin.linkCheckContent.and.returnValue(throwError(() => ({ error: { detail: 'le' } })));
+    c.runLinkCheck('blog.a');
+    expect(c.linkCheckError).toBe('le');
+  });
+
+  it('redirect/page helper functions map values', () => {
+    expect(c.redirectKeyToUrl('page.about')).toBe('/pages/about');
+    expect(c.redirectKeyToUrl('blog.x')).toBe('blog.x');
+    expect(c.pageKeySupportsRequiresAuth('page.x')).toBe(true);
+    expect(c.pageKeySupportsRequiresAuth('home.x')).toBe(false);
+    for (const t of ['image', 'columns', 'cta', 'faq', 'testimonials', 'product_grid', 'form', 'gallery', 'banner', 'carousel', 'text']) {
+      expect(c.pageBlockTypeLabelKey(t)).toContain(t === 'text' ? 'text' : t);
+    }
+    expect(c.allowedPageBlockTypesForKey('page.about').length).toBeGreaterThan(0);
+    expect(c.canRenamePageKey('page.about')).toBe(false);
+    expect(c.canRenamePageKey('page.custom')).toBe(true);
+    expect(c.canRenamePageKey('home.x')).toBe(false);
   });
 });
