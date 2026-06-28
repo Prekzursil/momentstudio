@@ -2303,3 +2303,146 @@ describe('AdminComponent — blog image markdown, a11y and writing aids', () => 
     expect(h.toast.error).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — settings save/load (checkout, reports, assets)', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 })); // safe reload
+  });
+
+  it('saveCheckoutSettings normalises values and persists', () => {
+    c.checkoutSettingsForm = {
+      shipping_fee_ron: '15.5', free_shipping_threshold_ron: '-1', fee_type: 'percent',
+      fee_value: '5', vat_enabled: true, vat_rate_percent: '200', money_rounding: 'down',
+      receipt_share_days: '5000',
+    };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveCheckoutSettings();
+    const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+    expect(payload.meta.shipping_fee_ron).toBe(15.5);
+    expect(payload.meta.free_shipping_threshold_ron).toBe(300); // negative → default
+    expect(payload.meta.fee_type).toBe('percent');
+    expect(payload.meta.vat_rate_percent).toBe(10); // out of range → default
+    expect(payload.meta.money_rounding).toBe('down');
+    expect(payload.meta.receipt_share_days).toBe(365); // out of range → default
+    expect(c.checkoutSettingsMessage).toBeTruthy();
+  });
+
+  it('saveCheckoutSettings handles a version conflict', () => {
+    c.checkoutSettingsForm = {};
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveCheckoutSettings();
+    expect(c.checkoutSettingsError).toBeTruthy();
+  });
+
+  it('saveCheckoutSettings falls back to create then reports errors', () => {
+    c.checkoutSettingsForm = {};
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    c.saveCheckoutSettings();
+    expect(c.checkoutSettingsMessage).toBeTruthy();
+
+    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+    c.saveCheckoutSettings();
+    expect(c.checkoutSettingsError).toBeTruthy();
+  });
+
+  it('loadReportsSettings parses meta and resets on error', () => {
+    h.admin.getContent.and.returnValue(of({
+      version: 3,
+      meta: {
+        reports_weekly_enabled: 'yes', reports_weekly_weekday: 9, reports_weekly_hour_utc: 30,
+        reports_monthly_enabled: 1, reports_monthly_day: 40, reports_monthly_hour_utc: '5',
+        reports_recipients: 'a@b.com, bad, c@d.com',
+        reports_weekly_last_sent_period_end: '2030', reports_weekly_last_error: 'err',
+      },
+    }));
+    c.loadReportsSettings();
+    expect(c.reportsSettingsForm.weekly_enabled).toBe(true);
+    expect(c.reportsSettingsForm.weekly_weekday).toBe(6); // clamped
+    expect(c.reportsSettingsForm.weekly_hour_utc).toBe(23); // clamped
+    expect(c.reportsSettingsForm.monthly_day).toBe('28'); // clamped
+    expect(c.reportsSettingsForm.recipients).toContain('a@b.com');
+    expect(c.reportsWeeklyLastSent).toBe('2030');
+
+    h.admin.getContent.and.returnValue(of({ meta: { reports_recipients: ['x@y.com', ''] } }));
+    c.loadReportsSettings();
+    expect(c.reportsSettingsForm.recipients).toBe('x@y.com');
+
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.loadReportsSettings();
+    expect(c.reportsSettingsForm.recipients).toBe('');
+  });
+
+  it('saveReportsSettings filters recipients and persists', () => {
+    c.reportsSettingsMeta = {};
+    c.reportsSettingsForm = {
+      weekly_enabled: true, weekly_weekday: 2, weekly_hour_utc: 9,
+      monthly_enabled: false, monthly_day: '15', monthly_hour_utc: 8,
+      recipients: 'a@b.com, a@b.com, invalid, c@d.com',
+    };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { reports_recipients: ['a@b.com', 'c@d.com'] } }));
+    c.saveReportsSettings();
+    const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+    expect(payload.meta.reports_recipients).toEqual(['a@b.com', 'c@d.com']);
+    expect(payload.meta.reports_top_products_limit).toBe(5);
+    expect(c.reportsSettingsMessage).toBeTruthy();
+
+    // no valid recipients deletes the key
+    c.reportsSettingsForm.recipients = 'none';
+    c.saveReportsSettings();
+    const p2 = h.admin.updateContentBlock.calls.mostRecent().args[1];
+    expect('reports_recipients' in p2.meta).toBe(false);
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveReportsSettings();
+    expect(c.reportsSettingsError).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    h.admin.createContent.and.returnValue(of({ version: 1, meta: {} }));
+    c.saveReportsSettings();
+    expect(c.reportsSettingsMessage).toBeTruthy();
+    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+    c.saveReportsSettings();
+    expect(c.reportsSettingsError).toBeTruthy();
+  });
+
+  it('sendReportNow guards re-entry and reports skip/sent/error', () => {
+    spyOn(c, 'loadReportsSettings'); // reload would clear the success message
+    c.reportsSending = true;
+    c.sendReportNow('weekly');
+    expect(h.admin.sendScheduledReport).not.toHaveBeenCalled();
+
+    c.reportsSending = false;
+    h.admin.sendScheduledReport.and.returnValue(of({ skipped: true }));
+    c.sendReportNow('weekly');
+    expect(c.reportsSettingsMessage).toContain('skipped');
+
+    h.admin.sendScheduledReport.and.returnValue(of({ skipped: false }));
+    c.sendReportNow('monthly', true);
+    expect(c.reportsSettingsMessage).toContain('sent');
+
+    h.admin.sendScheduledReport.and.returnValue(throwError(() => new Error('x')));
+    c.sendReportNow('weekly');
+    expect(c.reportsSettingsError).toBeTruthy();
+  });
+
+  it('saveAssets persists with conflict and create fallback', () => {
+    c.assetsForm = { logo: '/l.png' };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveAssets();
+    expect(c.assetsMessage).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveAssets();
+    expect(c.assetsError).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    c.saveAssets();
+    expect(c.assetsMessage).toBeTruthy();
+  });
+});
