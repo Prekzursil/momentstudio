@@ -65,6 +65,7 @@ function makeAdminSpy(): any {
     'fetchSocialThumbnail', 'sendScheduledReport', 'createPagePreviewToken',
     'createHomePreviewToken', 'listFeaturedCollections', 'createFeaturedCollection',
     'updateFeaturedCollection', 'reorderCategories', 'listContentRedirects',
+    'linkCheckContentPreview',
   ];
   const spy: any = jasmine.createSpyObj('AdminService', methods);
   for (const m of methods) spy[m].and.returnValue(of(undefined));
@@ -3825,5 +3826,83 @@ describe('AdminComponent — blog editor loading and meta sync', () => {
     expect(c.selectedBlogKey).toBeNull();
     expect(c.blogImages).toEqual([]);
     expect(c.blogVersions).toEqual([]);
+  });
+});
+
+describe('AdminComponent — page publish checklist', () => {
+  let h: Harness;
+  let c: any;
+  const KEY = 'page.about';
+  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; });
+
+  it('computePagePublishChecklistLocal flags empty enabled blocks of every type', () => {
+    c.pageBlocksNeedsTranslationEn[KEY] = true;
+    c.pageBlocksNeedsTranslationRo[KEY] = true;
+    c.pageBlocks[KEY] = [
+      { key: '1', type: 'text', enabled: true, body_markdown: {} },
+      { key: '2', type: 'columns', enabled: true, columns: [{}] },
+      { key: '3', type: 'cta', enabled: true, title: {}, body_markdown: {}, cta_label: {}, cta_url: '' },
+      { key: '4', type: 'faq', enabled: true, faq_items: [{}] },
+      { key: '5', type: 'testimonials', enabled: true, testimonials: [{}] },
+      { key: '6', type: 'product_grid', enabled: true, product_grid_source: 'category', product_grid_category_slug: '' },
+      { key: '7', type: 'product_grid', enabled: true, product_grid_source: 'collection', product_grid_collection_slug: '' },
+      { key: '8', type: 'product_grid', enabled: true, product_grid_source: 'products', product_grid_product_slugs: '' },
+      { key: '9', type: 'form', enabled: true },
+      { key: '10', type: 'image', enabled: true, url: '', alt: {} },
+      { key: '11', type: 'gallery', enabled: true, images: [] },
+      { key: '12', type: 'banner', enabled: true, slide: { image_url: '' } },
+      { key: '13', type: 'carousel', enabled: true, slides: [] },
+    ];
+    const r = (c as any).computePagePublishChecklistLocal(KEY);
+    expect(r.missingTranslations).toEqual(['en', 'ro']);
+    expect(r.emptySections.length).toBeGreaterThan(5);
+  });
+
+  it('computePagePublishChecklistLocal flags missing alt text for filled media', () => {
+    c.pageBlocks[KEY] = [
+      { key: 'i', type: 'image', enabled: true, url: '/u', alt: { en: '', ro: '' } },
+      { key: 'g', type: 'gallery', enabled: true, images: [{ url: '/g', alt: { en: '', ro: '' } }] },
+      { key: 'b', type: 'banner', enabled: true, slide: { image_url: '/b', alt: { en: '', ro: '' } } },
+      { key: 'c', type: 'carousel', enabled: true, slides: [{ image_url: '/s', alt: { en: '', ro: '' } }] },
+    ];
+    const r = (c as any).computePagePublishChecklistLocal(KEY);
+    expect(r.missingAlt.length).toBeGreaterThanOrEqual(8);
+    expect(r.emptySections.length).toBe(0);
+  });
+
+  it('computePagePublishChecklistLocal flags all-disabled pages', () => {
+    c.pageBlocks[KEY] = [{ key: '1', type: 'text', enabled: false, body_markdown: {} }];
+    const r = (c as any).computePagePublishChecklistLocal(KEY);
+    expect(r.emptySections.length).toBe(1);
+  });
+
+  it('openPagePublishChecklist runs link check (success and error)', () => {
+    c.pageBlocks[KEY] = [];
+    c.pageBlocksMeta[KEY] = {};
+    h.admin.linkCheckContentPreview.and.returnValue(of({ issues: [{ url: '/x' }] }));
+    c.openPagePublishChecklist(KEY);
+    expect(c.pagePublishChecklistOpen).toBe(true);
+    expect(c.pagePublishChecklistResult.linkIssues.length).toBe(1);
+
+    h.admin.linkCheckContentPreview.and.returnValue(throwError(() => ({ error: { detail: 'le' } })));
+    c.openPagePublishChecklist(KEY);
+    expect(c.pagePublishChecklistError).toBe('le');
+  });
+
+  it('pagePublishChecklistHasIssues and close/confirm flows', () => {
+    expect(c.pagePublishChecklistHasIssues()).toBe(false);
+    c.pagePublishChecklistResult = { missingTranslations: ['en'], missingAlt: [], emptySections: [], linkIssues: [] };
+    expect(c.pagePublishChecklistHasIssues()).toBe(true);
+
+    c.closePagePublishChecklist();
+    expect(c.pagePublishChecklistOpen).toBe(false);
+    expect(c.pagePublishChecklistResult).toBeNull();
+
+    c.confirmPagePublishChecklist(); // no key → no-op
+    c.pagePublishChecklistKey = KEY;
+    c.pagePublishChecklistOpen = true;
+    spyOn(c, 'savePageBlocks');
+    c.confirmPagePublishChecklist();
+    expect(c.savePageBlocks).toHaveBeenCalledWith(KEY, { bypassChecklist: true });
   });
 });
