@@ -4629,3 +4629,93 @@ describe('AdminComponent — saveBlogPost paths and cover image', () => {
     expect(c.blogImages.length).toBe(1);
   });
 });
+
+describe('AdminComponent — CMS media upload', () => {
+  let h: Harness;
+  let c: any;
+  const imgFile = () => new File(['x'], 'My_Cool-Pic.png', { type: 'image/png' });
+  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; c.homeBlocks = []; });
+
+  it('normalizeCmsImageFiles filters by type/size and caps at 12', () => {
+    expect((c as any).normalizeCmsImageFiles([new File(['x'], 'a.txt', { type: 'text/plain' })])).toEqual([]);
+    const ok = (c as any).normalizeCmsImageFiles([imgFile()]);
+    expect(ok.length).toBe(1);
+  });
+
+  it('filenameToAltText derives readable alt', () => {
+    expect((c as any).filenameToAltText('My_Cool-Pic.png')).toBe('My Cool Pic');
+    expect((c as any).filenameToAltText('.png')).toBe('Image');
+  });
+
+  it('lastUploadedContentImage extracts the last image', () => {
+    expect((c as any).lastUploadedContentImage({ images: [] })).toBeNull();
+    expect((c as any).lastUploadedContentImage({ images: [{ url: '/a', focal_x: 10, focal_y: 20 }] })).toEqual({ url: '/a', focal_x: 10, focal_y: 20 });
+    expect((c as any).lastUploadedContentImage({ images: [{ url: '' }] })).toBeNull();
+  });
+
+  it('onCmsMediaDragOver reacts only to file drags', () => {
+    const noFiles = { dataTransfer: { types: ['text/plain'], files: [] }, preventDefault: jasmine.createSpy('pd') } as any;
+    c.onCmsMediaDragOver(noFiles);
+    expect(noFiles.preventDefault).not.toHaveBeenCalled();
+    const withFiles = { dataTransfer: { types: ['Files'], files: [], dropEffect: '' }, preventDefault: jasmine.createSpy('pd') } as any;
+    c.onCmsMediaDragOver(withFiles);
+    expect(withFiles.preventDefault).toHaveBeenCalled();
+  });
+
+  it('onPageMediaDropOnContainer ignores non-self drops and inserts files', async () => {
+    const el = document.createElement('div');
+    const notSelf = { target: document.createElement('span'), currentTarget: el, dataTransfer: { files: [imgFile()] }, preventDefault: jasmine.createSpy('pd') } as any;
+    c.onPageMediaDropOnContainer(notSelf, 'page.about');
+    expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+
+    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', sort_order: 0, focal_x: 50, focal_y: 50 }] }));
+    const ev = { target: el, currentTarget: el, dataTransfer: { files: [imgFile()] }, preventDefault: jasmine.createSpy('pd') } as any;
+    c.onPageMediaDropOnContainer(ev, 'page.about');
+    await Promise.resolve(); await Promise.resolve();
+    expect(h.admin.uploadContentImage).toHaveBeenCalled();
+  });
+
+  it('onHomeMediaDropOnContainer inserts dropped files', async () => {
+    const el = document.createElement('div');
+    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', sort_order: 0, focal_x: 50, focal_y: 50 }] }));
+    const ev = { target: el, currentTarget: el, dataTransfer: { files: [imgFile()] }, preventDefault: jasmine.createSpy('pd') } as any;
+    c.onHomeMediaDropOnContainer(ev);
+    await Promise.resolve(); await Promise.resolve();
+    expect(h.admin.uploadContentImage).toHaveBeenCalled();
+  });
+
+  it('insertHomeMediaFiles inserts a single image then a gallery', async () => {
+    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', focal_x: 50, focal_y: 50 }] }));
+    c.homeBlocks = [];
+    await (c as any).insertHomeMediaFiles(0, [imgFile()]);
+    expect(c.homeBlocks.some((b: any) => b.type === 'image')).toBe(true);
+
+    c.homeBlocks = [];
+    await (c as any).insertHomeMediaFiles(0, [imgFile(), imgFile()]);
+    expect(c.homeBlocks.some((b: any) => b.type === 'gallery')).toBe(true);
+  });
+
+  it('insertHomeMediaFiles ignores empty/invalid file sets', async () => {
+    await (c as any).insertHomeMediaFiles(0, []);
+    expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+  });
+
+  it('uploadCmsImageToKey creates content on 404 then retries upload', async () => {
+    let uploadCalls = 0;
+    h.admin.uploadContentImage.and.callFake(() => {
+      uploadCalls += 1;
+      return uploadCalls === 1
+        ? throwError(() => ({ status: 404 }))
+        : of({ images: [{ url: '/after.png', focal_x: 50, focal_y: 50 }] });
+    });
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    const res = await (c as any).uploadCmsImageToKey('page.about', imgFile());
+    expect(res.url).toBe('/after.png');
+    expect(h.admin.createContent).toHaveBeenCalled();
+  });
+
+  it('uploadCmsImageToKey rethrows non-404 errors', async () => {
+    h.admin.uploadContentImage.and.returnValue(throwError(() => ({ status: 500 })));
+    await expectAsync((c as any).uploadCmsImageToKey('page.about', imgFile())).toBeRejected();
+  });
+});
