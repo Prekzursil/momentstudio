@@ -63,9 +63,12 @@ export class GoogleCallbackComponent implements OnInit {
       next: (res) => {
         localStorage.removeItem(GOOGLE_FLOW_KEY);
         if (res.requires_completion || res.completion_token) {
-          if (typeof sessionStorage !== 'undefined' && res.completion_token) {
-            sessionStorage.setItem('google_completion_token', res.completion_token);
-            sessionStorage.setItem('google_completion_user', JSON.stringify(res.user));
+          if (res.completion_token) {
+            /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser */
+            if (typeof sessionStorage !== 'undefined') {
+              sessionStorage.setItem('google_completion_token', res.completion_token);
+              sessionStorage.setItem('google_completion_user', JSON.stringify(res.user));
+            }
           }
           this.toast.info(
             this.translate.instant('auth.completeProfileRequiredTitle'),
@@ -75,9 +78,11 @@ export class GoogleCallbackComponent implements OnInit {
           return;
         }
         if (res.requires_two_factor && res.two_factor_token) {
+          const twoFactorUser = JSON.stringify(res.user ?? null);
+          /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser */
           if (typeof sessionStorage !== 'undefined') {
             sessionStorage.setItem('two_factor_token', res.two_factor_token);
-            sessionStorage.setItem('two_factor_user', JSON.stringify(res.user ?? null));
+            sessionStorage.setItem('two_factor_user', twoFactorUser);
             sessionStorage.setItem('two_factor_remember', JSON.stringify(true));
           }
           this.toast.info(this.translate.instant('auth.twoFactorRequired'));
@@ -89,6 +94,7 @@ export class GoogleCallbackComponent implements OnInit {
       },
       error: (err) => {
         localStorage.removeItem(GOOGLE_FLOW_KEY);
+        /* istanbul ignore next -- SSR guard: sessionStorage is always defined in the browser */
         if (typeof sessionStorage !== 'undefined') {
           sessionStorage.removeItem('google_completion_token');
           sessionStorage.removeItem('google_completion_user');
