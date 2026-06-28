@@ -1706,3 +1706,160 @@ describe('AdminComponent — category hierarchy and translations', () => {
     expect(h.toast.error).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — blog selection and bulk actions', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.contentBlocks = [{ key: 'blog.a' }, { key: 'blog.b' }, { key: 'page.x' }];
+  });
+
+  it('selection toggles track keys and reset errors', () => {
+    expect(c.isBlogSelected('blog.a')).toBe(false);
+    c.toggleBlogSelection('blog.a', checkboxEvent(true));
+    expect(c.isBlogSelected('blog.a')).toBe(true);
+    c.toggleBlogSelection('blog.a', checkboxEvent(false));
+    expect(c.isBlogSelected('blog.a')).toBe(false);
+  });
+
+  it('areAllBlogSelected and toggleSelectAllBlogs operate over blog posts', () => {
+    expect(c.areAllBlogSelected()).toBe(false);
+    c.toggleSelectAllBlogs(checkboxEvent(true));
+    expect(c.areAllBlogSelected()).toBe(true);
+    c.toggleSelectAllBlogs(checkboxEvent(false));
+    expect(c.blogBulkSelection.size).toBe(0);
+    c.toggleSelectAllBlogs({ target: null } as any); // guard
+    c.contentBlocks = [];
+    expect(c.areAllBlogSelected()).toBe(false);
+  });
+
+  it('clearBlogBulkSelection empties the set', () => {
+    c.blogBulkSelection.add('blog.a');
+    c.clearBlogBulkSelection();
+    expect(c.blogBulkSelection.size).toBe(0);
+  });
+
+  it('canApplyBlogBulk enforces selection and per-action requirements', () => {
+    expect(c.canApplyBlogBulk()).toBe(false); // empty selection
+    c.blogBulkSelection.add('blog.a');
+    c.blogBulkAction = 'publish';
+    expect(c.canApplyBlogBulk()).toBe(true);
+
+    c.blogBulkAction = 'schedule';
+    c.blogBulkPublishAt = '';
+    expect(c.canApplyBlogBulk()).toBe(false);
+    c.blogBulkPublishAt = '2030-01-01T10:00';
+    c.blogBulkUnpublishAt = '2029-01-01T10:00'; // before publish
+    expect(c.canApplyBlogBulk()).toBe(false);
+    c.blogBulkUnpublishAt = '2031-01-01T10:00';
+    expect(c.canApplyBlogBulk()).toBe(true);
+    c.blogBulkUnpublishAt = 'invalid-date';
+    expect(c.canApplyBlogBulk()).toBe(false);
+    c.blogBulkUnpublishAt = '';
+    expect(c.canApplyBlogBulk()).toBe(true);
+
+    c.blogBulkAction = 'tags_add';
+    c.blogBulkTags = '';
+    expect(c.canApplyBlogBulk()).toBe(false);
+    c.blogBulkTags = 'news, news, deals';
+    expect(c.canApplyBlogBulk()).toBe(true);
+  });
+
+  it('blogBulkPreview renders a label per action', () => {
+    expect(c.blogBulkPreview()).toContain('previewEmpty'); // no selection
+    c.blogBulkSelection.add('blog.a');
+    c.blogBulkAction = 'publish';
+    expect(c.blogBulkPreview()).toContain('previewPublish');
+    c.blogBulkAction = 'unpublish';
+    expect(c.blogBulkPreview()).toContain('previewUnpublish');
+    c.blogBulkAction = 'schedule';
+    c.blogBulkPublishAt = '2030-01-01T10:00';
+    c.blogBulkUnpublishAt = '';
+    expect(c.blogBulkPreview()).toContain('previewSchedule');
+    c.blogBulkAction = 'tags_add';
+    c.blogBulkTags = 'a';
+    expect(c.blogBulkPreview()).toContain('previewTagsAdd');
+    c.blogBulkAction = 'tags_remove';
+    expect(c.blogBulkPreview()).toContain('previewTagsRemove');
+    c.blogBulkAction = 'noop' as any;
+    expect(c.blogBulkPreview()).toContain('previewEmpty');
+  });
+
+  it('applyBlogBulkAction publishes selected posts and reports failures', () => {
+    spyOn(c, 'reloadContentBlocks');
+    c.blogBulkSelection = new Set(['blog.a', 'blog.b']);
+    c.blogBulkAction = 'publish';
+    h.admin.getContent.and.callFake((key: string) => of({ key, version: 1, meta: {} }));
+    h.admin.updateContentBlock.and.callFake((key: string) =>
+      key === 'blog.b' ? throwError(() => ({ key })) : of({ key, version: 2 }),
+    );
+    c.applyBlogBulkAction();
+    expect(h.toast.success).toHaveBeenCalled();
+    expect(h.toast.error).toHaveBeenCalled();
+    expect(c.blogBulkSaving).toBe(false);
+    expect(c.reloadContentBlocks).toHaveBeenCalled();
+  });
+
+  it('applyBlogBulkAction reports no-changes when content cannot be loaded', () => {
+    c.blogBulkSelection = new Set(['blog.a']);
+    c.blogBulkAction = 'publish';
+    h.admin.getContent.and.returnValue(throwError(() => new Error('missing')));
+    c.applyBlogBulkAction();
+    expect(c.blogBulkError).toContain('noChanges');
+  });
+
+  it('applyBlogBulkAction is a no-op when the action is not applicable', () => {
+    c.blogBulkSelection.clear();
+    c.applyBlogBulkAction();
+    expect(h.admin.getContent).not.toHaveBeenCalled();
+  });
+
+  it('extractBlogSlug and currentBlogSlug strip the blog prefix', () => {
+    expect(c.extractBlogSlug('blog.hello')).toBe('hello');
+    expect(c.extractBlogSlug('hello')).toBe('hello');
+    c.selectedBlogKey = null;
+    expect(c.currentBlogSlug()).toBe('');
+    c.selectedBlogKey = 'blog.world';
+    expect(c.currentBlogSlug()).toBe('world');
+  });
+
+  it('startBlogCreate and cancelBlogCreate manage the create form', () => {
+    c.startBlogCreate();
+    expect(c.showBlogCreate).toBe(true);
+    expect(c.blogCreate.baseLang).toBe('en');
+    expect(c.blogCreate.status).toBe('draft');
+    c.cancelBlogCreate();
+    expect(c.showBlogCreate).toBe(false);
+  });
+
+  it('parseTags trims, filters and de-duplicates case-insensitively', () => {
+    expect(c.parseTags(' a, b ,a ,B, ')).toEqual(['a', 'b']);
+    expect(c.parseTags('')).toEqual([]);
+  });
+
+  it('tags_add/tags_remove build merged meta payloads', () => {
+    c.blogBulkAction = 'tags_add';
+    c.blogBulkTags = 'news, deals';
+    const added = c.buildBlogBulkPayload({ meta: { tags: ['news'] } });
+    expect(added.meta.tags).toEqual(['news', 'deals']);
+    c.blogBulkAction = 'tags_remove';
+    const removed = c.buildBlogBulkPayload({ meta: { tags: 'news,deals' } });
+    expect(removed.meta.tags).toBeUndefined(); // all removed → key deleted
+    c.blogBulkTags = '';
+    expect(c.buildBlogBulkPayload({ meta: {} })).toBeNull();
+  });
+
+  it('schedule payload validates publish/unpublish ordering', () => {
+    c.blogBulkAction = 'schedule';
+    c.blogBulkPublishAt = '';
+    expect(c.buildBlogBulkPayload({ meta: {} })).toBeNull();
+    c.blogBulkPublishAt = '2030-01-01T10:00';
+    c.blogBulkUnpublishAt = '2029-01-01T10:00';
+    expect(c.buildBlogBulkPayload({ meta: {} })).toBeNull();
+    expect(c.blogBulkError).toContain('invalidSchedule');
+    c.blogBulkUnpublishAt = '';
+    expect(c.buildBlogBulkPayload({ meta: {} })).toEqual(jasmine.objectContaining({ status: 'published' }));
+  });
+});
