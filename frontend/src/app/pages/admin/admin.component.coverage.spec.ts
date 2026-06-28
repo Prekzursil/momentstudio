@@ -4971,3 +4971,82 @@ describe('AdminComponent — loadSections fallbacks and draft restore', () => {
     expect(() => (c as any).observeCmsDrafts()).not.toThrow();
   });
 });
+
+describe('AdminComponent — remaining edge branches', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { localStorage.clear(); h = createComponent(); c = h.component as any; });
+
+  it('submitOwnerTransfer surfaces server error detail', () => {
+    h.auth.role.and.returnValue('owner');
+    c.ownerTransferIdentifier = 'u@x.com';
+    spyOn(window, 'prompt').and.returnValue('pw');
+    h.admin.transferOwner.and.returnValue(throwError(() => ({ error: { detail: 'nope' } })));
+    c.submitOwnerTransfer();
+    expect(c.ownerTransferError).toBe('nope');
+
+    h.admin.transferOwner.and.returnValue(throwError(() => ({})));
+    c.submitOwnerTransfer();
+    expect(c.ownerTransferError).toBeTruthy();
+  });
+
+  it('hasUnsavedChanges detects dirty page and blog drafts', () => {
+    const pm = c.ensurePageDraft('page.about');
+    pm.initFromServer({ blocks: [], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false });
+    pm.observe({ blocks: [{ key: 'x', type: 'text' }], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false });
+    expect(c.hasUnsavedChanges()).toBe(true);
+
+    const h2 = createComponent();
+    const c2 = h2.component as any;
+    const bm = c2.ensureBlogDraft('blog.a', 'en');
+    bm.initFromServer({ title: 'a', body_markdown: '', status: 'draft', published_at: '', published_until: '', meta: {} });
+    bm.observe({ title: 'b', body_markdown: '', status: 'draft', published_at: '', published_until: '', meta: {} });
+    expect(c2.hasUnsavedChanges()).toBe(true);
+  });
+
+  it('blogPinnedPosts applies tie-breakers by published_at then updated_at', () => {
+    c.contentBlocks = [
+      { key: 'blog.a', meta: { pinned: true, pin_order: 1 }, published_at: '2020-01-01', updated_at: 'a' },
+      { key: 'blog.b', meta: { pinned: true, pin_order: 1 }, published_at: '2021-01-01', updated_at: 'b' },
+      { key: 'blog.c', meta: { pinned: true, pin_order: 1 }, published_at: '2021-01-01', updated_at: 'z' },
+    ];
+    const ranked = c.blogPinnedPosts().map((p: any) => p.key);
+    expect(ranked[0]).toBe('blog.c'); // newer published_at, then updated_at desc
+  });
+
+  it('saveContent handles a version conflict via reload', () => {
+    h.admin.getContent.and.returnValue(of({ key: 'site.x', title: 'T', body_markdown: 'B', status: 'draft', version: 1 }));
+    c.selectedContent = { key: 'site.x' };
+    c.contentForm = { title: 'T', body_markdown: 'B', status: 'draft' };
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveContent();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('onCategoryDrop reports a reorder failure', () => {
+    c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }];
+    c.draggingSlug = 'a';
+    h.admin.reorderCategories.and.returnValue(throwError(() => new Error('x')));
+    c.onCategoryDrop('b');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('saveBlogPost translation meta save handles a conflict', () => {
+    c.selectedBlogKey = 'blog.a';
+    c.blogEditLang = 'ro';
+    c.blogBaseLang = 'en';
+    c.blogForm = { title: 'Titlu', body_markdown: 'Corp', status: 'draft', published_at: '', published_until: '', summary: '', tags: 'x', series: '', cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', pinned: false, pin_order: '1' };
+    c.blogMeta = {};
+    c.ensureBlogDraft('blog.a', 'ro').initFromServer(c.currentBlogDraftState());
+    spyOn(c, 'reloadContentBlocks');
+    spyOn(c, 'setBlogEditLang');
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, lang: 'ro', title: 'Titlu', body_markdown: 'Corp' }));
+    let calls = 0;
+    h.admin.updateContentBlock.and.callFake(() => {
+      calls += 1;
+      return calls === 1 ? of({ version: 2 }) : throwError(() => ({ status: 409 }));
+    });
+    c.saveBlogPost();
+    expect(calls).toBe(2); // translation save ok, meta save conflict
+  });
+});
