@@ -4528,3 +4528,104 @@ describe('AdminComponent — full block serialization and remaining flows', () =
     expect((c as any).slugifyPageSlug('')).toBe('page');
   });
 });
+
+describe('AdminComponent — saveBlogPost paths and cover image', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.selectedBlogKey = 'blog.a';
+    c.blogEditLang = 'en';
+    c.blogBaseLang = 'en';
+    c.blogForm = {
+      title: 'Title here long enough', body_markdown: 'Body text', status: 'draft',
+      published_at: '', published_until: '', summary: '', tags: '', series: '',
+      cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', pinned: false, pin_order: '1',
+    };
+    c.blogMeta = {};
+    c.ensureBlogDraft('blog.a', 'en').initFromServer(c.currentBlogDraftState());
+    spyOn(c, 'reloadContentBlocks');
+    spyOn(c, 'loadBlogEditor');
+    spyOn(c, 'setBlogEditLang');
+  });
+
+  it('saves a base-language post (success and conflict and error)', () => {
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveBlogPost();
+    expect(h.toast.success).toHaveBeenCalled();
+    expect(c.loadBlogEditor).toHaveBeenCalledWith('blog.a');
+
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, lang: 'en' }));
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveBlogPost();
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    c.saveBlogPost();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('respects the a11y publish gate', () => {
+    c.blogForm = { ...c.blogForm, title: 'A title that is plenty long', body_markdown: '![](a.png)', status: 'published' };
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.saveBlogPost(); // declined → no save
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+    confirmSpy.and.returnValue(true);
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveBlogPost();
+    expect(h.admin.updateContentBlock).toHaveBeenCalled();
+  });
+
+  it('saves a translation (no meta change, meta change, and errors)', () => {
+    c.blogEditLang = 'ro'; // not base
+    c.blogForm = { ...c.blogForm, title: 'Titlu', body_markdown: 'Corp', status: 'draft' };
+    c.blogMeta = {};
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveBlogPost(); // metaChanged false (buildBlogMeta == {})
+    expect(h.toast.success).toHaveBeenCalled();
+
+    c.blogForm = { ...c.blogForm, title: 'Titlu', body_markdown: 'Corp', status: 'draft', tags: 'x' };
+    let calls = 0;
+    h.admin.updateContentBlock.and.callFake(() => { calls += 1; return of({ version: calls + 1 }); });
+    c.saveBlogPost(); // metaChanged true → two updates
+    expect(calls).toBeGreaterThanOrEqual(2);
+
+    c.blogForm.tags = 'y';
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    c.saveBlogPost();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('uploadBlogCoverImage sets the cover and clears it', () => {
+    c.blogEditLang = 'en'; c.blogBaseLang = 'en';
+    c.uploadBlogCoverImage({ target: { files: [], value: '' } } as any); // no file
+    expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+
+    const file = new File(['x'], 'cover.png', { type: 'image/png' });
+    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/cover.png', sort_order: 0 }] }));
+    c.uploadBlogCoverImage({ target: { files: [file], value: 'v' } } as any);
+    expect(c.blogForm.cover_image_url).toBe('/cover.png');
+
+    h.admin.uploadContentImage.and.returnValue(throwError(() => new Error('x')));
+    c.uploadBlogCoverImage({ target: { files: [file], value: 'v' } } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.clearBlogCoverOverride();
+    expect(c.blogForm.cover_image_url).toBe('');
+
+    // wrong lang short-circuits
+    c.blogEditLang = 'ro';
+    c.uploadBlogCoverImage({ target: { files: [file], value: 'v' } } as any);
+  });
+
+  it('selectBlogCoverAsset sets cover and tracks the image', () => {
+    c.blogEditLang = 'en'; c.blogBaseLang = 'en';
+    c.blogImages = [];
+    c.selectBlogCoverAsset({ url: '', id: 'a' }); // empty url
+    expect(c.blogForm.cover_image_url).toBeFalsy();
+    c.selectBlogCoverAsset({ url: '/c.png', id: 'a1', focal_x: 10, focal_y: 20 });
+    expect(c.blogForm.cover_image_url).toBe('/c.png');
+    expect(c.blogImages.length).toBe(1);
+    c.selectBlogCoverAsset({ url: '/c2.png', id: 'a1' }); // update existing
+    expect(c.blogImages.length).toBe(1);
+  });
+});
