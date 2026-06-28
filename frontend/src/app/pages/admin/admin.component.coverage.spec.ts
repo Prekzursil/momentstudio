@@ -85,6 +85,8 @@ function makeCmsPrefs(): any {
     mode: jasmine.createSpy('mode').and.returnValue('basic'),
     previewDevice: jasmine.createSpy('previewDevice').and.returnValue('desktop'),
     previewLayout: jasmine.createSpy('previewLayout').and.returnValue('stacked'),
+    previewLang: jasmine.createSpy('previewLang').and.returnValue('en'),
+    previewTheme: jasmine.createSpy('previewTheme').and.returnValue('light'),
     setMode: jasmine.createSpy('setMode'),
     setPreviewDevice: jasmine.createSpy('setPreviewDevice'),
     setPreviewLayout: jasmine.createSpy('setPreviewLayout'),
@@ -1861,5 +1863,130 @@ describe('AdminComponent — blog selection and bulk actions', () => {
     expect(c.blogBulkError).toContain('invalidSchedule');
     c.blogBulkUnpublishAt = '';
     expect(c.buildBlogBulkPayload({ meta: {} })).toEqual(jasmine.objectContaining({ status: 'published' }));
+  });
+});
+
+describe('AdminComponent — preview links', () => {
+  let h: Harness;
+  let c: any;
+  let copy: jasmine.Spy;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    copy = spyOn(c, 'copyToClipboard').and.returnValue(Promise.resolve(true));
+  });
+
+  it('pagePreviewSlug extracts the slug part', () => {
+    expect(c.pagePreviewSlug('page.about')).toBe('about');
+    expect(c.pagePreviewSlug('notpage')).toBeNull();
+    expect(c.pagePreviewSlug('page.')).toBeNull();
+  });
+
+  it('pagePublicPath maps known slugs and falls back', () => {
+    expect(c.pagePublicPath('')).toBe('/pages');
+    expect(c.pagePublicPath('about')).toBe('/about');
+    expect(c.pagePublicPath('contact')).toBe('/contact');
+    expect(c.pagePublicPath('faq')).toBe('/pages/faq');
+  });
+
+  it('previewOriginFromResponse extracts origin or falls back to window', () => {
+    expect(c.previewOriginFromResponse({ url: 'https://ex.com/p?a=1' })).toBe('https://ex.com');
+    expect(c.previewOriginFromResponse({ url: '' })).toBe(window.location.origin);
+    expect(c.previewOriginFromResponse({ url: '/relative/path' })).toBe(window.location.origin);
+  });
+
+  it('pagePreviewShareUrl requires a matching token and builds a URL', () => {
+    expect(c.pagePreviewShareUrl('')).toBeNull();
+    c.pagePreviewToken = null;
+    expect(c.pagePreviewShareUrl('about')).toBeNull();
+    c.pagePreviewToken = 'tok';
+    c.pagePreviewForSlug = 'about';
+    c.pagePreviewOrigin = 'https://ex.com';
+    const url = c.pagePreviewShareUrl('about');
+    expect(url).toContain('preview=tok');
+    expect(url).toContain('/about');
+    const src = c.pagePreviewIframeSrc('about');
+    expect(String(src)).toContain('__ts=');
+    expect(c.pagePreviewIframeSrc('other')).toBeNull();
+  });
+
+  it('generatePagePreviewLink stores the token and copies the url', () => {
+    c.generatePagePreviewLink('   '); // empty → no call
+    expect(h.admin.createPagePreviewToken).not.toHaveBeenCalled();
+
+    h.admin.createPagePreviewToken.and.returnValue(of({ token: 'pt', expires_at: 'soon', url: 'https://ex.com/about' }));
+    c.generatePagePreviewLink('about');
+    expect(c.pagePreviewToken).toBe('pt');
+    expect(copy).toHaveBeenCalled();
+
+    h.admin.createPagePreviewToken.and.returnValue(throwError(() => new Error('x')));
+    c.generatePagePreviewLink('about');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('refreshPagePreview bumps the nonce only when a token exists', () => {
+    c.pagePreviewToken = null;
+    c.pagePreviewNonce = 0;
+    c.refreshPagePreview();
+    expect(c.pagePreviewNonce).toBe(0);
+    c.pagePreviewToken = 'x';
+    c.refreshPagePreview();
+    expect(c.pagePreviewNonce).toBeGreaterThan(0);
+  });
+
+  it('home preview share url, iframe src, generate and refresh', () => {
+    expect(c.homePreviewShareUrl()).toBeNull();
+    c.homePreviewToken = 'ht';
+    c.homePreviewOrigin = 'https://ex.com';
+    expect(c.homePreviewShareUrl()).toContain('preview=ht');
+    expect(String(c.homePreviewIframeSrc())).toContain('__ts=');
+
+    c.homePreviewToken = null;
+    h.admin.createHomePreviewToken.and.returnValue(of({ token: 'ht2', expires_at: 's', url: 'https://ex.com/' }));
+    c.generateHomePreviewLink();
+    expect(c.homePreviewToken).toBe('ht2');
+    expect(copy).toHaveBeenCalled();
+
+    h.admin.createHomePreviewToken.and.returnValue(throwError(() => new Error('x')));
+    c.generateHomePreviewLink();
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.homePreviewToken = null;
+    c.homePreviewNonce = 0;
+    c.refreshHomePreview();
+    expect(c.homePreviewNonce).toBe(0);
+    c.homePreviewToken = 'ht2';
+    c.refreshHomePreview();
+    expect(c.homePreviewNonce).toBeGreaterThan(0);
+  });
+
+  it('copyPreviewLink copies non-empty urls', async () => {
+    c.copyPreviewLink('   ');
+    expect(copy).not.toHaveBeenCalled();
+    c.copyPreviewLink('https://ex.com');
+    expect(copy).toHaveBeenCalledWith('https://ex.com');
+    await Promise.resolve();
+    expect(h.toast.info).toHaveBeenCalled();
+  });
+
+  it('generateBlogPreviewLink and copyBlogPreviewLink handle tokens', () => {
+    c.selectedBlogKey = null;
+    c.generateBlogPreviewLink();
+    expect(h.blog.createPreviewToken).not.toHaveBeenCalled();
+
+    c.selectedBlogKey = 'blog.hello';
+    h.blog.createPreviewToken.and.returnValue(of({ url: 'https://ex.com/blog/hello', token: 'bt', expires_at: 's' }));
+    c.generateBlogPreviewLink();
+    expect(c.blogPreviewUrl).toBe('https://ex.com/blog/hello');
+
+    h.blog.createPreviewToken.and.returnValue(throwError(() => new Error('x')));
+    c.generateBlogPreviewLink();
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.blogPreviewUrl = null;
+    c.copyBlogPreviewLink();
+    c.blogPreviewUrl = 'https://ex.com/blog/hello';
+    c.copyBlogPreviewLink();
+    expect(copy).toHaveBeenCalledWith('https://ex.com/blog/hello');
   });
 });
