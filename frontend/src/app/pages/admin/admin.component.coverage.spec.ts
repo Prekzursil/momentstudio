@@ -4837,4 +4837,69 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
     c.editBlogCoverFocalPoint();
     expect(h.admin.updateContentImageFocalPoint).toHaveBeenCalled();
   });
+
+  it('deleteImage removes a product image', () => {
+    c.editingId = null;
+    c.deleteImage('i1');
+    expect(h.admin.deleteProductImage).not.toHaveBeenCalled();
+    c.editingId = 's1';
+    h.admin.deleteProductImage.and.returnValue(of({ images: [] }));
+    c.deleteImage('i1');
+    expect(h.toast.success).toHaveBeenCalled();
+    h.admin.deleteProductImage.and.returnValue(throwError(() => new Error('x')));
+    c.deleteImage('i1');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('savePageBlocks serialises product_grid collection/products and form', () => {
+    c.pageBlocksStatus[KEY] = 'draft';
+    c.pageBlocks[KEY] = [
+      { ...c.makeHomeBlockDraft('pg1', 'product_grid', true), type: 'product_grid', product_grid_source: 'collection', product_grid_collection_slug: 'col', product_grid_limit: 100 },
+      { ...c.makeHomeBlockDraft('pg2', 'product_grid', true), type: 'product_grid', product_grid_source: 'products', product_grid_product_slugs: 'a, a, b' },
+      { ...c.makeHomeBlockDraft('fm', 'form', true), type: 'form', form_type: 'contact', form_topic: 'support' },
+    ];
+    c.pageBlocksMeta[KEY] = {};
+    c.ensurePageDraft(KEY).initFromServer(c.currentPageDraftState(KEY));
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, status: 'draft', meta: {} }));
+    c.savePageBlocks(KEY);
+    const blocks = h.admin.updateContentBlock.calls.mostRecent().args[1].meta.blocks;
+    const pg = blocks.find((b: any) => b.key === 'pg1');
+    expect(pg.collection_slug).toBe('col');
+    expect(pg.limit).toBe(24);
+    const pg2 = blocks.find((b: any) => b.key === 'pg2');
+    expect(pg2.product_slugs).toEqual(['a', 'b']);
+    const fm = blocks.find((b: any) => b.key === 'fm');
+    expect(fm.topic).toBe('support');
+  });
+
+  it('saveSections serialises cta/columns/faq/image/banner content', () => {
+    c.cmsHomeDraft.initFromServer([]);
+    spyOn(c, 'refreshHomePreview');
+    c.homeBlocks = [
+      { ...c.makeHomeBlockDraft('cta', 'cta', true), cta_url: '/go', cta_new_tab: true },
+      { ...c.makeHomeBlockDraft('col', 'columns', true), columns_breakpoint: 'lg' },
+      c.makeHomeBlockDraft('faq', 'faq', true),
+      c.makeHomeBlockDraft('img', 'image', true),
+      c.makeHomeBlockDraft('ban', 'banner', true),
+    ];
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveSections();
+    const blocks = h.admin.updateContentBlock.calls.mostRecent().args[1].meta.blocks;
+    const cta = blocks.find((b: any) => b.key === 'cta');
+    expect(cta.cta_new_tab).toBe(true);
+    expect(blocks.find((b: any) => b.key === 'col').columns_breakpoint).toBe('lg');
+  });
+
+  it('copyToClipboard falls back to execCommand when the API rejects', async () => {
+    const original = (navigator as any).clipboard;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+      configurable: true,
+    });
+    spyOn(document, 'execCommand').and.returnValue(true);
+    const ok = await (c as any).copyToClipboard('hello');
+    expect(ok).toBe(true);
+    expect(document.execCommand).toHaveBeenCalledWith('copy');
+    Object.defineProperty(navigator, 'clipboard', { value: original, configurable: true });
+  });
 });
