@@ -64,7 +64,7 @@ function makeAdminSpy(): any {
     'previewFindReplaceContent', 'applyFindReplaceContent', 'linkCheckContent',
     'fetchSocialThumbnail', 'sendScheduledReport', 'createPagePreviewToken',
     'createHomePreviewToken', 'listFeaturedCollections', 'createFeaturedCollection',
-    'updateFeaturedCollection',
+    'updateFeaturedCollection', 'reorderCategories',
   ];
   const spy: any = jasmine.createSpyObj('AdminService', methods);
   for (const m of methods) spy[m].and.returnValue(of(undefined));
@@ -885,5 +885,247 @@ describe('AdminComponent — page block mutators', () => {
 
   it('pageBlockLabel returns translation or raw type', () => {
     expect(c.pageBlockLabel({ type: 'image' })).toContain('image');
+  });
+});
+
+describe('AdminComponent — orders, users, categories, coupons', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('selectOrder clones the order and filteredOrders honours the status filter', () => {
+    const order = { id: 'o1', status: 'paid' } as any;
+    c.selectOrder(order);
+    expect(c.activeOrder).toEqual(order);
+    expect(c.activeOrder).not.toBe(order);
+    c.orders = [{ id: 'o1', status: 'paid' }, { id: 'o2', status: 'shipped' }] as any;
+    c.orderFilter = '';
+    expect(c.filteredOrders().length).toBe(2);
+    c.orderFilter = 'shipped';
+    expect(c.filteredOrders().map((o: any) => o.id)).toEqual(['o2']);
+  });
+
+  it('toggleAll / toggleSelect / computeAllSelected maintain the selection set', () => {
+    c.products = [{ id: 'a' }, { id: 'b' }] as any;
+    c.toggleAll(checkboxEvent(true));
+    expect(c.selectedIds.size).toBe(2);
+    expect(c.allSelected).toBe(true);
+    c.toggleAll(checkboxEvent(false));
+    expect(c.selectedIds.size).toBe(0);
+    c.toggleSelect('a', checkboxEvent(true));
+    expect(c.selectedIds.has('a')).toBe(true);
+    expect(c.allSelected).toBe(false);
+    c.toggleSelect('b', checkboxEvent(true));
+    expect(c.allSelected).toBe(true);
+    c.toggleSelect('a', checkboxEvent(false));
+    expect(c.selectedIds.has('a')).toBe(false);
+  });
+
+  it('changeOrderStatus updates the active order on success and toasts on error', () => {
+    c.activeOrder = null;
+    c.changeOrderStatus('paid');
+    expect(h.admin.updateOrderStatus).not.toHaveBeenCalled();
+
+    c.activeOrder = { id: 'o1', status: 'new' };
+    c.orders = [{ id: 'o1', status: 'new' }];
+    h.admin.updateOrderStatus.and.returnValue(of({ id: 'o1', status: 'paid' }));
+    c.changeOrderStatus('paid');
+    expect(c.activeOrder.status).toBe('paid');
+    expect(c.orders[0].status).toBe('paid');
+    expect(h.toast.success).toHaveBeenCalled();
+
+    h.admin.updateOrderStatus.and.returnValue(throwError(() => new Error('x')));
+    c.changeOrderStatus('shipped');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('forceLogout requires a selected user and reports outcome', () => {
+    c.selectedUserId = '';
+    c.forceLogout();
+    expect(h.admin.revokeSessions).not.toHaveBeenCalled();
+    c.selectedUserId = 'u1';
+    h.admin.revokeSessions.and.returnValue(of({}));
+    c.forceLogout();
+    expect(h.toast.success).toHaveBeenCalled();
+    h.admin.revokeSessions.and.returnValue(throwError(() => new Error('x')));
+    c.forceLogout();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('selectUser and onSelectedUserIdChange set selection and trigger alias loading', () => {
+    c.users = [{ id: 'u1', role: 'admin' }];
+    h.admin.userAliases.and.returnValue(of({ aliases: [{ name: 'x' }] }));
+    c.selectUser('u1', 'editor');
+    expect(c.selectedUserId).toBe('u1');
+    expect(c.selectedUserRole).toBe('editor');
+    expect(c.userAliases).toEqual({ aliases: [{ name: 'x' }] } as any);
+
+    c.onSelectedUserIdChange('u1');
+    expect(c.selectedUserRole).toBe('admin'); // derived from users list
+    c.selectedUserRole = 'keepme';
+    c.onSelectedUserIdChange('missing');
+    expect(c.selectedUserRole).toBe('keepme'); // unchanged when user not found
+  });
+
+  it('loadUserAliases short-circuits without a user and records errors', () => {
+    c.loadUserAliases('');
+    expect(c.userAliasesLoading).toBe(false);
+    h.admin.userAliases.and.returnValue(throwError(() => new Error('boom')));
+    c.loadUserAliases('u1');
+    expect(c.userAliasesError).toContain('alias');
+  });
+
+  it('userIdentity and commentAuthorLabel delegate to formatIdentity', () => {
+    expect(typeof c.userIdentity({ id: 'x', email: 'a@b.c' })).toBe('string');
+    expect(typeof c.commentAuthorLabel({ id: 'x', name: 'Bob' })).toBe('string');
+  });
+
+  it('updateRole enforces a password prompt and reports outcomes', () => {
+    const promptSpy = spyOn(window, 'prompt');
+    c.selectedUserId = '';
+    c.updateRole();
+    expect(h.admin.updateUserRole).not.toHaveBeenCalled();
+
+    c.selectedUserId = 'u1';
+    c.selectedUserRole = 'admin';
+    promptSpy.and.returnValue('');
+    c.updateRole();
+    expect(h.toast.error).toHaveBeenCalled();
+
+    promptSpy.and.returnValue('secret');
+    c.users = [{ id: 'u1', role: 'member' }];
+    h.admin.updateUserRole.and.returnValue(of({ id: 'u1', role: 'admin' }));
+    c.updateRole();
+    expect(c.users[0].role).toBe('admin');
+
+    h.admin.updateUserRole.and.returnValue(throwError(() => new Error('x')));
+    c.updateRole();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('moveCategory swaps sort order and respects bounds', () => {
+    c.categories = [
+      { slug: 'a', sort_order: 0 },
+      { slug: 'b', sort_order: 1 },
+    ];
+    h.admin.reorderCategories.and.returnValue(of([{ slug: 'b', sort_order: 0 }, { slug: 'a', sort_order: 1 }]));
+    c.moveCategory({ slug: 'a' } as any, 1);
+    expect(h.admin.reorderCategories).toHaveBeenCalled();
+    expect(h.toast.success).toHaveBeenCalled();
+
+    c.moveCategory({ slug: 'a' } as any, -5); // out of range → no call
+    h.admin.reorderCategories.calls.reset();
+    c.moveCategory({ slug: 'a' } as any, 5);
+    expect(h.admin.reorderCategories).not.toHaveBeenCalled();
+
+    h.admin.reorderCategories.and.returnValue(throwError(() => new Error('x')));
+    c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }];
+    c.moveCategory({ slug: 'a' } as any, 1);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('category drag-drop reorders and guards self/missing drops', () => {
+    c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }, { slug: 'c', sort_order: 2 }];
+    c.onCategoryDragStart('a');
+    expect(c.draggingSlug).toBe('a');
+    const ev = dragEvent();
+    c.onCategoryDragOver(ev);
+    expect(ev.preventDefault).toHaveBeenCalled();
+
+    h.admin.reorderCategories.and.returnValue(of(c.categories));
+    c.onCategoryDrop('c');
+    expect(h.admin.reorderCategories).toHaveBeenCalled();
+    expect(c.draggingSlug).toBeNull();
+
+    c.draggingSlug = 'a';
+    c.onCategoryDrop('a'); // self → reset, no call
+    expect(c.draggingSlug).toBeNull();
+
+    c.draggingSlug = 'ghost';
+    c.onCategoryDrop('a'); // from missing
+    expect(c.draggingSlug).toBeNull();
+  });
+
+  it('createCoupon validates the code and reports success/error', () => {
+    c.newCoupon = { code: '' };
+    c.createCoupon();
+    expect(h.admin.createCoupon).not.toHaveBeenCalled();
+
+    c.newCoupon = { code: 'SAVE10' };
+    c.coupons = [];
+    h.admin.createCoupon.and.returnValue(of({ id: 'c1', code: 'SAVE10' }));
+    c.createCoupon();
+    expect(c.coupons.length).toBe(1);
+
+    h.admin.createCoupon.and.returnValue(throwError(() => new Error('x')));
+    c.createCoupon();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('toggleCoupon flips active state and invalidateCouponStripe reports counts', () => {
+    c.coupons = [{ id: 'c1', active: true }];
+    h.admin.updateCoupon.and.returnValue(of({ id: 'c1', active: false }));
+    c.toggleCoupon({ id: 'c1', active: true });
+    expect(c.coupons[0].active).toBe(false);
+    h.admin.updateCoupon.and.returnValue(throwError(() => new Error('x')));
+    c.toggleCoupon({ id: 'c1', active: false });
+    expect(h.toast.error).toHaveBeenCalled();
+
+    h.admin.invalidateCouponStripeMappings.and.returnValue(of({ deleted_mappings: 3 }));
+    c.invalidateCouponStripe({ id: 'c1' });
+    expect(h.toast.success).toHaveBeenCalled();
+    h.admin.invalidateCouponStripeMappings.and.returnValue(throwError(() => new Error('x')));
+    c.invalidateCouponStripe({ id: 'c1' });
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+});
+
+describe('AdminComponent — blog pinning helpers', () => {
+  let c: any;
+  beforeEach(() => { c = createComponent().component as any; });
+
+  it('blogPosts filters content blocks by blog prefix', () => {
+    c.contentBlocks = [{ key: 'blog.a' }, { key: 'page.x' }, { key: 'blog.b' }];
+    expect(c.blogPosts().map((p: any) => p.key)).toEqual(['blog.a', 'blog.b']);
+  });
+
+  it('pinnedSlotFromMeta interprets pinned flags and pin_order', () => {
+    expect(c.pinnedSlotFromMeta(null)).toBeNull();
+    expect(c.pinnedSlotFromMeta({})).toBeNull();
+    expect(c.pinnedSlotFromMeta({ pinned: false })).toBeNull();
+    expect(c.pinnedSlotFromMeta({ pinned: true })).toBe(1);
+    expect(c.pinnedSlotFromMeta({ pinned: 1, pin_order: 3 })).toBe(3);
+    expect(c.pinnedSlotFromMeta({ pinned: 'yes', pin_order: '2' })).toBe(2);
+    expect(c.pinnedSlotFromMeta({ pinned: 'no' })).toBeNull();
+    expect(c.pinnedSlotFromMeta({ pinned: true, pin_order: -4 })).toBe(1); // normalised
+    expect(c.pinnedSlotFromMeta({ pinned: true, pin_order: 'bad' })).toBe(1);
+  });
+
+  it('blogPinnedSlot/blogPinnedPosts/nextBlogPinOrder rank pinned posts', () => {
+    c.contentBlocks = [
+      { key: 'blog.a', meta: { pinned: true, pin_order: 2 }, published_at: '2020-01-01', updated_at: 'a' },
+      { key: 'blog.b', meta: { pinned: true, pin_order: 1 }, published_at: '2021-01-01', updated_at: 'b' },
+      { key: 'blog.c', meta: { pinned: false } },
+      { key: 'page.x', meta: { pinned: true, pin_order: 9 } },
+    ];
+    expect(c.blogPinnedSlot(c.contentBlocks[0])).toBe(2);
+    const ranked = c.blogPinnedPosts().map((p: any) => p.key);
+    expect(ranked).toEqual(['blog.b', 'blog.a']);
+    expect(c.nextBlogPinOrder()).toBe(3); // max pinned order among blog posts + 1
+  });
+
+  it('nextBlogPinOrder is 1 when no blog posts are pinned', () => {
+    c.contentBlocks = [{ key: 'blog.a', meta: {} }];
+    expect(c.nextBlogPinOrder()).toBe(1);
+  });
+
+  it('onBlogPinDragStart/Over set the dragging key', () => {
+    c.onBlogPinDragStart('  blog.a  ');
+    expect(c.draggingBlogPinKey).toBe('blog.a');
+    c.onBlogPinDragStart('   ');
+    expect(c.draggingBlogPinKey).toBeNull();
+    const ev = dragEvent();
+    c.onBlogPinDragOver(ev);
+    expect(ev.preventDefault).toHaveBeenCalled();
   });
 });
