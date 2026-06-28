@@ -3752,3 +3752,78 @@ describe('AdminComponent — info pages, legal pages, visibility', () => {
     expect(h.admin.getContent).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — blog editor loading and meta sync', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('loadBlogEditor hydrates the form and handles errors', () => {
+    h.admin.listContentVersions.and.returnValue(of([]));
+    h.admin.getContent.and.returnValue(of({
+      lang: 'ro', title: 'Titlu', body_markdown: 'Corp', status: 'published',
+      published_at: '2030-01-01T00:00:00Z', published_until: '',
+      meta: { tags: ['a', 'b'], series: 'S', cover_image_url: '/c.png', reading_time_minutes: 5, pinned: true, pin_order: 3 },
+      images: [{ id: 'i', url: '/u', sort_order: 0 }],
+    }));
+    (c as any).loadBlogEditor('blog.a');
+    expect(c.selectedBlogKey).toBe('blog.a');
+    expect(c.blogBaseLang).toBe('ro');
+    expect(c.blogForm.title).toBe('Titlu');
+    expect(c.blogForm.tags).toBe('a, b');
+    expect(c.blogForm.pinned).toBe(true);
+    expect(c.blogImages.length).toBe(1);
+
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    (c as any).loadBlogEditor('blog.b');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('reloadContentBlocks stores blocks and clears on error', () => {
+    h.admin.content.and.returnValue(of([{ key: 'blog.a' }]));
+    (c as any).reloadContentBlocks();
+    expect(c.contentBlocks.length).toBe(1);
+    h.admin.content.and.returnValue(of('not-array'));
+    (c as any).reloadContentBlocks();
+    expect(c.contentBlocks).toEqual([]);
+    h.admin.content.and.returnValue(throwError(() => new Error('x')));
+    (c as any).reloadContentBlocks();
+    expect(c.contentBlocks).toEqual([]);
+  });
+
+  it('normalizeBlogSlug and blogCreateSlug produce url-safe slugs', () => {
+    expect((c as any).normalizeBlogSlug('Héllo World!! Foo')).toBe('hello-world-foo');
+    expect((c as any).normalizeBlogSlug('   ')).toBe('');
+    c.blogCreate = { title: 'My New Post' };
+    expect(c.blogCreateSlug()).toBe('my-new-post');
+  });
+
+  it('syncBlogMetaToForm maps meta variants', () => {
+    c.blogForm = {};
+    c.blogMeta = { tags: 'x,y', series: 'Ser', cover_image: '/c', cover_fit: 'CONTAIN', reading_time: 7, pinned: 'yes', pin_order: '4' };
+    (c as any).syncBlogMetaToForm('en');
+    expect(c.blogForm.tags).toBe('x,y');
+    expect(c.blogForm.cover_image_url).toBe('/c');
+    expect(c.blogForm.cover_fit).toBe('contain');
+    expect(c.blogForm.reading_time_minutes).toBe('7');
+    expect(c.blogForm.pinned).toBe(true);
+    expect(c.blogForm.pin_order).toBe('4');
+
+    c.blogMeta = {};
+    (c as any).syncBlogMetaToForm('en');
+    expect(c.blogForm.tags).toBe('');
+    expect(c.blogForm.cover_fit).toBe('cover');
+    expect(c.blogForm.pinned).toBe(false);
+    expect(c.blogForm.pin_order).toBe('1');
+  });
+
+  it('closeBlogEditor resets editor state', () => {
+    c.selectedBlogKey = 'blog.a';
+    c.blogImages = [{ id: 'i' }];
+    c.blogVersions = [{ version: 1 }];
+    c.closeBlogEditor();
+    expect(c.selectedBlogKey).toBeNull();
+    expect(c.blogImages).toEqual([]);
+    expect(c.blogVersions).toEqual([]);
+  });
+});
