@@ -4318,3 +4318,80 @@ describe('AdminComponent — draft delegate accessors', () => {
     expect(() => c.dismissBlogDraftAutosave()).not.toThrow();
   });
 });
+
+describe('AdminComponent — blog SEO helpers', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.selectedBlogKey = 'blog.hello';
+    c.blogEditLang = 'en';
+    c.blogBaseLang = 'en';
+    c.blogForm = { title: 'My Post Title', body_markdown: 'Some body content here.', status: 'draft' };
+    c.blogMeta = {};
+    c.blogSeoSnapshots = { en: null, ro: null };
+  });
+
+  it('blogSeoHasContent checks the edit lang form and snapshots', () => {
+    expect(c.blogSeoHasContent('en')).toBe(true);
+    expect(c.blogSeoHasContent('ro')).toBe(false);
+    c.blogSeoSnapshots.ro = { title: 'RO', body_markdown: '' };
+    expect(c.blogSeoHasContent('ro')).toBe(true);
+    c.selectedBlogKey = null;
+    expect(c.blogSeoHasContent('en')).toBe(false);
+  });
+
+  it('blogSeoTitleFull appends the brand and previews truncate', () => {
+    expect(c.blogSeoTitleFull('en')).toBe('My Post Title | momentstudio');
+    c.blogForm.title = '';
+    expect(c.blogSeoTitleFull('en')).toBe('');
+    c.blogSeoSnapshots.ro = { title: 'RO Title', body_markdown: '' };
+    expect(c.blogSeoTitleFull('ro')).toContain('RO Title');
+    expect(typeof c.blogSeoTitlePreview('en')).toBe('string');
+    expect(typeof c.blogSeoDescriptionPreview('en')).toBe('string');
+  });
+
+  it('blogSeoDescriptionFull derives from summary or body', () => {
+    c.blogMeta = { summary: { en: 'A crafted summary sentence.' } };
+    expect(c.blogSeoDescriptionFull('en')).toContain('crafted summary');
+    c.blogMeta = {};
+    expect(c.blogSeoDescriptionFull('en')).toContain('body content');
+  });
+
+  it('blogSeoIssues reports title/description problems', () => {
+    c.blogForm = { title: 'Hi', body_markdown: '', status: 'draft' };
+    c.blogMeta = {};
+    const issues = c.blogSeoIssues('en').map((i: any) => i.key);
+    expect(issues.some((k: string) => k.includes('missingDescription'))).toBe(true);
+    expect(issues.some((k: string) => k.includes('titleTooShort'))).toBe(true);
+
+    c.blogForm = { title: 'x'.repeat(80), body_markdown: 'y'.repeat(300), status: 'draft' };
+    const issues2 = c.blogSeoIssues('en').map((i: any) => i.key);
+    expect(issues2.some((k: string) => k.includes('titleTooLong'))).toBe(true);
+    expect(issues2.some((k: string) => k.includes('descriptionTooLong'))).toBe(true);
+  });
+
+  it('truncateForPreview and toSeoDescription clean text', () => {
+    expect((c as any).truncateForPreview('', 10)).toBe('');
+    expect((c as any).truncateForPreview('short', 10)).toBe('short');
+    expect((c as any).truncateForPreview('a'.repeat(20), 10)).toContain('…');
+    expect((c as any).toSeoDescription('# Title\n```code```\n[link](u) **bold**')).not.toContain('#');
+  });
+
+  it('blog public and og image urls build correctly', () => {
+    expect(c.blogPublicUrl('en')).toContain('/blog/hello?lang=en');
+    expect(c.blogPublishedOgImageUrl('en')).toContain('og.png');
+    expect(c.blogPreviewOgImageUrl('en')).toBeNull();
+    c.blogPreviewToken = 'tok';
+    expect(c.blogPreviewOgImageUrl('en')).toContain('og-preview.png');
+  });
+
+  it('copyText copies non-empty text', () => {
+    const copy = spyOn(c, 'copyToClipboard').and.returnValue(Promise.resolve(true));
+    c.copyText('  ');
+    expect(copy).not.toHaveBeenCalled();
+    c.copyText('hello');
+    expect(copy).toHaveBeenCalledWith('hello');
+  });
+});
