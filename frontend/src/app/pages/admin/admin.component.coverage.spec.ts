@@ -5127,3 +5127,52 @@ describe('AdminComponent — legal save, media drop, split scroll', () => {
     expect(() => c.syncSplitScroll(source, target)).not.toThrow();
   });
 });
+
+describe('AdminComponent — clipboard failure branches', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('copyBlogPreviewLink toasts an error when the copy fails', async () => {
+    spyOn(c, 'copyToClipboard').and.returnValue(Promise.resolve(false));
+    c.blogPreviewUrl = 'https://ex.com/p';
+    c.copyBlogPreviewLink();
+    await Promise.resolve();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('copyPreviewLink toasts an error when the copy fails', async () => {
+    spyOn(c, 'copyToClipboard').and.returnValue(Promise.resolve(false));
+    c.copyPreviewLink('https://ex.com/p');
+    await Promise.resolve();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('copyText toasts an error when the copy fails', async () => {
+    spyOn(c, 'copyToClipboard').and.returnValue(Promise.resolve(false));
+    c.copyText('hello');
+    await Promise.resolve();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('generateBlogPreviewLink tolerates a failed clipboard copy', async () => {
+    spyOn(c, 'copyToClipboard').and.returnValue(Promise.resolve(false));
+    c.selectedBlogKey = 'blog.hello';
+    h.blog.createPreviewToken.and.returnValue(of({ url: '/u', token: 't', expires_at: 's' }));
+    c.generateBlogPreviewLink();
+    await Promise.resolve();
+    expect(c.blogPreviewToken).toBe('t');
+  });
+
+  it('copyToClipboard returns false when execCommand also throws', async () => {
+    const original = (navigator as any).clipboard;
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: () => Promise.reject(new Error('denied')) },
+      configurable: true,
+    });
+    spyOn(document, 'execCommand').and.throwError('blocked');
+    const ok = await (c as any).copyToClipboard('hello');
+    expect(ok).toBe(false);
+    Object.defineProperty(navigator, 'clipboard', { value: original, configurable: true });
+  });
+});
