@@ -1433,3 +1433,276 @@ describe('AdminComponent — category wizard', () => {
     expect(h.toast.error).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — tax groups and rates', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('loadTaxGroups stores groups and surfaces error details', () => {
+    h.taxesAdmin.listGroups.and.returnValue(of([{ id: 'g1' }]));
+    c.loadTaxGroups();
+    expect(c.taxGroups.length).toBe(1);
+    h.taxesAdmin.listGroups.and.returnValue(of('bad'));
+    c.loadTaxGroups();
+    expect(c.taxGroups).toEqual([]);
+    h.taxesAdmin.listGroups.and.returnValue(throwError(() => ({ error: { detail: 'nope' } })));
+    c.loadTaxGroups();
+    expect(c.taxGroupsError).toBe('nope');
+  });
+
+  it('createTaxGroup validates required fields and reports results', () => {
+    c.taxGroupCreate = { code: '', name: '' };
+    c.createTaxGroup();
+    expect(h.taxesAdmin.createGroup).not.toHaveBeenCalled();
+
+    c.taxGroupCreate = { code: ' VAT ', name: ' Std ', description: ' d ', is_default: true };
+    h.taxesAdmin.createGroup.and.returnValue(of({}));
+    c.createTaxGroup();
+    expect(h.taxesAdmin.createGroup).toHaveBeenCalledWith(jasmine.objectContaining({ code: 'VAT', name: 'Std', is_default: true }));
+
+    c.taxGroupCreate = { code: 'A', name: 'B' };
+    h.taxesAdmin.createGroup.and.returnValue(throwError(() => ({ error: { detail: 'dup' } })));
+    c.createTaxGroup();
+    expect(h.toast.error).toHaveBeenCalledWith('dup');
+  });
+
+  it('saveTaxGroup requires a name and reports outcomes', () => {
+    c.saveTaxGroup({ id: 'g1', name: '  ' } as any);
+    expect(h.taxesAdmin.updateGroup).not.toHaveBeenCalled();
+    h.taxesAdmin.updateGroup.and.returnValue(of({}));
+    c.saveTaxGroup({ id: 'g1', name: 'Reduced', description: '' } as any);
+    expect(h.toast.success).toHaveBeenCalled();
+    h.taxesAdmin.updateGroup.and.returnValue(throwError(() => ({})));
+    c.saveTaxGroup({ id: 'g1', name: 'Reduced' } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('setDefaultTaxGroup skips defaults and updates otherwise', () => {
+    c.setDefaultTaxGroup({ id: 'g1', is_default: true } as any);
+    expect(h.taxesAdmin.updateGroup).not.toHaveBeenCalled();
+    h.taxesAdmin.updateGroup.and.returnValue(of({}));
+    c.setDefaultTaxGroup({ id: 'g1', is_default: false } as any);
+    expect(h.taxesAdmin.updateGroup).toHaveBeenCalledWith('g1', { is_default: true });
+    h.taxesAdmin.updateGroup.and.returnValue(throwError(() => ({})));
+    c.setDefaultTaxGroup({ id: 'g2', is_default: false } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('deleteTaxGroup blocks default deletion and reports outcomes', () => {
+    c.deleteTaxGroup({ id: 'g1', is_default: true } as any);
+    expect(h.taxesAdmin.deleteGroup).not.toHaveBeenCalled();
+    h.taxesAdmin.deleteGroup.and.returnValue(of({}));
+    c.deleteTaxGroup({ id: 'g1', is_default: false } as any);
+    expect(h.toast.success).toHaveBeenCalled();
+    h.taxesAdmin.deleteGroup.and.returnValue(throwError(() => ({})));
+    c.deleteTaxGroup({ id: 'g2', is_default: false } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('upsertTaxRate validates country and rate, then clears inputs', () => {
+    c.taxRateCountry = {}; c.taxRatePercent = {};
+    c.upsertTaxRate({ id: 'g1' } as any); // missing country
+    expect(h.taxesAdmin.upsertRate).not.toHaveBeenCalled();
+
+    c.taxRateCountry = { g1: ' RO ' };
+    c.taxRatePercent = { g1: '19' };
+    h.taxesAdmin.upsertRate.and.returnValue(of({}));
+    c.upsertTaxRate({ id: 'g1' } as any);
+    expect(c.taxRateCountry['g1']).toBe('');
+    expect(h.taxesAdmin.upsertRate).toHaveBeenCalledWith('g1', { country_code: 'RO', vat_rate_percent: 19 });
+
+    c.taxRateCountry = { g1: 'RO' };
+    c.taxRatePercent = { g1: '5' };
+    h.taxesAdmin.upsertRate.and.returnValue(throwError(() => ({})));
+    c.upsertTaxRate({ id: 'g1' } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('deleteTaxRate requires a country code and reports outcomes', () => {
+    c.deleteTaxRate({ id: 'g1' } as any, '  ');
+    expect(h.taxesAdmin.deleteRate).not.toHaveBeenCalled();
+    h.taxesAdmin.deleteRate.and.returnValue(of({}));
+    c.deleteTaxRate({ id: 'g1' } as any, 'RO');
+    expect(h.toast.success).toHaveBeenCalled();
+    h.taxesAdmin.deleteRate.and.returnValue(throwError(() => ({})));
+    c.deleteTaxRate({ id: 'g1' } as any, 'RO');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+});
+
+describe('AdminComponent — category hierarchy and translations', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('categoryParentLabel resolves names or the none label', () => {
+    c.categories = [{ id: 'p', name: 'Parent' }, { id: 'c', name: 'Child', parent_id: 'p' }];
+    expect(c.categoryParentLabel({ parent_id: 'p' })).toBe('Parent');
+    expect(c.categoryParentLabel({ parent_id: '' })).toContain('parentNone');
+    expect(c.categoryParentLabel({ parent_id: 'missing' })).toContain('parentNone');
+  });
+
+  it('categoryParentOptions excludes self and descendants', () => {
+    c.categories = [
+      { id: 'a', name: 'A' },
+      { id: 'b', name: 'B', parent_id: 'a' },
+      { id: 'cc', name: 'C', parent_id: 'b' },
+      { id: 'd', name: 'D' },
+    ];
+    const ids = c.categoryParentOptions({ id: 'a' }).map((x: any) => x.id);
+    expect(ids).toEqual(['d']); // b and cc are descendants, a is self
+  });
+
+  it('categoryDescendantIds walks the tree', () => {
+    c.categories = [
+      { id: 'b', parent_id: 'a' },
+      { id: 'cc', parent_id: 'b' },
+      { id: 'orphan' },
+    ];
+    const set = c.categoryDescendantIds('a');
+    expect(Array.from(set).sort()).toEqual(['b', 'cc']);
+  });
+
+  it('updateCategoryParent optimistically updates and rolls back on error', () => {
+    const cat = { slug: 's', parent_id: null } as any;
+    cat.parent_id = null;
+    c.updateCategoryParent(cat, ' '); // unchanged → no call
+    expect(h.admin.updateCategory).not.toHaveBeenCalled();
+
+    h.admin.updateCategory.and.returnValue(of({ parent_id: 'p2' }));
+    c.updateCategoryParent(cat, 'p2');
+    expect(cat.parent_id).toBe('p2');
+
+    const cat2 = { slug: 's2', parent_id: 'old' } as any;
+    h.admin.updateCategory.and.returnValue(throwError(() => new Error('x')));
+    c.updateCategoryParent(cat2, 'new');
+    expect(cat2.parent_id).toBe('old'); // rolled back
+  });
+
+  it('updateCategoryLowStockThreshold validates and rolls back', () => {
+    const cat = { slug: 's', low_stock_threshold: 5 } as any;
+    c.updateCategoryLowStockThreshold(cat, '-2'); // invalid
+    expect(cat.low_stock_threshold).toBe(5);
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.updateCategoryLowStockThreshold(cat, '5'); // unchanged
+    expect(h.admin.updateCategory).not.toHaveBeenCalled();
+
+    h.admin.updateCategory.and.returnValue(of({ low_stock_threshold: 3 }));
+    c.updateCategoryLowStockThreshold(cat, '3');
+    expect(cat.low_stock_threshold).toBe(3);
+
+    const cat2 = { slug: 's2', low_stock_threshold: 1 } as any;
+    h.admin.updateCategory.and.returnValue(throwError(() => new Error('x')));
+    c.updateCategoryLowStockThreshold(cat2, '9');
+    expect(cat2.low_stock_threshold).toBe(1);
+  });
+
+  it('updateCategoryTaxGroup updates and rolls back', () => {
+    const cat = { slug: 's', tax_group_id: null } as any;
+    c.updateCategoryTaxGroup(cat, ''); // unchanged
+    expect(h.admin.updateCategory).not.toHaveBeenCalled();
+    h.admin.updateCategory.and.returnValue(of({ tax_group_id: 'g1' }));
+    c.updateCategoryTaxGroup(cat, 'g1');
+    expect(cat.tax_group_id).toBe('g1');
+    const cat2 = { slug: 's2', tax_group_id: 'old' } as any;
+    h.admin.updateCategory.and.returnValue(throwError(() => new Error('x')));
+    c.updateCategoryTaxGroup(cat2, 'g2');
+    expect(cat2.tax_group_id).toBe('old');
+  });
+
+  it('category delete confirm flow opens, confirms and closes', () => {
+    c.openCategoryDeleteConfirm({ slug: 's', id: 'c1' });
+    expect(c.categoryDeleteConfirmOpen()).toBe(true);
+    h.admin.deleteCategory.and.returnValue(of({}));
+    c.categories = [{ slug: 's' }];
+    c.confirmDeleteCategory();
+    expect(c.categoryDeleteConfirmOpen()).toBe(false);
+    expect(c.categories.length).toBe(0);
+
+    // guards: no target, busy
+    c.confirmDeleteCategory();
+    c.categoryDeleteConfirmTarget.set({ slug: 's2' });
+    c.categoryDeleteConfirmBusy.set(true);
+    c.confirmDeleteCategory();
+    expect(h.admin.deleteCategory.calls.count()).toBe(1);
+  });
+
+  it('deleteCategory removes the category and reports failure', () => {
+    c.categories = [{ slug: 'x' }];
+    c.categoryTranslationsSlug = 'x';
+    h.admin.deleteCategory.and.returnValue(of({}));
+    const done = jasmine.createSpy('done');
+    c.deleteCategory('x', { done });
+    expect(done).toHaveBeenCalledWith(true);
+    expect(c.categoryTranslationsSlug).toBeNull();
+
+    h.admin.deleteCategory.and.returnValue(throwError(() => new Error('x')));
+    const done2 = jasmine.createSpy('done2');
+    c.deleteCategory('y', { done: done2 });
+    expect(done2).toHaveBeenCalledWith(false);
+  });
+
+  it('toggleCategoryTranslations opens and closes by slug', () => {
+    h.admin.getCategoryTranslations.and.returnValue(of([{ lang: 'en', name: 'EN', description: 'd' }, { lang: 'fr' }]));
+    c.toggleCategoryTranslations('s1');
+    expect(c.categoryTranslationsSlug).toBe('s1');
+    expect(c.categoryTranslationExists.en).toBe(true);
+    c.toggleCategoryTranslations('s1'); // toggle off
+    expect(c.categoryTranslationsSlug).toBeNull();
+  });
+
+  it('loadCategoryTranslations handles load errors', () => {
+    h.admin.getCategoryTranslations.and.returnValue(throwError(() => new Error('x')));
+    c.toggleCategoryTranslations('s2');
+    expect(c.categoryTranslationsError()).toBeTruthy();
+  });
+
+  it('saveCategoryTranslation validates name and persists', () => {
+    c.categoryTranslationsSlug = null;
+    c.saveCategoryTranslation('en');
+    expect(h.admin.upsertCategoryTranslation).not.toHaveBeenCalled();
+
+    c.categoryTranslationsSlug = 's1';
+    c.categoryTranslations = { en: { name: '', description: '' }, ro: { name: '', description: '' } };
+    c.saveCategoryTranslation('en'); // empty name
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.categoryTranslations.en = { name: 'Hello', description: ' world ' };
+    h.admin.upsertCategoryTranslation.and.returnValue(of({ name: 'Hello', description: 'world' }));
+    c.saveCategoryTranslation('en');
+    expect(c.categoryTranslationExists.en).toBe(true);
+
+    h.admin.upsertCategoryTranslation.and.returnValue(throwError(() => new Error('x')));
+    c.saveCategoryTranslation('en');
+    expect(c.categoryTranslationsError()).toBeTruthy();
+  });
+
+  it('deleteCategoryTranslation clears the entry and handles errors', () => {
+    c.categoryTranslationsSlug = null;
+    c.deleteCategoryTranslation('ro');
+    expect(h.admin.deleteCategoryTranslation).not.toHaveBeenCalled();
+
+    c.categoryTranslationsSlug = 's1';
+    c.categoryTranslationExists = { en: true, ro: true };
+    h.admin.deleteCategoryTranslation.and.returnValue(of({}));
+    c.deleteCategoryTranslation('ro');
+    expect(c.categoryTranslationExists.ro).toBe(false);
+
+    h.admin.deleteCategoryTranslation.and.returnValue(throwError(() => new Error('x')));
+    c.deleteCategoryTranslation('en');
+    expect(c.categoryTranslationsError()).toBeTruthy();
+  });
+
+  it('duplicateProduct reports success and error', () => {
+    spyOn(c, 'loadAll');
+    spyOn(c, 'loadProduct');
+    h.admin.duplicateProduct.and.returnValue(of({ slug: 'copy' }));
+    c.duplicateProduct('orig');
+    expect(c.loadProduct).toHaveBeenCalledWith('copy');
+    h.admin.duplicateProduct.and.returnValue(throwError(() => new Error('x')));
+    c.duplicateProduct('orig');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+});
