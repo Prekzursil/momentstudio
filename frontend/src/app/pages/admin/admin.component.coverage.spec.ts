@@ -3906,3 +3906,88 @@ describe('AdminComponent — page publish checklist', () => {
     expect(c.savePageBlocks).toHaveBeenCalledWith(KEY, { bypassChecklist: true });
   });
 });
+
+describe('AdminComponent — collections, maintenance, custom pages', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('editCollection populates the form', () => {
+    c.editCollection({ slug: 's1', name: 'N', description: 'D', product_ids: ['p1'] });
+    expect(c.editingCollection).toBe('s1');
+    expect(c.collectionForm.product_ids).toEqual(['p1']);
+  });
+
+  it('saveCollection validates name and creates/updates', () => {
+    c.collectionForm = { name: '', description: '', product_ids: [] };
+    c.saveCollection();
+    expect(h.admin.createFeaturedCollection).not.toHaveBeenCalled();
+
+    c.collectionForm = { name: 'New', description: '', product_ids: [] };
+    c.featuredCollections = [];
+    c.editingCollection = null;
+    h.admin.createFeaturedCollection.and.returnValue(of({ slug: 'new', name: 'New' }));
+    c.saveCollection();
+    expect(c.featuredCollections.length).toBe(1);
+
+    c.editingCollection = 'new';
+    h.admin.updateFeaturedCollection.and.returnValue(of({ slug: 'new', name: 'Updated' }));
+    c.saveCollection();
+    expect(c.featuredCollections[0].name).toBe('Updated');
+
+    c.collectionForm = { name: 'X', description: '', product_ids: [] };
+    h.admin.updateFeaturedCollection.and.returnValue(throwError(() => new Error('x')));
+    c.saveCollection();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('saveMaintenance toggles and reports', () => {
+    c.maintenanceEnabledValue = true;
+    h.admin.setMaintenance.and.returnValue(of({ enabled: true }));
+    c.saveMaintenance();
+    expect(c.maintenanceEnabled()).toBe(true);
+    h.admin.setMaintenance.and.returnValue(throwError(() => new Error('x')));
+    c.saveMaintenance();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('createCustomPage validates title and reserved slugs', () => {
+    c.newCustomPageTitle = '';
+    c.createCustomPage();
+    expect(h.admin.createContent).not.toHaveBeenCalled();
+
+    c.newCustomPageTitle = 'About'; // slug 'about' is reserved
+    c.createCustomPage();
+    expect(h.admin.createContent).not.toHaveBeenCalled();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('createCustomPage creates a unique page and handles errors', () => {
+    spyOn(c, 'loadContentPages');
+    spyOn(c, 'loadPageBlocks');
+    c.contentPages = [{ slug: 'my-page' }];
+    c.newCustomPageTitle = 'My Page'; // collides → my-page-2
+    c.newCustomPageStatus = 'published';
+    c.newCustomPagePublishedAt = '2030-01-01T10:00';
+    c.newCustomPageTemplate = 'about';
+    h.admin.createContent.and.returnValue(of({}));
+    c.createCustomPage();
+    expect(h.admin.createContent).toHaveBeenCalled();
+    const key = h.admin.createContent.calls.mostRecent().args[0];
+    expect(key).toBe('page.my-page-2');
+    expect(c.pageBlocksKey).toBe('page.my-page-2');
+
+    c.newCustomPageTitle = 'Other';
+    h.admin.createContent.and.returnValue(throwError(() => ({ error: { detail: 'taken' } })));
+    c.createCustomPage();
+    expect(h.toast.error).toHaveBeenCalledWith('taken');
+  });
+
+  it('pageTemplateBlocks produces blocks per template', () => {
+    expect((c as any).pageTemplateBlocks('blank')).toEqual([]);
+    expect((c as any).pageTemplateBlocks('about').length).toBe(3);
+    expect((c as any).pageTemplateBlocks('faq').length).toBe(2);
+    expect((c as any).pageTemplateBlocks('shipping').length).toBeGreaterThan(0);
+    expect((c as any).pageTemplateBlocks('returns').length).toBeGreaterThan(0);
+  });
+});
