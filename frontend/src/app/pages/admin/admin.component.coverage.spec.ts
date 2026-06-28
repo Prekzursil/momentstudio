@@ -1990,3 +1990,208 @@ describe('AdminComponent — preview links', () => {
     expect(copy).toHaveBeenCalledWith('https://ex.com/blog/hello');
   });
 });
+
+describe('AdminComponent — blog versions and comment moderation', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('loadBlogVersions requires a key and stores versions', () => {
+    c.selectedBlogKey = null;
+    c.loadBlogVersions();
+    expect(h.admin.listContentVersions).not.toHaveBeenCalled();
+    c.selectedBlogKey = 'blog.a';
+    h.admin.listContentVersions.and.returnValue(of([{ version: 1 }]));
+    c.loadBlogVersions();
+    expect(c.blogVersions.length).toBe(1);
+    h.admin.listContentVersions.and.returnValue(throwError(() => new Error('x')));
+    c.loadBlogVersions();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('loadFlaggedComments stores items and handles errors', () => {
+    h.blog.listFlaggedComments.and.returnValue(of({ items: [{ id: 'c1' }] }));
+    c.loadFlaggedComments();
+    expect(c.flaggedComments().length).toBe(1);
+    expect(c.flaggedCommentsLoading()).toBe(false);
+    h.blog.listFlaggedComments.and.returnValue(throwError(() => new Error('x')));
+    c.loadFlaggedComments();
+    expect(c.flaggedCommentsError).toBeTruthy();
+  });
+
+  it('resolveFlags reports success and error', () => {
+    h.blog.listFlaggedComments.and.returnValue(of({ items: [] }));
+    h.blog.resolveCommentFlagsAdmin.and.returnValue(of({}));
+    c.resolveFlags({ id: 'c1' });
+    expect(h.toast.success).toHaveBeenCalled();
+    h.blog.resolveCommentFlagsAdmin.and.returnValue(throwError(() => new Error('x')));
+    c.resolveFlags({ id: 'c1' });
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('toggleHide unhides a hidden comment and rolls back on error', () => {
+    spyOn(c, 'loadFlaggedComments'); // isolate optimistic update from reload
+    c.flaggedComments.set([{ id: 'c1', is_hidden: true }]);
+    h.blog.unhideCommentAdmin.and.returnValue(of({}));
+    c.toggleHide({ id: 'c1', is_hidden: true });
+    expect(c.flaggedComments()[0].is_hidden).toBe(false);
+
+    c.flaggedComments.set([{ id: 'c2', is_hidden: true }]);
+    h.blog.unhideCommentAdmin.and.returnValue(throwError(() => new Error('x')));
+    c.toggleHide({ id: 'c2', is_hidden: true });
+    expect(c.flaggedComments()[0].is_hidden).toBe(true); // rolled back
+  });
+
+  it('toggleHide hides a visible comment via reason prompt', () => {
+    const promptSpy = spyOn(window, 'prompt');
+    spyOn(c, 'loadFlaggedComments'); // isolate optimistic update from reload
+    c.flaggedComments.set([{ id: 'c3', is_hidden: false }]);
+
+    promptSpy.and.returnValue(null); // cancel
+    c.toggleHide({ id: 'c3', is_hidden: false });
+    expect(h.blog.hideCommentAdmin).not.toHaveBeenCalled();
+
+    promptSpy.and.returnValue('spam');
+    h.blog.hideCommentAdmin.and.returnValue(of({}));
+    c.toggleHide({ id: 'c3', is_hidden: false });
+    expect(c.flaggedComments()[0].is_hidden).toBe(true);
+
+    c.flaggedComments.set([{ id: 'c4', is_hidden: false }]);
+    h.blog.hideCommentAdmin.and.returnValue(throwError(() => new Error('x')));
+    c.toggleHide({ id: 'c4', is_hidden: false });
+    expect(c.flaggedComments()[0].is_hidden).toBe(false); // rolled back
+  });
+
+  it('toggleHide respects the moderation-busy guard', () => {
+    c.blogCommentModerationBusy.add('busy');
+    c.toggleHide({ id: 'busy', is_hidden: false });
+    expect(h.blog.hideCommentAdmin).not.toHaveBeenCalled();
+  });
+
+  it('adminDeleteComment confirms before deleting', () => {
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.adminDeleteComment({ id: 'c1' });
+    expect(h.blog.deleteComment).not.toHaveBeenCalled();
+
+    confirmSpy.and.returnValue(true);
+    h.blog.listFlaggedComments.and.returnValue(of({ items: [] }));
+    h.blog.deleteComment.and.returnValue(of({}));
+    c.adminDeleteComment({ id: 'c1' });
+    expect(h.toast.success).toHaveBeenCalled();
+    h.blog.deleteComment.and.returnValue(throwError(() => new Error('x')));
+    c.adminDeleteComment({ id: 'c1' });
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.blogCommentModerationBusy.add('busy');
+    c.adminDeleteComment({ id: 'busy' });
+  });
+
+  it('selectBlogVersion computes a diff and handles errors', () => {
+    c.selectedBlogKey = null;
+    c.selectBlogVersion(1);
+    expect(h.admin.getContentVersion).not.toHaveBeenCalled();
+    c.selectedBlogKey = 'blog.a';
+    c.blogForm = { body_markdown: 'new text' };
+    h.admin.getContentVersion.and.returnValue(of({ body_markdown: 'old text' }));
+    c.selectBlogVersion(2);
+    expect(c.blogDiffParts.length).toBeGreaterThan(0);
+    h.admin.getContentVersion.and.returnValue(throwError(() => new Error('x')));
+    c.selectBlogVersion(2);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('rollbackBlogVersion confirms then reloads', () => {
+    c.selectedBlogKey = null;
+    c.rollbackBlogVersion(1);
+    expect(h.admin.rollbackContentVersion).not.toHaveBeenCalled();
+
+    c.selectedBlogKey = 'blog.a';
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.rollbackBlogVersion(1);
+    expect(h.admin.rollbackContentVersion).not.toHaveBeenCalled();
+
+    confirmSpy.and.returnValue(true);
+    spyOn(c, 'reloadContentBlocks');
+    spyOn(c, 'loadBlogEditor');
+    spyOn(c, 'loadBlogVersions');
+    h.admin.rollbackContentVersion.and.returnValue(of({}));
+    c.rollbackBlogVersion(1);
+    expect(c.loadBlogEditor).toHaveBeenCalledWith('blog.a');
+
+    h.admin.rollbackContentVersion.and.returnValue(throwError(() => new Error('x')));
+    c.rollbackBlogVersion(1);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('renderMarkdown delegates to the markdown service', () => {
+    expect(c.renderMarkdown('hello')).toBe('<p>hello</p>');
+  });
+});
+
+describe('AdminComponent — markdown editor helpers', () => {
+  let c: any;
+  let ta: HTMLTextAreaElement;
+  beforeEach(() => {
+    c = createComponent().component as any;
+    c.blogForm = { body_markdown: '' };
+    ta = document.createElement('textarea');
+    document.body.appendChild(ta);
+  });
+  afterEach(() => ta.remove());
+
+  it('applyBlogHeading prefixes the current line', () => {
+    ta.value = 'Title';
+    ta.selectionStart = ta.selectionEnd = 0;
+    c.applyBlogHeading(ta, 2);
+    expect(c.blogForm.body_markdown).toBe('## Title');
+  });
+
+  it('applyBlogList prefixes lines with a dash', () => {
+    ta.value = 'item';
+    ta.selectionStart = ta.selectionEnd = 0;
+    c.applyBlogList(ta);
+    expect(c.blogForm.body_markdown).toBe('- item');
+  });
+
+  it('wrapBlogSelection wraps a selection or inserts a placeholder', () => {
+    ta.value = 'bold me';
+    ta.selectionStart = 0; ta.selectionEnd = 4;
+    c.wrapBlogSelection(ta, '**', '**', 'text');
+    expect(c.blogForm.body_markdown).toBe('**bold** me');
+
+    ta.value = '';
+    ta.selectionStart = ta.selectionEnd = 0;
+    c.wrapBlogSelection(ta, '_', '_', 'ph');
+    expect(c.blogForm.body_markdown).toBe('_ph_');
+  });
+
+  it('insertBlogLink and insertBlogCodeBlock insert markdown snippets', () => {
+    ta.value = 'click';
+    ta.selectionStart = 0; ta.selectionEnd = 5;
+    c.insertBlogLink(ta);
+    expect(c.blogForm.body_markdown).toContain('[click](https://)');
+
+    ta.value = 'x = 1';
+    ta.selectionStart = 0; ta.selectionEnd = 5;
+    c.insertBlogCodeBlock(ta);
+    expect(c.blogForm.body_markdown).toContain('```');
+  });
+
+  it('insertBlogEmbed inserts an embed snippet or cancels', () => {
+    const promptSpy = spyOn(window, 'prompt').and.returnValue('');
+    ta.value = '';
+    ta.selectionStart = ta.selectionEnd = 0;
+    c.insertBlogEmbed(ta, 'product');
+    expect(c.blogForm.body_markdown).toBe('');
+
+    promptSpy.and.returnValue('shoes');
+    c.insertBlogEmbed(ta, 'category');
+    expect(c.blogForm.body_markdown).toContain('{{category:shoes}}');
+
+    // RichEditorComponent branch
+    const editor = { insertMarkdown: jasmine.createSpy('insertMarkdown') } as any;
+    promptSpy.and.returnValue('coll');
+    c.insertBlogEmbed(editor, 'collection');
+    expect(editor.insertMarkdown).toHaveBeenCalledWith('{{collection:coll}}');
+  });
+});
