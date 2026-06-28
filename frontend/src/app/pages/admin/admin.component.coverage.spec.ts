@@ -4718,4 +4718,123 @@ describe('AdminComponent — CMS media upload', () => {
     h.admin.uploadContentImage.and.returnValue(throwError(() => ({ status: 500 })));
     await expectAsync((c as any).uploadCmsImageToKey('page.about', imgFile())).toBeRejected();
   });
+
+  it('insertPageMediaFiles inserts an image then a gallery', async () => {
+    h.admin.uploadContentImage.and.returnValue(of({ images: [{ url: '/u.png', focal_x: 50, focal_y: 50 }] }));
+    c.pageBlocks['page.about'] = [];
+    await (c as any).insertPageMediaFiles('page.about', 0, [imgFile()]);
+    expect(c.pageBlocks['page.about'].some((b: any) => b.type === 'image')).toBe(true);
+
+    c.pageBlocks['page.about'] = [];
+    await (c as any).insertPageMediaFiles('page.about', 0, [imgFile(), imgFile()]);
+    expect(c.pageBlocks['page.about'].some((b: any) => b.type === 'gallery')).toBe(true);
+  });
+});
+
+describe('AdminComponent — image insert, page carousel, exports, misc', () => {
+  let h: Harness;
+  let c: any;
+  const KEY = 'page.about';
+  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; });
+
+  it('uploadAndInsertBlogImage inserts markdown for textarea and editor', () => {
+    c.selectedBlogKey = null;
+    c.uploadAndInsertBlogImage(document.createElement('textarea'), { target: { files: [] } } as any);
+    expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+
+    c.selectedBlogKey = 'blog.a';
+    c.blogForm = { body_markdown: '' };
+    c.blogImageLayout = 'wide';
+    const ta = document.createElement('textarea');
+    const file = new File(['x'], 'pic.png', { type: 'image/png' });
+    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/p.png', sort_order: 0 }] }));
+    c.uploadAndInsertBlogImage(ta, { target: { files: [file], value: 'v' } } as any);
+    expect(c.blogForm.body_markdown).toContain('/p.png');
+
+    const editor = { insertMarkdown: jasmine.createSpy('im') } as any;
+    c.blogImageLayout = 'default';
+    c.uploadAndInsertBlogImage(editor, { target: { files: [file], value: 'v' } } as any);
+    expect(editor.insertMarkdown).toHaveBeenCalled();
+
+    h.admin.uploadContentImage.and.returnValue(throwError(() => new Error('x')));
+    c.uploadAndInsertBlogImage(ta, { target: { files: [file], value: 'v' } } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('page carousel slide methods reorder, remove and set image', () => {
+    c.pageBlocks[KEY] = [{ key: 'car', type: 'carousel', slides: [c.emptySlideDraft(), c.emptySlideDraft()] }];
+    c.movePageCarouselSlide(KEY, 'car', 0, 1);
+    c.movePageCarouselSlide(KEY, 'car', 0, 99); // out of range
+    c.setPageCarouselSlideImage(KEY, 'car', 0, { url: '/s.jpg', focal_x: 1, focal_y: 2 });
+    expect(c.pageBlocks[KEY][0].slides[0].image_url).toBe('/s.jpg');
+    c.setPageCarouselSlideImage(KEY, 'car', 9, { url: '/x' }); // bad idx
+    c.setPageCarouselSlideImage(KEY, 'car', 0, { url: '' }); // empty
+    c.removePageCarouselSlide(KEY, 'car', 0);
+    expect(c.pageBlocks[KEY][0].slides.length).toBe(1);
+    c.removePageCarouselSlide(KEY, 'car', 0); // keeps one
+    expect(c.pageBlocks[KEY][0].slides.length).toBe(1);
+  });
+
+  it('exportContentRedirects downloads a csv and reports errors', () => {
+    c.redirectsExporting = false;
+    c.redirectsQuery = 'q';
+    h.admin.exportContentRedirects.and.returnValue(of(new Blob(['a,b'], { type: 'text/csv' })));
+    c.exportContentRedirects();
+    expect(h.toast.success).toHaveBeenCalled();
+    expect(c.redirectsExporting).toBe(false);
+
+    h.admin.exportContentRedirects.and.returnValue(throwError(() => ({ error: { detail: 'e' } })));
+    c.exportContentRedirects();
+    expect(h.toast.error).toHaveBeenCalledWith('e');
+
+    c.redirectsExporting = true; // busy guard
+    h.admin.exportContentRedirects.calls.reset();
+    c.exportContentRedirects();
+    expect(h.admin.exportContentRedirects).not.toHaveBeenCalled();
+  });
+
+  it('saveBulkStock updates selected products', async () => {
+    c.bulkStock = null;
+    await c.saveBulkStock(); // no bulk
+    expect(h.admin.updateProduct).not.toHaveBeenCalled();
+
+    c.bulkStock = 7;
+    c.selectedIds = new Set(['p1', 'missing']);
+    c.products = [{ id: 'p1', slug: 's1', stock_quantity: 0 }];
+    h.admin.updateProduct.and.returnValue(of({}));
+    await c.saveBulkStock();
+    expect(c.products[0].stock_quantity).toBe(7);
+
+    c.selectedIds = new Set(['p1']);
+    h.admin.updateProduct.and.returnValue(throwError(() => new Error('x')));
+    await c.saveBulkStock();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('syncSplitScroll early-returns for non-split and non-scrollable', () => {
+    h.cmsPrefs.previewLayout.and.returnValue('stacked');
+    const a = document.createElement('div');
+    const b = document.createElement('div');
+    expect(() => c.syncSplitScroll(a, b)).not.toThrow();
+    h.cmsPrefs.previewLayout.and.returnValue('split');
+    expect(() => c.syncSplitScroll(a, b)).not.toThrow(); // no scrollable height
+  });
+
+  it('editBlogCoverFocalPoint validates input', () => {
+    c.blogEditLang = 'en'; c.blogBaseLang = 'en';
+    c.blogImages = [{ id: 'i', url: '/c.png', focal_x: 50, focal_y: 50 }];
+    c.blogForm = { cover_image_url: '/c.png' };
+    const promptSpy = spyOn(window, 'prompt').and.returnValue(null);
+    c.editBlogCoverFocalPoint(); // cancelled
+    expect(h.admin.updateContentImageFocalPoint).not.toHaveBeenCalled();
+
+    promptSpy.and.returnValue('bad');
+    c.editBlogCoverFocalPoint(); // bad format
+    expect(h.toast.error).toHaveBeenCalled();
+
+    promptSpy.and.returnValue('30, 40');
+    h.admin.updateContentImageFocalPoint.and.returnValue(of({ focal_x: 30, focal_y: 40 }));
+    c.editBlogCoverFocalPoint();
+    expect(h.admin.updateContentImageFocalPoint).toHaveBeenCalled();
+  });
 });
