@@ -14,7 +14,6 @@
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
     "e2e": "playwright test",
-    "e2e:chromatic": "playwright test --config=playwright.chromatic.config.ts --project=chromium",
     "dev:ssr": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js run app:serve-ssr",
     "serve:ssr": "node scripts/prepare-ssr-runtime.cjs && node dist/app/server/main.js",
     "build:ssr": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js build && node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js run app:server && node scripts/prepare-ssr-runtime.cjs",
@@ -48,15 +47,13 @@
     "libphonenumber-js": "^1.12.40",
     "marked": "^17.0.4",
     "rxjs": "^7.8.1",
+    "uuid": "^11.1.1",
     "zone.js": "~0.16.1"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^21.2.9",
     "@angular/cli": "^21.2.9",
     "@angular/compiler-cli": "^21.2.9",
-    "@applitools/eyes-playwright": "^1.46.0",
-    "@chromatic-com/playwright": "^0.12.8",
-    "@codecov/bundle-analyzer": "^1.9.1",
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.58.2",
     "@types/express": "^5.0.1",
@@ -67,7 +64,6 @@
     "autoprefixer": "^10.4.27",
     "browser-sync": "^3.0.0",
     "chokidar": "^3.6.0",
-    "chromatic": "^13.3.2",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "glob-parent": "^5.1.2",
@@ -86,14 +82,15 @@
     "typescript-eslint": "^8.57.0"
   },
   "overrides": {
-    "@toast-ui/editor": {
-      "dompurify": "3.3.1"
-    },
-    "fastify": "5.7.2",
-    "hono": "4.12.2",
-    "lodash": "4.17.23",
-    "serialize-javascript": "7.0.3",
-    "tar": "7.5.8",
-    "undici": "7.18.2"
+    "@babel/core": "^7.29.7",
+    "dompurify": "$dompurify",
+    "esbuild": "^0.28.1",
+    "hono": "4.12.25",
+    "http-proxy-middleware": "^3.0.7",
+    "lodash": "^4.18.0",
+    "serialize-javascript": "^7.0.5",
+    "tar": "7.5.16",
+    "undici": "7.28.0",
+    "uuid": "$uuid"
   }
 }

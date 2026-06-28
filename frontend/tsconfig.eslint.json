@@ -6,7 +6,6 @@
   "include": [
     "src/**/*.ts",
     "e2e/**/*.ts",
-    "playwright.config.ts",
-    "playwright.chromatic.config.ts"
+    "playwright.config.ts"
   ]
 }
