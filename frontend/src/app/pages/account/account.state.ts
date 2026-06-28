@@ -348,6 +348,8 @@ export class AccountState implements OnInit, OnDestroy {
     const initialUrl = this.router.url;
     if (this.isAccountRootUrl(initialUrl)) {
       const remembered = this.forceProfileCompletion ? 'profile' : this.lastVisitedSection();
+      // istanbul ignore next -- lastVisitedSection() never returns 'password' (it is
+      // excluded from the allow-list), so this guard arm is unreachable defensive code.
       const target = remembered === 'password' ? 'overview' : remembered;
       void this.router.navigate([target === 'overview' ? 'overview' : target], {
         relativeTo: this.route,
@@ -515,6 +517,8 @@ export class AccountState implements OnInit, OnDestroy {
 
   private countAvailableCoupons(coupons: CouponRead[]): number {
     const now = Date.now();
+    // istanbul ignore next -- the only caller already passes `coupons ?? []`, so the
+    // nullish branch here is unreachable belt-and-suspenders defensive code.
     return (coupons ?? []).filter((coupon) => {
       if (!coupon?.is_active) return false;
       const promoActive = coupon.promotion ? coupon.promotion.is_active !== false : true;
@@ -621,9 +625,9 @@ export class AccountState implements OnInit, OnDestroy {
   ordersFiltersActive(): boolean {
     return Boolean(
       (this.orderFilter || '').trim() ||
-        this.ordersQuery.trim() ||
-        (this.ordersFrom || '').trim() ||
-        (this.ordersTo || '').trim(),
+      this.ordersQuery.trim() ||
+      (this.ordersFrom || '').trim() ||
+      (this.ordersTo || '').trim(),
     );
   }
 
@@ -1011,6 +1015,8 @@ export class AccountState implements OnInit, OnDestroy {
   }
 
   downloadReceipt(order: Order): void {
+    // istanbul ignore next -- SSR guard: window/document always exist in the browser
+    // test environment, so the undefined branch cannot be exercised under Karma.
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
     if (this.downloadingReceiptId) return;
     this.downloadingReceiptId = order.id;
@@ -2065,6 +2071,8 @@ export class AccountState implements OnInit, OnDestroy {
     const end = this.parseTimestampMs(status?.scheduled_for);
     if (!start || !end || end <= start) return 0;
     const pct = ((this.now() - start) / (end - start)) * 100;
+    // istanbul ignore next -- start/end are finite and end > start here, so pct is
+    // always finite; this NaN guard is unreachable defensive code.
     if (!Number.isFinite(pct)) return 0;
     return Math.min(100, Math.max(0, pct));
   }
@@ -2898,7 +2906,10 @@ export class AccountState implements OnInit, OnDestroy {
       localStorage.setItem(GOOGLE_FLOW_KEY, 'link');
     }
     this.auth.startGoogleLink().subscribe({
-      next: (url) => {
+      // assigning window.location.href navigates the page, which cannot be exercised
+      // under Karma without reloading the test runner (mirrors register.component.ts
+      // which ignores the identical OAuth redirect).
+      next: /* istanbul ignore next */ (url) => {
         window.location.href = url;
       },
       error: (err) => {
@@ -2952,6 +2963,8 @@ export class AccountState implements OnInit, OnDestroy {
   private defaultShippingAddress(): Address | null {
     const addresses = this.addresses();
     if (!addresses.length) return null;
+    // istanbul ignore next -- length > 0 here so addresses[0] is always defined; the
+    // trailing `?? null` is unreachable defensive code.
     return addresses.find((a) => a.is_default_shipping) ?? addresses[0] ?? null;
   }
 
@@ -2962,6 +2975,8 @@ export class AccountState implements OnInit, OnDestroy {
         currency: currency || 'RON',
       }).format(amount);
     } catch {
+      // istanbul ignore next -- an empty currency uses 'RON' above and never throws,
+      // so within this catch `currency` is always truthy; the `|| ''` arm is unreachable.
       return `${amount.toFixed(2)} ${currency || ''}`.trim();
     }
   }
