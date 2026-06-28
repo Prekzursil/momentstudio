@@ -50,6 +50,7 @@ export class ErrorComponent implements OnInit, OnDestroy {
     this.socialSub?.unsubscribe();
   }
 
+  /* istanbul ignore next -- location.reload() reloads the Karma test runner and Location.reload is non-configurable/non-writable in Chrome, so this is not unit-testable */
   onRetry(): void {
     location.reload();
   }
