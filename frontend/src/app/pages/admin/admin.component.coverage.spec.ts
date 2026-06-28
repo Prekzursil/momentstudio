@@ -2446,3 +2446,161 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
     expect(c.assetsMessage).toBeTruthy();
   });
 });
+
+describe('AdminComponent — site settings load/save (assets, company, social, seo)', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
+  });
+
+  it('loadAssets maps meta and resets on error', () => {
+    h.admin.getContent.and.returnValue(of({ version: 2, meta: { logo_url: '/l', favicon_url: '/f', social_image_url: '/s' } }));
+    c.loadAssets();
+    expect(c.assetsForm.logo_url).toBe('/l');
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.loadAssets();
+    expect(c.assetsForm.logo_url).toBe('');
+  });
+
+  it('loadCheckoutSettings parses meta and resets on error', () => {
+    h.admin.getContent.and.returnValue(of({
+      version: 2,
+      meta: { shipping_fee_ron: 12, fee_type: 'percent', fee_value: 3, vat_rate_percent: 19, money_rounding: 'up', receipt_share_days: 30, phone_required_home: 'no' },
+    }));
+    c.loadCheckoutSettings();
+    expect(c.checkoutSettingsForm.shipping_fee_ron).toBe(12);
+    expect(c.checkoutSettingsForm.fee_type).toBe('percent');
+    expect(c.checkoutSettingsForm.money_rounding).toBe('up');
+    expect(c.checkoutSettingsForm.phone_required_home).toBe(false);
+
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.loadCheckoutSettings();
+    expect(c.checkoutSettingsForm.shipping_fee_ron).toBe(20);
+  });
+
+  it('loadCompany maps nested company meta and resets on error', () => {
+    h.admin.getContent.and.returnValue(of({ version: 2, meta: { company: { name: ' Acme ', cui: 'RO1' } } }));
+    c.loadCompany();
+    expect(c.companyForm.name).toBe('Acme');
+    expect(c.companyForm.cui).toBe('RO1');
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.loadCompany();
+    expect(c.companyForm.name).toBe('');
+  });
+
+  it('companyMissingFields lists empty required fields', () => {
+    c.companyForm = { name: '', registration_number: '', cui: '', address: '', phone: '', email: '' };
+    expect(c.companyMissingFields().length).toBe(6);
+    c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+    expect(c.companyMissingFields().length).toBe(0);
+  });
+
+  it('saveCompany blocks on missing fields then persists with fallbacks', () => {
+    c.companyForm = { name: '', registration_number: '', cui: '', address: '', phone: '', email: '' };
+    c.saveCompany();
+    expect(c.companyError).toBeTruthy();
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+
+    c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveCompany();
+    expect(c.companyMessage).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveCompany();
+    expect(c.companyError).toBeTruthy();
+
+    // the conflict reload above blanks companyForm — re-populate before the create fallback
+    c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    c.saveCompany();
+    expect(c.companyMessage).toBeTruthy();
+    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+    c.saveCompany();
+    expect(c.companyError).toBeTruthy();
+  });
+
+  it('loadSocial maps contact + pages and keeps defaults on error', () => {
+    h.admin.getContent.and.returnValue(of({ version: 2, meta: { contact: { phone: '123', email: 'a@b.c' }, instagram_pages: [{ label: 'IG', url: 'u' }] } }));
+    c.loadSocial();
+    expect(c.socialForm.phone).toBe('123');
+    expect(c.socialForm.instagram_pages.length).toBe(1);
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    expect(() => c.loadSocial()).not.toThrow();
+  });
+
+  it('addSocialLink and removeSocialLink manage page lists', () => {
+    c.socialForm = { phone: '', email: '', instagram_pages: [], facebook_pages: [] };
+    c.addSocialLink('instagram');
+    c.addSocialLink('facebook');
+    expect(c.socialForm.instagram_pages.length).toBe(1);
+    expect(c.socialForm.facebook_pages.length).toBe(1);
+    c.removeSocialLink('instagram', 0);
+    expect(c.socialForm.instagram_pages.length).toBe(0);
+  });
+
+  it('loadSeo maps title/description and resets on error', () => {
+    c.seoPage = 'home'; c.seoLang = 'en';
+    h.admin.getContent.and.returnValue(of({ version: 2, title: 'SEO', meta: { description: 'desc' } }));
+    c.loadSeo();
+    expect(c.seoForm.title).toBe('SEO');
+    expect(c.seoForm.description).toBe('desc');
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.loadSeo();
+    expect(c.seoForm.title).toBe('');
+  });
+
+  it('saveSeo persists with conflict and create fallback', () => {
+    c.seoPage = 'home'; c.seoLang = 'en';
+    c.seoForm = { title: 'T', description: 'D' };
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveSeo();
+    expect(c.seoMessage).toBeTruthy();
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveSeo();
+    expect(c.seoError).toBeTruthy();
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    c.saveSeo();
+    expect(c.seoMessage).toBeTruthy();
+    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+    c.saveSeo();
+    expect(c.seoError).toBeTruthy();
+  });
+
+  it('loadSitemapPreview stores by-lang data and surfaces detail errors', () => {
+    h.admin.getSitemapPreview.and.returnValue(of({ by_lang: { en: ['/'] } }));
+    c.loadSitemapPreview();
+    expect(c.sitemapPreviewByLang).toEqual({ en: ['/'] });
+    h.admin.getSitemapPreview.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })));
+    c.loadSitemapPreview();
+    expect(c.sitemapPreviewError).toBe('boom');
+  });
+
+  it('structuredDataIssueUrl builds entity URLs', () => {
+    expect(c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'p1' })).toBe('/products/p1');
+    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe('/about');
+    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' })).toBe('/contact');
+    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe('/pages/faq');
+    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.' })).toBe('/pages');
+    expect(c.structuredDataIssueUrl({ entity_type: 'other', entity_key: 'x' })).toBe('/');
+  });
+
+  it('runStructuredDataValidation stores results and surfaces errors', () => {
+    h.admin.validateStructuredData.and.returnValue(of({ issues: [] }));
+    c.runStructuredDataValidation();
+    expect(c.structuredDataResult).toEqual({ issues: [] } as any);
+    h.admin.validateStructuredData.and.returnValue(throwError(() => ({ error: { detail: 'bad' } })));
+    c.runStructuredDataValidation();
+    expect(c.structuredDataError).toBe('bad');
+  });
+
+  it('selectInfoLang sets the active info language', () => {
+    c.selectInfoLang('ro');
+    expect(c.infoLang).toBe('ro');
+  });
+});
