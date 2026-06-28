@@ -87,6 +87,7 @@ function makeCmsPrefs(): any {
     previewLayout: jasmine.createSpy('previewLayout').and.returnValue('stacked'),
     previewLang: jasmine.createSpy('previewLang').and.returnValue('en'),
     previewTheme: jasmine.createSpy('previewTheme').and.returnValue('light'),
+    translationLayout: jasmine.createSpy('translationLayout').and.returnValue('tabbed'),
     setMode: jasmine.createSpy('setMode'),
     setPreviewDevice: jasmine.createSpy('setPreviewDevice'),
     setPreviewLayout: jasmine.createSpy('setPreviewLayout'),
@@ -3627,5 +3628,127 @@ describe('AdminComponent — page blocks load/save', () => {
   it('selectHomeBlocksLang sets the active home language', () => {
     c.selectHomeBlocksLang('ro');
     expect(c.homeBlocksLang).toBe('ro');
+  });
+});
+
+describe('AdminComponent — info pages, legal pages, visibility', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('pagePublicUrlForKey maps slugs', () => {
+    expect(c.pagePublicUrlForKey('page.about')).toBe('/about');
+    expect(c.pagePublicUrlForKey('page.contact')).toBe('/contact');
+    expect(c.pagePublicUrlForKey('page.faq')).toBe('/pages/faq');
+    expect(c.pagePublicUrlForKey('page.')).toBe('/pages');
+  });
+
+  it('isPageHidden / canTogglePageHidden reflect content pages and protections', () => {
+    c.contentPages = [{ key: 'page.custom', hidden: true }, { key: 'page.about', hidden: false }];
+    expect(c.isPageHidden('page.custom')).toBe(true);
+    expect(c.isPageHidden('page.about')).toBe(false);
+    expect(c.isPageHidden('')).toBe(false);
+    expect(c.canTogglePageHidden('page.custom')).toBe(true);
+    expect(c.canTogglePageHidden('page.about')).toBe(false); // protected
+    expect(c.canTogglePageHidden('home.x')).toBe(false);
+  });
+
+  it('togglePageHidden persists visibility with conflict/error handling', () => {
+    c.contentPages = [{ key: 'page.custom', hidden: false }];
+    spyOn(c, 'loadContentPages');
+    spyOn(c as any, 'ensureSelectedPageIsVisible');
+    h.admin.getContent.and.returnValue(of({ version: 1, meta: {} }));
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.togglePageHidden('page.custom');
+    expect(h.admin.updateContentBlock).toHaveBeenCalled();
+    expect(h.toast.success).toHaveBeenCalled();
+
+    // protected page is a no-op
+    c.contentPages = [{ key: 'page.about', hidden: false }];
+    h.admin.updateContentBlock.calls.reset();
+    c.togglePageHidden('page.about');
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+
+    // update error rolls back
+    c.contentPages = [{ key: 'page.custom', hidden: false }];
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    c.togglePageHidden('page.custom');
+    expect(c.contentPages[0].hidden).toBe(false);
+
+    // load error
+    c.contentPages = [{ key: 'page.custom', hidden: false }];
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.togglePageHidden('page.custom');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('onLegalPageKeyChange switches and reloads', () => {
+    spyOn(c, 'loadLegalPage');
+    c.legalPageKey = 'page.terms';
+    c.onLegalPageKeyChange('page.terms'); // unchanged
+    expect(c.loadLegalPage).not.toHaveBeenCalled();
+    c.onLegalPageKeyChange('page.privacy-policy');
+    expect(c.legalPageKey).toBe('page.privacy-policy');
+    expect(c.loadLegalPage).toHaveBeenCalled();
+  });
+
+  it('loadLegalPage requires a key and merges en/ro content', () => {
+    c.loadLegalPage('' as any);
+    expect(c.legalPageError).toBeTruthy();
+
+    h.admin.getContent.and.callFake((key: string, lang: string) =>
+      of({ body_markdown: lang === 'en' ? 'EN body' : 'RO body', meta: { last_updated: '2030' } }),
+    );
+    c.loadLegalPage('page.terms');
+    expect(c.legalPageForm.en).toBe('EN body');
+    expect(c.legalPageForm.ro).toBe('RO body');
+    expect(c.legalPageLastUpdated).toBe('2030');
+
+    // 404 on both → empty form, no error
+    h.admin.getContent.and.returnValue(throwError(() => ({ status: 404 })));
+    c.loadLegalPage('page.terms');
+    expect(c.legalPageForm.en).toBe('');
+
+    // non-404 surfaces error
+    h.admin.getContent.and.returnValue(of({ status: 500 }));
+    c.loadLegalPage('page.terms');
+    expect(c.legalPageError).toBeTruthy();
+  });
+
+  it('saveInfoUi routes by translation layout', () => {
+    const single = spyOn<any>(c, 'saveInfo');
+    const both = spyOn<any>(c, 'saveInfoBoth');
+    h.cmsPrefs.translationLayout.and.returnValue('tabbed');
+    c.infoLang = 'en';
+    c.saveInfoUi('page.about', { en: 'A', ro: 'B' });
+    expect(single).toHaveBeenCalledWith('page.about', 'A', 'en');
+    h.cmsPrefs.translationLayout.and.returnValue('sideBySide');
+    c.saveInfoUi('page.about', { en: 'A', ro: 'B' });
+    expect(both).toHaveBeenCalled();
+  });
+
+  it('saveLegalPageUi routes by translation layout and guards key', () => {
+    const single = spyOn<any>(c, 'saveLegalPage');
+    const both = spyOn<any>(c, 'saveLegalPageBoth');
+    c.legalPageKey = null;
+    c.saveLegalPageUi();
+    expect(single).not.toHaveBeenCalled();
+    c.legalPageKey = 'page.terms';
+    c.legalPageForm = { en: 'E', ro: 'R' };
+    h.cmsPrefs.translationLayout.and.returnValue('sideBySide');
+    c.saveLegalPageUi();
+    expect(both).toHaveBeenCalled();
+    h.cmsPrefs.translationLayout.and.returnValue('tabbed');
+    c.infoLang = 'ro';
+    c.saveLegalPageUi();
+    expect(single).toHaveBeenCalledWith('page.terms', 'R', 'ro');
+  });
+
+  it('loadInfo fetches each info page', async () => {
+    h.admin.getContent.and.returnValue(of({ body_markdown: 'Body', meta: {} }));
+    c.loadInfo();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(h.admin.getContent).toHaveBeenCalled();
   });
 });
