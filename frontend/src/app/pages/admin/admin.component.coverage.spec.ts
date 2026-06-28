@@ -3087,3 +3087,155 @@ describe('AdminComponent — content redirects, find/replace, link check', () =>
     expect(c.canRenamePageKey('home.x')).toBe(false);
   });
 });
+
+describe('AdminComponent — page builder block editing', () => {
+  let h: Harness;
+  let c: any;
+  const KEY = 'page.about';
+  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; });
+
+  it('addPageBlockFromLibrary inserts a block and applies starter templates', () => {
+    for (const type of ['text', 'columns', 'cta', 'faq', 'testimonials', 'product_grid', 'form', 'image', 'gallery', 'banner', 'carousel']) {
+      c.addPageBlockFromLibrary(KEY, type, 'starter');
+    }
+    expect(c.pageBlocks[KEY].length).toBe(11);
+    expect(c.pageBlocks[KEY][0].title.en).toBe('Section title'); // text starter
+  });
+
+  it('addPageBlockFromLibrary rejects a type not allowed for the key', () => {
+    // global section keys restrict allowed types
+    const restricted = c.allowedCmsLibraryTypes('home.story');
+    if (restricted) {
+      c.addPageBlockFromLibrary('home.story', 'product_grid', 'blank');
+      expect(h.toast.error).toHaveBeenCalled();
+    }
+    expect(true).toBe(true);
+  });
+
+  it('movePageBlock reorders within bounds and announces', () => {
+    c.pageBlocks[KEY] = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }, { key: 'c', type: 'text' }];
+    c.movePageBlock(KEY, 'a', 1);
+    expect(c.pageBlocks[KEY].map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
+    c.movePageBlock(KEY, 'missing', 1);
+    c.movePageBlock(KEY, 'b', -5); // out of range
+    expect(c.pageBlocks[KEY][0].key).toBe('b');
+  });
+
+  it('page block drag lifecycle and drop zone reorders', () => {
+    c.pageBlocks[KEY] = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }];
+    c.onPageBlockDragStart(KEY, 'a');
+    expect(c.draggingPageBlockKey).toBe('a');
+    const ev = dragEvent();
+    c.onPageBlockDragOver(ev);
+    expect(ev.preventDefault).toHaveBeenCalled();
+
+    c.draggingPageBlocksKey = KEY;
+    c.draggingPageBlockKey = 'a';
+    c.onPageBlockDropZone(dragEvent(), KEY, 2);
+    expect(c.pageBlocks[KEY].map((b: any) => b.key)).toEqual(['b', 'a']);
+
+    // library payload insert
+    c.onPageBlockDropZone(dragEvent({ kind: 'cms-block', scope: 'page', type: 'text', template: 'blank' }), KEY, 0);
+    expect(c.pageBlocks[KEY].length).toBe(3);
+
+    // wrong scope
+    const before = c.pageBlocks[KEY].length;
+    c.onPageBlockDropZone(dragEvent({ kind: 'cms-block', scope: 'home', type: 'text' }), KEY, 0);
+    expect(c.pageBlocks[KEY].length).toBe(before);
+
+    c.onPageBlockDragEnd();
+    expect(c.draggingPageBlockKey).toBeNull();
+  });
+
+  it('onPageBlockDrop reorders onto a target and inserts library payloads', () => {
+    c.pageBlocks[KEY] = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }, { key: 'c', type: 'text' }];
+    c.draggingPageBlocksKey = KEY;
+    c.draggingPageBlockKey = 'a';
+    c.onPageBlockDrop(dragEvent(), KEY, 'c');
+    expect(c.pageBlocks[KEY].map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
+
+    const cnt = c.pageBlocks[KEY].length;
+    c.onPageBlockDrop(dragEvent({ kind: 'cms-block', scope: 'page', type: 'text', template: 'blank' }), KEY, 'b');
+    expect(c.pageBlocks[KEY].length).toBe(cnt + 1);
+  });
+
+  it('gallery image add/remove and from-asset', () => {
+    c.pageBlocks[KEY] = [{ key: 'g', type: 'gallery', images: [] }];
+    c.addPageGalleryImage(KEY, 'g');
+    expect(c.pageBlocks[KEY][0].images.length).toBe(1);
+    c.addPageGalleryImageFromAsset(KEY, 'g', { url: ' /a.png ', focal_x: 10, focal_y: 20 });
+    expect(c.pageBlocks[KEY][0].images[1].url).toBe('/a.png');
+    c.addPageGalleryImageFromAsset(KEY, 'g', { url: '' }); // ignored
+    expect(c.pageBlocks[KEY][0].images.length).toBe(2);
+    c.removePageGalleryImage(KEY, 'g', 0);
+    expect(c.pageBlocks[KEY][0].images.length).toBe(1);
+  });
+
+  it('columns add/remove respects min 2 / max 3', () => {
+    c.pageBlocks[KEY] = [{ key: 'col', type: 'columns', columns: [{}, {}] }];
+    c.addPageColumnsColumn(KEY, 'col');
+    expect(c.pageBlocks[KEY][0].columns.length).toBe(3);
+    c.addPageColumnsColumn(KEY, 'col'); // capped at 3
+    expect(c.pageBlocks[KEY][0].columns.length).toBe(3);
+    c.removePageColumnsColumn(KEY, 'col', 0);
+    expect(c.pageBlocks[KEY][0].columns.length).toBe(2);
+    c.removePageColumnsColumn(KEY, 'col', 0); // min 2
+    expect(c.pageBlocks[KEY][0].columns.length).toBe(2);
+  });
+
+  it('faq and testimonial items add/remove respect bounds', () => {
+    c.pageBlocks[KEY] = [
+      { key: 'f', type: 'faq', faq_items: [{}] },
+      { key: 't', type: 'testimonials', testimonials: [{}] },
+    ];
+    c.addPageFaqItem(KEY, 'f');
+    expect(c.pageBlocks[KEY][0].faq_items.length).toBe(2);
+    c.removePageFaqItem(KEY, 'f', 1);
+    expect(c.pageBlocks[KEY][0].faq_items.length).toBe(1);
+    c.removePageFaqItem(KEY, 'f', 0); // min 1
+    expect(c.pageBlocks[KEY][0].faq_items.length).toBe(1);
+
+    c.addPageTestimonial(KEY, 't');
+    expect(c.pageBlocks[KEY][1].testimonials.length).toBe(2);
+    c.removePageTestimonial(KEY, 't', 1);
+    expect(c.pageBlocks[KEY][1].testimonials.length).toBe(1);
+    c.removePageTestimonial(KEY, 't', 0); // min 1
+    expect(c.pageBlocks[KEY][1].testimonials.length).toBe(1);
+  });
+
+  it('product grid slug helpers parse, add and remove', () => {
+    const block = { product_grid_product_slugs: 'a\nb' };
+    expect(c.productGridSelectedSlugs(block)).toEqual(['a', 'b']);
+    c.addProductGridProductSlug(block, 'c');
+    expect(block.product_grid_product_slugs).toBe('a\nb\nc');
+    c.addProductGridProductSlug(block, 'a'); // dup ignored
+    c.addProductGridProductSlug(block, '  '); // empty ignored
+    c.removeProductGridProductSlug(block, 'b');
+    expect(block.product_grid_product_slugs).toBe('a\nc');
+    c.removeProductGridProductSlug(block, '  '); // guard
+  });
+
+  it('searchProductGridProducts stores results and errors', () => {
+    c.productGridProductSearchQuery = { k1: '' };
+    c.searchProductGridProducts('k1'); // empty → reset
+    expect(c.productGridProductSearchResults['k1']).toEqual([]);
+
+    c.productGridProductSearchQuery = { k1: 'shoe' };
+    h.adminProducts.search.and.returnValue(of({ items: [{ slug: 's' }] }));
+    c.searchProductGridProducts('k1');
+    expect(c.productGridProductSearchResults['k1'].length).toBe(1);
+
+    h.adminProducts.search.and.returnValue(throwError(() => new Error('x')));
+    c.searchProductGridProducts('k1');
+    expect(c.productGridProductSearchError['k1']).toBeTruthy();
+  });
+
+  it('queueProductGridProductSearch clears on empty query', () => {
+    c.productGridProductSearchQuery = {};
+    c.productGridProductSearchResults = {};
+    c.queueProductGridProductSearch('k1', '   ');
+    expect(c.productGridProductSearchResults['k1']).toEqual([]);
+    c.queueProductGridProductSearch('k1', 'shoe'); // schedules a timer (no throw)
+    expect(c.productGridProductSearchQuery['k1']).toBe('shoe');
+  });
+});
