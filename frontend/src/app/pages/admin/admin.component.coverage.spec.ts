@@ -3239,3 +3239,96 @@ describe('AdminComponent — page builder block editing', () => {
     expect(c.productGridProductSearchQuery['k1']).toBe('shoe');
   });
 });
+
+describe('AdminComponent — home sections load/save and collections', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('loadSections parses built-in and custom blocks', () => {
+    h.admin.getContent.and.returnValue(of({
+      version: 2,
+      meta: { blocks: [
+        { type: 'featured_products', enabled: false },
+        { type: 'featured_products' }, // dup built-in skipped
+        { type: 'text', key: 't1', title: 'Hi', body_markdown: 'Body' },
+        { type: 'columns', key: 'c1', columns: [{ title: 'a' }, { title: 'b' }], columns_breakpoint: 'lg' },
+        { type: 'cta', key: 'cta1', cta_url: '/go', cta_new_tab: true },
+        { type: 'faq', key: 'f1', items: [{ question: 'q' }] },
+        { type: 'testimonials', key: 'te1', items: [{ author: 'a' }] },
+        { type: 'image', key: 'i1', url: '/img' },
+        { type: 'gallery', key: 'g1', images: [{ url: '/g' }, { url: '' }] },
+        { type: 'banner', key: 'b1', slide: { image: '/b' } },
+        { type: 'carousel', key: 'car1', slides: [{ image: '/s' }], settings: { autoplay: true } },
+        { type: 'unknown' }, // skipped
+        null,
+      ] },
+    }));
+    c.loadSections();
+    const types = c.homeBlocks.map((b: any) => b.type);
+    expect(types).toContain('featured_products');
+    expect(types).toContain('text');
+    expect(types).toContain('carousel');
+    expect(types.filter((t: string) => t === 'featured_products').length).toBe(1); // de-duped
+  });
+
+  it('saveSections serialises blocks and persists with conflict/404 fallbacks', () => {
+    c.cmsHomeDraft.initFromServer([]);
+    c.homeBlocks = [
+      c.makeHomeBlockDraft('featured_products', 'featured_products', true),
+      { ...c.makeHomeBlockDraft('t1', 'text', true), title: { en: 'T', ro: '' } },
+      c.makeHomeBlockDraft('g1', 'gallery', true),
+      c.makeHomeBlockDraft('car1', 'carousel', true),
+    ];
+    spyOn(c, 'refreshHomePreview');
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveSections();
+    const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+    expect(payload.meta.sections.length).toBe(1); // only the built-in section
+    expect(c.sectionsMessage).toBeTruthy();
+
+    h.admin.getContent.and.returnValue(of({ meta: { blocks: [] }, version: 1 }));
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.saveSections();
+    expect(c.sectionsMessage).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+    h.admin.createContent.and.returnValue(of({ version: 1 }));
+    c.saveSections();
+    expect(c.sectionsMessage).toBeTruthy();
+
+    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+    c.saveSections();
+    expect(c.sectionsMessage).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    c.saveSections();
+    expect(c.sectionsMessage).toBeTruthy();
+  });
+
+  it('loadCategories sorts and resets on error', () => {
+    h.admin.getCategories.and.returnValue(of([{ slug: 'b', sort_order: 2 }, { slug: 'a', sort_order: 1 }]));
+    c.loadCategories();
+    expect(c.categories[0].slug).toBe('a');
+    h.admin.getCategories.and.returnValue(throwError(() => new Error('x')));
+    c.loadCategories();
+    expect(c.categories).toEqual([]);
+  });
+
+  it('loadCollections stores collections and resets on error', () => {
+    h.admin.listFeaturedCollections.and.returnValue(of([{ id: 'c1' }]));
+    c.loadCollections();
+    expect(c.featuredCollections.length).toBe(1);
+    h.admin.listFeaturedCollections.and.returnValue(throwError(() => new Error('x')));
+    c.loadCollections();
+    expect(c.featuredCollections).toEqual([]);
+  });
+
+  it('resetCollectionForm clears the editing state', () => {
+    c.editingCollection = { id: 'x' };
+    c.collectionForm = { name: 'n', description: 'd', product_ids: ['p'] };
+    c.resetCollectionForm();
+    expect(c.editingCollection).toBeNull();
+    expect(c.collectionForm.product_ids).toEqual([]);
+  });
+});
