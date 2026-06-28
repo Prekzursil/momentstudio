@@ -681,3 +681,209 @@ describe('AdminComponent — contentTitleForKey and page block mutators', () => 
     expect(c.pageBlocks['page.about'][0].slides.length).toBe(1);
   });
 });
+
+function dragEvent(payload?: unknown, files: File[] = []): any {
+  return {
+    preventDefault: jasmine.createSpy('preventDefault'),
+    target: null,
+    dataTransfer: {
+      getData: () => (payload === undefined ? '' : JSON.stringify(payload)),
+      files,
+      items: [],
+    },
+  };
+}
+
+function checkboxEvent(checked: boolean): any {
+  return { target: { checked } };
+}
+
+describe('AdminComponent — home section helpers and slides', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('toPreviewSlide prefers the active language and falls back to the other', () => {
+    const slide = {
+      ...c.emptySlideDraft(),
+      image_url: ' /i ',
+      headline: { en: 'Hello', ro: '' },
+      subheadline: { en: '', ro: 'Salut' },
+      cta_url: ' /c ',
+    };
+    const en = c.toPreviewSlide(slide, 'en');
+    expect(en.image_url).toBe('/i');
+    expect(en.headline).toBe('Hello');
+    expect(en.subheadline).toBe('Salut'); // fallback to ro
+    expect(en.cta_url).toBe('/c');
+    const ro = c.toPreviewSlide(slide, 'ro');
+    expect(ro.headline).toBe('Hello'); // fallback to en
+    const emptyPreview = c.toPreviewSlide(c.emptySlideDraft(), 'en');
+    expect(emptyPreview.headline).toBeNull();
+    expect(emptyPreview.cta_url).toBeNull();
+  });
+
+  it('toPreviewSlides maps an array and tolerates empties', () => {
+    expect(c.toPreviewSlides([], 'en')).toEqual([]);
+    expect(c.toPreviewSlides(null, 'en')).toEqual([]);
+    expect(c.toPreviewSlides([c.emptySlideDraft()], 'en').length).toBe(1);
+  });
+
+  it('isHomeSectionId recognises every canonical id', () => {
+    for (const id of ['featured_products', 'sale_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why']) {
+      expect(c.isHomeSectionId(id)).toBe(true);
+    }
+    expect(c.isHomeSectionId('nope')).toBe(false);
+    expect(c.isHomeSectionId(7)).toBe(false);
+  });
+
+  it('normalizeHomeSectionId maps aliases and camelCase variants', () => {
+    expect(c.normalizeHomeSectionId('story')).toBe('story');
+    expect(c.normalizeHomeSectionId('newArrivals')).toBe('new_arrivals');
+    expect(c.normalizeHomeSectionId('collections')).toBe('featured_collections');
+    expect(c.normalizeHomeSectionId('featured')).toBe('featured_products');
+    expect(c.normalizeHomeSectionId('bestsellers')).toBe('featured_products');
+    expect(c.normalizeHomeSectionId('sale')).toBe('sale_products');
+    expect(c.normalizeHomeSectionId('sales')).toBe('sale_products');
+    expect(c.normalizeHomeSectionId('new')).toBe('new_arrivals');
+    expect(c.normalizeHomeSectionId('recent')).toBe('recently_viewed');
+    expect(c.normalizeHomeSectionId('recentlyViewed')).toBe('recently_viewed');
+    expect(c.normalizeHomeSectionId('   ')).toBeNull();
+    expect(c.normalizeHomeSectionId('totally-unknown')).toBeNull();
+    expect(c.normalizeHomeSectionId(123)).toBeNull();
+  });
+
+  it('ensureAllDefaultHomeBlocks appends missing default sections only', () => {
+    const existing = [c.makeHomeBlockDraft('story', 'story', true)];
+    const out = c.ensureAllDefaultHomeBlocks(existing);
+    const ids = out.map((b: any) => b.type);
+    expect(ids).toContain('featured_products');
+    expect(ids.filter((t: string) => t === 'story').length).toBe(1); // not duplicated
+    expect(out.length).toBe(c.defaultHomeSections().length);
+  });
+
+  it('isCustomHomeBlock is true for custom block types and false for sections', () => {
+    expect(c.isCustomHomeBlock({ type: 'text' })).toBe(true);
+    expect(c.isCustomHomeBlock({ type: 'carousel' })).toBe(true);
+    expect(c.isCustomHomeBlock({ type: 'story' })).toBe(false);
+  });
+
+  it('homeBlockLabel returns translation or raw type', () => {
+    expect(c.homeBlockLabel({ type: 'text' })).toContain('text');
+  });
+
+  it('toggleHomeBlockEnabled flips the enabled flag for the matching block', () => {
+    c.homeBlocks = [{ key: 'a', enabled: true }, { key: 'b', enabled: true }];
+    c.toggleHomeBlockEnabled({ key: 'a' }, checkboxEvent(false));
+    expect(c.homeBlocks[0].enabled).toBe(false);
+    expect(c.homeBlocks[1].enabled).toBe(true);
+    c.toggleHomeBlockEnabled({ key: 'a' }, checkboxEvent(true));
+    expect(c.homeBlocks[0].enabled).toBe(true);
+  });
+
+  it('moveHomeBlock reorders within bounds and ignores out-of-range moves', () => {
+    c.homeBlocks = [{ key: 'a' }, { key: 'b' }, { key: 'c' }].map((b) => ({ ...b, type: 'text' }));
+    c.moveHomeBlock('a', 1);
+    expect(c.homeBlocks.map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
+    c.moveHomeBlock('missing', 1); // no-op
+    expect(c.homeBlocks.length).toBe(3);
+    c.moveHomeBlock('b', -1); // would go below 0 → no-op
+    expect(c.homeBlocks[0].key).toBe('b');
+  });
+
+  it('addHomeBlock and addHomeBlockFromLibrary insert blocks with unique keys', () => {
+    c.homeBlocks = [];
+    c.newHomeBlockType = 'text';
+    c.addHomeBlock();
+    expect(c.homeBlocks.length).toBe(1);
+    c.addHomeBlockFromLibrary('cta', 'starter');
+    expect(c.homeBlocks.length).toBe(2);
+    expect(c.homeBlocks[0].key).not.toBe(c.homeBlocks[1].key);
+  });
+
+  it('home block drag lifecycle sets and clears the dragging key', () => {
+    c.setHomeInsertDragActive(true);
+    expect(c.homeInsertDragActive).toBe(true);
+    c.onHomeBlockDragStart('a');
+    expect(c.draggingHomeBlockKey).toBe('a');
+    const ev = dragEvent();
+    c.onHomeBlockDragOver(ev);
+    expect(ev.preventDefault).toHaveBeenCalled();
+    c.onHomeBlockDragEnd();
+    expect(c.draggingHomeBlockKey).toBeNull();
+    expect(c.homeInsertDragActive).toBe(false);
+  });
+
+  it('onHomeBlockDropZone reorders an internal drag and inserts a library payload', () => {
+    c.homeBlocks = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }];
+    c.draggingHomeBlockKey = 'a';
+    c.onHomeBlockDropZone(dragEvent(), 2);
+    expect(c.homeBlocks.map((b: any) => b.key)).toEqual(['b', 'a']);
+
+    c.draggingHomeBlockKey = 'missing';
+    c.onHomeBlockDropZone(dragEvent(), 0); // from === -1 → ends drag
+    expect(c.draggingHomeBlockKey).toBeNull();
+
+    const before = c.homeBlocks.length;
+    c.onHomeBlockDropZone(dragEvent({ kind: 'cms-block', scope: 'home', type: 'cta', template: 'blank' }), 0);
+    expect(c.homeBlocks.length).toBe(before + 1);
+
+    const after = c.homeBlocks.length;
+    c.onHomeBlockDropZone(dragEvent({ kind: 'cms-block', scope: 'page', type: 'cta' }), 0); // wrong scope
+    expect(c.homeBlocks.length).toBe(after);
+  });
+
+  it('onHomeBlockDrop reorders onto a target and inserts a home payload', () => {
+    c.homeBlocks = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }, { key: 'c', type: 'text' }];
+    c.draggingHomeBlockKey = 'a';
+    c.onHomeBlockDrop(dragEvent(), 'c');
+    expect(c.homeBlocks.map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
+
+    const cnt = c.homeBlocks.length;
+    c.onHomeBlockDrop(dragEvent({ kind: 'cms-block', scope: 'home', type: 'cta', template: 'blank' }), 'b');
+    expect(c.homeBlocks.length).toBe(cnt + 1);
+
+    // dropping a block onto itself is a no-op
+    c.draggingHomeBlockKey = 'b';
+    const same = c.homeBlocks.length;
+    c.onHomeBlockDrop(dragEvent(), 'b');
+    expect(c.homeBlocks.length).toBe(same);
+  });
+
+  it('readCmsBlockPayload validates the JSON envelope', () => {
+    expect(c.readCmsBlockPayload(dragEvent())).toBeNull();
+    expect(c.readCmsBlockPayload(dragEvent('not-json'))).toBeNull();
+    expect(c.readCmsBlockPayload(dragEvent({ kind: 'other' }))).toBeNull();
+    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'bad', type: 'text' }))).toBeNull();
+    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'home', type: 'nope' }))).toBeNull();
+    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'home', type: 'text', template: 'starter' })))
+      .toEqual({ scope: 'home', type: 'text', template: 'starter' });
+    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'page', type: 'cta' })).template).toBe('blank');
+  });
+});
+
+describe('AdminComponent — page block mutators', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('addPageBlock and removePageBlock manage the page block list', () => {
+    c.newPageBlockType = 'text';
+    c.pageBlocks['page.about'] = [];
+    c.addPageBlock('page.about');
+    expect(c.pageBlocks['page.about'].length).toBe(1);
+    const key = c.pageBlocks['page.about'][0].key;
+    c.removePageBlock('page.about', key);
+    expect(c.pageBlocks['page.about'].length).toBe(0);
+  });
+
+  it('togglePageBlockEnabled flips a single block', () => {
+    c.pageBlocks['page.about'] = [{ key: 'x', enabled: true }];
+    c.togglePageBlockEnabled('page.about', 'x', checkboxEvent(false));
+    expect(c.pageBlocks['page.about'][0].enabled).toBe(false);
+  });
+
+  it('pageBlockLabel returns translation or raw type', () => {
+    expect(c.pageBlockLabel({ type: 'image' })).toContain('image');
+  });
+});
