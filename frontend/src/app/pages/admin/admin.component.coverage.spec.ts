@@ -3547,3 +3547,85 @@ describe('AdminComponent — blog editor create/select/delete/lang', () => {
     expect(h.toast.error).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — page blocks load/save', () => {
+  let h: Harness;
+  let c: any;
+  const KEY = 'page.about';
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('loadPageBlocks parses content, defaults on 404 and errors otherwise', () => {
+    h.admin.getContent.and.returnValue(of({
+      version: 2, status: 'published', needs_translation_en: true,
+      published_at: '2030-01-01T00:00:00Z', published_until: '',
+      meta: { requires_auth: true, blocks: [{ type: 'text', key: 't', body_markdown: 'b' }] },
+    }));
+    c.loadPageBlocks(KEY);
+    expect(c.pageBlocks[KEY].length).toBe(1);
+    expect(c.pageBlocksStatus[KEY]).toBe('published');
+    expect(c.pageBlocksRequiresAuth[KEY]).toBe(true);
+
+    h.admin.getContent.and.returnValue(throwError(() => ({ status: 404 })));
+    c.loadPageBlocks(KEY);
+    expect(c.pageBlocks[KEY]).toEqual([]);
+    expect(c.pageBlocksStatus[KEY]).toBe('draft');
+
+    h.admin.getContent.and.returnValue(throwError(() => ({ status: 500 })));
+    c.loadPageBlocks(KEY);
+    expect(c.pageBlocksError[KEY]).toBeTruthy();
+  });
+
+  it('savePageBlocks opens the checklist when publishing without bypass', () => {
+    spyOn(c, 'openPagePublishChecklist');
+    c.pageBlocksStatus[KEY] = 'published';
+    c.savePageBlocks(KEY);
+    expect(c.openPagePublishChecklist).toHaveBeenCalledWith(KEY);
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+  });
+
+  it('savePageBlocks persists a draft with conflict/404/error fallbacks', () => {
+    c.pageBlocksStatus[KEY] = 'draft';
+    c.pageBlocks[KEY] = [{ key: 't', type: 'text', title: {}, body_markdown: {}, layout: {} }];
+    c.pageBlocksMeta[KEY] = {};
+    c.ensurePageDraft(KEY).initFromServer(c.currentPageDraftState(KEY));
+
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, status: 'draft', meta: {} }));
+    c.savePageBlocks(KEY);
+    expect(c.pageBlocksMessage[KEY]).toBeTruthy();
+
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, status: 'draft' }));
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+    c.savePageBlocks(KEY);
+    expect(c.pageBlocksError[KEY]).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+    h.admin.createContent.and.returnValue(of({ version: 1, status: 'draft', meta: {} }));
+    c.savePageBlocks(KEY);
+    expect(c.pageBlocksMessage[KEY]).toBeTruthy();
+
+    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+    c.savePageBlocks(KEY);
+    expect(c.pageBlocksError[KEY]).toBeTruthy();
+
+    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+    c.savePageBlocks(KEY);
+    expect(c.pageBlocksError[KEY]).toBeTruthy();
+  });
+
+  it('savePageBlocks publishes when bypassing the checklist', () => {
+    c.pageBlocksStatus[KEY] = 'published';
+    c.pageBlocks[KEY] = [];
+    c.pageBlocksMeta[KEY] = {};
+    c.pageBlocksPublishedAt[KEY] = '2030-01-01T10:00';
+    c.ensurePageDraft(KEY).initFromServer(c.currentPageDraftState(KEY));
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, status: 'published', published_at: '2030-01-01T00:00:00Z', meta: {} }));
+    c.savePageBlocks(KEY, { bypassChecklist: true });
+    expect(c.pageBlocksStatus[KEY]).toBe('published');
+    expect(c.pageBlocksMessage[KEY]).toBeTruthy();
+  });
+
+  it('selectHomeBlocksLang sets the active home language', () => {
+    c.selectHomeBlocksLang('ro');
+    expect(c.homeBlocksLang).toBe('ro');
+  });
+});
