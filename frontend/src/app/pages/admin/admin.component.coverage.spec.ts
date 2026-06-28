@@ -4240,3 +4240,81 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
     expect((c as any).contentVersions['k2']).toBeUndefined();
   });
 });
+
+describe('AdminComponent — draft delegate accessors', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { localStorage.clear(); h = createComponent(); c = h.component as any; });
+
+  it('home draft delegates reflect the underlying manager', () => {
+    expect(c.homeDraftReady()).toBe(false);
+    c.cmsHomeDraft.initFromServer([{ id: 'a' }]);
+    expect(c.homeDraftReady()).toBe(true);
+    expect(c.homeDraftDirty()).toBe(false);
+    expect(c.homeDraftAutosaving()).toBe(false);
+    expect(c.homeDraftLastAutosavedAt()).toBeNull();
+    expect(c.homeDraftHasRestore()).toBe(false);
+    expect(c.homeDraftRestoreAt()).toBeNull();
+    c.homeBlocks = [{ id: 'b' }];
+    expect(c.homeDraftCanUndo()).toBe(true);
+    expect(c.homeDraftCanRedo()).toBe(false);
+    c.undoHomeDraft();
+    expect(c.homeBlocks).toEqual([{ id: 'a' }]);
+    c.redoHomeDraft();
+    expect(c.homeBlocks).toEqual([{ id: 'b' }]);
+    c.restoreHomeDraftAutosave(); // no restore candidate → no-op
+    c.dismissHomeDraftAutosave();
+    expect(() => c.dismissHomeDraftAutosave()).not.toThrow();
+  });
+
+  it('page draft delegates operate per page key', () => {
+    const KEY = 'page.about';
+    expect(c.pageDraftReady(KEY)).toBe(false);
+    c.pageBlocks[KEY] = [];
+    c.ensurePageDraft(KEY).initFromServer(c.currentPageDraftState(KEY));
+    expect(c.pageDraftReady(KEY)).toBe(true);
+    expect(c.pageDraftDirty(KEY)).toBe(false);
+    expect(c.pageDraftAutosaving(KEY)).toBe(false);
+    expect(c.pageDraftLastAutosavedAt(KEY)).toBeNull();
+    expect(c.pageDraftHasRestore(KEY)).toBe(false);
+    expect(c.pageDraftRestoreAt(KEY)).toBeNull();
+    expect(typeof c.pageDraftCanUndo(KEY)).toBe('boolean');
+    expect(typeof c.pageDraftCanRedo(KEY)).toBe('boolean');
+    c.undoPageDraft(KEY);
+    c.redoPageDraft(KEY);
+    c.restorePageDraftAutosave(KEY);
+    c.dismissPageDraftAutosave(KEY);
+    expect(() => c.dismissPageDraftAutosave(KEY)).not.toThrow();
+  });
+
+  it('blog draft delegates short-circuit without a selected key', () => {
+    c.selectedBlogKey = null;
+    expect(c.blogDraftReady()).toBe(false);
+    expect(c.blogDraftDirty()).toBe(false);
+    expect(c.blogDraftAutosaving()).toBe(false);
+    expect(c.blogDraftLastAutosavedAt()).toBeNull();
+    expect(c.blogDraftHasRestore()).toBe(false);
+    expect(c.blogDraftRestoreAt()).toBeNull();
+    c.restoreBlogDraftAutosave(); // no-op
+    c.dismissBlogDraftAutosave(); // no-op
+    expect(() => c.dismissBlogDraftAutosave()).not.toThrow();
+  });
+
+  it('blog draft delegates reflect a manager once selected', () => {
+    c.selectedBlogKey = 'blog.a';
+    c.blogEditLang = 'en';
+    c.blogForm = { title: 'T', body_markdown: 'B', status: 'draft', published_at: '', published_until: '' };
+    c.blogMeta = {};
+    const mgr = c.ensureBlogDraft('blog.a', 'en');
+    mgr.initFromServer(c.currentBlogDraftState());
+    expect(c.blogDraftReady()).toBe(true);
+    expect(c.blogDraftDirty()).toBe(false);
+    expect(c.blogDraftAutosaving()).toBe(false);
+    expect(c.blogDraftLastAutosavedAt()).toBeNull();
+    expect(c.blogDraftHasRestore()).toBe(false);
+    expect(c.blogDraftRestoreAt()).toBeNull();
+    c.restoreBlogDraftAutosave(); // no candidate
+    c.dismissBlogDraftAutosave();
+    expect(() => c.dismissBlogDraftAutosave()).not.toThrow();
+  });
+});
