@@ -1129,3 +1129,307 @@ describe('AdminComponent — blog pinning helpers', () => {
     expect(ev.preventDefault).toHaveBeenCalled();
   });
 });
+
+describe('AdminComponent — FX override controls', () => {
+  let h: Harness;
+  let c: any;
+  const status = { override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '2020-01-01' } };
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    h.fxAdmin.getStatus.and.returnValue(of(status)); // safe default for cascading reloads
+  });
+
+  it('loadFxStatus seeds the override form and handles errors', () => {
+    h.fxAdmin.getStatus.and.returnValue(of(status));
+    c.loadFxStatus();
+    expect(c.fxOverrideForm.eur_per_ron).toBe(5);
+    expect(c.fxStatus()).toEqual(status as any);
+
+    h.fxAdmin.getStatus.and.returnValue(throwError(() => new Error('x')));
+    c.loadFxStatus();
+    expect(c.fxError()).toBeTruthy();
+  });
+
+  it('loadFxAudit stores audit rows and falls back to an empty list on error', () => {
+    h.fxAdmin.listOverrideAudit.and.returnValue(of([{ id: 'a1', action: 'set' }]));
+    c.loadFxAudit();
+    expect(c.fxAudit().length).toBe(1);
+    h.fxAdmin.listOverrideAudit.and.returnValue(of('not-an-array'));
+    c.loadFxAudit();
+    expect(c.fxAudit()).toEqual([]);
+    h.fxAdmin.listOverrideAudit.and.returnValue(throwError(() => new Error('x')));
+    c.loadFxAudit();
+    expect(c.fxAuditError()).toBeTruthy();
+  });
+
+  it('restoreFxOverrideFromAudit guards missing id and confirmation', () => {
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.restoreFxOverrideFromAudit({ id: '' });
+    expect(h.fxAdmin.restoreOverrideFromAudit).not.toHaveBeenCalled();
+    c.restoreFxOverrideFromAudit({ id: 'a1' }); // declined
+    expect(h.fxAdmin.restoreOverrideFromAudit).not.toHaveBeenCalled();
+
+    confirmSpy.and.returnValue(true);
+    h.fxAdmin.restoreOverrideFromAudit.and.returnValue(of(status));
+    c.restoreFxOverrideFromAudit({ id: 'a1' });
+    expect(h.toast.success).toHaveBeenCalled();
+    h.fxAdmin.restoreOverrideFromAudit.and.returnValue(throwError(() => new Error('x')));
+    c.restoreFxOverrideFromAudit({ id: 'a1' });
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('resetFxOverrideForm copies from the current status only when present', () => {
+    c.fxStatus.set(null);
+    c.fxOverrideForm = { eur_per_ron: 9, usd_per_ron: 9, as_of: 'keep' };
+    c.resetFxOverrideForm();
+    expect(c.fxOverrideForm.as_of).toBe('keep');
+    c.fxStatus.set({ override: { eur_per_ron: 1, usd_per_ron: 2, as_of: 'new' } });
+    c.resetFxOverrideForm();
+    expect(c.fxOverrideForm.as_of).toBe('new');
+  });
+
+  it('saveFxOverride validates positive rates', () => {
+    c.fxOverrideForm = { eur_per_ron: 0, usd_per_ron: 1, as_of: '' };
+    c.saveFxOverride();
+    expect(h.fxAdmin.setOverride).not.toHaveBeenCalled();
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.fxOverrideForm = { eur_per_ron: 5, usd_per_ron: 4, as_of: ' 2021 ' };
+    h.fxAdmin.setOverride.and.returnValue(of({}));
+    c.saveFxOverride();
+    expect(h.fxAdmin.setOverride).toHaveBeenCalledWith(jasmine.objectContaining({ as_of: '2021' }));
+
+    h.fxAdmin.setOverride.and.returnValue(throwError(() => new Error('x')));
+    c.fxOverrideForm = { eur_per_ron: 5, usd_per_ron: 4, as_of: '' };
+    c.saveFxOverride();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('clearFxOverride only acts when an override exists and is confirmed', () => {
+    c.fxStatus.set({ override: null });
+    c.clearFxOverride();
+    expect(h.fxAdmin.clearOverride).not.toHaveBeenCalled();
+
+    c.fxStatus.set({ override: { eur_per_ron: 1 } });
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+    c.clearFxOverride();
+    expect(h.fxAdmin.clearOverride).not.toHaveBeenCalled();
+
+    confirmSpy.and.returnValue(true);
+    h.fxAdmin.clearOverride.and.returnValue(of({}));
+    c.clearFxOverride();
+    expect(h.toast.success).toHaveBeenCalled();
+    c.fxStatus.set({ override: { eur_per_ron: 1 } }); // restore override cleared by loadFxStatus
+    h.fxAdmin.clearOverride.and.returnValue(throwError(() => new Error('x')));
+    c.clearFxOverride();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+});
+
+describe('AdminComponent — products and stock', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('startNewProduct resets the form using the first category', () => {
+    c.categories = [{ id: 'cat1' }];
+    c.startNewProduct();
+    expect(c.editingId).toBeNull();
+    expect(c.form.category_id).toBe('cat1');
+    expect(c.form.status).toBe('draft');
+  });
+
+  it('loadProduct hydrates the form and reports load errors', () => {
+    h.admin.getProduct.and.returnValue(of({
+      slug: 's1', name: 'P', category_id: 'c', price: 10, stock_quantity: 5, status: 'live',
+      sku: 'SKU', long_description: 'desc', publish_at: '2030-01-01T00:00:00Z', tags: ['bestseller'], images: [{ id: 'i' }],
+    }));
+    c.loadProduct('s1');
+    expect(c.editingId).toBe('s1');
+    expect(c.form.is_bestseller).toBe(true);
+    expect(c.productImages().length).toBe(1);
+
+    h.admin.getProduct.and.returnValue(throwError(() => new Error('x')));
+    c.loadProduct('s1');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('saveProduct creates when new and updates when editing', () => {
+    spyOn(c, 'loadAll'); // avoid cascading section reloads
+    c.form = { name: 'n', slug: 's', category_id: 'c', price: 1, stock: 2, status: 'draft', sku: '', description: '', publish_at: '', is_bestseller: false };
+    c.editingId = null;
+    h.admin.createProduct.and.returnValue(of({}));
+    c.saveProduct();
+    expect(h.admin.createProduct).toHaveBeenCalled();
+
+    c.editingId = 's';
+    c.form.publish_at = '2030-01-01T10:00';
+    h.admin.updateProduct.and.returnValue(of({}));
+    c.saveProduct();
+    expect(h.admin.updateProduct).toHaveBeenCalled();
+
+    c.editingId = 's'; // success path reset it via startNewProduct
+    h.admin.updateProduct.and.returnValue(throwError(() => new Error('x')));
+    c.saveProduct();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('deleteSelected requires a selection and an existing product', () => {
+    c.selectedIds = new Set<string>();
+    c.deleteSelected();
+    expect(h.admin.deleteProduct).not.toHaveBeenCalled();
+
+    c.selectedIds = new Set(['missing']);
+    c.products = [];
+    c.deleteSelected();
+    expect(h.admin.deleteProduct).not.toHaveBeenCalled();
+
+    c.products = [{ id: 'missing', slug: 'sl' }] as any;
+    c.selectedIds = new Set(['missing']);
+    h.admin.deleteProduct.and.returnValue(of({}));
+    c.deleteSelected();
+    expect(c.products.length).toBe(0);
+
+    c.products = [{ id: 'x', slug: 'sx' }] as any;
+    c.selectedIds = new Set(['x']);
+    h.admin.deleteProduct.and.returnValue(throwError(() => new Error('e')));
+    c.deleteSelected();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('setStock/saveStock update edits and persist with feedback', () => {
+    c.setStock('p1', '12' as any);
+    expect(c.stockEdits['p1']).toBe(12);
+    const product = { id: 'p1', slug: 'sl', stock_quantity: 0 } as any;
+    h.admin.updateProduct.and.returnValue(of({}));
+    c.saveStock(product);
+    expect(product.stock_quantity).toBe(12);
+    h.admin.updateProduct.and.returnValue(throwError(() => new Error('x')));
+    c.saveStock({ id: 'p2', slug: 's2', stock_quantity: 3 } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('buildTags merges bestseller flag with existing tags', () => {
+    c.form = { is_bestseller: true };
+    c.productDetail = { tags: ['new', 'bestseller'] };
+    expect(c.buildTags().sort()).toEqual(['bestseller', 'new']);
+    c.form = { is_bestseller: false };
+    c.productDetail = null;
+    expect(c.buildTags()).toEqual([]);
+  });
+
+  it('upcomingProducts keeps only future products sorted ascending', () => {
+    const past = new Date(Date.now() - 86400000).toISOString();
+    const soon = new Date(Date.now() + 86400000).toISOString();
+    const later = new Date(Date.now() + 2 * 86400000).toISOString();
+    c.products = [
+      { id: '1', publish_at: later },
+      { id: '2', publish_at: past },
+      { id: '3', publish_at: soon },
+      { id: '4', publish_at: '' },
+    ] as any;
+    expect(c.upcomingProducts().map((p: any) => p.id)).toEqual(['3', '1']);
+  });
+
+  it('toLocalDateTime formats an ISO string to a datetime-local value', () => {
+    expect(c.toLocalDateTime('2030-06-15T12:00:00Z')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  });
+
+  it('onImageUpload requires a saved product and a file', () => {
+    c.editingId = null;
+    c.onImageUpload({ target: { files: [] } } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+
+    c.editingId = 's1';
+    c.onImageUpload({ target: { files: [] } } as any); // no file → silent return
+    expect(h.admin.uploadProductImage).not.toHaveBeenCalled();
+
+    const file = new File(['x'], 'a.png', { type: 'image/png' });
+    h.admin.uploadProductImage.and.returnValue(of({ images: [{ id: 'i' }] }));
+    c.onImageUpload({ target: { files: [file] } } as any);
+    expect(c.productImages().length).toBe(1);
+
+    h.admin.uploadProductImage.and.returnValue(throwError(() => new Error('x')));
+    c.onImageUpload({ target: { files: [file] } } as any);
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+});
+
+describe('AdminComponent — category wizard', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('start/exit toggle the wizard state', () => {
+    c.startCategoryWizard();
+    expect(c.categoryWizardOpen()).toBe(true);
+    c.exitCategoryWizard();
+    expect(c.categoryWizardOpen()).toBe(false);
+  });
+
+  it('descriptionKey/nextLabelKey/canNext respond to the current step', () => {
+    c.startCategoryWizard();
+    expect(c.categoryWizardDescriptionKey()).toContain('basics');
+    expect(c.categoryWizardNextLabelKey()).toContain('next');
+    expect(c.categoryWizardCanNext()).toBe(false); // no slug yet
+    c.categoryWizardSlug.set('cat');
+    expect(c.categoryWizardCanNext()).toBe(true);
+    c.categoryWizardStep.set(1);
+    expect(c.categoryWizardNextLabelKey()).toContain('done');
+    expect(c.categoryWizardCanNext()).toBe(true); // last step
+    c.exitCategoryWizard();
+    expect(c.categoryWizardCanNext()).toBe(false); // closed
+  });
+
+  it('prev/next/goToStep navigate with guards', () => {
+    c.startCategoryWizard();
+    c.categoryWizardPrev(); // already 0 → no-op
+    expect(c.categoryWizardStep()).toBe(0);
+
+    c.categoryWizardNext(); // cannot advance without slug
+    expect(h.toast.error).toHaveBeenCalled();
+    expect(c.categoryWizardStep()).toBe(0);
+
+    c.categoryWizardSlug.set('cat');
+    c.categoryWizardNext(); // advances to step 1, opens translations
+    expect(c.categoryWizardStep()).toBe(1);
+
+    c.categoryWizardPrev();
+    expect(c.categoryWizardStep()).toBe(0);
+
+    c.categoryWizardNext(); // last step from 1? at step 0 with slug → step 1
+    c.categoryWizardNext(); // at last step → exit
+    expect(c.categoryWizardOpen()).toBe(false);
+
+    c.startCategoryWizard();
+    c.goToCategoryWizardStep(5); // out of range
+    expect(c.categoryWizardStep()).toBe(0);
+    c.categoryWizardSlug.set(null);
+    c.goToCategoryWizardStep(1); // needs slug
+    expect(c.categoryWizardStep()).toBe(0);
+    c.categoryWizardSlug.set('cat');
+    c.goToCategoryWizardStep(1);
+    expect(c.categoryWizardStep()).toBe(1);
+  });
+
+  it('addCategory validates the name and advances the wizard on success', () => {
+    c.categoryName = '';
+    c.addCategory();
+    expect(h.admin.createCategory).not.toHaveBeenCalled();
+
+    c.startCategoryWizard();
+    c.categoryName = 'Shoes';
+    c.categoryParentId = ' p1 ';
+    h.admin.createCategory.and.returnValue(of({ slug: 'shoes' }));
+    c.addCategory();
+    expect(c.categories.length).toBe(1);
+    expect(c.categoryWizardSlug()).toBe('shoes');
+    expect(c.categoryWizardStep()).toBe(1);
+
+    h.admin.createCategory.and.returnValue(throwError(() => new Error('x')));
+    c.categoryName = 'Hats';
+    c.addCategory();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+});
