@@ -4903,3 +4903,71 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
     Object.defineProperty(navigator, 'clipboard', { value: original, configurable: true });
   });
 });
+
+describe('AdminComponent — loadSections fallbacks and draft restore', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { localStorage.clear(); h = createComponent(); c = h.component as any; });
+
+  it('loadSections derives from sections metadata', () => {
+    h.admin.getContent.and.returnValue(of({ version: 1, meta: { sections: [{ id: 'story', enabled: false }, { id: 'bad' }, null] } }));
+    c.loadSections();
+    expect(c.homeBlocks.some((b: any) => b.type === 'story')).toBe(true);
+  });
+
+  it('loadSections derives from legacy order metadata', () => {
+    h.admin.getContent.and.returnValue(of({ version: 1, meta: { order: ['featured_products', 'story'] } }));
+    c.loadSections();
+    expect(c.homeBlocks.length).toBeGreaterThan(0);
+  });
+
+  it('loadSections falls back to defaults when meta is empty or errors', () => {
+    h.admin.getContent.and.returnValue(of({ version: 1, meta: {} }));
+    c.loadSections();
+    expect(c.homeBlocks.length).toBe(c.defaultHomeSections().length);
+    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+    c.loadSections();
+    expect(c.homeBlocks.length).toBe(c.defaultHomeSections().length);
+  });
+
+  it('restoreHomeDraftAutosave applies a stored draft', () => {
+    const mgr = c.cmsHomeDraft;
+    localStorage.setItem((mgr as any).storageKey, JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify([{ key: 'restored', type: 'text' }]) }));
+    mgr.initFromServer([{ key: 'orig', type: 'text' }]);
+    c.homeBlocks = [{ key: 'orig', type: 'text' }];
+    c.restoreHomeDraftAutosave();
+    expect(c.homeBlocks[0].key).toBe('restored');
+  });
+
+  it('restorePageDraftAutosave applies a stored page draft', () => {
+    const KEY = 'page.about';
+    c.pageBlocks[KEY] = [];
+    const mgr = c.ensurePageDraft(KEY);
+    const state = { blocks: [{ key: 'b', type: 'text', layout: {} }], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false };
+    localStorage.setItem((mgr as any).storageKey, JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify(state) }));
+    mgr.initFromServer(c.currentPageDraftState(KEY));
+    c.restorePageDraftAutosave(KEY);
+    expect(c.pageBlocks[KEY].length).toBe(1);
+  });
+
+  it('restoreBlogDraftAutosave applies a stored blog draft', () => {
+    c.selectedBlogKey = 'blog.a';
+    c.blogEditLang = 'en';
+    c.blogForm = { title: 'orig', body_markdown: '', status: 'draft', published_at: '', published_until: '', summary: '', tags: '', series: '', cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', pinned: false, pin_order: '1' };
+    c.blogMeta = {};
+    const mgr = c.ensureBlogDraft('blog.a', 'en');
+    const state = c.currentBlogDraftState();
+    const restored = { ...state, title: 'restored title' };
+    localStorage.setItem((mgr as any).storageKey, JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify(restored) }));
+    mgr.initFromServer(state);
+    c.restoreBlogDraftAutosave();
+    expect(c.blogForm.title).toBe('restored title');
+  });
+
+  it('observeCmsDrafts observes ready drafts without throwing', () => {
+    c.cmsHomeDraft.initFromServer([]);
+    c.pageBlocks['page.about'] = [];
+    c.ensurePageDraft('page.about').initFromServer(c.currentPageDraftState('page.about'));
+    expect(() => (c as any).observeCmsDrafts()).not.toThrow();
+  });
+});
