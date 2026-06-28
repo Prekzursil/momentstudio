@@ -3332,3 +3332,89 @@ describe('AdminComponent — home sections load/save and collections', () => {
     expect(c.collectionForm.product_ids).toEqual([]);
   });
 });
+
+describe('AdminComponent — home block content editing', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  it('removeHomeBlock only removes custom blocks', () => {
+    c.homeBlocks = [
+      c.makeHomeBlockDraft('story', 'story', true),
+      c.makeHomeBlockDraft('t1', 'text', true),
+    ];
+    c.removeHomeBlock('story'); // built-in → kept
+    expect(c.homeBlocks.length).toBe(2);
+    c.removeHomeBlock('t1'); // custom → removed
+    expect(c.homeBlocks.length).toBe(1);
+    c.removeHomeBlock('missing'); // no-op
+  });
+
+  it('setImageBlockUrl updates the matching image block', () => {
+    c.homeBlocks = [c.makeHomeBlockDraft('img', 'image', true)];
+    c.setImageBlockUrl('img', { url: ' /p.png ', focal_x: 10, focal_y: 20 });
+    expect(c.homeBlocks[0].url).toBe('/p.png');
+    c.setImageBlockUrl('img', { url: '' }); // ignored
+    expect(c.homeBlocks[0].url).toBe('/p.png');
+  });
+
+  it('home gallery image add/remove/from-asset', () => {
+    c.homeBlocks = [c.makeHomeBlockDraft('g', 'gallery', true)];
+    c.addGalleryImage('g');
+    expect(c.homeBlocks[0].images.length).toBe(1);
+    c.addGalleryImageFromAsset('g', { url: '/a.png', focal_x: 5, focal_y: 6 });
+    expect(c.homeBlocks[0].images[1].url).toBe('/a.png');
+    c.addGalleryImageFromAsset('g', { url: '' }); // ignored
+    c.removeGalleryImage('g', 0);
+    expect(c.homeBlocks[0].images.length).toBe(1);
+  });
+
+  it('home columns/faq/testimonials add and remove respect bounds', () => {
+    c.homeBlocks = [
+      c.makeHomeBlockDraft('col', 'columns', true),
+      c.makeHomeBlockDraft('f', 'faq', true),
+      c.makeHomeBlockDraft('te', 'testimonials', true),
+    ];
+    c.addHomeColumnsColumn('col');
+    expect(c.homeBlocks[0].columns.length).toBe(3);
+    c.addHomeColumnsColumn('col'); // capped
+    c.removeHomeColumnsColumn('col', 0);
+    expect(c.homeBlocks[0].columns.length).toBe(2);
+    c.removeHomeColumnsColumn('col', 0); // min 2
+
+    c.addHomeFaqItem('f');
+    expect(c.homeBlocks[1].faq_items.length).toBe(2);
+    c.removeHomeFaqItem('f', 1);
+    c.removeHomeFaqItem('f', 0); // min 1
+    expect(c.homeBlocks[1].faq_items.length).toBe(1);
+
+    c.addHomeTestimonial('te');
+    expect(c.homeBlocks[2].testimonials.length).toBe(2);
+    c.removeHomeTestimonial('te', 1);
+    c.removeHomeTestimonial('te', 0); // min 1
+    expect(c.homeBlocks[2].testimonials.length).toBe(1);
+  });
+
+  it('banner and carousel slide editing', () => {
+    c.homeBlocks = [
+      c.makeHomeBlockDraft('b', 'banner', true),
+      c.makeHomeBlockDraft('car', 'carousel', true),
+    ];
+    c.setBannerSlideImage('b', { url: '/banner.jpg', focal_x: 1, focal_y: 2 });
+    expect(c.homeBlocks[0].slide.image_url).toBe('/banner.jpg');
+    c.setBannerSlideImage('b', { url: '' }); // ignored
+
+    c.addCarouselSlide('car');
+    expect(c.homeBlocks[1].slides.length).toBe(2);
+    c.moveCarouselSlide('car', 0, 1);
+    c.moveCarouselSlide('car', 0, 99); // out of range
+    c.setCarouselSlideImage('car', 0, { url: '/s.jpg', focal_x: 3, focal_y: 4 });
+    expect(c.homeBlocks[1].slides[0].image_url).toBe('/s.jpg');
+    c.setCarouselSlideImage('car', 99, { url: '/x' }); // bad idx
+    c.setCarouselSlideImage('car', 0, { url: '' }); // ignored
+    c.removeCarouselSlide('car', 0);
+    expect(c.homeBlocks[1].slides.length).toBe(1);
+    c.removeCarouselSlide('car', 0); // keeps at least one
+    expect(c.homeBlocks[1].slides.length).toBe(1);
+  });
+});
