@@ -3991,3 +3991,127 @@ describe('AdminComponent — collections, maintenance, custom pages', () => {
     expect((c as any).pageTemplateBlocks('returns').length).toBeGreaterThan(0);
   });
 });
+
+describe('AdminComponent — lifecycle and section orchestration', () => {
+  function safeHarness(section: string): Harness {
+    const h = createComponent(createRouteStub(section));
+    // Every getContent-backed loader is safe with an empty meta block.
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft' }));
+    h.admin.listContentPages.and.returnValue(of([]));
+    h.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
+    h.fxAdmin.getStatus.and.returnValue(of({ override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '' } }));
+    return h;
+  }
+
+  it('ngOnInit applies the route section and loads (settings)', () => {
+    const h = safeHarness('settings');
+    h.component.ngOnInit();
+    expect(h.component.section()).toBe('settings');
+    expect(h.admin.audit).toHaveBeenCalled();
+    expect(h.admin.getMaintenance).toHaveBeenCalled();
+    h.component.ngOnDestroy();
+  });
+
+  it('ngOnInit loads the home section', () => {
+    const h = safeHarness('home');
+    h.component.ngOnInit();
+    expect(h.component.section()).toBe('home');
+    expect(h.admin.products).toHaveBeenCalled();
+    h.component.ngOnDestroy();
+  });
+
+  it('ngOnInit loads the pages section and applies an edit query', () => {
+    const h = createComponent(createRouteStub('pages', { edit: 'about' }));
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft' }));
+    h.admin.listContentPages.and.returnValue(of([]));
+    h.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
+    h.component.ngOnInit();
+    expect(h.component.section()).toBe('pages');
+    h.component.ngOnDestroy();
+  });
+
+  it('ngOnInit loads the blog section and applies a blog edit query', () => {
+    const h = createComponent(createRouteStub('blog', { edit: 'welcome' }));
+    h.admin.content.and.returnValue(of([]));
+    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft', lang: 'en' }));
+    h.admin.listContentVersions.and.returnValue(of([]));
+    h.blog.listFlaggedComments.and.returnValue(of({ items: [] }));
+    h.component.ngOnInit();
+    expect(h.component.section()).toBe('blog');
+    expect(h.component.selectedBlogKey).toBe('blog.welcome');
+    h.component.ngOnDestroy();
+  });
+
+  it('reactive route streams re-apply the section', () => {
+    const route = createRouteStub('home');
+    const h = safeHarness('home');
+    // rebuild with the same route object so the stream is wired
+    const route2 = createRouteStub('settings');
+    const h2 = createComponent(route2);
+    h2.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '' }));
+    h2.admin.listContentPages.and.returnValue(of([]));
+    h2.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
+    h2.fxAdmin.getStatus.and.returnValue(of({ override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '' } }));
+    h2.component.ngOnInit();
+    route2.data.next({ section: 'home' });
+    route2.queryParams.next({});
+    expect(h2.component.section()).toBe('home');
+    h2.component.ngOnDestroy();
+    void route; void h;
+  });
+
+  it('loadAll/retryLoadAll re-run the current section loaders', () => {
+    const h = safeHarness('home');
+    h.component.ngOnInit();
+    h.admin.products.calls.reset();
+    h.component.retryLoadAll();
+    expect(h.admin.products).toHaveBeenCalled();
+    h.component.ngOnDestroy();
+  });
+
+  it('hasUnsavedChanges and discardUnsavedChanges inspect draft managers', () => {
+    const h = safeHarness('home');
+    const c = h.component as any;
+    expect(h.component.hasUnsavedChanges()).toBe(false);
+    c.cmsHomeDraft.initFromServer([{ id: 'a' }]);
+    c.cmsHomeDraft.observe([{ id: 'b' }]);
+    expect(h.component.hasUnsavedChanges()).toBe(true);
+    h.component.discardUnsavedChanges();
+    expect(() => h.component.discardUnsavedChanges()).not.toThrow();
+  });
+
+  it('loadAudit stores logs and toasts on error', () => {
+    const h = createComponent();
+    const c = h.component as any;
+    h.admin.audit.and.returnValue(of({ products: [{ id: 1 }], content: [], security: null }));
+    c.loadAudit();
+    expect(c.productAudit.length).toBe(1);
+    expect(c.securityAudit).toEqual([]);
+    h.admin.audit.and.returnValue(throwError(() => new Error('x')));
+    c.loadAudit();
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('submitOwnerTransfer enforces owner, identifier and password', () => {
+    const h = createComponent();
+    const c = h.component as any;
+    h.auth.role.and.returnValue('admin');
+    c.submitOwnerTransfer(); // not owner
+    expect(h.admin.transferOwner).not.toHaveBeenCalled();
+
+    h.auth.role.and.returnValue('owner');
+    c.ownerTransferIdentifier = '';
+    c.submitOwnerTransfer();
+    expect(c.ownerTransferError).toBeTruthy();
+
+    c.ownerTransferIdentifier = 'user@x.com';
+    const promptSpy = spyOn(window, 'prompt').and.returnValue('');
+    c.submitOwnerTransfer();
+    expect(c.ownerTransferError).toBeTruthy();
+
+    promptSpy.and.returnValue('pw');
+    h.admin.transferOwner.and.returnValue(of({}));
+    c.submitOwnerTransfer();
+    expect(h.admin.transferOwner).toHaveBeenCalled();
+  });
+});
