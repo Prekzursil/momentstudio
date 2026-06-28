@@ -4395,3 +4395,136 @@ describe('AdminComponent — blog SEO helpers', () => {
     expect(copy).toHaveBeenCalledWith('hello');
   });
 });
+
+describe('AdminComponent — full block serialization and remaining flows', () => {
+  let h: Harness;
+  let c: any;
+  beforeEach(() => { h = createComponent(); c = h.component as any; });
+
+  function allHomeTypes(): any[] {
+    return ['text', 'columns', 'cta', 'faq', 'testimonials', 'image', 'gallery', 'banner', 'carousel', 'featured_products']
+      .map((t) => c.makeHomeBlockDraft(`${t}_k`, t, true));
+  }
+  function allPageTypes(): any[] {
+    return ['text', 'columns', 'cta', 'faq', 'testimonials', 'product_grid', 'form', 'image', 'gallery', 'banner', 'carousel']
+      .map((t) => ({ ...c.makeHomeBlockDraft(`${t}_k`, t, true), type: t }));
+  }
+
+  it('saveSections serialises every home block type', () => {
+    c.cmsHomeDraft.initFromServer([]);
+    c.homeBlocks = allHomeTypes();
+    spyOn(c, 'refreshHomePreview');
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    c.saveSections();
+    const meta = h.admin.updateContentBlock.calls.mostRecent().args[1].meta;
+    const types = meta.blocks.map((b: any) => b.type);
+    expect(types).toContain('carousel');
+    expect(types).toContain('gallery');
+  });
+
+  it('savePageBlocks serialises every page block type', () => {
+    const KEY = 'page.about';
+    c.pageBlocksStatus[KEY] = 'draft';
+    c.pageBlocks[KEY] = allPageTypes();
+    c.pageBlocksMeta[KEY] = {};
+    c.pageBlocksRequiresAuth[KEY] = true;
+    c.ensurePageDraft(KEY).initFromServer(c.currentPageDraftState(KEY));
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, status: 'draft', meta: {} }));
+    c.savePageBlocks(KEY);
+    const meta = h.admin.updateContentBlock.calls.mostRecent().args[1].meta;
+    const types = meta.blocks.map((b: any) => b.type);
+    expect(types).toContain('product_grid');
+    expect(types).toContain('form');
+  });
+
+  it('onBlogPinDrop reorders pinned posts', async () => {
+    spyOn(c, 'reloadContentBlocks');
+    c.contentBlocks = [
+      { key: 'blog.a', meta: { pinned: true, pin_order: 1 } },
+      { key: 'blog.b', meta: { pinned: true, pin_order: 2 } },
+    ];
+    c.draggingBlogPinKey = 'blog.b';
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+    await c.onBlogPinDrop('blog.a'); // move b before a → real reorder
+    expect(h.admin.updateContentBlock).toHaveBeenCalled();
+    expect(h.toast.success).toHaveBeenCalled();
+
+    // guard: same key
+    c.draggingBlogPinKey = 'blog.a';
+    h.admin.updateContentBlock.calls.reset();
+    await c.onBlogPinDrop('blog.a');
+    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+  });
+
+  it('onBlogPinDrop reports reorder errors', async () => {
+    spyOn(c, 'reloadContentBlocks');
+    c.contentBlocks = [
+      { key: 'blog.a', meta: { pinned: true, pin_order: 1 } },
+      { key: 'blog.b', meta: { pinned: true, pin_order: 2 } },
+    ];
+    c.draggingBlogPinKey = 'blog.b';
+    h.admin.updateContentBlock.and.returnValue(throwError(() => new Error('x')));
+    await c.onBlogPinDrop('blog.a');
+    expect(h.toast.error).toHaveBeenCalled();
+  });
+
+  it('saveLegalPage and saveLegalPageBoth persist with meta sync', () => {
+    spyOn(c, 'loadContentPages');
+    c.legalPageKey = 'page.terms';
+    c.legalPageForm = { en: 'E', ro: 'R' };
+    c.legalPageLastUpdated = '2030';
+    c.legalPageLastUpdatedOriginal = '';
+    c.legalPageMeta = {};
+    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { last_updated: '2030' } }));
+    h.cmsPrefs.translationLayout.and.returnValue('tabbed');
+    c.infoLang = 'en';
+    c.saveLegalPageUi();
+    expect(c.legalPageMessage).toBeTruthy();
+
+    h.cmsPrefs.translationLayout.and.returnValue('sideBySide');
+    c.legalPageLastUpdated = ''; c.legalPageLastUpdatedOriginal = '';
+    c.saveLegalPageUi();
+    expect(c.legalPageMessage).toBeTruthy();
+  });
+
+  it('renameCustomPageUrl renames a custom page and optional redirect', () => {
+    spyOn(c, 'loadContentPages');
+    spyOn(c, 'loadPageBlocks');
+    spyOn(c, 'loadContentRedirects');
+    c.pageBlocksKey = 'page.custom';
+    const promptSpy = spyOn(window, 'prompt').and.returnValue('renamed');
+    const confirmSpy = spyOn(window, 'confirm').and.returnValue(true);
+    h.admin.renameContentPage.and.returnValue(of({ old_key: 'custom', new_key: 'page.renamed' }));
+    h.admin.upsertContentRedirect.and.returnValue(of({}));
+    c.renameCustomPageUrl();
+    expect(h.admin.renameContentPage).toHaveBeenCalled();
+    expect(c.pageBlocksKey).toBe('page.renamed');
+    expect(h.admin.upsertContentRedirect).toHaveBeenCalled();
+
+    // protected page → no-op
+    c.pageBlocksKey = 'page.about';
+    h.admin.renameContentPage.calls.reset();
+    c.renameCustomPageUrl();
+    expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+
+    // cancelled prompt
+    c.pageBlocksKey = 'page.custom';
+    promptSpy.and.returnValue(null);
+    c.renameCustomPageUrl();
+    expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+
+    // reserved slug
+    promptSpy.and.returnValue('about');
+    c.renameCustomPageUrl();
+    expect(h.toast.error).toHaveBeenCalled();
+    void confirmSpy;
+  });
+
+  it('isReservedPageSlug and slugifyPageSlug behave correctly', () => {
+    expect((c as any).isReservedPageSlug('about')).toBe(true);
+    expect((c as any).isReservedPageSlug('')).toBe(true);
+    expect((c as any).isReservedPageSlug('my-page')).toBe(false);
+    expect((c as any).slugifyPageSlug('Héllo World')).toBe('hello-world');
+    expect((c as any).slugifyPageSlug('')).toBe('page');
+  });
+});
