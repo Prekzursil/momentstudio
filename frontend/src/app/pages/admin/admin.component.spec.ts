@@ -1,87 +1,1270 @@
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 
 import { AdminComponent } from './admin.component';
 
-describe('AdminComponent content first-paint init', () => {
-  type RouteStub = {
+type AnySpy = jasmine.SpyObj<any>;
+
+interface Mocks {
+  route: {
     snapshot: { data: Record<string, unknown>; queryParams: Record<string, unknown> };
     data: Subject<Record<string, unknown>>;
     queryParams: Subject<Record<string, unknown>>;
   };
+  admin: AnySpy;
+  adminProducts: AnySpy;
+  blog: AnySpy;
+  fxAdmin: AnySpy;
+  taxesAdmin: AnySpy;
+  auth: AnySpy;
+  cmsPrefs: AnySpy;
+  toast: AnySpy;
+  translate: { instant: (k: string, p?: unknown) => string };
+  markdown: { render: (v: string) => string };
+  sanitizer: AnySpy;
+}
 
-  function createRouteStub(section: string, query: Record<string, unknown> = {}): RouteStub {
-    return {
-      snapshot: { data: { section }, queryParams: query },
-      data: new Subject<Record<string, unknown>>(),
-      queryParams: new Subject<Record<string, unknown>>(),
-    };
-  }
+function spyObj(name: string, methods: string[], obsValue: unknown = undefined): AnySpy {
+  const spy = jasmine.createSpyObj(name, methods);
+  for (const m of methods) (spy[m] as jasmine.Spy).and.returnValue(of(obsValue));
+  return spy;
+}
 
-  function createComponent(routeStub: RouteStub): {
-    component: AdminComponent;
-    admin: jasmine.SpyObj<any>;
-  } {
-    const admin = jasmine.createSpyObj('AdminService', ['content']);
-    const component = new AdminComponent(
-      {
-        snapshot: routeStub.snapshot,
-        data: routeStub.data.asObservable(),
-        queryParams: routeStub.queryParams.asObservable(),
-      } as unknown as ActivatedRoute,
-      admin as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      jasmine.createSpyObj('ToastService', ['success', 'error']) as any,
-      { instant: (k: string) => k } as any,
-      { render: (value: string) => value } as any,
-      { bypassSecurityTrustHtml: (value: string) => value } as unknown as DomSanitizer,
-    );
+function build(section = 'home', query: Record<string, unknown> = {}): { c: AdminComponent } & Mocks {
+  const route = {
+    snapshot: { data: { section }, queryParams: query },
+    data: new Subject<Record<string, unknown>>(),
+    queryParams: new Subject<Record<string, unknown>>(),
+  };
 
-    return { component, admin };
-  }
+  const admin = spyObj('AdminService', [
+    'products', 'coupons', 'lowStock', 'audit', 'content', 'getMaintenance', 'setMaintenance',
+    'getCategories', 'createCategory', 'updateCategory', 'deleteCategory',
+    'getCategoryTranslations', 'upsertCategoryTranslation', 'deleteCategoryTranslation',
+    'listFeaturedCollections', 'createFeaturedCollection', 'updateFeaturedCollection',
+    'getProduct', 'createProduct', 'updateProduct', 'deleteProduct', 'duplicateProduct',
+    'uploadProductImage', 'deleteProductImage',
+    'getContent', 'createContent', 'updateContentBlock', 'deleteContent', 'getContentVersion',
+    'listContentVersions', 'rollbackContentVersion', 'updateContentTranslationStatus',
+    'uploadContentImage', 'updateContentImageFocalPoint',
+    'listContentPages', 'renameContentPage', 'createPagePreviewToken', 'createHomePreviewToken',
+    'listContentRedirects', 'deleteContentRedirect', 'exportContentRedirects',
+    'importContentRedirects', 'upsertContentRedirect',
+    'previewFindReplaceContent', 'applyFindReplaceContent', 'linkCheckContent',
+    'getSitemapPreview', 'validateStructuredData',
+    'updateOrderStatus', 'createCoupon', 'updateCoupon', 'invalidateCouponStripeMappings',
+    'updateUserRole', 'userAliases', 'revokeSessions', 'transferOwner', 'fetchSocialThumbnail',
+  ]);
+  const adminProducts = spyObj('AdminProductsService', ['search'], []);
+  const blog = spyObj('BlogService', [
+    'createPreviewToken', 'deleteComment', 'hideCommentAdmin', 'listFlaggedComments',
+    'resolveCommentFlagsAdmin', 'unhideCommentAdmin',
+  ], []);
+  const fxAdmin = spyObj('FxAdminService', [
+    'clearOverride', 'getStatus', 'listOverrideAudit', 'restoreOverrideFromAudit', 'setOverride',
+  ], []);
+  const taxesAdmin = spyObj('TaxesAdminService', [
+    'deleteGroup', 'deleteRate', 'listGroups', 'updateGroup', 'createGroup', 'upsertRate',
+  ], []);
 
-  it('applies route snapshot section/edit query before reactive streams emit', () => {
-    const routeStub = createRouteStub('blog', { edit: 'welcome-post' });
-    const { component } = createComponent(routeStub);
+  const auth = jasmine.createSpyObj('AuthService', ['role', 'loadCurrentUser']);
+  auth.role.and.returnValue('owner');
+  auth.loadCurrentUser.and.returnValue(of(null));
 
-    const applySection = spyOn<any>(component, 'applySection').and.stub();
-    const applyQuery = spyOn<any>(component, 'applyContentEditQuery').and.stub();
-    const normalizeSection = spyOn<any>(component, 'normalizeSection').and.callThrough();
+  const cmsPrefs = jasmine.createSpyObj('CmsEditorPrefsService', [
+    'mode', 'previewDevice', 'previewLang', 'previewLayout', 'previewTheme', 'translationLayout',
+  ]);
+  cmsPrefs.mode.and.returnValue('basic');
+  cmsPrefs.previewDevice.and.returnValue('desktop');
+  cmsPrefs.previewLang.and.returnValue('en');
+  cmsPrefs.previewLayout.and.returnValue('stacked');
+  cmsPrefs.previewTheme.and.returnValue('light');
+  cmsPrefs.translationLayout.and.returnValue('tabs');
 
-    component.ngOnInit();
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+  const translate = { instant: (k: string) => k };
+  const markdown = { render: (v: string) => `R:${v}` };
+  const sanitizer = jasmine.createSpyObj('DomSanitizer', ['bypassSecurityTrustResourceUrl']);
+  sanitizer.bypassSecurityTrustResourceUrl.and.callFake((v: string) => ({ safe: v }));
 
-    expect(normalizeSection).toHaveBeenCalledWith('blog');
-    expect(applySection.calls.count()).toBe(1);
-    expect(applySection).toHaveBeenCalledWith('blog');
-    expect(applyQuery.calls.count()).toBe(1);
-    expect(applyQuery).toHaveBeenCalledWith('blog', { edit: 'welcome-post' });
+  const c = new AdminComponent(
+    {
+      snapshot: route.snapshot,
+      data: route.data.asObservable(),
+      queryParams: route.queryParams.asObservable(),
+    } as unknown as ActivatedRoute,
+    admin as any,
+    adminProducts as any,
+    blog as any,
+    fxAdmin as any,
+    taxesAdmin as any,
+    auth as any,
+    cmsPrefs as any,
+    toast as any,
+    translate as any,
+    markdown as any,
+    sanitizer as unknown as DomSanitizer,
+  );
 
-    routeStub.data.next({ section: 'pages' });
-    routeStub.queryParams.next({ edit: 'about' });
+  return { c, route, admin, adminProducts, blog, fxAdmin, taxesAdmin, auth, cmsPrefs, toast, translate, markdown, sanitizer };
+}
 
-    expect(applySection.calls.count()).toBe(2);
-    expect(applySection.calls.mostRecent().args[0]).toBe('pages');
-    expect(applyQuery.calls.count()).toBe(2);
-    expect(applyQuery.calls.mostRecent().args).toEqual(['pages', { edit: 'about' }]);
-
-    component.ngOnDestroy();
+describe('AdminComponent', () => {
+  beforeEach(() => {
+    try {
+      window.localStorage.clear();
+    } catch {
+      /* ignore */
+    }
   });
 
-  it('clones fetched content block arrays to avoid stale template references', () => {
-    const routeStub = createRouteStub('home');
-    const { component, admin } = createComponent(routeStub);
-    const sourceBlocks = [{ key: 'home.hero', title: 'Hero' }] as any[];
-    admin.content.and.returnValue(of(sourceBlocks));
+  describe('route-driven initialization', () => {
+    it('applies route snapshot section/edit query before reactive streams emit', () => {
+      const env = build('blog', { edit: 'welcome-post' });
+      const applySection = spyOn<any>(env.c, 'applySection').and.stub();
+      const applyQuery = spyOn<any>(env.c, 'applyContentEditQuery').and.stub();
+      const normalizeSection = spyOn<any>(env.c, 'normalizeSection').and.callThrough();
 
-    (component as any).reloadContentBlocks();
+      env.c.ngOnInit();
 
-    expect(component.contentBlocks).toEqual(sourceBlocks as any);
-    expect(component.contentBlocks).not.toBe(sourceBlocks as any);
+      expect(normalizeSection).toHaveBeenCalledWith('blog');
+      expect(applySection).toHaveBeenCalledWith('blog');
+      expect(applyQuery).toHaveBeenCalledWith('blog', { edit: 'welcome-post' });
+
+      env.route.data.next({ section: 'pages' });
+      env.route.queryParams.next({ edit: 'about' });
+
+      expect(applySection.calls.mostRecent().args[0]).toBe('pages');
+      expect(applyQuery.calls.mostRecent().args).toEqual(['pages', { edit: 'about' }]);
+
+      env.c.ngOnDestroy();
+    });
+
+    it('normalizes unknown sections to home and switches crumbs/state', () => {
+      const env = build('home');
+      spyOn<any>(env.c, 'loadForSection').and.stub();
+      env.c.ngOnInit();
+      expect(env.c.section()).toBe('home');
+
+      env.route.data.next({ section: 'totally-bogus' });
+      env.route.queryParams.next({});
+      expect(env.c.section()).toBe('home');
+
+      env.route.data.next({ section: 'pages' });
+      env.route.queryParams.next({});
+      expect(env.c.section()).toBe('pages');
+      expect(env.c.crumbs[1].label).toBe('adminUi.content.nav.pages');
+      env.c.ngOnDestroy();
+    });
+
+    it('falls back to empty queryParams when snapshot has none', () => {
+      const env = build('home');
+      spyOn<any>(env.c, 'loadForSection').and.stub();
+      (env.c as any).route.snapshot.queryParams = undefined;
+      expect(() => env.c.ngOnInit()).not.toThrow();
+      env.c.ngOnDestroy();
+    });
+  });
+
+  describe('applyContentEditQuery', () => {
+    it('ignores blank edit values', () => {
+      const env = build('blog');
+      const loadBlogEditor = spyOn<any>(env.c, 'loadBlogEditor').and.stub();
+      (env.c as any).applyContentEditQuery('blog', { edit: '   ' });
+      expect(loadBlogEditor).not.toHaveBeenCalled();
+    });
+
+    it('prefixes a bare blog key and loads it once', () => {
+      const env = build('blog');
+      const loadBlogEditor = spyOn<any>(env.c, 'loadBlogEditor').and.stub();
+      (env.c as any).applyContentEditQuery('blog', { edit: 'welcome' });
+      expect(loadBlogEditor).toHaveBeenCalledWith('blog.welcome');
+      env.c.selectedBlogKey = 'blog.welcome';
+      (env.c as any).applyContentEditQuery('blog', { edit: 'blog.welcome' });
+      expect(loadBlogEditor.calls.count()).toBe(1);
+    });
+
+    it('prefixes a bare page key and routes to page-block change', () => {
+      const env = build('pages');
+      const onPageKey = spyOn<any>(env.c, 'onPageBlocksKeyChange').and.stub();
+      env.c.pageBlocksKey = 'page.contact';
+      (env.c as any).applyContentEditQuery('pages', { edit: 'about' });
+      expect(onPageKey).toHaveBeenCalledWith('page.about');
+    });
+
+    it('keeps a fully-qualified page key and skips no-op page changes', () => {
+      const env = build('pages');
+      const onPageKey = spyOn<any>(env.c, 'onPageBlocksKeyChange').and.stub();
+      env.c.pageBlocksKey = 'page.contact';
+      (env.c as any).applyContentEditQuery('pages', { edit: 'page.contact' });
+      expect(onPageKey).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('loadForSection', () => {
+    it('loads home data (products + sections + collections)', () => {
+      const env = build('home');
+      env.admin.products.and.returnValue(of([{ id: 'p1' }]));
+      const loadSections = spyOn<any>(env.c, 'loadSections').and.stub();
+      const loadCollections = spyOn<any>(env.c, 'loadCollections').and.stub();
+      (env.c as any).loadForSection('home');
+      expect(env.c.products).toEqual([{ id: 'p1' }] as any);
+      expect(loadSections).toHaveBeenCalled();
+      expect(loadCollections).toHaveBeenCalled();
+      expect(env.c.loading()).toBeFalse();
+    });
+
+    it('resets products to [] when home products fail', () => {
+      const env = build('home');
+      env.admin.products.and.returnValue(throwError(() => new Error('x')));
+      spyOn<any>(env.c, 'loadSections').and.stub();
+      spyOn<any>(env.c, 'loadCollections').and.stub();
+      (env.c as any).loadForSection('home');
+      expect(env.c.products).toEqual([]);
+    });
+
+    it('loads the full pages workspace', () => {
+      const env = build('pages');
+      const spies = ['loadInfo', 'loadLegalPage', 'loadCategories', 'loadCollections',
+        'loadContentPages', 'loadReusableBlocks', 'loadPageBlocks', 'loadContentRedirects']
+        .map((m) => spyOn<any>(env.c, m).and.stub());
+      (env.c as any).loadForSection('pages');
+      spies.forEach((s) => expect(s).toHaveBeenCalled());
+      expect(env.c.loading()).toBeFalse();
+    });
+
+    it('loads blog data', () => {
+      const env = build('blog');
+      const reload = spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
+      const flagged = spyOn<any>(env.c, 'loadFlaggedComments').and.stub();
+      (env.c as any).loadForSection('blog');
+      expect(reload).toHaveBeenCalled();
+      expect(flagged).toHaveBeenCalled();
+    });
+
+    it('loads the settings workspace and audit data', () => {
+      const env = build('settings');
+      spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
+      ['loadCategories', 'loadTaxGroups', 'loadAssets', 'loadSocial', 'loadCompany',
+        'loadNavigation', 'loadCheckoutSettings', 'loadReportsSettings', 'loadSeo', 'loadFxStatus']
+        .forEach((m) => spyOn<any>(env.c, m).and.stub());
+      env.admin.coupons.and.returnValue(of([{ code: 'A' }]));
+      env.admin.lowStock.and.returnValue(of([{ id: 'l1' }]));
+      env.admin.audit.and.returnValue(of({ products: [1], content: [2], security: [3] }));
+      env.admin.getMaintenance.and.returnValue(of({ enabled: true }));
+      (env.c as any).loadForSection('settings');
+      expect(env.c.coupons).toEqual([{ code: 'A' }] as any);
+      expect(env.c.lowStock).toEqual([{ id: 'l1' }] as any);
+      expect(env.c.productAudit).toEqual([1] as any);
+      expect(env.c.securityAudit).toEqual([3] as any);
+      expect(env.c.maintenanceEnabled()).toBeTrue();
+      expect(env.c.maintenanceEnabledValue).toBeTrue();
+    });
+
+    it('handles settings load failures defensively', () => {
+      const env = build('settings');
+      spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
+      ['loadCategories', 'loadTaxGroups', 'loadAssets', 'loadSocial', 'loadCompany',
+        'loadNavigation', 'loadCheckoutSettings', 'loadReportsSettings', 'loadSeo', 'loadFxStatus']
+        .forEach((m) => spyOn<any>(env.c, m).and.stub());
+      env.admin.coupons.and.returnValue(throwError(() => new Error('x')));
+      env.admin.lowStock.and.returnValue(throwError(() => new Error('x')));
+      env.admin.audit.and.returnValue(throwError(() => new Error('x')));
+      env.admin.getMaintenance.and.returnValue(of({ enabled: false }));
+      (env.c as any).loadForSection('settings');
+      expect(env.c.coupons).toEqual([]);
+      expect(env.c.lowStock).toEqual([]);
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('uses [] security default when audit omits it', () => {
+      const env = build('settings');
+      env.admin.audit.and.returnValue(of({ products: [], content: [] }));
+      env.c.loadAudit();
+      expect(env.c.securityAudit).toEqual([]);
+    });
+
+    it('loadAudit reports a toast on failure', () => {
+      const env = build('settings');
+      env.admin.audit.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadAudit();
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+  });
+
+  describe('loadAll / retry / discard', () => {
+    it('loadAll + retryLoadAll delegate to the current section', () => {
+      const env = build('home');
+      const spy = spyOn<any>(env.c, 'loadForSection').and.stub();
+      env.c.loadAll();
+      env.c.retryLoadAll();
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.calls.mostRecent().args[0]).toBe('home');
+    });
+
+    it('discardUnsavedChanges discards ready home draft + page/blog drafts', () => {
+      const env = build('home');
+      (env.c as any).cmsHomeDraft.initFromServer([]);
+      const homeDiscard = spyOn((env.c as any).cmsHomeDraft, 'discardAutosave').and.callThrough();
+      const page = (env.c as any).ensurePageDraft('page.about');
+      const pageDiscard = spyOn(page, 'discardAutosave').and.callThrough();
+      env.c.discardUnsavedChanges();
+      expect(homeDiscard).toHaveBeenCalled();
+      expect(pageDiscard).toHaveBeenCalled();
+    });
+
+    it('hasUnsavedChanges reflects a dirty ready draft', () => {
+      const env = build('home');
+      expect(env.c.hasUnsavedChanges()).toBeFalse();
+      const mgr = (env.c as any).cmsHomeDraft;
+      mgr.initFromServer([{ key: 'a' }]);
+      mgr.markServerSaved([{ key: 'a' }]);
+      mgr.dirty = true;
+      expect(env.c.hasUnsavedChanges()).toBeTrue();
+    });
+  });
+
+  describe('CmsDraftManager via home draft helpers', () => {
+    it('tracks ready/dirty/undo/redo lifecycle', () => {
+      const env = build('home');
+      const mgr = (env.c as any).cmsHomeDraft;
+      expect(env.c.homeDraftReady()).toBeFalse();
+      env.c.homeBlocks = [{ key: 'a' }] as any;
+      mgr.initFromServer([{ key: 'a' }]);
+      expect(env.c.homeDraftReady()).toBeTrue();
+      expect(env.c.homeDraftDirty()).toBeFalse();
+      expect(env.c.homeDraftCanUndo()).toBeFalse();
+
+      env.c.homeBlocks = [{ key: 'a' }, { key: 'b' }] as any;
+      expect(env.c.homeDraftCanUndo()).toBeTrue();
+      env.c.undoHomeDraft();
+      expect(env.c.homeBlocks).toEqual([{ key: 'a' }] as any);
+      expect(env.c.homeDraftCanRedo()).toBeTrue();
+      env.c.redoHomeDraft();
+      expect(env.c.homeBlocks).toEqual([{ key: 'a' }, { key: 'b' }] as any);
+      expect(env.c.homeDraftAutosaving()).toBeFalse();
+      expect(typeof env.c.homeDraftLastAutosavedAt()).toBe('string');
+    });
+
+    it('restores and dismisses autosaved home drafts', () => {
+      const env = build('home');
+      window.localStorage.setItem(
+        'adrianaart.cms.autosave.home.sections',
+        JSON.stringify({ v: 1, ts: '2026-01-01T00:00:00.000Z', state_json: JSON.stringify([{ key: 'restored' }]) }),
+      );
+      const mgr = (env.c as any).cmsHomeDraft;
+      mgr.initFromServer([{ key: 'server' }]);
+      expect(env.c.homeDraftHasRestore()).toBeTrue();
+      expect(env.c.homeDraftRestoreAt()).toBe('2026-01-01T00:00:00.000Z');
+      env.c.restoreHomeDraftAutosave();
+      expect(env.c.homeBlocks).toEqual([{ key: 'restored' }] as any);
+      env.c.dismissHomeDraftAutosave();
+      expect(env.c.homeDraftHasRestore()).toBeFalse();
+    });
+
+    it('ignores a stored autosave identical to the server snapshot', () => {
+      const env = build('home');
+      const same = JSON.stringify([{ key: 'same' }]);
+      window.localStorage.setItem(
+        'adrianaart.cms.autosave.home.sections',
+        JSON.stringify({ v: 1, ts: 't', state_json: same }),
+      );
+      (env.c as any).cmsHomeDraft.initFromServer([{ key: 'same' }]);
+      expect(env.c.homeDraftHasRestore()).toBeFalse();
+    });
+
+    it('observe + commit debounce promotes pending state to dirty', () => {
+      jasmine.clock().install();
+      const env = build('home');
+      const mgr = (env.c as any).cmsHomeDraft;
+      mgr.initFromServer([{ key: 'a' }]);
+      mgr.observe([{ key: 'a' }, { key: 'b' }]);
+      expect(mgr.autosavePending).toBeTrue();
+      jasmine.clock().tick(700);
+      expect(mgr.autosavePending).toBeFalse();
+      expect(mgr.dirty).toBeTrue();
+      mgr.markServerSaved([{ key: 'a' }, { key: 'b' }]);
+      expect(mgr.dirty).toBeFalse();
+      jasmine.clock().uninstall();
+    });
+  });
+
+  describe('page + blog draft helpers', () => {
+    it('exposes page draft lifecycle accessors', () => {
+      const env = build('pages');
+      const key = 'page.about' as const;
+      expect(env.c.pageDraftReady(key)).toBeFalse();
+      const mgr = (env.c as any).ensurePageDraft(key);
+      mgr.initFromServer((env.c as any).currentPageDraftState(key));
+      expect(env.c.pageDraftReady(key)).toBeTrue();
+      expect(env.c.pageDraftDirty(key)).toBeFalse();
+      expect(env.c.pageDraftAutosaving(key)).toBeFalse();
+      expect(env.c.pageDraftLastAutosavedAt(key)).toBeNull();
+      expect(env.c.pageDraftHasRestore(key)).toBeFalse();
+      expect(env.c.pageDraftRestoreAt(key)).toBeNull();
+      expect(env.c.pageDraftCanUndo(key)).toBeFalse();
+      expect(env.c.pageDraftCanRedo(key)).toBeFalse();
+      env.c.dismissPageDraftAutosave(key);
+    });
+
+    it('undo/redo/restore page drafts apply state', () => {
+      const env = build('pages');
+      const key = 'page.about' as const;
+      const mgr = (env.c as any).ensurePageDraft(key);
+      mgr.initFromServer((env.c as any).currentPageDraftState(key));
+      env.c.pageBlocks['page.about'] = [{ key: 'b1', type: 'text', layout: undefined }] as any;
+      expect(env.c.pageDraftCanUndo(key)).toBeTrue();
+      env.c.undoPageDraft(key);
+      expect(env.c.pageBlocks['page.about']).toEqual([]);
+      env.c.redoPageDraft(key);
+      expect(env.c.pageBlocks['page.about'].length).toBe(1);
+      env.c.restorePageDraftAutosave(key);
+    });
+
+    it('blog draft helpers gate on a selected key', () => {
+      const env = build('blog');
+      expect(env.c.blogDraftReady()).toBeFalse();
+      expect(env.c.blogDraftDirty()).toBeFalse();
+      expect(env.c.blogDraftAutosaving()).toBeFalse();
+      expect(env.c.blogDraftLastAutosavedAt()).toBeNull();
+      expect(env.c.blogDraftHasRestore()).toBeFalse();
+      expect(env.c.blogDraftRestoreAt()).toBeNull();
+      env.c.restoreBlogDraftAutosave();
+      env.c.dismissBlogDraftAutosave();
+
+      env.c.selectedBlogKey = 'blog.x';
+      const mgr = (env.c as any).ensureBlogDraft('blog.x', 'en');
+      mgr.initFromServer((env.c as any).currentBlogDraftState());
+      expect(env.c.blogDraftReady()).toBeTrue();
+      expect(env.c.blogDraftHasRestore()).toBeFalse();
+      env.c.restoreBlogDraftAutosave();
+      env.c.dismissBlogDraftAutosave();
+    });
+  });
+
+  describe('revision title keys', () => {
+    it('maps the pages revision key to legal/about/contact labels', () => {
+      const env = build('pages');
+      const cases: Array<[string, string | undefined]> = [
+        ['page.about', 'adminUi.site.pages.aboutLabel'],
+        ['page.contact', 'adminUi.site.pages.contactLabel'],
+        ['page.terms', 'adminUi.site.pages.legal.documents.termsIndex'],
+        ['page.terms-and-conditions', 'adminUi.site.pages.legal.documents.terms'],
+        ['page.privacy-policy', 'adminUi.site.pages.legal.documents.privacy'],
+        ['page.anpc', 'adminUi.site.pages.legal.documents.anpc'],
+        ['page.unknown', undefined],
+      ];
+      for (const [key, expected] of cases) {
+        env.c.pagesRevisionKey = key;
+        expect(env.c.pagesRevisionTitleKey()).toBe(expected);
+      }
+    });
+
+    it('maps the home revision key', () => {
+      const env = build('home');
+      env.c.homeRevisionKey = 'home.sections';
+      expect(env.c.homeRevisionTitleKey()).toBe('adminUi.home.sections.title');
+      env.c.homeRevisionKey = 'home.story';
+      expect(env.c.homeRevisionTitleKey()).toBe('adminUi.home.story.title');
+      env.c.homeRevisionKey = 'something.else';
+      expect(env.c.homeRevisionTitleKey()).toBe('adminUi.content.revisions.title');
+    });
+
+    it('maps the settings revision key including seo prefix', () => {
+      const env = build('settings');
+      const cases: Array<[string, string]> = [
+        ['seo.home', 'adminUi.site.seo.title'],
+        ['site.assets', 'adminUi.site.assets.title'],
+        ['site.social', 'adminUi.site.social.title'],
+        ['site.company', 'adminUi.site.company.title'],
+        ['site.navigation', 'adminUi.site.navigation.title'],
+        ['site.checkout', 'adminUi.site.checkout.title'],
+        ['site.reports', 'adminUi.reports.title'],
+        ['mystery', 'adminUi.content.revisions.title'],
+      ];
+      for (const [key, expected] of cases) {
+        env.c.settingsRevisionKey = key;
+        expect(env.c.settingsRevisionTitleKey()).toBe(expected);
+      }
+    });
+  });
+
+  describe('cms preference helpers', () => {
+    it('reflects owner role + advanced mode', () => {
+      const env = build('home');
+      expect(env.c.isOwner()).toBeTrue();
+      env.auth.role.and.returnValue('admin');
+      expect(env.c.isOwner()).toBeFalse();
+      expect(env.c.cmsAdvanced()).toBeFalse();
+      env.cmsPrefs.mode.and.returnValue('advanced');
+      expect(env.c.cmsAdvanced()).toBeTrue();
+    });
+
+    it('maps preview device to width class + numeric viewport', () => {
+      const env = build('home');
+      env.cmsPrefs.previewDevice.and.returnValue('mobile');
+      expect(env.c.cmsPreviewMaxWidthClass()).toBe('max-w-[390px]');
+      expect(env.c.cmsPreviewViewportWidth()).toBe(390);
+      env.cmsPrefs.previewDevice.and.returnValue('tablet');
+      expect(env.c.cmsPreviewMaxWidthClass()).toBe('max-w-[768px]');
+      expect(env.c.cmsPreviewViewportWidth()).toBe(768);
+      env.cmsPrefs.previewDevice.and.returnValue('desktop');
+      expect(env.c.cmsPreviewMaxWidthClass()).toBe('max-w-[1024px]');
+      expect(env.c.cmsPreviewViewportWidth()).toBe(1024);
+    });
+
+    it('syncSplitScroll only mirrors scroll in split layout with scrollable panes', () => {
+      const env = build('home');
+      const source = { scrollHeight: 200, clientHeight: 100, scrollTop: 50 } as HTMLElement;
+      const target = { scrollHeight: 400, clientHeight: 100, scrollTop: 0 } as HTMLElement;
+      env.cmsPrefs.previewLayout.and.returnValue('stacked');
+      env.c.syncSplitScroll(source, target);
+      expect(target.scrollTop).toBe(0);
+
+      env.cmsPrefs.previewLayout.and.returnValue('split');
+      env.c.syncSplitScroll(source, target);
+      expect(target.scrollTop).toBeGreaterThan(0);
+    });
+
+    it('syncSplitScroll bails out when panes are not scrollable', () => {
+      const env = build('home');
+      env.cmsPrefs.previewLayout.and.returnValue('split');
+      const source = { scrollHeight: 100, clientHeight: 100, scrollTop: 0 } as HTMLElement;
+      const target = { scrollHeight: 100, clientHeight: 100, scrollTop: 0 } as HTMLElement;
+      env.c.syncSplitScroll(source, target);
+      expect(target.scrollTop).toBe(0);
+    });
+  });
+
+  describe('owner transfer', () => {
+    it('requires owner role', () => {
+      const env = build('settings');
+      env.auth.role.and.returnValue('admin');
+      env.c.submitOwnerTransfer();
+      expect(env.admin.transferOwner).not.toHaveBeenCalled();
+    });
+
+    it('validates the identifier before prompting', () => {
+      const env = build('settings');
+      env.c.ownerTransferIdentifier = '   ';
+      env.c.submitOwnerTransfer();
+      expect(env.c.ownerTransferError).toBe('adminUi.ownerTransfer.errors.identifier');
+    });
+
+    it('aborts when the password prompt is empty', () => {
+      const env = build('settings');
+      env.c.ownerTransferIdentifier = 'new-owner';
+      spyOn(window, 'prompt').and.returnValue('');
+      env.c.submitOwnerTransfer();
+      expect(env.c.ownerTransferError).toBe('adminUi.ownerTransfer.passwordRequired');
+    });
+
+    it('submits and resets on success', () => {
+      const env = build('settings');
+      env.c.ownerTransferIdentifier = 'new-owner';
+      env.c.ownerTransferConfirm = 'yes';
+      spyOn(window, 'prompt').and.returnValue('pw');
+      env.admin.transferOwner.and.returnValue(of({}));
+      const loadAudit = spyOn(env.c, 'loadAudit').and.stub();
+      env.c.submitOwnerTransfer();
+      expect(env.admin.transferOwner).toHaveBeenCalledWith({ identifier: 'new-owner', confirm: 'yes', password: 'pw' });
+      expect(env.c.ownerTransferIdentifier).toBe('');
+      expect(env.toast.success).toHaveBeenCalled();
+      expect(loadAudit).toHaveBeenCalled();
+      expect(env.c.ownerTransferLoading).toBeFalse();
+    });
+
+    it('surfaces a server detail on failure', () => {
+      const env = build('settings');
+      env.c.ownerTransferIdentifier = 'new-owner';
+      spyOn(window, 'prompt').and.returnValue('pw');
+      env.admin.transferOwner.and.returnValue(throwError(() => ({ error: { detail: 'nope' } })));
+      env.c.submitOwnerTransfer();
+      expect(env.c.ownerTransferError).toBe('nope');
+      expect(env.c.ownerTransferLoading).toBeFalse();
+    });
+
+    it('falls back to a generic error when detail is missing', () => {
+      const env = build('settings');
+      env.c.ownerTransferIdentifier = 'new-owner';
+      spyOn(window, 'prompt').and.returnValue('pw');
+      env.admin.transferOwner.and.returnValue(throwError(() => ({})));
+      env.c.submitOwnerTransfer();
+      expect(env.c.ownerTransferError).toBe('adminUi.ownerTransfer.errors.generic');
+    });
+  });
+
+  describe('FX overrides', () => {
+    it('loads status + audit and seeds the override form', () => {
+      const env = build('settings');
+      env.fxAdmin.getStatus.and.returnValue(of({
+        override: { eur_per_ron: '0.2', usd_per_ron: '0.22', as_of: '2026-01-01' },
+        effective: { eur_per_ron: '0.1', usd_per_ron: '0.11', as_of: '' },
+      }));
+      env.fxAdmin.listOverrideAudit.and.returnValue(of([{ id: 'a1' }]));
+      env.c.loadFxStatus();
+      expect(env.c.fxOverrideForm.eur_per_ron).toBe(0.2);
+      expect(env.c.fxAudit()).toEqual([{ id: 'a1' }] as any);
+      expect(env.c.fxLoading()).toBeFalse();
+    });
+
+    it('uses effective rates when no override exists', () => {
+      const env = build('settings');
+      env.fxAdmin.getStatus.and.returnValue(of({
+        effective: { eur_per_ron: '0.1', usd_per_ron: '0.11', as_of: '2025-12-31' },
+      }));
+      env.c.loadFxStatus();
+      expect(env.c.fxOverrideForm.usd_per_ron).toBe(0.11);
+      expect(env.c.fxOverrideForm.as_of).toBe('2025-12-31');
+    });
+
+    it('records an error when status load fails', () => {
+      const env = build('settings');
+      env.fxAdmin.getStatus.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadFxStatus();
+      expect(env.c.fxError()).toBe('adminUi.fx.errors.load');
+    });
+
+    it('handles fx audit failures and non-array payloads', () => {
+      const env = build('settings');
+      env.fxAdmin.listOverrideAudit.and.returnValue(of('not-array'));
+      env.c.loadFxAudit();
+      expect(env.c.fxAudit()).toEqual([]);
+      env.fxAdmin.listOverrideAudit.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadFxAudit();
+      expect(env.c.fxAuditError()).toBe('adminUi.fx.audit.errors.load');
+    });
+
+    it('fxAuditActionLabel returns the raw action when untranslated', () => {
+      const env = build('settings');
+      expect(env.c.fxAuditActionLabel('SET')).toBe('SET');
+      env.translate.instant = (k: string) => (k.endsWith('.set') ? 'Set rate' : k);
+      expect(env.c.fxAuditActionLabel('set')).toBe('Set rate');
+    });
+
+    it('restoreFxOverrideFromAudit guards id + confirm', () => {
+      const env = build('settings');
+      env.c.restoreFxOverrideFromAudit({ id: '' } as any);
+      expect(env.fxAdmin.restoreOverrideFromAudit).not.toHaveBeenCalled();
+      spyOn(window, 'confirm').and.returnValue(false);
+      env.c.restoreFxOverrideFromAudit({ id: 'a1' } as any);
+      expect(env.fxAdmin.restoreOverrideFromAudit).not.toHaveBeenCalled();
+    });
+
+    it('restoreFxOverrideFromAudit applies restored status on success', () => {
+      const env = build('settings');
+      spyOn(window, 'confirm').and.returnValue(true);
+      env.fxAdmin.restoreOverrideFromAudit.and.returnValue(of({
+        effective: { eur_per_ron: '0.3', usd_per_ron: '0.33', as_of: 'x' },
+      }));
+      env.c.restoreFxOverrideFromAudit({ id: 'a1' } as any);
+      expect(env.c.fxOverrideForm.eur_per_ron).toBe(0.3);
+      expect(env.toast.success).toHaveBeenCalled();
+      expect(env.c.fxAuditRestoring()).toBeNull();
+    });
+
+    it('restoreFxOverrideFromAudit toasts on failure', () => {
+      const env = build('settings');
+      spyOn(window, 'confirm').and.returnValue(true);
+      env.fxAdmin.restoreOverrideFromAudit.and.returnValue(throwError(() => new Error('x')));
+      env.c.restoreFxOverrideFromAudit({ id: 'a1' } as any);
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('resetFxOverrideForm requires a loaded status', () => {
+      const env = build('settings');
+      env.c.fxStatus.set(null);
+      env.c.resetFxOverrideForm();
+      expect(env.c.fxOverrideForm.eur_per_ron).toBe(0);
+      env.c.fxStatus.set({ effective: { eur_per_ron: '0.5', usd_per_ron: '0.55', as_of: 'y' } } as any);
+      env.c.resetFxOverrideForm();
+      expect(env.c.fxOverrideForm.eur_per_ron).toBe(0.5);
+    });
+
+    it('saveFxOverride validates positive rates', () => {
+      const env = build('settings');
+      env.c.fxOverrideForm = { eur_per_ron: 0, usd_per_ron: 1, as_of: '' };
+      env.c.saveFxOverride();
+      expect(env.toast.error).toHaveBeenCalled();
+      expect(env.fxAdmin.setOverride).not.toHaveBeenCalled();
+    });
+
+    it('saveFxOverride posts the override and reloads', () => {
+      const env = build('settings');
+      env.c.fxOverrideForm = { eur_per_ron: 0.2, usd_per_ron: 0.22, as_of: ' 2026-01-01 ' };
+      env.fxAdmin.setOverride.and.returnValue(of({}));
+      const reload = spyOn(env.c, 'loadFxStatus').and.stub();
+      env.c.saveFxOverride();
+      expect(env.fxAdmin.setOverride).toHaveBeenCalledWith({ eur_per_ron: 0.2, usd_per_ron: 0.22, as_of: '2026-01-01' });
+      expect(reload).toHaveBeenCalled();
+    });
+
+    it('saveFxOverride sends null as_of when blank and toasts on failure', () => {
+      const env = build('settings');
+      env.c.fxOverrideForm = { eur_per_ron: 0.2, usd_per_ron: 0.22, as_of: '' };
+      env.fxAdmin.setOverride.and.returnValue(throwError(() => new Error('x')));
+      env.c.saveFxOverride();
+      expect(env.fxAdmin.setOverride).toHaveBeenCalledWith(jasmine.objectContaining({ as_of: null }));
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('clearFxOverride needs an active override + confirmation', () => {
+      const env = build('settings');
+      env.c.fxStatus.set({ override: null } as any);
+      env.c.clearFxOverride();
+      expect(env.fxAdmin.clearOverride).not.toHaveBeenCalled();
+      env.c.fxStatus.set({ override: { eur_per_ron: '1' } } as any);
+      spyOn(window, 'confirm').and.returnValue(true);
+      env.fxAdmin.clearOverride.and.returnValue(of({}));
+      const reload = spyOn(env.c, 'loadFxStatus').and.stub();
+      env.c.clearFxOverride();
+      expect(env.fxAdmin.clearOverride).toHaveBeenCalled();
+      expect(reload).toHaveBeenCalled();
+    });
+
+    it('clearFxOverride toasts on failure', () => {
+      const env = build('settings');
+      env.c.fxStatus.set({ override: { eur_per_ron: '1' } } as any);
+      spyOn(window, 'confirm').and.returnValue(true);
+      env.fxAdmin.clearOverride.and.returnValue(throwError(() => new Error('x')));
+      env.c.clearFxOverride();
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+  });
+
+  describe('products', () => {
+    it('startNewProduct resets the form using the first category id', () => {
+      const env = build('settings');
+      env.c.categories = [{ id: 'c1' }] as any;
+      env.c.editingId = 'old';
+      env.c.startNewProduct();
+      expect(env.c.editingId).toBeNull();
+      expect(env.c.form.category_id).toBe('c1');
+      expect(env.c.form.price).toBe(0);
+    });
+
+    it('loadProduct hydrates the form from a detail payload', () => {
+      const env = build('settings');
+      env.admin.getProduct.and.returnValue(of({
+        slug: 's1', name: 'N', category_id: 'c1', price: 10, stock_quantity: 5,
+        status: 'active', sku: 'SKU', long_description: 'desc', publish_at: '2026-01-01T10:00:00Z',
+        tags: ['bestseller'], images: [{ id: 'i1', url: 'u' }],
+      }));
+      env.c.loadProduct('s1');
+      expect(env.c.editingId).toBe('s1');
+      expect(env.c.form.is_bestseller).toBeTrue();
+      expect(env.c.productImages().length).toBe(1);
+    });
+
+    it('loadProduct toasts on failure', () => {
+      const env = build('settings');
+      env.admin.getProduct.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadProduct('s1');
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('saveProduct creates when not editing and updates when editing', () => {
+      const env = build('settings');
+      env.admin.createProduct.and.returnValue(of({}));
+      env.admin.updateProduct.and.returnValue(of({}));
+      const loadAll = spyOn(env.c, 'loadAll').and.stub();
+      env.c.editingId = null;
+      env.c.saveProduct();
+      expect(env.admin.createProduct).toHaveBeenCalled();
+      env.c.editingId = 'edit-me';
+      env.c.saveProduct();
+      expect(env.admin.updateProduct).toHaveBeenCalled();
+      expect(loadAll).toHaveBeenCalled();
+    });
+
+    it('saveProduct serializes publish_at + toasts on failure', () => {
+      const env = build('settings');
+      env.c.editingId = null;
+      env.c.form.publish_at = '2026-01-01T10:00';
+      env.admin.createProduct.and.returnValue(throwError(() => new Error('x')));
+      env.c.saveProduct();
+      const payload = env.admin.createProduct.calls.mostRecent().args[0];
+      expect(payload.publish_at).toContain('2026-01-01');
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('deleteSelected removes the first selected product', () => {
+      const env = build('settings');
+      env.c.products = [{ id: 'p1', slug: 's1' }, { id: 'p2', slug: 's2' }] as any;
+      env.c.selectedIds = new Set(['p1']);
+      env.admin.deleteProduct.and.returnValue(of({}));
+      env.c.deleteSelected();
+      expect(env.admin.deleteProduct).toHaveBeenCalledWith('s1');
+      expect(env.c.products.map((p) => p.id)).toEqual(['p2']);
+    });
+
+    it('deleteSelected exits when nothing is selected or target missing', () => {
+      const env = build('settings');
+      env.c.selectedIds = new Set();
+      env.c.deleteSelected();
+      env.c.selectedIds = new Set(['ghost']);
+      env.c.products = [];
+      env.c.deleteSelected();
+      expect(env.admin.deleteProduct).not.toHaveBeenCalled();
+    });
+
+    it('deleteSelected toasts on failure', () => {
+      const env = build('settings');
+      env.c.products = [{ id: 'p1', slug: 's1' }] as any;
+      env.c.selectedIds = new Set(['p1']);
+      env.admin.deleteProduct.and.returnValue(throwError(() => new Error('x')));
+      env.c.deleteSelected();
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('duplicateProduct reloads and opens the new slug', () => {
+      const env = build('settings');
+      env.admin.duplicateProduct.and.returnValue(of({ slug: 'dup' }));
+      env.admin.getProduct.and.returnValue(of({ slug: 'dup', name: '', price: 0, stock_quantity: 0, status: 'draft', tags: [] }));
+      spyOn(env.c, 'loadAll').and.stub();
+      env.c.duplicateProduct('orig');
+      expect(env.c.editingId).toBe('dup');
+    });
+
+    it('duplicateProduct toasts on failure', () => {
+      const env = build('settings');
+      env.admin.duplicateProduct.and.returnValue(throwError(() => new Error('x')));
+      env.c.duplicateProduct('orig');
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('setStock + saveStock persist edited stock', () => {
+      const env = build('settings');
+      const product = { id: 'p1', slug: 's1', stock_quantity: 1 } as any;
+      env.c.setStock('p1', 9);
+      expect(env.c.stockEdits['p1']).toBe(9);
+      env.admin.updateProduct.and.returnValue(of({}));
+      env.c.saveStock(product);
+      expect(product.stock_quantity).toBe(9);
+      expect(env.toast.success).toHaveBeenCalled();
+    });
+
+    it('saveStock falls back to current stock + toasts on failure', () => {
+      const env = build('settings');
+      const product = { id: 'p2', slug: 's2', stock_quantity: 4 } as any;
+      env.admin.updateProduct.and.returnValue(throwError(() => new Error('x')));
+      env.c.saveStock(product);
+      expect(env.admin.updateProduct).toHaveBeenCalledWith('s2', { stock_quantity: 4 } as any);
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('saveBulkStock applies the bulk value to every selected product', async () => {
+      const env = build('settings');
+      env.c.products = [{ id: 'p1', slug: 's1', stock_quantity: 0 }, { id: 'p2', slug: 's2', stock_quantity: 0 }] as any;
+      env.c.selectedIds = new Set(['p1', 'p2', 'ghost']);
+      env.c.bulkStock = 7;
+      env.admin.updateProduct.and.returnValue(of({}));
+      await env.c.saveBulkStock();
+      expect(env.c.products.every((p) => p.stock_quantity === 7)).toBeTrue();
+      expect(env.toast.success).toHaveBeenCalled();
+    });
+
+    it('saveBulkStock exits early without a value or selection', async () => {
+      const env = build('settings');
+      env.c.bulkStock = null;
+      await env.c.saveBulkStock();
+      env.c.bulkStock = 1;
+      env.c.selectedIds = new Set();
+      await env.c.saveBulkStock();
+      expect(env.admin.updateProduct).not.toHaveBeenCalled();
+    });
+
+    it('saveBulkStock toasts when an update rejects', async () => {
+      const env = build('settings');
+      env.c.products = [{ id: 'p1', slug: 's1', stock_quantity: 0 }] as any;
+      env.c.selectedIds = new Set(['p1']);
+      env.c.bulkStock = 7;
+      env.admin.updateProduct.and.returnValue(throwError(() => new Error('x')));
+      await env.c.saveBulkStock();
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('buildTags merges bestseller flag with existing detail tags', () => {
+      const env = build('settings');
+      env.c.form.is_bestseller = true;
+      env.c.productDetail = { tags: ['handmade', 'bestseller'] } as any;
+      expect(env.c.buildTags().sort()).toEqual(['bestseller', 'handmade']);
+    });
+
+    it('upcomingProducts filters + sorts future publish dates', () => {
+      const env = build('settings');
+      const future1 = new Date(Date.now() + 86400000).toISOString();
+      const future2 = new Date(Date.now() + 2 * 86400000).toISOString();
+      const past = new Date(Date.now() - 86400000).toISOString();
+      env.c.products = [
+        { id: 'a', publish_at: future2 },
+        { id: 'b', publish_at: past },
+        { id: 'c', publish_at: future1 },
+      ] as any;
+      expect(env.c.upcomingProducts().map((p) => p.id)).toEqual(['c', 'a']);
+    });
+
+    it('toLocalDateTime trims an ISO string to minutes', () => {
+      const env = build('settings');
+      expect(env.c.toLocalDateTime('2026-01-01T10:00:00Z')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    });
+  });
+
+  describe('category management', () => {
+    it('runs the category wizard navigation', () => {
+      const env = build('settings');
+      env.c.startCategoryWizard();
+      expect(env.c.categoryWizardOpen()).toBeTrue();
+      expect(env.c.categoryWizardCanNext()).toBeFalse();
+      expect(env.c.categoryWizardNextLabelKey()).toBe('adminUi.actions.next');
+      env.c.categoryWizardNext();
+      expect(env.toast.error).toHaveBeenCalled();
+      env.c.categoryWizardSlug.set('slug-1');
+      expect(env.c.categoryWizardCanNext()).toBeTrue();
+      const openTr = spyOn(env.c, 'openCategoryWizardTranslations').and.stub();
+      env.c.categoryWizardNext();
+      expect(env.c.categoryWizardStep()).toBe(1);
+      expect(openTr).toHaveBeenCalled();
+      expect(env.c.categoryWizardNextLabelKey()).toBe('adminUi.actions.done');
+      env.c.categoryWizardPrev();
+      expect(env.c.categoryWizardStep()).toBe(0);
+      env.c.categoryWizardPrev();
+      expect(env.c.categoryWizardStep()).toBe(0);
+      env.c.categoryWizardStep.set(1);
+      env.c.categoryWizardNext();
+      expect(env.c.categoryWizardOpen()).toBeFalse();
+    });
+
+    it('goToCategoryWizardStep validates bounds + slug', () => {
+      const env = build('settings');
+      env.c.goToCategoryWizardStep(0);
+      expect(env.c.categoryWizardOpen()).toBeFalse();
+      env.c.startCategoryWizard();
+      env.c.goToCategoryWizardStep(-1);
+      env.c.goToCategoryWizardStep(99);
+      expect(env.c.categoryWizardStep()).toBe(0);
+      env.c.goToCategoryWizardStep(1);
+      expect(env.toast.error).toHaveBeenCalled();
+      env.c.categoryWizardSlug.set('s');
+      const openTr = spyOn(env.c, 'openCategoryWizardTranslations').and.stub();
+      env.c.goToCategoryWizardStep(1);
+      expect(openTr).toHaveBeenCalled();
+    });
+
+    it('categoryWizardDescriptionKey falls back to basics', () => {
+      const env = build('settings');
+      env.c.categoryWizardStep.set(99);
+      expect(env.c.categoryWizardDescriptionKey()).toBe('adminUi.categories.wizard.desc.basics');
+    });
+
+    it('addCategory validates name then prepends the created category', () => {
+      const env = build('settings');
+      env.c.categoryName = '';
+      env.c.addCategory();
+      expect(env.toast.error).toHaveBeenCalled();
+      env.c.categoryName = 'New';
+      env.c.categories = [{ id: 'old' }] as any;
+      env.admin.createCategory.and.returnValue(of({ id: 'new', slug: 'new-cat' }));
+      env.c.addCategory();
+      expect(env.c.categories[0]).toEqual({ id: 'new', slug: 'new-cat' } as any);
+      expect(env.c.categoryName).toBe('');
+    });
+
+    it('addCategory advances the open wizard to translations', () => {
+      const env = build('settings');
+      env.c.startCategoryWizard();
+      env.c.categoryName = 'New';
+      env.admin.createCategory.and.returnValue(of({ id: 'new', slug: 'new-cat' }));
+      const openTr = spyOn(env.c, 'openCategoryWizardTranslations').and.stub();
+      env.c.addCategory();
+      expect(env.c.categoryWizardSlug()).toBe('new-cat');
+      expect(openTr).toHaveBeenCalled();
+    });
+
+    it('addCategory toasts on failure', () => {
+      const env = build('settings');
+      env.c.categoryName = 'New';
+      env.admin.createCategory.and.returnValue(throwError(() => new Error('x')));
+      env.c.addCategory();
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('categoryParentLabel resolves parent names', () => {
+      const env = build('settings');
+      env.c.categories = [{ id: 'p', name: 'Parent' }, { id: 'c', name: 'Child', parent_id: 'p' }] as any;
+      expect(env.c.categoryParentLabel({ parent_id: '' } as any)).toBe('adminUi.categories.parentNone');
+      expect(env.c.categoryParentLabel({ parent_id: 'p' } as any)).toBe('Parent');
+      expect(env.c.categoryParentLabel({ parent_id: 'missing' } as any)).toBe('adminUi.categories.parentNone');
+    });
+
+    it('categoryParentOptions excludes self + descendants', () => {
+      const env = build('settings');
+      env.c.categories = [
+        { id: 'root', name: 'Root' },
+        { id: 'child', name: 'Child', parent_id: 'root' },
+        { id: 'grand', name: 'Grand', parent_id: 'child' },
+        { id: 'other', name: 'Other' },
+      ] as any;
+      const options = env.c.categoryParentOptions({ id: 'root' } as any).map((c) => c.id);
+      expect(options).toEqual(['other']);
+    });
+
+    it('updateCategoryParent skips no-ops and persists changes', () => {
+      const env = build('settings');
+      const cat = { slug: 's', parent_id: 'p' } as any;
+      env.c.updateCategoryParent(cat, 'p');
+      expect(env.admin.updateCategory).not.toHaveBeenCalled();
+      env.admin.updateCategory.and.returnValue(of({ parent_id: 'q' }));
+      env.c.updateCategoryParent(cat, 'q');
+      expect(cat.parent_id).toBe('q');
+    });
+
+    it('updateCategoryParent rolls back on failure', () => {
+      const env = build('settings');
+      const cat = { slug: 's', parent_id: 'p' } as any;
+      env.admin.updateCategory.and.returnValue(throwError(() => new Error('x')));
+      env.c.updateCategoryParent(cat, 'q');
+      expect(cat.parent_id).toBe('p');
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('updateCategoryLowStockThreshold validates + persists', () => {
+      const env = build('settings');
+      const cat = { slug: 's', low_stock_threshold: 5 } as any;
+      env.c.updateCategoryLowStockThreshold(cat, '-1');
+      expect(cat.low_stock_threshold).toBe(5);
+      expect(env.toast.error).toHaveBeenCalled();
+      env.c.updateCategoryLowStockThreshold(cat, '5');
+      expect(env.admin.updateCategory).not.toHaveBeenCalled();
+      env.admin.updateCategory.and.returnValue(of({ low_stock_threshold: 8 }));
+      env.c.updateCategoryLowStockThreshold(cat, '8');
+      expect(cat.low_stock_threshold).toBe(8);
+    });
+
+    it('updateCategoryLowStockThreshold rolls back on failure', () => {
+      const env = build('settings');
+      const cat = { slug: 's', low_stock_threshold: 5 } as any;
+      env.admin.updateCategory.and.returnValue(throwError(() => new Error('x')));
+      env.c.updateCategoryLowStockThreshold(cat, '8');
+      expect(cat.low_stock_threshold).toBe(5);
+    });
+
+    it('updateCategoryTaxGroup persists + rolls back', () => {
+      const env = build('settings');
+      const cat = { slug: 's', tax_group_id: 'g1' } as any;
+      env.c.updateCategoryTaxGroup(cat, 'g1');
+      expect(env.admin.updateCategory).not.toHaveBeenCalled();
+      env.admin.updateCategory.and.returnValue(of({ tax_group_id: 'g2' }));
+      env.c.updateCategoryTaxGroup(cat, 'g2');
+      expect(cat.tax_group_id).toBe('g2');
+      env.admin.updateCategory.and.returnValue(throwError(() => new Error('x')));
+      env.c.updateCategoryTaxGroup(cat, 'g3');
+      expect(cat.tax_group_id).toBe('g2');
+    });
+
+    it('category delete confirm flow', () => {
+      const env = build('settings');
+      const cat = { slug: 's' } as any;
+      env.c.openCategoryDeleteConfirm(cat);
+      expect(env.c.categoryDeleteConfirmOpen()).toBeTrue();
+      env.admin.deleteCategory.and.returnValue(of({}));
+      env.c.categories = [{ slug: 's' }, { slug: 't' }] as any;
+      env.c.confirmDeleteCategory();
+      expect(env.c.categories.map((x) => x.slug)).toEqual(['t']);
+      expect(env.c.categoryDeleteConfirmOpen()).toBeFalse();
+    });
+
+    it('confirmDeleteCategory guards on missing target + busy', () => {
+      const env = build('settings');
+      env.c.confirmDeleteCategory();
+      expect(env.admin.deleteCategory).not.toHaveBeenCalled();
+      env.c.categoryDeleteConfirmTarget.set({ slug: 's' } as any);
+      env.c.categoryDeleteConfirmBusy.set(true);
+      env.c.confirmDeleteCategory();
+      expect(env.admin.deleteCategory).not.toHaveBeenCalled();
+    });
+
+    it('deleteCategory toasts + closes translations on failure/success', () => {
+      const env = build('settings');
+      env.c.categoryTranslationsSlug = 's';
+      env.admin.deleteCategory.and.returnValue(of({}));
+      env.c.categories = [{ slug: 's' }] as any;
+      env.c.deleteCategory('s');
+      expect(env.c.categoryTranslationsSlug).toBeNull();
+      env.admin.deleteCategory.and.returnValue(throwError(() => new Error('x')));
+      const done = jasmine.createSpy('done');
+      env.c.deleteCategory('z', { done });
+      expect(done).toHaveBeenCalledWith(false);
+    });
+
+    it('toggleCategoryTranslations opens + closes', () => {
+      const env = build('settings');
+      env.admin.getCategoryTranslations.and.returnValue(of([{ lang: 'en', name: 'N', description: 'D' }]));
+      env.c.toggleCategoryTranslations('s');
+      expect(env.c.categoryTranslationsSlug).toBe('s');
+      expect(env.c.categoryTranslationExists.en).toBeTrue();
+      env.c.toggleCategoryTranslations('s');
+      expect(env.c.categoryTranslationsSlug).toBeNull();
+    });
+
+    it('saveCategoryTranslation validates + persists', () => {
+      const env = build('settings');
+      env.c.saveCategoryTranslation('en');
+      expect(env.admin.upsertCategoryTranslation).not.toHaveBeenCalled();
+      env.c.categoryTranslationsSlug = 's';
+      env.c.categoryTranslations.en = { name: '', description: '' };
+      env.c.saveCategoryTranslation('en');
+      expect(env.toast.error).toHaveBeenCalled();
+      env.c.categoryTranslations.en = { name: 'Name', description: 'Desc' };
+      env.admin.upsertCategoryTranslation.and.returnValue(of({ name: 'Name', description: 'Desc' }));
+      env.c.saveCategoryTranslation('en');
+      expect(env.c.categoryTranslationExists.en).toBeTrue();
+    });
+
+    it('saveCategoryTranslation surfaces an error', () => {
+      const env = build('settings');
+      env.c.categoryTranslationsSlug = 's';
+      env.c.categoryTranslations.ro = { name: 'Nume', description: '' };
+      env.admin.upsertCategoryTranslation.and.returnValue(throwError(() => new Error('x')));
+      env.c.saveCategoryTranslation('ro');
+      expect(env.c.categoryTranslationsError()).toBe('adminUi.categories.translations.errors.save');
+    });
+
+    it('deleteCategoryTranslation persists + errors', () => {
+      const env = build('settings');
+      env.c.deleteCategoryTranslation('en');
+      expect(env.admin.deleteCategoryTranslation).not.toHaveBeenCalled();
+      env.c.categoryTranslationsSlug = 's';
+      env.c.categoryTranslationExists.en = true;
+      env.admin.deleteCategoryTranslation.and.returnValue(of({}));
+      env.c.deleteCategoryTranslation('en');
+      expect(env.c.categoryTranslationExists.en).toBeFalse();
+      env.admin.deleteCategoryTranslation.and.returnValue(throwError(() => new Error('x')));
+      env.c.deleteCategoryTranslation('ro');
+      expect(env.c.categoryTranslationsError()).toBe('adminUi.categories.translations.errors.delete');
+    });
+
+    it('loadCategoryTranslations maps + errors', () => {
+      const env = build('settings');
+      env.admin.getCategoryTranslations.and.returnValue(of([
+        { lang: 'en', name: 'EN', description: 'd' },
+        { lang: 'fr', name: 'skip' },
+      ]));
+      (env.c as any).loadCategoryTranslations('s');
+      expect(env.c.categoryTranslationExists.en).toBeTrue();
+      expect(env.c.categoryTranslationExists.ro).toBeFalse();
+      env.admin.getCategoryTranslations.and.returnValue(throwError(() => new Error('x')));
+      (env.c as any).loadCategoryTranslations('s');
+      expect(env.c.categoryTranslationsError()).toBe('adminUi.categories.translations.errors.load');
+    });
+  });
+
+  describe('tax groups', () => {
+    it('loadTaxGroups normalizes + handles errors', () => {
+      const env = build('settings');
+      env.taxesAdmin.listGroups.and.returnValue(of([{ id: 'g1' }]));
+      env.c.loadTaxGroups();
+      expect(env.c.taxGroups).toEqual([{ id: 'g1' }] as any);
+      expect(env.c.taxGroupsLoading).toBeFalse();
+      env.taxesAdmin.listGroups.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })));
+      env.c.loadTaxGroups();
+      expect(env.c.taxGroupsError).toBe('boom');
+    });
+
+    it('createTaxGroup validates + posts', () => {
+      const env = build('settings');
+      env.c.taxGroupCreate = { code: '', name: '', description: '', is_default: false };
+      env.c.createTaxGroup();
+      expect(env.toast.error).toHaveBeenCalled();
+      env.c.taxGroupCreate = { code: 'C', name: 'N', description: ' d ', is_default: true };
+      env.taxesAdmin.createGroup.and.returnValue(of({}));
+      const reload = spyOn(env.c, 'loadTaxGroups').and.stub();
+      env.c.createTaxGroup();
+      expect(env.taxesAdmin.createGroup).toHaveBeenCalledWith(jasmine.objectContaining({ code: 'C', description: 'd', is_default: true }));
+      expect(reload).toHaveBeenCalled();
+    });
+
+    it('createTaxGroup surfaces server detail', () => {
+      const env = build('settings');
+      env.c.taxGroupCreate = { code: 'C', name: 'N', description: '', is_default: false };
+      env.taxesAdmin.createGroup.and.returnValue(throwError(() => ({ error: { detail: 'dup' } })));
+      env.c.createTaxGroup();
+      expect(env.toast.error).toHaveBeenCalledWith('dup');
+    });
+
+    it('saveTaxGroup validates name + persists', () => {
+      const env = build('settings');
+      env.c.saveTaxGroup({ id: 'g', name: ' ' } as any);
+      expect(env.toast.error).toHaveBeenCalled();
+      env.taxesAdmin.updateGroup.and.returnValue(of({}));
+      env.c.saveTaxGroup({ id: 'g', name: 'Std', description: '' } as any);
+      expect(env.taxesAdmin.updateGroup).toHaveBeenCalled();
+    });
+
+    it('saveTaxGroup surfaces server detail', () => {
+      const env = build('settings');
+      env.taxesAdmin.updateGroup.and.returnValue(throwError(() => ({ error: { detail: 'bad' } })));
+      env.c.saveTaxGroup({ id: 'g', name: 'Std' } as any);
+      expect(env.toast.error).toHaveBeenCalledWith('bad');
+    });
+
+    it('setDefaultTaxGroup skips defaults + persists', () => {
+      const env = build('settings');
+      env.c.setDefaultTaxGroup({ id: 'g', is_default: true } as any);
+      expect(env.taxesAdmin.updateGroup).not.toHaveBeenCalled();
+      env.taxesAdmin.updateGroup.and.returnValue(of({}));
+      env.c.setDefaultTaxGroup({ id: 'g', is_default: false } as any);
+      expect(env.taxesAdmin.updateGroup).toHaveBeenCalledWith('g', { is_default: true });
+      env.taxesAdmin.updateGroup.and.returnValue(throwError(() => ({})));
+      env.c.setDefaultTaxGroup({ id: 'h', is_default: false } as any);
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('deleteTaxGroup blocks default deletion + persists', () => {
+      const env = build('settings');
+      env.c.deleteTaxGroup({ id: 'g', is_default: true } as any);
+      expect(env.taxesAdmin.deleteGroup).not.toHaveBeenCalled();
+      env.taxesAdmin.deleteGroup.and.returnValue(of({}));
+      env.c.deleteTaxGroup({ id: 'g', is_default: false } as any);
+      expect(env.taxesAdmin.deleteGroup).toHaveBeenCalled();
+      env.taxesAdmin.deleteGroup.and.returnValue(throwError(() => ({})));
+      env.c.deleteTaxGroup({ id: 'h', is_default: false } as any);
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('upsertTaxRate validates + persists', () => {
+      const env = build('settings');
+      env.c.taxRateCountry['g'] = '';
+      env.c.upsertTaxRate({ id: 'g' } as any);
+      expect(env.toast.error).toHaveBeenCalled();
+      env.c.taxRateCountry['g'] = 'RO';
+      env.c.taxRatePercent['g'] = '19';
+      env.taxesAdmin.upsertRate.and.returnValue(of({}));
+      env.c.upsertTaxRate({ id: 'g' } as any);
+      expect(env.taxesAdmin.upsertRate).toHaveBeenCalledWith('g', { country_code: 'RO', vat_rate_percent: 19 });
+      expect(env.c.taxRateCountry['g']).toBe('');
+    });
+
+    it('upsertTaxRate surfaces failures', () => {
+      const env = build('settings');
+      env.c.taxRateCountry['g'] = 'RO';
+      env.c.taxRatePercent['g'] = '19';
+      env.taxesAdmin.upsertRate.and.returnValue(throwError(() => ({})));
+      env.c.upsertTaxRate({ id: 'g' } as any);
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('deleteTaxRate validates code + persists', () => {
+      const env = build('settings');
+      env.c.deleteTaxRate({ id: 'g' } as any, '  ');
+      expect(env.taxesAdmin.deleteRate).not.toHaveBeenCalled();
+      env.taxesAdmin.deleteRate.and.returnValue(of({}));
+      env.c.deleteTaxRate({ id: 'g' } as any, 'RO');
+      expect(env.taxesAdmin.deleteRate).toHaveBeenCalledWith('g', 'RO');
+      env.taxesAdmin.deleteRate.and.returnValue(throwError(() => ({})));
+      env.c.deleteTaxRate({ id: 'g' } as any, 'RO');
+      expect(env.toast.error).toHaveBeenCalled();
+    });
   });
 });
