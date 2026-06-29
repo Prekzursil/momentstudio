@@ -76,6 +76,24 @@ describe('CartApi', () => {
     }
   });
 
+  it('returns an empty session id when localStorage is unavailable (SSR)', () => {
+    // Simulate a server-side rendering context where the `localStorage`
+    // global is absent so the guard `typeof localStorage === 'undefined'`
+    // is exercised and the early empty-string return path is covered.
+    const hadOwn = Object.prototype.hasOwnProperty.call(window, 'localStorage');
+    const original = Object.getOwnPropertyDescriptor(window, 'localStorage');
+    Object.defineProperty(window, 'localStorage', { configurable: true, value: undefined });
+    try {
+      expect(api.getSessionId()).toBe('');
+    } finally {
+      if (hadOwn && original) {
+        Object.defineProperty(window, 'localStorage', original);
+      } else {
+        delete (window as unknown as { localStorage?: Storage }).localStorage;
+      }
+    }
+  });
+
   it('headers returns an empty object when there is no session id', () => {
     spyOn(api, 'getSessionId').and.returnValue('');
     expect(api.headers()).toEqual({});
