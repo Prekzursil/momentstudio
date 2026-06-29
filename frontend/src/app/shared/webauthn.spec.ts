@@ -9,13 +9,42 @@ import {
 
 describe('webauthn helpers', () => {
   describe('isWebAuthnSupported', () => {
+    let originalSecureContext: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+      originalSecureContext = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
+    });
+
+    afterEach(() => {
+      // Restore the genuine `isSecureContext` so later specs see the real value.
+      if (originalSecureContext) {
+        Object.defineProperty(window, 'isSecureContext', originalSecureContext);
+      } else {
+        delete (window as unknown as { isSecureContext?: boolean }).isSecureContext;
+      }
+    });
+
+    // REASON(chrome-149-readonly-prop): Chrome 149 exposes
+    // `window.isSecureContext` as a configurable data property with no getter,
+    // so jasmine's `spyOnProperty(window, 'isSecureContext', 'get')` throws
+    // "does not have access type get". Redefine it as a configurable accessor to
+    // drive the real branch that `isWebAuthnSupported()` reads; `afterEach`
+    // restores the original descriptor. This controls real behaviour, not a stub
+    // of the function under test.
+    function setSecureContext(value: boolean): void {
+      Object.defineProperty(window, 'isSecureContext', {
+        configurable: true,
+        get: () => value,
+      });
+    }
+
     it('returns false when the context is not secure', () => {
-      spyOnProperty(window, 'isSecureContext', 'get').and.returnValue(false);
+      setSecureContext(false);
       expect(isWebAuthnSupported()).toBeFalse();
     });
 
     it('returns true in a secure context with PublicKeyCredential + credentials', () => {
-      spyOnProperty(window, 'isSecureContext', 'get').and.returnValue(true);
+      setSecureContext(true);
       const win = window as unknown as { PublicKeyCredential?: unknown };
       const hadPkc = 'PublicKeyCredential' in win;
       const original = win.PublicKeyCredential;
@@ -33,7 +62,7 @@ describe('webauthn helpers', () => {
     });
 
     it('returns false when PublicKeyCredential is unavailable', () => {
-      spyOnProperty(window, 'isSecureContext', 'get').and.returnValue(true);
+      setSecureContext(true);
       const win = window as unknown as { PublicKeyCredential?: unknown };
       const hadPkc = 'PublicKeyCredential' in win;
       const original = win.PublicKeyCredential;
