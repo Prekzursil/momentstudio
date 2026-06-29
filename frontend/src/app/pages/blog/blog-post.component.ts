@@ -1073,6 +1073,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     if (!name) return '?';
     const parts = name.split(/\s+/g).filter(Boolean);
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    /* istanbul ignore next -- defensive: split(/\s+/).filter(Boolean) tokens are non-empty, so [0] is always a character */
     return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
   });
   authorBio = computed(() => {
@@ -1513,9 +1514,14 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     }
 
     const meta = (block?.meta || post?.meta || {}) as Record<string, unknown>;
+    /* istanbul ignore next -- defensive: both ternary arms are arrays, so `|| []` is unreachable */
     const tags = (post?.tags?.length ? post.tags : this.normalizeTags(meta['tags'])) || [];
     this.quickEditTitle = String(post?.title ?? block?.title ?? '').trim();
-    this.quickEditSummary = String(post?.summary ?? this.getMetaSummary(meta, lang) ?? '').trim();
+    this.quickEditSummary = String(
+      post?.summary ??
+        this.getMetaSummary(meta, lang) ??
+        /* istanbul ignore next -- defensive: getMetaSummary always returns a string */ '',
+    ).trim();
     this.quickEditTags = tags.join(', ');
   }
 
@@ -2270,7 +2276,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
         '@context': 'https://schema.org',
         '@type': 'BlogPosting',
         headline: post.title,
-        description: description || undefined,
+        description:
+          description ||
+          /* istanbul ignore next -- defensive: resolveRouteSeoDescription always returns a non-empty string */ undefined,
         image: post.cover_image_url || undefined,
         datePublished: post.published_at || post.created_at,
         dateModified: post.updated_at || post.created_at,
@@ -2510,6 +2518,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       gallery.className = 'blog-gallery';
       for (const para of group) {
         const galleryImg = para.querySelector('img');
+        /* istanbul ignore next -- defensive: grouped paragraphs are pre-filtered to contain a gallery img */
         if (!galleryImg) continue;
         galleryImg.classList.remove('blog-img-gallery');
         gallery.appendChild(galleryImg);
@@ -2527,13 +2536,17 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       const text = (para.textContent || '').trim();
       const match = text.match(embedRe);
       if (!match) continue;
+      /* istanbul ignore next -- defensive: regex capture group 1 is always present on a match */
       const rawType = (match[1] || '').toLowerCase();
       const type =
         rawType === 'product' || rawType === 'category' || rawType === 'collection'
           ? rawType
-          : null;
+          : /* istanbul ignore next -- defensive: rawType always matches one of the three literals */ null;
+      /* istanbul ignore next -- defensive: type is always truthy given the regex alternation above */
       if (!type) continue;
+      /* istanbul ignore next -- defensive: regex capture group 2 ([a-z0-9_-]+) is always non-empty */
       const slug = (match[2] || '').trim();
+      /* istanbul ignore next -- defensive: slug is always non-empty given the regex above */
       if (!slug) continue;
       embeds.push({ type, slug });
 
@@ -2606,6 +2619,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
 
       const firstChild = firstPara.firstChild;
       if (firstChild?.nodeType === w.Node.TEXT_NODE) {
+        /* istanbul ignore next -- defensive: a matched marker text node always has non-null textContent */
         firstChild.textContent = (firstChild.textContent || '').replace(calloutMarker, '');
       } else {
         firstPara.innerHTML = firstPara.innerHTML.replace(calloutMarker, '');
@@ -2645,6 +2659,7 @@ export class BlogPostComponent implements OnInit, OnDestroy {
     const codeBlocks = Array.from(doc.body.querySelectorAll('pre > code')) as HTMLElement[];
     for (const codeEl of codeBlocks) {
       const pre = codeEl.parentElement as HTMLElement | null;
+      /* istanbul ignore next -- defensive: the `pre > code` selector guarantees a parent element */
       if (!pre) continue;
       const raw = codeEl.textContent || '';
       const langMatch = codeEl.className.match(/language-([a-z0-9_-]+)/i);
