@@ -1888,4 +1888,195 @@ describe('AdminComponent', () => {
       expect(env.c.homeInsertDragActive).toBeTrue();
     });
   });
+
+  describe('site settings load/save', () => {
+    it('loadAssets hydrates + clears form on error', () => {
+      const env = build('settings');
+      env.admin.getContent.and.returnValue(of({ meta: { logo_url: 'L', favicon_url: 'F', social_image_url: 'S' }, version: 1 }));
+      env.c.loadAssets();
+      expect(env.c.assetsForm.logo_url).toBe('L');
+      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadAssets();
+      expect(env.c.assetsForm.logo_url).toBe('');
+    });
+
+    it('saveAssets updates then reports success', () => {
+      const env = build('settings');
+      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+      env.c.saveAssets();
+      expect(env.c.assetsMessage).toBe('adminUi.site.assets.success.save');
+    });
+
+    it('saveAssets falls back to createContent when update fails', () => {
+      const env = build('settings');
+      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      env.admin.createContent.and.returnValue(of({ version: 1 }));
+      env.c.saveAssets();
+      expect(env.admin.createContent).toHaveBeenCalled();
+      expect(env.c.assetsMessage).toBe('adminUi.site.assets.success.save');
+    });
+
+    it('saveAssets reports error on a 409 conflict', () => {
+      const env = build('settings');
+      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+      env.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
+      env.c.saveAssets();
+      expect(env.c.assetsError).toBe('adminUi.site.assets.errors.save');
+    });
+
+    it('saveAssets reports error when create also fails', () => {
+      const env = build('settings');
+      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+      env.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.saveAssets();
+      expect(env.c.assetsError).toBe('adminUi.site.assets.errors.save');
+    });
+
+    it('loadCheckoutSettings parses meta + falls back on error', () => {
+      const env = build('settings');
+      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
+        shipping_fee_ron: 15, free_shipping_threshold_ron: 250, phone_required_home: 'no',
+        fee_enabled: 1, fee_type: 'percent', fee_value: 5, vat_enabled: false, vat_rate_percent: 19,
+        receipt_share_days: 30, money_rounding: 'down',
+      } }));
+      env.c.loadCheckoutSettings();
+      expect(env.c.checkoutSettingsForm.shipping_fee_ron).toBe(15);
+      expect(env.c.checkoutSettingsForm.fee_type).toBe('percent');
+      expect(env.c.checkoutSettingsForm.money_rounding).toBe('down');
+      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadCheckoutSettings();
+      expect(env.c.checkoutSettingsForm.shipping_fee_ron).toBe(20);
+    });
+
+    it('saveCheckoutSettings persists + create fallback', () => {
+      const env = build('settings');
+      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+      env.c.saveCheckoutSettings();
+      expect(env.c.checkoutSettingsMessage).toBe('adminUi.site.checkout.success.save');
+      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      env.admin.createContent.and.returnValue(of({ version: 1 }));
+      env.c.saveCheckoutSettings();
+      expect(env.admin.createContent).toHaveBeenCalled();
+    });
+
+    it('loadReportsSettings parses recipients + falls back', () => {
+      const env = build('settings');
+      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
+        reports_weekly_enabled: true, reports_weekly_weekday: 9, reports_monthly_day: 40,
+        reports_recipients: 'a@b.com, c@d.com', reports_weekly_last_error: 'boom',
+      } }));
+      env.c.loadReportsSettings();
+      expect(env.c.reportsSettingsForm.weekly_enabled).toBeTrue();
+      expect(env.c.reportsSettingsForm.weekly_weekday).toBe(6);
+      expect(env.c.reportsSettingsForm.recipients).toBe('a@b.com, c@d.com');
+      expect(env.c.reportsWeeklyLastError).toBe('boom');
+      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadReportsSettings();
+      expect(env.c.reportsSettingsForm.recipients).toBe('');
+    });
+
+    it('saveReportsSettings filters invalid emails + create fallback', () => {
+      const env = build('settings');
+      env.c.reportsSettingsForm.recipients = 'a@b.com, not-an-email, a@b.com';
+      env.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { reports_recipients: ['a@b.com'] } }));
+      env.c.saveReportsSettings();
+      const payload = env.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.meta.reports_recipients).toEqual(['a@b.com']);
+      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      env.admin.createContent.and.returnValue(of({ version: 1 }));
+      env.c.saveReportsSettings();
+      expect(env.admin.createContent).toHaveBeenCalled();
+    });
+
+    it('sendReportNow guards re-entry + reports skipped/sent', () => {
+      const env = build('settings');
+      env.admin.sendScheduledReport.and.returnValue(of({ skipped: true }));
+      spyOn(env.c, 'loadReportsSettings').and.stub();
+      env.c.sendReportNow('weekly');
+      expect(env.c.reportsSettingsMessage).toBe('adminUi.reports.success.skipped');
+      env.admin.sendScheduledReport.and.returnValue(of({ skipped: false }));
+      env.c.sendReportNow('monthly', true);
+      expect(env.c.reportsSettingsMessage).toBe('adminUi.reports.success.sent');
+      env.admin.sendScheduledReport.and.returnValue(throwError(() => new Error('x')));
+      env.c.sendReportNow('weekly');
+      expect(env.c.reportsSettingsError).toBe('adminUi.reports.errors.send');
+    });
+
+    it('loadCompany hydrates + clears on error', () => {
+      const env = build('settings');
+      env.admin.getContent.and.returnValue(of({ version: 1, meta: { company: { name: 'Acme', cui: 'RO1' } } }));
+      env.c.loadCompany();
+      expect(env.c.companyForm.name).toBe('Acme');
+      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadCompany();
+      expect(env.c.companyForm.name).toBe('');
+    });
+
+    it('companyMissingFields lists empty fields', () => {
+      const env = build('settings');
+      expect(env.c.companyMissingFields().length).toBe(6);
+      env.c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+      expect(env.c.companyMissingFields().length).toBe(0);
+    });
+
+    it('saveCompany validates + persists', () => {
+      const env = build('settings');
+      env.c.saveCompany();
+      expect(env.c.companyError).toBe('adminUi.site.company.errors.required');
+      env.c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+      env.c.saveCompany();
+      expect(env.c.companyMessage).toBe('adminUi.site.company.success.save');
+    });
+
+    it('loadSocial parses pages + survives errors', () => {
+      const env = build('settings');
+      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
+        contact: { phone: '123', email: 'a@b.com' },
+        instagram_pages: [{ label: 'IG', url: 'https://ig', thumbnail_url: '' }],
+      } }));
+      env.c.loadSocial();
+      expect(env.c.socialForm.phone).toBe('123');
+      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+      expect(() => env.c.loadSocial()).not.toThrow();
+    });
+
+    it('addSocialLink + removeSocialLink mutate the page lists', () => {
+      const env = build('settings');
+      const igBefore = env.c.socialForm.instagram_pages.length;
+      env.c.addSocialLink('instagram');
+      expect(env.c.socialForm.instagram_pages.length).toBe(igBefore + 1);
+      env.c.addSocialLink('facebook');
+      env.c.removeSocialLink('instagram', env.c.socialForm.instagram_pages.length - 1);
+      expect(env.c.socialForm.instagram_pages.length).toBe(igBefore);
+      const fbLen = env.c.socialForm.facebook_pages.length;
+      env.c.removeSocialLink('facebook', fbLen - 1);
+      expect(env.c.socialForm.facebook_pages.length).toBe(fbLen - 1);
+      expect(env.c.socialThumbKey('instagram', 2)).toBe('instagram-2');
+    });
+
+    it('fetchSocialThumbnail validates url + applies result', () => {
+      const env = build('settings');
+      env.c.socialForm.instagram_pages = [{ label: 'IG', url: '', thumbnail_url: '' }];
+      env.c.fetchSocialThumbnail('instagram', 0);
+      expect(env.c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.urlRequired');
+      env.c.socialForm.instagram_pages = [{ label: 'IG', url: 'https://ig', thumbnail_url: '' }];
+      env.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: 'thumb.png' }));
+      env.c.fetchSocialThumbnail('instagram', 0);
+      expect(env.c.socialForm.instagram_pages[0].thumbnail_url).toBe('thumb.png');
+      env.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '' }));
+      env.c.fetchSocialThumbnail('instagram', 0);
+      expect(env.c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.noThumbnail');
+      env.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({ error: { detail: 'bad-url' } })));
+      env.c.fetchSocialThumbnail('instagram', 0);
+      expect(env.c.socialThumbErrors['instagram-0']).toBe('bad-url');
+    });
+
+    it('saveSocial persists sanitized pages', () => {
+      const env = build('settings');
+      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+      env.c.saveSocial();
+      expect(env.c.socialMessage).toBe('adminUi.site.social.success.save');
+    });
+  });
 });
