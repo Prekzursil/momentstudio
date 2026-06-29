@@ -175,7 +175,7 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    passkeys: Mapped[list["UserPasskey"]] = relationship(  # noqa: F821  # forward ref resolved by SQLAlchemy registry; import omitted to break a cyclic import (CodeQL py/unsafe-cyclic-import)
+    passkeys: Mapped[list["UserPasskey"]] = relationship(  # type: ignore[name-defined]  # noqa: F821  # forward ref resolved by SQLAlchemy registry; import omitted to break a cyclic import (CodeQL py/unsafe-cyclic-import)
         "UserPasskey",
         back_populates="user",
         cascade="all, delete-orphan",
