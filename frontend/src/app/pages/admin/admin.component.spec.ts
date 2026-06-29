@@ -2079,4 +2079,156 @@ describe('AdminComponent', () => {
       expect(env.c.socialMessage).toBe('adminUi.site.social.success.save');
     });
   });
+
+  describe('navigation', () => {
+    it('loadNavigation parses links + falls back to defaults', () => {
+      const env = build('settings');
+      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
+        header_links: [
+          { id: 'h1', url: '/', label: { en: 'Home', ro: 'Acasa' } },
+          { url: '', label: {} },
+        ],
+      } }));
+      env.c.loadNavigation();
+      expect(env.c.navigationForm.header_links.length).toBe(1);
+      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadNavigation();
+      expect(env.c.navigationForm.header_links.length).toBeGreaterThan(1);
+    });
+
+    it('add/remove/move navigation links across lists', () => {
+      const env = build('settings');
+      env.c.navigationForm = (env.c as any).defaultNavigationForm();
+      env.c.addNavigationLink('header');
+      env.c.addNavigationLink('footer_handcrafted');
+      env.c.addNavigationLink('footer_legal');
+      const headerLast = env.c.navigationForm.header_links.slice(-1)[0].id;
+      env.c.removeNavigationLink('header', headerLast);
+      expect(env.c.navigationForm.header_links.find((l) => l.id === headerLast)).toBeUndefined();
+      env.c.removeNavigationLink('header', '');
+      const first = env.c.navigationForm.header_links[0].id;
+      env.c.moveNavigationLink('header', first, 1);
+      expect(env.c.navigationForm.header_links[1].id).toBe(first);
+      env.c.moveNavigationLink('header', first, 99);
+      env.c.moveNavigationLink('header', '', 1);
+      env.c.removeNavigationLink('footer_handcrafted', env.c.navigationForm.footer_handcrafted_links.slice(-1)[0].id);
+      env.c.removeNavigationLink('footer_legal', env.c.navigationForm.footer_legal_links.slice(-1)[0].id);
+      env.c.moveNavigationLink('footer_handcrafted', env.c.navigationForm.footer_handcrafted_links[0].id, 1);
+      env.c.moveNavigationLink('footer_legal', env.c.navigationForm.footer_legal_links[0].id, 1);
+    });
+
+    it('resetNavigationDefaults requires confirmation', () => {
+      const env = build('settings');
+      const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
+      env.c.navigationForm = { header_links: [], footer_handcrafted_links: [], footer_legal_links: [] };
+      env.c.resetNavigationDefaults();
+      expect(env.c.navigationForm.header_links.length).toBe(0);
+      confirmSpy.and.returnValue(true);
+      env.c.resetNavigationDefaults();
+      expect(env.c.navigationForm.header_links.length).toBeGreaterThan(0);
+    });
+
+    it('navigation drag start/over/drop reorders within a list', () => {
+      const env = build('settings');
+      env.c.navigationForm = (env.c as any).defaultNavigationForm();
+      const a = env.c.navigationForm.header_links[0].id;
+      const b = env.c.navigationForm.header_links[1].id;
+      const evt = { preventDefault: jasmine.createSpy('pd') } as any;
+      env.c.onNavigationDragOver(evt);
+      expect(evt.preventDefault).toHaveBeenCalled();
+      env.c.onNavigationDragStart('header', a);
+      env.c.onNavigationDrop('header', b);
+      expect(env.c.navigationForm.header_links[1].id).toBe(a);
+      env.c.onNavigationDragStart('header', a);
+      env.c.onNavigationDrop('header', a);
+      env.c.onNavigationDragStart('footer_legal', 'ghost');
+      env.c.onNavigationDrop('footer_legal', env.c.navigationForm.footer_legal_links[0].id);
+    });
+
+    it('saveNavigation validates + persists', () => {
+      const env = build('settings');
+      env.c.navigationForm = {
+        header_links: [{ id: 'h1', url: '/x', label: { en: 'X', ro: '' } }],
+        footer_handcrafted_links: [],
+        footer_legal_links: [],
+      };
+      env.c.saveNavigation();
+      expect(env.c.navigationError).toBe('adminUi.site.navigation.errors.invalid');
+      env.c.navigationForm = {
+        header_links: [{ id: 'h1', url: '/x', label: { en: 'X', ro: 'X' } }, { id: 'blank', url: '', label: { en: '', ro: '' } }],
+        footer_handcrafted_links: [],
+        footer_legal_links: [],
+      };
+      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+      env.c.saveNavigation();
+      expect(env.c.navigationMessage).toBe('adminUi.site.navigation.success.save');
+      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      env.admin.createContent.and.returnValue(of({ version: 1 }));
+      env.c.saveNavigation();
+      expect(env.admin.createContent).toHaveBeenCalled();
+    });
+  });
+
+  describe('seo + sitemap + structured data', () => {
+    it('selectSeoLang + loadSeo hydrate the form', () => {
+      const env = build('settings');
+      env.admin.getContent.and.returnValue(of({ title: 'T', meta: { description: 'D' }, version: 1 }));
+      env.c.selectSeoLang('ro');
+      expect(env.c.seoLang).toBe('ro');
+      expect(env.c.seoForm.title).toBe('T');
+      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.loadSeo();
+      expect(env.c.seoForm.title).toBe('');
+    });
+
+    it('saveSeo persists + create fallback', () => {
+      const env = build('settings');
+      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+      env.c.saveSeo();
+      expect(env.c.seoMessage).toBe('adminUi.site.seo.success.save');
+      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      env.admin.createContent.and.returnValue(of({ version: 1 }));
+      env.c.saveSeo();
+      expect(env.admin.createContent).toHaveBeenCalled();
+      env.admin.createContent.and.returnValue(throwError(() => new Error('x')));
+      env.c.saveSeo();
+      expect(env.c.seoError).toBe('adminUi.site.seo.errors.save');
+    });
+
+    it('loadSitemapPreview maps by_lang + handles errors', () => {
+      const env = build('settings');
+      env.admin.getSitemapPreview.and.returnValue(of({ by_lang: { en: ['/'] } }));
+      env.c.loadSitemapPreview();
+      expect(env.c.sitemapPreviewByLang).toEqual({ en: ['/'] });
+      env.admin.getSitemapPreview.and.returnValue(throwError(() => ({ error: { detail: 'down' } })));
+      env.c.loadSitemapPreview();
+      expect(env.c.sitemapPreviewError).toBe('down');
+    });
+
+    it('structuredDataIssueUrl maps entity types', () => {
+      const env = build('settings');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'mug' })).toBe('/products/mug');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe('/about');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' })).toBe('/contact');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe('/pages/faq');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.' })).toBe('/pages');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'other', entity_key: 'x' })).toBe('/');
+    });
+
+    it('runStructuredDataValidation stores results + errors', () => {
+      const env = build('settings');
+      env.admin.validateStructuredData.and.returnValue(of({ ok: true }));
+      env.c.runStructuredDataValidation();
+      expect(env.c.structuredDataResult).toEqual({ ok: true } as any);
+      env.admin.validateStructuredData.and.returnValue(throwError(() => ({ error: { detail: 'invalid' } })));
+      env.c.runStructuredDataValidation();
+      expect(env.c.structuredDataError).toBe('invalid');
+    });
+
+    it('selectInfoLang sets the active language', () => {
+      const env = build('pages');
+      env.c.selectInfoLang('ro');
+      expect(env.c.infoLang).toBe('ro');
+    });
+  });
 });
