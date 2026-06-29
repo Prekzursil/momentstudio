@@ -132,11 +132,6 @@ async def ingest_analytics_event(
                 detail="Invalid analytics token",
                 headers={"X-Error-Code": "analytics_token_invalid"},
             )
-    elif raw_token and not analytics_tokens.validate_analytics_token(
-        token=raw_token, session_id=session_id
-    ):
-        raw_token = ""
-
     order_id: UUID | None = payload.order_id
     if not order_id and isinstance(payload.payload, dict):
         raw_order_id = payload.payload.get("order_id")

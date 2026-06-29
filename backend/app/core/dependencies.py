@@ -2,9 +2,7 @@ from collections.abc import Awaitable, Callable
 from ipaddress import (
     ip_address,
     ip_network,
-    IPv4Address,
     IPv4Network,
-    IPv6Address,
     IPv6Network,
 )
 from uuid import UUID
@@ -61,7 +59,6 @@ _ADMIN_IP_DENIED_DETAIL = "Admin access is blocked from this IP address"
 _ADMIN_IP_ALLOWLIST_DETAIL = "Admin access is restricted to approved IP addresses"
 _TRAINING_MODE_DETAIL = "Training mode is read-only"
 
-_IPAddress = IPv4Address | IPv6Address
 _IPNetwork = IPv4Network | IPv6Network
 
 

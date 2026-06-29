@@ -515,10 +515,6 @@ async def build_order_from_cart(
 
     ref = await _generate_reference_code(session)
     discount_val = discount or Decimal("0")
-    computed_fee = Decimal("0.00")
-    computed_tax = Decimal("0.00")
-    computed_shipping = Decimal("0.00")
-    computed_total = Decimal("0.00")
 
     if (
         tax_amount is not None

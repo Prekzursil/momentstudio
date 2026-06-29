@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, LargeBinary, String, func
 from sqlalchemy.dialects.postgresql import UUID
@@ -10,8 +9,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-if TYPE_CHECKING:
-    from app.models.user import User
+# NOTE: `User` is intentionally NOT imported here (not even under TYPE_CHECKING)
+# to avoid a module-level import cycle with app.models.user that CodeQL flags as
+# py/unsafe-cyclic-import. SQLAlchemy resolves the relationship target via the
+# registry using the string "User"; the `Mapped["User"]` annotation is a forward
+# reference suppressed with `# type: ignore[name-defined]` on the field below.
 
 
 class UserPasskey(Base):
@@ -47,4 +49,4 @@ class UserPasskey(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="passkeys")  # type: ignore[name-defined]
+    user: Mapped["User"] = relationship("User", back_populates="passkeys")  # type: ignore[name-defined]  # noqa: F821  # forward ref resolved by SQLAlchemy registry; import omitted to break a cyclic import (CodeQL py/unsafe-cyclic-import)
