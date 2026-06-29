@@ -1746,4 +1746,414 @@ describe('AdminComponent — branch fill', () => {
       expect(insert.calls.mostRecent().args[1]).toBe('![pic](/d.png "narrow")');
     });
   });
+
+  describe('content redirects', () => {
+    it('deleteContentRedirect ignores blanks and respects a cancelled confirm', () => {
+      c.deleteContentRedirect('  ');
+      const confirm = spyOn(window, 'confirm').and.returnValue(false);
+      c.deleteContentRedirect('id1');
+      expect(h.admin.deleteContentRedirect).not.toHaveBeenCalled();
+      confirm.and.returnValue(true);
+      spyOn(c, 'loadContentRedirects');
+      h.admin.deleteContentRedirect.and.returnValue(of({}));
+      c.deleteContentRedirect('id1');
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.deleted');
+    });
+
+    it('deleteContentRedirect surfaces a detail message then a default', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.deleteContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'nope' } })));
+      c.deleteContentRedirect('id1');
+      expect(h.toast.error).toHaveBeenCalledWith('nope');
+      h.admin.deleteContentRedirect.and.returnValue(throwError(() => ({})));
+      c.deleteContentRedirect('id1');
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.delete');
+    });
+
+    it('exportContentRedirects guards re-entry, downloads a csv and handles errors', () => {
+      c.redirectsExporting = true;
+      c.exportContentRedirects();
+      expect(h.admin.exportContentRedirects).not.toHaveBeenCalled();
+      c.redirectsExporting = false;
+      c.redirectsQuery = ' term ';
+      h.admin.exportContentRedirects.and.returnValue(of(new Blob(['a,b'], { type: 'text/csv' })));
+      c.exportContentRedirects();
+      expect(h.admin.exportContentRedirects).toHaveBeenCalledWith({ q: 'term' });
+      expect(c.redirectsExporting).toBe(false);
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.export');
+    });
+
+    it('exportContentRedirects reports an error detail and a default, sending undefined for a blank query', () => {
+      c.redirectsQuery = '';
+      h.admin.exportContentRedirects.and.returnValue(throwError(() => ({ error: { detail: 'x' } })));
+      c.exportContentRedirects();
+      expect(h.admin.exportContentRedirects).toHaveBeenCalledWith({ q: undefined });
+      expect(h.toast.error).toHaveBeenCalledWith('x');
+      c.redirectsExporting = false;
+      h.admin.exportContentRedirects.and.returnValue(throwError(() => ({})));
+      c.exportContentRedirects();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.export');
+    });
+
+    function importEvent(file?: File): any {
+      return { target: { files: file ? [file] : [], value: 'x' } };
+    }
+
+    it('importContentRedirects ignores empty input and an in-flight import', () => {
+      c.importContentRedirects(importEvent());
+      c.redirectsImporting = true;
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(h.admin.importContentRedirects).not.toHaveBeenCalled();
+    });
+
+    it('importContentRedirects imports a file and falls back to null result', () => {
+      spyOn(c, 'loadContentRedirects');
+      h.admin.importContentRedirects.and.returnValue(of(undefined));
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(c.redirectsImportResult).toBeNull();
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.import');
+    });
+
+    it('importContentRedirects reports an error detail and a default', () => {
+      h.admin.importContentRedirects.and.returnValue(throwError(() => ({ error: { detail: 'bad' } })));
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(h.toast.error).toHaveBeenCalledWith('bad');
+      h.admin.importContentRedirects.and.returnValue(throwError(() => ({})));
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.import');
+    });
+
+    it('createContentRedirect guards re-entry and missing fields, then creates', () => {
+      c.redirectCreateSaving = true;
+      c.createContentRedirect();
+      expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
+      c.redirectCreateSaving = false;
+      c.redirectCreateFrom = 'a';
+      c.redirectCreateTo = '';
+      c.createContentRedirect();
+      expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
+      c.redirectCreateFrom = 'from';
+      c.redirectCreateTo = 'to';
+      spyOn(c, 'loadContentRedirects');
+      h.admin.upsertContentRedirect.and.returnValue(of({}));
+      c.createContentRedirect();
+      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({ from_key: 'from', to_key: 'to' });
+      expect(c.redirectCreateFrom).toBe('');
+    });
+
+    it('createContentRedirect reports an error detail and a default', () => {
+      c.redirectCreateFrom = 'from';
+      c.redirectCreateTo = 'to';
+      h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'oops' } })));
+      c.createContentRedirect();
+      expect(h.toast.error).toHaveBeenCalledWith('oops');
+      c.redirectCreateFrom = 'from';
+      c.redirectCreateTo = 'to';
+      h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({})));
+      c.createContentRedirect();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.create');
+    });
+  });
+
+  describe('find & replace', () => {
+    it('previewFindReplace guards, validates and derives the key prefix per scope', () => {
+      c.findReplaceLoading = true;
+      c.previewFindReplace();
+      expect(h.admin.previewFindReplaceContent).not.toHaveBeenCalled();
+      c.findReplaceLoading = false;
+      c.findReplaceFind = '   ';
+      c.previewFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.findRequired');
+
+      const scopes: Array<[string, string | undefined]> = [
+        ['blog', 'blog.'], ['home', 'home.'], ['site', 'site.'], ['pages', 'page.'], ['all', undefined],
+      ];
+      h.admin.previewFindReplaceContent.and.returnValue(of({ total_items: 1, total_matches: 2 }));
+      for (const [scope, prefix] of scopes) {
+        c.findReplaceFind = 'foo';
+        c.findReplaceScope = scope;
+        c.previewFindReplace();
+        expect(h.admin.previewFindReplaceContent.calls.mostRecent().args[0].key_prefix).toBe(prefix);
+      }
+      expect(c.findReplacePreviewKey).toBeTruthy();
+    });
+
+    it('previewFindReplace reports an error detail and a default', () => {
+      c.findReplaceFind = 'foo';
+      c.findReplaceScope = 'all';
+      h.admin.previewFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'pe' } })));
+      c.previewFindReplace();
+      expect(c.findReplaceError).toBe('pe');
+      h.admin.previewFindReplaceContent.and.returnValue(throwError(() => ({})));
+      c.previewFindReplace();
+      expect(c.findReplaceError).toBe('adminUi.content.findReplace.errors.preview');
+    });
+
+    it('applyFindReplace requires a find term and a matching preview first', () => {
+      c.findReplaceApplying = true;
+      c.applyFindReplace();
+      expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
+      c.findReplaceApplying = false;
+      c.findReplaceFind = '';
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.findRequired');
+      c.findReplaceFind = 'foo';
+      c.findReplacePreview = null;
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.previewFirst');
+    });
+
+    it('applyFindReplace respects a cancelled confirm', () => {
+      c.findReplaceFind = 'foo';
+      c.findReplaceScope = 'all';
+      c.findReplaceReplace = 'bar';
+      c.findReplaceCaseSensitive = false;
+      c.findReplacePreview = { total_items: 1, total_matches: 1 };
+      c.findReplacePreviewKey = c.findReplacePayloadKey({ find: 'foo', replace: 'bar', key_prefix: null, case_sensitive: false });
+      spyOn(window, 'confirm').and.returnValue(false);
+      c.applyFindReplace();
+      expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
+    });
+
+    function primeApply(): void {
+      c.findReplaceApplying = false;
+      c.findReplaceLoading = false;
+      c.findReplaceFind = 'foo';
+      c.findReplaceScope = 'all';
+      c.findReplaceReplace = 'bar';
+      c.findReplaceCaseSensitive = false;
+      c.findReplacePreview = { total_items: 1, total_matches: 1 };
+      c.findReplacePreviewKey = c.findReplacePayloadKey({ find: 'foo', replace: 'bar', key_prefix: null, case_sensitive: false });
+    }
+
+    it('applyFindReplace applies with default counts on a null response', () => {
+      primeApply();
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.applyFindReplaceContent.and.returnValue(of(null));
+      c.applyFindReplace();
+      expect(c.findReplaceApplyResult).toBeNull();
+      expect(h.toast.success).toHaveBeenCalled();
+    });
+
+    it('applyFindReplace surfaces an error detail', () => {
+      primeApply();
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.applyFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'ae' } })));
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('ae');
+      expect(c.findReplaceApplying).toBe(false);
+    });
+
+    it('applyFindReplace surfaces the default error message', () => {
+      primeApply();
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.applyFindReplaceContent.and.returnValue(throwError(() => ({})));
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.apply');
+    });
+  });
+
+  describe('runLinkCheck', () => {
+    it('ignores a blank key, uses an override, and stores issues', () => {
+      c.linkCheckKey = '';
+      c.runLinkCheck();
+      expect(h.admin.linkCheckContent).not.toHaveBeenCalled();
+      h.admin.linkCheckContent.and.returnValue(of({ issues: [{ url: '/a' }] }));
+      c.runLinkCheck(' page.about ');
+      expect(c.linkCheckKey).toBe('page.about');
+      expect(c.linkCheckIssues.length).toBe(1);
+      h.admin.linkCheckContent.and.returnValue(of({}));
+      c.runLinkCheck('page.about');
+      expect(c.linkCheckIssues).toEqual([]);
+    });
+
+    it('reports an error detail and a default', () => {
+      h.admin.linkCheckContent.and.returnValue(throwError(() => ({ error: { detail: 'lc' } })));
+      c.runLinkCheck('page.about');
+      expect(c.linkCheckError).toBe('lc');
+      h.admin.linkCheckContent.and.returnValue(throwError(() => ({})));
+      c.runLinkCheck('page.about');
+      expect(c.linkCheckError).toBe('adminUi.content.linkCheck.errors.load');
+    });
+  });
+
+  describe('page block drop handlers', () => {
+    function blockPayloadEvent(payload: unknown, files: File[] = []): any {
+      return {
+        preventDefault: () => undefined,
+        dataTransfer: {
+          files,
+          types: files.length ? ['Files'] : ['text/plain'],
+          getData: () => (payload === undefined ? '' : JSON.stringify(payload)),
+        },
+      };
+    }
+
+    it('onPageBlockDrop inserts dropped media files', () => {
+      const insert = spyOn(c, 'insertPageMediaFiles').and.returnValue(Promise.resolve());
+      c.pageBlocks['page.about'] = [];
+      const png = new File(['x'], 'a.png', { type: 'image/png' });
+      c.onPageBlockDrop(blockPayloadEvent(undefined, [png]), 'page.about', 'targetKey');
+      expect(insert).toHaveBeenCalled();
+      expect(c.pageInsertDragActive).toBe(false);
+    });
+
+    it('onPageBlockDrop inserts a library block at the target index', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'k1', body_markdown: { en: 'a', ro: '' } }] });
+      const insertAt = spyOn(c, 'insertPageBlockAt').and.returnValue('new');
+      c.onPageBlockDrop(blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }), 'page.about', 'k1');
+      expect(insertAt).toHaveBeenCalledWith('page.about', 'cta', 0, 'blank');
+    });
+
+    it('onPageBlockDrop does not insert a library block when the target is missing', () => {
+      c.pageBlocks['page.about'] = [];
+      const insertAt = spyOn(c, 'insertPageBlockAt');
+      c.onPageBlockDrop(blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }), 'page.about', 'nope');
+      expect(insertAt).not.toHaveBeenCalled();
+    });
+
+    it('onPageBlockDrop reorders an existing block onto a target', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }, { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } }, { type: 'text', key: 'c', body_markdown: { en: '3', ro: '' } }],
+      });
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'c');
+      expect(c.pageBlocks['page.about'].map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
+    });
+
+    it('onPageBlockDrop ignores reorders with missing drag context, mismatched page or identical key', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }] });
+      c.draggingPageBlocksKey = null;
+      c.draggingPageBlockKey = null;
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'a');
+      c.draggingPageBlocksKey = 'page.other';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'a');
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'a');
+      expect(c.pageBlocks['page.about'].length).toBe(1);
+    });
+
+    it('onPageBlockDropZone reorders to a zone index and ends the drag', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }, { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } }],
+      });
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDropZone(blockPayloadEvent(undefined), 'page.about', 2);
+      expect(c.pageBlocks['page.about'].map((b: any) => b.key)).toEqual(['b', 'a']);
+    });
+
+    it('onPageBlockDropZone ends the drag when the dragged block is gone', () => {
+      c.pageBlocks['page.about'] = [];
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'ghost';
+      const end = spyOn(c, 'onPageBlockDragEnd');
+      c.onPageBlockDropZone(blockPayloadEvent(undefined), 'page.about', 0);
+      expect(end).toHaveBeenCalled();
+    });
+
+    it('onPageBlockDropZone inserts a library block and resets the active flag', () => {
+      c.pageBlocks['page.about'] = [];
+      const insertAt = spyOn(c, 'insertPageBlockAt').and.returnValue('k');
+      c.onPageBlockDropZone(blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'image', template: 'starter' }), 'page.about', 0);
+      expect(insertAt).toHaveBeenCalledWith('page.about', 'image', 0, 'starter');
+      expect(c.pageInsertDragActive).toBe(false);
+    });
+
+    it('onPageBlockDropZone ends the drag for a non-page payload', () => {
+      c.pageBlocks['page.about'] = [];
+      const end = spyOn(c, 'onPageBlockDragEnd');
+      c.onPageBlockDropZone(blockPayloadEvent({ kind: 'cms-block', scope: 'home', type: 'text' }), 'page.about', 0);
+      expect(end).toHaveBeenCalled();
+    });
+  });
+
+  describe('renameCustomPageUrl', () => {
+    beforeEach(() => {
+      c.pageBlocksKey = 'page.custom';
+    });
+
+    it('returns when the key cannot be renamed', () => {
+      c.pageBlocksKey = 'page.about';
+      c.renameCustomPageUrl();
+      expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+    });
+
+    it('returns when the prompt is cancelled', () => {
+      spyOn(window, 'prompt').and.returnValue(null);
+      c.renameCustomPageUrl();
+      expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unchanged or empty slug', () => {
+      spyOn(window, 'prompt').and.returnValue('custom');
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.rename');
+    });
+
+    it('rejects a reserved slug', () => {
+      spyOn(window, 'prompt').and.returnValue('about');
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.errors.reservedTitle', 'adminUi.site.pages.errors.reservedCopy');
+    });
+
+    it('returns when the change confirm is declined', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(false);
+      c.renameCustomPageUrl();
+      expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+    });
+
+    it('renames the page and creates a redirect when confirmed', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(true);
+      spyOn(c, 'loadContentPages');
+      spyOn(c, 'loadPageBlocks');
+      spyOn(c, 'loadContentRedirects');
+      h.admin.renameContentPage.and.returnValue(of({ new_key: 'page.renamed', old_key: 'page.custom' }));
+      h.admin.upsertContentRedirect.and.returnValue(of({}));
+      c.renameCustomPageUrl();
+      expect(c.pageBlocksKey).toBe('page.renamed');
+      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({ from_key: 'page.custom', to_key: 'page.renamed' });
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.created');
+    });
+
+    it('renames without a redirect when the redirect confirm is declined and tolerates redirect errors', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      const confirm = spyOn(window, 'confirm').and.returnValues(true, false);
+      spyOn(c, 'loadContentPages');
+      spyOn(c, 'loadPageBlocks');
+      h.admin.renameContentPage.and.returnValue(of({ new_key: 'page.renamed', old_key: 'page.custom' }));
+      c.renameCustomPageUrl();
+      expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
+      expect(confirm).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports a redirect creation error after a successful rename', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(true);
+      spyOn(c, 'loadContentPages');
+      spyOn(c, 'loadPageBlocks');
+      spyOn(c, 'loadContentRedirects');
+      h.admin.renameContentPage.and.returnValue(of({ new_key: 'page.renamed', old_key: 'page.custom' }));
+      h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'rdr' } })));
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('rdr');
+    });
+
+    it('reports a rename error detail and a default', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.renameContentPage.and.returnValue(throwError(() => ({ error: { detail: 'rn' } })));
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('rn');
+      c.pageBlocksKey = 'page.custom';
+      h.admin.renameContentPage.and.returnValue(throwError(() => ({})));
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.rename');
+    });
+  });
 });
