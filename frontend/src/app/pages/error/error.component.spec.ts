@@ -78,4 +78,20 @@ describe('ErrorComponent', () => {
     expect(() => component.ngOnDestroy()).not.toThrow();
   });
 
+  it('wires the Retry button action to onRetry', () => {
+    const { fixture, component } = configure({
+      get: () => of(socialData('help@momentstudio.ro')),
+    });
+    // Spy so the click does not trigger a real window.location.reload(), which
+    // would reload the Karma host page; this asserts the template (action) binding.
+    const onRetry = spyOn(component, 'onRetry');
+    fixture.detectChanges();
+
+    const retryButton = (fixture.nativeElement as HTMLElement).querySelector(
+      'app-button button',
+    ) as HTMLButtonElement;
+    retryButton.click();
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
 });
