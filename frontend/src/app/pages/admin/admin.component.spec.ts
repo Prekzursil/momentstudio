@@ -2231,4 +2231,227 @@ describe('AdminComponent', () => {
       expect(env.c.infoLang).toBe('ro');
     });
   });
+
+  describe('page builder', () => {
+    const allTypesMeta = {
+      blocks: [
+        { key: 'b_text', type: 'text', body_markdown: { en: 'Hi', ro: 'Salut' } },
+        { type: 'columns', columns: [{ title: 'A' }, { title: 'B' }, { title: 'C' }, { title: 'D' }], columns_breakpoint: 'lg' },
+        { type: 'cta', cta_url: '/go', cta_new_tab: 'yes' },
+        { type: 'faq', items: [{ question: 'Q' }] },
+        { type: 'testimonials', items: [{ author: 'Jo' }] },
+        { type: 'product_grid', source: 'products', product_slugs: 'a, b, b', limit: 100 },
+        { type: 'form', form_type: 'newsletter', topic: 'support' },
+        { type: 'image', url: 'i.png', link_url: '/l', focal_x: 10, focal_y: 90 },
+        { type: 'gallery', images: [{ url: 'g.png' }, { noturl: true }] },
+        { type: 'banner', slide: { image_url: 's.png' } },
+        { type: 'carousel', slides: [{ image_url: 'c.png' }], settings: { autoplay: true } },
+        { type: 'unknown-type' },
+        'not-an-object',
+        { type: 'text', key: 'b_text' },
+      ],
+    };
+
+    function pageWithAllBlocks(env: ReturnType<typeof build>) {
+      env.c.pageBlocks['page.about'] = (env.c as any).parsePageBlocksDraft(allTypesMeta);
+      return env.c.pageBlocks['page.about'];
+    }
+
+    it('parsePageBlocksDraft parses every block type', () => {
+      const env = build('pages');
+      const blocks = pageWithAllBlocks(env);
+      const types = blocks.map((b) => b.type);
+      expect(types).toEqual([
+        'text', 'columns', 'cta', 'faq', 'testimonials', 'product_grid',
+        'form', 'image', 'gallery', 'banner', 'carousel',
+      ]);
+      const grid = blocks.find((b) => b.type === 'product_grid')!;
+      expect(grid.product_grid_source).toBe('products');
+      expect(grid.product_grid_limit).toBe(24);
+      expect(grid.product_grid_product_slugs).toBe('a\nb');
+      expect(blocks.find((b) => b.type === 'cta')!.cta_new_tab).toBeTrue();
+      expect(blocks.find((b) => b.type === 'columns')!.columns.length).toBe(3);
+    });
+
+    it('parsePageBlocksDraft returns [] for empty/missing blocks', () => {
+      const env = build('pages');
+      expect((env.c as any).parsePageBlocksDraft(null)).toEqual([]);
+      expect((env.c as any).parsePageBlocksDraft({ blocks: [] })).toEqual([]);
+    });
+
+    it('loadPageBlocks hydrates from server meta', () => {
+      const env = build('pages');
+      env.admin.getContent.and.returnValue(of({
+        status: 'published', published_at: '2026-01-01T10:00:00Z', version: 1,
+        needs_translation_en: true, meta: { requires_auth: true, ...allTypesMeta },
+      }));
+      env.c.loadPageBlocks('page.about');
+      expect(env.c.pageBlocks['page.about'].length).toBe(11);
+      expect(env.c.pageBlocksStatus['page.about']).toBe('published');
+      expect(env.c.pageBlocksRequiresAuth['page.about']).toBeTrue();
+    });
+
+    it('loadPageBlocks treats 404 as an empty draft', () => {
+      const env = build('pages');
+      env.admin.getContent.and.returnValue(throwError(() => ({ status: 404 })));
+      env.c.loadPageBlocks('page.about');
+      expect(env.c.pageBlocks['page.about']).toEqual([]);
+      expect(env.c.pageBlocksStatus['page.about']).toBe('draft');
+    });
+
+    it('loadPageBlocks records a generic load error', () => {
+      const env = build('pages');
+      env.admin.getContent.and.returnValue(throwError(() => ({ status: 500 })));
+      env.c.loadPageBlocks('page.about');
+      expect(env.c.pageBlocksError['page.about']).toBe('adminUi.site.pages.builder.errors.load');
+    });
+
+    it('add/remove/move/toggle page blocks', () => {
+      const env = build('pages');
+      pageWithAllBlocks(env);
+      const before = env.c.pageBlocks['page.about'].length;
+      env.c.newPageBlockType = 'text';
+      env.c.addPageBlock('page.about');
+      expect(env.c.pageBlocks['page.about'].length).toBe(before + 1);
+      const lastKey = env.c.pageBlocks['page.about'].slice(-1)[0].key;
+      env.c.removePageBlock('page.about', lastKey);
+      expect(env.c.pageBlocks['page.about'].length).toBe(before);
+      env.c.togglePageBlockEnabled('page.about', 'b_text', { target: { checked: false } } as any);
+      expect(env.c.pageBlocks['page.about'].find((b) => b.key === 'b_text')!.enabled).toBeFalse();
+      expect(env.c.pageBlockLabel({ type: 'text' } as any)).toBe('text');
+      const firstKey = env.c.pageBlocks['page.about'][0].key;
+      env.c.movePageBlock('page.about', firstKey, 1);
+      expect(env.c.pageBlocks['page.about'][1].key).toBe(firstKey);
+      env.c.movePageBlock('page.about', 'ghost', 1);
+      env.c.movePageBlock('page.about', firstKey, 99);
+      env.c.setPageInsertDragActive(true);
+      expect(env.c.pageInsertDragActive).toBeTrue();
+    });
+
+    it('page block drag reorder via drop zone + drop target', () => {
+      const env = build('pages');
+      pageWithAllBlocks(env);
+      const keys = env.c.pageBlocks['page.about'].map((b) => b.key);
+      env.c.onPageBlockDragStart('page.about', keys[0]);
+      expect(env.c.draggingPageBlockKey).toBe(keys[0]);
+      const evt = { preventDefault: jasmine.createSpy('pd'), dataTransfer: null } as any;
+      env.c.onPageBlockDragOver(evt);
+      expect(evt.preventDefault).toHaveBeenCalled();
+      env.c.onPageBlockDropZone(evt, 'page.about', 2);
+      expect(env.c.pageBlocks['page.about'][1].key).toBe(keys[0]);
+      env.c.onPageBlockDragStart('page.about', keys[1]);
+      env.c.onPageBlockDrop(evt, 'page.about', keys[3]);
+      env.c.onPageBlockDragEnd();
+      expect(env.c.draggingPageBlockKey).toBeNull();
+    });
+
+    it('carousel slide manipulators', () => {
+      const env = build('pages');
+      pageWithAllBlocks(env);
+      const block = env.c.pageBlocks['page.about'].find((b) => b.type === 'carousel')!;
+      env.c.addPageCarouselSlide('page.about', block.key);
+      let cur = env.c.pageBlocks['page.about'].find((b) => b.type === 'carousel')!;
+      expect(cur.slides.length).toBe(2);
+      env.c.movePageCarouselSlide('page.about', block.key, 0, 1);
+      env.c.movePageCarouselSlide('page.about', block.key, 0, 99);
+      env.c.setPageCarouselSlideImage('page.about', block.key, 0, { url: 'new.png', focal_x: 1, focal_y: 2 } as any);
+      cur = env.c.pageBlocks['page.about'].find((b) => b.type === 'carousel')!;
+      expect(cur.slides[0].image_url).toBe('new.png');
+      env.c.removePageCarouselSlide('page.about', block.key, 0);
+      env.c.setPageBannerSlideImage('page.about', env.c.pageBlocks['page.about'].find((b) => b.type === 'banner')!.key, { url: 'b.png' } as any);
+    });
+
+    it('gallery + columns + faq + testimonial manipulators', () => {
+      const env = build('pages');
+      pageWithAllBlocks(env);
+      const gallery = env.c.pageBlocks['page.about'].find((b) => b.type === 'gallery')!;
+      env.c.addPageGalleryImage('page.about', gallery.key);
+      env.c.addPageGalleryImageFromAsset('page.about', gallery.key, { url: 'a.png', focal_x: 1, focal_y: 2 } as any);
+      let cur = env.c.pageBlocks['page.about'].find((b) => b.type === 'gallery')!;
+      expect(cur.images.length).toBeGreaterThanOrEqual(3);
+      env.c.removePageGalleryImage('page.about', gallery.key, 0);
+      env.c.setPageImageBlockUrl('page.about', env.c.pageBlocks['page.about'].find((b) => b.type === 'image')!.key, { url: 'x.png', focal_x: 5, focal_y: 6 } as any);
+
+      const columns = env.c.pageBlocks['page.about'].find((b) => b.type === 'columns')!;
+      env.c.addPageColumnsColumn('page.about', columns.key);
+      env.c.removePageColumnsColumn('page.about', columns.key, 0);
+
+      const faq = env.c.pageBlocks['page.about'].find((b) => b.type === 'faq')!;
+      env.c.addPageFaqItem('page.about', faq.key);
+      env.c.removePageFaqItem('page.about', faq.key, 0);
+
+      const test = env.c.pageBlocks['page.about'].find((b) => b.type === 'testimonials')!;
+      env.c.addPageTestimonial('page.about', test.key);
+      env.c.removePageTestimonial('page.about', test.key, 0);
+    });
+
+    it('product grid slug helpers', () => {
+      const env = build('pages');
+      const block = { product_grid_product_slugs: 'a\nb' };
+      expect(env.c.productGridSelectedSlugs(block)).toEqual(['a', 'b']);
+      env.c.addProductGridProductSlug(block, 'c');
+      expect(block.product_grid_product_slugs).toBe('a\nb\nc');
+      env.c.addProductGridProductSlug(block, 'c');
+      env.c.addProductGridProductSlug(block, '  ');
+      env.c.removeProductGridProductSlug(block, 'a');
+      expect(block.product_grid_product_slugs).toBe('b\nc');
+      env.c.removeProductGridProductSlug(block, '  ');
+    });
+
+    it('searchProductGridProducts queries + handles errors', () => {
+      const env = build('pages');
+      env.c.searchProductGridProducts('blk');
+      expect(env.c.productGridProductSearchLoading['blk']).toBeFalse();
+      env.c.productGridProductSearchQuery['blk'] = 'mug';
+      env.adminProducts.search.and.returnValue(of({ items: [{ slug: 'mug' }] }));
+      env.c.searchProductGridProducts('blk');
+      expect(env.c.productGridProductSearchResults['blk'].length).toBe(1);
+      env.adminProducts.search.and.returnValue(throwError(() => new Error('x')));
+      env.c.searchProductGridProducts('blk');
+      expect(env.c.productGridProductSearchError['blk']).toBe('adminUi.home.sections.errors.searchProducts');
+    });
+
+    it('queueProductGridProductSearch debounces + clears', () => {
+      jasmine.clock().install();
+      const env = build('pages');
+      env.c.productGridProductSearchQuery['blk'] = 'old';
+      env.c.queueProductGridProductSearch('blk', '');
+      expect(env.c.productGridProductSearchResults['blk']).toEqual([]);
+      env.adminProducts.search.and.returnValue(of({ items: [] }));
+      env.c.queueProductGridProductSearch('blk', 'mug');
+      jasmine.clock().tick(300);
+      expect(env.adminProducts.search).toHaveBeenCalled();
+      jasmine.clock().uninstall();
+    });
+
+    it('createCustomPage validates title + reserved slugs', () => {
+      const env = build('pages');
+      env.c.newCustomPageTitle = '';
+      env.c.createCustomPage();
+      expect(env.admin.createContent).not.toHaveBeenCalled();
+      env.c.newCustomPageTitle = 'About';
+      env.c.createCustomPage();
+      expect(env.toast.error).toHaveBeenCalled();
+    });
+
+    it('createCustomPage creates a unique custom page', () => {
+      const env = build('pages');
+      env.c.newCustomPageTitle = 'My New Page';
+      env.c.contentPages = [{ slug: 'my-new-page', key: 'page.my-new-page' }] as any;
+      env.admin.createContent.and.returnValue(of({ version: 1 }));
+      spyOn(env.c, 'loadContentPages').and.stub();
+      spyOn(env.c, 'loadPageBlocks').and.stub();
+      env.c.createCustomPage();
+      expect(env.admin.createContent).toHaveBeenCalled();
+      expect(env.c.creatingCustomPage).toBeFalse();
+    });
+
+    it('createCustomPage surfaces a server error', () => {
+      const env = build('pages');
+      env.c.newCustomPageTitle = 'Brand New';
+      env.admin.createContent.and.returnValue(throwError(() => ({ error: { detail: 'taken' } })));
+      env.c.createCustomPage();
+      expect(env.toast.error).toHaveBeenCalledWith('taken');
+    });
+  });
 });
