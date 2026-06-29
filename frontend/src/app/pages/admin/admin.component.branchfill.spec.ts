@@ -2156,4 +2156,380 @@ describe('AdminComponent — branch fill', () => {
       expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.rename');
     });
   });
+
+  describe('category management', () => {
+    function cat(over: Record<string, unknown> = {}): any {
+      return { id: 'id', slug: 'slug', name: 'name', sort_order: 0, parent_id: null, low_stock_threshold: null, tax_group_id: null, ...over };
+    }
+
+    it('categoryDescendantIds resolves nested children, ignoring cycles', () => {
+      c.categories = [
+        cat({ id: 'root', slug: 'root' }),
+        cat({ id: 'a', slug: 'a', parent_id: 'root' }),
+        cat({ id: 'b', slug: 'b', parent_id: 'root' }),
+        cat({ id: 'c', slug: 'c', parent_id: 'a' }),
+        cat({ id: 'self', slug: 'self', parent_id: 'self' }), // cycle entry
+      ];
+      const ids = c.categoryDescendantIds('root');
+      expect(ids.has('a')).toBe(true);
+      expect(ids.has('c')).toBe(true);
+      expect(ids.has('root')).toBe(false);
+    });
+
+    it('categoryParentLabel resolves none/found/missing parents', () => {
+      c.categories = [cat({ id: 'p', slug: 'p', name: 'Parent' }), cat({ id: 'child', slug: 'child', parent_id: 'p' })];
+      expect(c.categoryParentLabel(cat({ parent_id: null }))).toBe('adminUi.categories.parentNone');
+      expect(c.categoryParentLabel(cat({ parent_id: 'p' }))).toBe('Parent');
+      expect(c.categoryParentLabel(cat({ parent_id: 'gone' }))).toBe('adminUi.categories.parentNone');
+    });
+
+    it('categoryParentOptions excludes self and descendants and sorts by name', () => {
+      c.categories = [
+        cat({ id: 'root', slug: 'root', name: 'B' }),
+        cat({ id: 'child', slug: 'child', name: 'A', parent_id: 'root' }),
+        cat({ id: 'other', slug: 'other', name: undefined }),
+      ];
+      const opts = c.categoryParentOptions(cat({ id: 'root', slug: 'root' }));
+      expect(opts.map((o: any) => o.id)).not.toContain('root');
+      expect(opts.map((o: any) => o.id)).not.toContain('child');
+      expect(opts.map((o: any) => o.id)).toContain('other');
+    });
+
+    it('moveCategory ignores out-of-range moves and reorders/persists otherwise', () => {
+      c.categories = [cat({ slug: 'a', sort_order: 0 }), cat({ slug: 'b' /* missing sort_order */ }), cat({ slug: 'c', sort_order: 2 })];
+      c.moveCategory(cat({ slug: 'a' }), -1); // swapIndex < 0
+      c.moveCategory(cat({ slug: 'c', sort_order: 2 }), 1); // swapIndex >= length
+      c.moveCategory(cat({ slug: 'missing' }), 1); // index < 0
+      expect(h.admin.reorderCategories).not.toHaveBeenCalled();
+      h.admin.reorderCategories.and.returnValue(of([cat({ slug: 'b', sort_order: 0 }), cat({ slug: 'a', sort_order: 1 })]));
+      c.moveCategory(cat({ slug: 'a', sort_order: 0 }), 1);
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.categories.success.reorder');
+    });
+
+    it('moveCategory reports a reorder error', () => {
+      c.categories = [cat({ slug: 'a', sort_order: 0 }), cat({ slug: 'b', sort_order: 1 })];
+      h.admin.reorderCategories.and.returnValue(throwError(() => ({})));
+      c.moveCategory(cat({ slug: 'a', sort_order: 0 }), 1);
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.categories.errors.reorder');
+    });
+
+    it('onCategoryDrop ignores empty/identical drags and missing endpoints', () => {
+      c.categories = [cat({ slug: 'a', sort_order: 0 }), cat({ slug: 'b', sort_order: 1 })];
+      c.draggingSlug = null;
+      c.onCategoryDrop('a');
+      c.draggingSlug = 'a';
+      c.onCategoryDrop('a');
+      c.draggingSlug = 'ghost';
+      c.onCategoryDrop('b');
+      expect(h.admin.reorderCategories).not.toHaveBeenCalled();
+    });
+
+    it('onCategoryDrop reorders, persists and clears the dragging slug', () => {
+      c.categories = [cat({ slug: 'a', sort_order: 0 }), cat({ slug: 'b', sort_order: 1 }), cat({ slug: 'c', sort_order: 2 })];
+      h.admin.reorderCategories.and.returnValue(of([cat({ slug: 'b', sort_order: 0 })]));
+      c.draggingSlug = 'a';
+      c.onCategoryDrop('c');
+      expect(h.admin.reorderCategories).toHaveBeenCalled();
+      expect(c.draggingSlug).toBeNull();
+    });
+
+    it('onCategoryDrop reports a reorder error', () => {
+      c.categories = [cat({ slug: 'a', sort_order: 0 }), cat({ slug: 'b', sort_order: 1 })];
+      h.admin.reorderCategories.and.returnValue(throwError(() => ({})));
+      c.draggingSlug = 'a';
+      c.onCategoryDrop('b');
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.categories.errors.reorder');
+    });
+
+    it('updateCategoryLowStockThreshold validates, ignores no-ops, persists and reverts', () => {
+      const bad = cat({ slug: 's', low_stock_threshold: 5 });
+      c.updateCategoryLowStockThreshold(bad, '-3');
+      expect(bad.low_stock_threshold).toBe(5);
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.categories.errors.updateLowStockThreshold');
+
+      const same = cat({ slug: 's', low_stock_threshold: null });
+      c.updateCategoryLowStockThreshold(same, '   ');
+      expect(h.admin.updateCategory).not.toHaveBeenCalled();
+
+      const ok = cat({ slug: 's', low_stock_threshold: null });
+      h.admin.updateCategory.and.returnValue(of({ low_stock_threshold: 7 }));
+      c.updateCategoryLowStockThreshold(ok, '7');
+      expect(ok.low_stock_threshold).toBe(7);
+
+      const fail = cat({ slug: 's', low_stock_threshold: 1 });
+      h.admin.updateCategory.and.returnValue(throwError(() => ({})));
+      c.updateCategoryLowStockThreshold(fail, '9');
+      expect(fail.low_stock_threshold).toBe(1);
+    });
+
+    it('updateCategoryParent ignores no-ops, persists and reverts', () => {
+      const same = cat({ slug: 's', parent_id: null });
+      c.updateCategoryParent(same, '  ');
+      expect(h.admin.updateCategory).not.toHaveBeenCalled();
+
+      const ok = cat({ slug: 's', parent_id: null });
+      h.admin.updateCategory.and.returnValue(of({ parent_id: 'p2' }));
+      c.updateCategoryParent(ok, 'p1');
+      expect(ok.parent_id).toBe('p2');
+
+      const fail = cat({ slug: 's', parent_id: 'old' });
+      h.admin.updateCategory.and.returnValue(throwError(() => ({})));
+      c.updateCategoryParent(fail, 'new');
+      expect(fail.parent_id).toBe('old');
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.categories.errors.updateParent');
+    });
+
+    it('updateCategoryTaxGroup ignores no-ops, persists and reverts', () => {
+      const same = cat({ slug: 's', tax_group_id: null });
+      c.updateCategoryTaxGroup(same, '');
+      expect(h.admin.updateCategory).not.toHaveBeenCalled();
+
+      const ok = cat({ slug: 's', tax_group_id: null });
+      h.admin.updateCategory.and.returnValue(of({ tax_group_id: 'g2' }));
+      c.updateCategoryTaxGroup(ok, 'g1');
+      expect(ok.tax_group_id).toBe('g2');
+
+      const fail = cat({ slug: 's', tax_group_id: 'old' });
+      h.admin.updateCategory.and.returnValue(throwError(() => ({})));
+      c.updateCategoryTaxGroup(fail, 'new');
+      expect(fail.tax_group_id).toBe('old');
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.taxes.errors.categoryAssign');
+    });
+  });
+
+  describe('reports settings', () => {
+    it('loadReportsSettings parses string flags, list/recipients and last-run markers', () => {
+      h.admin.getContent.and.returnValue(
+        of({
+          meta: {
+            reports_weekly_enabled: 'yes',
+            reports_monthly_enabled: 'off',
+            reports_weekly_weekday: '3',
+            reports_weekly_hour_utc: '30',
+            reports_monthly_day: '50',
+            reports_recipients: ['a@b.com', '  ', 'c@d.com'],
+            reports_weekly_last_sent_period_end: '2026-01-01',
+            reports_weekly_last_error: 'werr',
+            reports_monthly_last_sent_period_end: '2026-02-01',
+            reports_monthly_last_error: 'merr',
+          },
+        }),
+      );
+      c.loadReportsSettings();
+      expect(c.reportsSettingsForm.weekly_enabled).toBe(true);
+      expect(c.reportsSettingsForm.monthly_enabled).toBe(false);
+      expect(c.reportsSettingsForm.weekly_weekday).toBe(3);
+      expect(c.reportsSettingsForm.weekly_hour_utc).toBe(23);
+      expect(c.reportsSettingsForm.monthly_day).toBe('28');
+      expect(c.reportsSettingsForm.recipients).toBe('a@b.com, c@d.com');
+      expect(c.reportsMonthlyLastSent).toBe('2026-02-01');
+      expect(c.reportsMonthlyLastError).toBe('merr');
+    });
+
+    it('loadReportsSettings parses a string recipient list and resets on error', () => {
+      h.admin.getContent.and.returnValue(of({ meta: { reports_recipients: 'a@b.com; c@d.com\ne@f.com' } }));
+      c.loadReportsSettings();
+      expect(c.reportsSettingsForm.recipients).toBe('a@b.com, c@d.com, e@f.com');
+
+      c.contentVersions['site.reports'] = { version: 1 };
+      h.admin.getContent.and.returnValue(throwError(() => ({})));
+      c.loadReportsSettings();
+      expect(c.contentVersions['site.reports']).toBeUndefined();
+      expect(c.reportsSettingsForm.recipients).toBe('');
+    });
+
+    it('saveReportsSettings normalises numbers, dedupes valid recipients and persists', () => {
+      c.reportsSettingsMeta = {};
+      c.reportsSettingsForm = { weekly_enabled: true, weekly_weekday: 0, weekly_hour_utc: 0, monthly_enabled: false, monthly_day: '', monthly_hour_utc: 0, recipients: 'a@b.com, a@b.com, bad, c@d.com' };
+      h.admin.updateContentBlock.and.returnValue(of({ meta: { reports_recipients: ['a@b.com', 'c@d.com'] } }));
+      c.saveReportsSettings();
+      const meta = h.admin.updateContentBlock.calls.mostRecent().args[1].meta;
+      expect(meta.reports_monthly_day).toBe(1);
+      expect(meta.reports_recipients).toEqual(['a@b.com', 'c@d.com']);
+      expect(meta.reports_top_products_limit).toBe(5);
+      expect(c.reportsSettingsMessage).toBe('adminUi.reports.success.save');
+    });
+
+    it('saveReportsSettings drops recipients when none are valid and keeps preset limits', () => {
+      c.reportsSettingsMeta = { reports_top_products_limit: 9, reports_low_stock_limit: 9, reports_retry_cooldown_minutes: 9 };
+      c.reportsSettingsForm = { weekly_enabled: false, weekly_weekday: 9, weekly_hour_utc: 9, monthly_enabled: true, monthly_day: '15', monthly_hour_utc: 9, recipients: 'not-an-email' };
+      h.admin.updateContentBlock.and.returnValue(of(null));
+      c.saveReportsSettings();
+      const meta = h.admin.updateContentBlock.calls.mostRecent().args[1].meta;
+      expect('reports_recipients' in meta).toBe(false);
+      expect(meta.reports_top_products_limit).toBe(9);
+    });
+
+    it('saveReportsSettings surfaces a conflict, then creates on a generic error', () => {
+      c.reportsSettingsMeta = {};
+      c.reportsSettingsForm = { weekly_enabled: false, weekly_weekday: 0, weekly_hour_utc: 8, monthly_enabled: false, monthly_day: '1', monthly_hour_utc: 8, recipients: '' };
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+      h.admin.getContent.and.returnValue(of({ meta: {} }));
+      c.saveReportsSettings();
+      expect(c.reportsSettingsError).toBe('adminUi.reports.errors.save');
+
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+      h.admin.createContent.and.returnValue(of({ meta: {} }));
+      c.saveReportsSettings();
+      expect(c.reportsSettingsMessage).toBe('adminUi.reports.success.save');
+
+      h.admin.createContent.and.returnValue(throwError(() => ({})));
+      c.saveReportsSettings();
+      expect(c.reportsSettingsError).toBe('adminUi.reports.errors.save');
+    });
+
+    it('sendReportNow guards re-entry and maps skipped/sent/error', () => {
+      c.reportsSending = true;
+      c.sendReportNow('weekly');
+      expect(h.admin.sendScheduledReport).not.toHaveBeenCalled();
+      c.reportsSending = false;
+      spyOn(c, 'loadReportsSettings');
+      h.admin.sendScheduledReport.and.returnValue(of({ skipped: true }));
+      c.sendReportNow('weekly');
+      expect(c.reportsSettingsMessage).toBe('adminUi.reports.success.skipped');
+      h.admin.sendScheduledReport.and.returnValue(of({ skipped: false }));
+      c.sendReportNow('monthly', true);
+      expect(c.reportsSettingsMessage).toBe('adminUi.reports.success.sent');
+      h.admin.sendScheduledReport.and.returnValue(throwError(() => ({})));
+      c.sendReportNow('weekly');
+      expect(c.reportsSettingsError).toBe('adminUi.reports.errors.send');
+    });
+  });
+
+  describe('company', () => {
+    const filled = { name: 'N', registration_number: 'R', cui: 'C', address: 'A', phone: 'P', email: 'E' };
+
+    it('loadCompany maps the nested company meta and resets on error', () => {
+      h.admin.getContent.and.returnValue(of({ meta: { company: { name: ' Acme ', email: 'x@y.z' } } }));
+      c.loadCompany();
+      expect(c.companyForm.name).toBe('Acme');
+      expect(c.companyForm.registration_number).toBe('');
+      c.contentVersions['site.company'] = { version: 1 };
+      h.admin.getContent.and.returnValue(throwError(() => ({})));
+      c.loadCompany();
+      expect(c.contentVersions['site.company']).toBeUndefined();
+      expect(c.companyForm.name).toBe('');
+    });
+
+    it('saveCompany blocks when required fields are missing', () => {
+      c.companyForm = { ...filled, name: '' };
+      c.saveCompany();
+      expect(c.companyError).toBe('adminUi.site.company.errors.required');
+      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+    });
+
+    it('saveCompany persists, then handles conflict and 404 create paths', () => {
+      c.companyForm = { ...filled };
+      h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
+      c.saveCompany();
+      expect(c.companyMessage).toBe('adminUi.site.company.success.save');
+
+      // The conflict reload calls loadCompany(); stub getContent so the form is preserved.
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+      h.admin.getContent.and.returnValue(of({ meta: { company: filled } }));
+      c.saveCompany();
+      expect(c.companyError).toBe('adminUi.site.company.errors.save');
+
+      c.companyForm = { ...filled };
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(of({ version: 3 }));
+      c.saveCompany();
+      expect(c.companyMessage).toBe('adminUi.site.company.success.save');
+
+      c.companyForm = { ...filled };
+      h.admin.createContent.and.returnValue(throwError(() => ({})));
+      c.saveCompany();
+      expect(c.companyError).toBe('adminUi.site.company.errors.save');
+    });
+  });
+
+  describe('social', () => {
+    it('parseSocialPages falls back for non-arrays and skips invalid entries', () => {
+      const fb = [{ label: 'd', url: 'u', thumbnail_url: '' }];
+      expect(c.parseSocialPages('not-array', fb)).toBe(fb);
+      const parsed = c.parseSocialPages([null, 5, { label: 1, url: 2, thumbnail_url: 3 }], fb);
+      expect(parsed.length).toBe(1);
+      expect(parsed[0]).toEqual({ label: '1', url: '2', thumbnail_url: '3' });
+    });
+
+    it('loadSocial merges contact info and parses page lists; ignores errors', () => {
+      c.socialForm = { phone: 'old', email: '', instagram_pages: [], facebook_pages: [] };
+      h.admin.getContent.and.returnValue(of({ meta: { contact: { email: 'm@e.co' }, instagram_pages: [{ url: 'ig' }] } }));
+      c.loadSocial();
+      expect(c.socialForm.phone).toBe('old');
+      expect(c.socialForm.email).toBe('m@e.co');
+      expect(c.socialForm.instagram_pages.length).toBe(1);
+      c.contentVersions['site.social'] = { version: 1 };
+      h.admin.getContent.and.returnValue(throwError(() => ({})));
+      c.loadSocial();
+      expect(c.contentVersions['site.social']).toBeUndefined();
+    });
+
+    it('fetchSocialThumbnail validates the url and applies/falls-back/errors', () => {
+      c.socialForm = { phone: '', email: '', instagram_pages: [{ label: '', url: '', thumbnail_url: '' }], facebook_pages: [] };
+      c.socialThumbErrors = {};
+      c.socialThumbLoading = {};
+      c.fetchSocialThumbnail('instagram', 0);
+      expect(c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.urlRequired');
+
+      c.socialForm.instagram_pages = [{ label: '', url: 'http://ig', thumbnail_url: '' }];
+      h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: ' /thumb ' }));
+      c.fetchSocialThumbnail('instagram', 0);
+      expect(c.socialForm.instagram_pages[0].thumbnail_url).toBe('/thumb');
+      expect(h.toast.success).toHaveBeenCalled();
+
+      h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '' }));
+      c.fetchSocialThumbnail('instagram', 0);
+      expect(c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.noThumbnail');
+
+      c.socialForm.facebook_pages = [{ label: '', url: 'http://fb', thumbnail_url: '' }];
+      h.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({ error: { detail: 'fd' } })));
+      c.fetchSocialThumbnail('facebook', 0);
+      expect(c.socialThumbErrors['facebook-0']).toBe('fd');
+      h.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({})));
+      c.fetchSocialThumbnail('facebook', 0);
+      expect(c.socialThumbErrors['facebook-0']).toBe('adminUi.site.social.errors.fetchFailed');
+    });
+  });
+
+  describe('onNavigationDrop', () => {
+    function link(id: string): any {
+      return { id, url: `/u/${id}`, label: { en: id, ro: id } };
+    }
+    beforeEach(() => {
+      c.navigationForm = {
+        header_links: [link('h1'), link('h2'), link('h3')],
+        footer_handcrafted_links: [link('f1'), link('f2')],
+        footer_legal_links: [link('l1'), link('l2')],
+      };
+    });
+
+    it('clears drag state for invalid drops', () => {
+      c.draggingNavList = null;
+      c.draggingNavId = 'h1';
+      c.onNavigationDrop('header', 'h2');
+      expect(c.draggingNavId).toBeNull();
+      c.draggingNavList = 'header';
+      c.draggingNavId = 'ghost';
+      c.onNavigationDrop('header', 'h2');
+      expect(c.navigationForm.header_links.map((l: any) => l.id)).toEqual(['h1', 'h2', 'h3']);
+    });
+
+    it('reorders within the header, handcrafted and legal lists', () => {
+      c.draggingNavList = 'header';
+      c.draggingNavId = 'h1';
+      c.onNavigationDrop('header', 'h3');
+      expect(c.navigationForm.header_links.map((l: any) => l.id)).toEqual(['h2', 'h3', 'h1']);
+
+      c.draggingNavList = 'footer_handcrafted';
+      c.draggingNavId = 'f2';
+      c.onNavigationDrop('footer_handcrafted', 'f1');
+      expect(c.navigationForm.footer_handcrafted_links.map((l: any) => l.id)).toEqual(['f2', 'f1']);
+
+      c.draggingNavList = 'footer_legal';
+      c.draggingNavId = 'l2';
+      c.onNavigationDrop('footer_legal', 'l1');
+      expect(c.navigationForm.footer_legal_links.map((l: any) => l.id)).toEqual(['l2', 'l1']);
+    });
+  });
 });
