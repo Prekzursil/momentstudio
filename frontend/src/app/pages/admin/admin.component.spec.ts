@@ -1726,4 +1726,166 @@ describe('AdminComponent', () => {
       expect(env.c.blogCreateSlug()).toBe('anta-test-post');
     });
   });
+
+  describe('value normalizers', () => {
+    it('safePageRecordKey rejects malformed/prototype keys', () => {
+      const env = build('pages');
+      const s = (k: string) => (env.c as any).safePageRecordKey(k);
+      expect(s('page.about')).toBe('page.about');
+      expect(s('not-a-page')).toBe('page.about');
+      expect(s('page.__proto__')).toBe('page.about');
+      expect(s('page.x.constructor')).toBe('page.about');
+    });
+
+    it('safeRecordKey falls back for unsafe keys', () => {
+      const env = build('pages');
+      const s = (k: string) => (env.c as any).safeRecordKey(k);
+      expect(s('site.assets')).toBe('site.assets');
+      expect(s('has space')).toBe('unknown');
+      expect(s('__proto__')).toBe('unknown');
+      expect(s('a.prototype')).toBe('unknown');
+    });
+
+    it('deleteRecordValue removes the safe key', () => {
+      const env = build('pages');
+      const rec: Record<string, unknown> = { 'site.assets': 1 };
+      (env.c as any).deleteRecordValue(rec, 'site.assets');
+      expect(rec['site.assets']).toBeUndefined();
+    });
+
+    it('toLocalizedText handles strings, objects, and junk', () => {
+      const env = build('pages');
+      const t = (v: unknown) => (env.c as any).toLocalizedText(v);
+      expect(t('  hi ')).toEqual({ en: 'hi', ro: 'hi' });
+      expect(t({ en: ' a ', ro: 5 })).toEqual({ en: 'a', ro: '' });
+      expect(t(null)).toEqual({ en: '', ro: '' });
+    });
+
+    it('toFocalValue clamps to 0..100', () => {
+      const env = build('pages');
+      const f = (v: unknown) => (env.c as any).toFocalValue(v);
+      expect(f('abc')).toBe(50);
+      expect(f(-10)).toBe(0);
+      expect(f(150)).toBe(100);
+      expect(f(33.4)).toBe(33);
+    });
+
+    it('toBooleanValue parses truthy/falsey/fallback', () => {
+      const env = build('pages');
+      const b = (v: unknown, fb?: boolean) => (env.c as any).toBooleanValue(v, fb);
+      expect(b(true)).toBeTrue();
+      expect(b(1)).toBeTrue();
+      expect(b('yes')).toBeTrue();
+      expect(b('off')).toBeFalse();
+      expect(b('maybe', true)).toBeTrue();
+    });
+
+    it('toCmsBlockLayout coerces known + unknown values', () => {
+      const env = build('pages');
+      const l = (v: unknown) => (env.c as any).toCmsBlockLayout(v);
+      expect(l({ spacing: 'md', background: 'accent', align: 'center', max_width: 'prose' }))
+        .toEqual({ spacing: 'md', background: 'accent', align: 'center', max_width: 'prose' });
+      expect(l({ spacing: 'huge', maxWidth: 'wide' }))
+        .toEqual({ spacing: 'none', background: 'none', align: 'left', max_width: 'wide' });
+      expect(l(null)).toEqual({ spacing: 'none', background: 'none', align: 'left', max_width: 'full' });
+    });
+
+    it('focalPosition builds a CSS position string', () => {
+      const env = build('pages');
+      expect(env.c.focalPosition(20, 80)).toBe('20% 80%');
+    });
+
+    it('toSlideDraft hydrates from a partial record', () => {
+      const env = build('home');
+      const draft = (env.c as any).toSlideDraft({ image: 'u.png', variant: 'full', size: 'S', text_style: 'light', focal_x: 10 });
+      expect(draft.image_url).toBe('u.png');
+      expect(draft.variant).toBe('full');
+      expect(draft.size).toBe('S');
+      expect(draft.text_style).toBe('light');
+      expect(draft.focal_x).toBe(10);
+      expect((env.c as any).toSlideDraft(null).variant).toBe('split');
+    });
+
+    it('toCarouselSettingsDraft applies defaults + overrides', () => {
+      const env = build('home');
+      const d = (env.c as any).toCarouselSettingsDraft({ autoplay: true, interval_ms: 3000, show_dots: false });
+      expect(d.autoplay).toBeTrue();
+      expect(d.interval_ms).toBe(3000);
+      expect(d.show_dots).toBeFalse();
+      expect(d.show_arrows).toBeTrue();
+      const def = (env.c as any).toCarouselSettingsDraft('bad');
+      expect(def.interval_ms).toBe(5000);
+    });
+
+    it('serializeSlideDraft trims + clamps', () => {
+      const env = build('home');
+      const slide = { ...(env.c as any).emptySlideDraft(), image_url: ' x ', cta_url: ' y ', focal_x: 200 };
+      const out = (env.c as any).serializeSlideDraft(slide);
+      expect(out['image_url']).toBe('x');
+      expect(out['cta_url']).toBe('y');
+      expect(out['focal_x']).toBe(100);
+    });
+
+    it('toPreviewSlide prefers active lang then falls back', () => {
+      const env = build('home');
+      const slide = { ...(env.c as any).emptySlideDraft(), headline: { en: 'Hello', ro: '' }, image_url: 'u' };
+      expect(env.c.toPreviewSlide(slide, 'ro').headline).toBe('Hello');
+      expect(env.c.toPreviewSlide(slide, 'en').headline).toBe('Hello');
+      expect(env.c.toPreviewSlides([slide], 'en').length).toBe(1);
+    });
+
+    it('normalizeHomeSectionId maps aliases', () => {
+      const env = build('home');
+      const n = (v: unknown) => (env.c as any).normalizeHomeSectionId(v);
+      expect(n('featured_products')).toBe('featured_products');
+      expect(n('collections')).toBe('featured_collections');
+      expect(n('Sales')).toBe('sale_products');
+      expect(n('new')).toBe('new_arrivals');
+      expect(n('recent')).toBe('recently_viewed');
+      expect(n('totally-unknown')).toBeNull();
+      expect(n(123)).toBeNull();
+      expect(n('  ')).toBeNull();
+    });
+
+    it('defaultHomeSections + ensureAllDefaultHomeBlocks fill gaps', () => {
+      const env = build('home');
+      expect((env.c as any).defaultHomeSections().length).toBe(7);
+      const filled = (env.c as any).ensureAllDefaultHomeBlocks([
+        (env.c as any).makeHomeBlockDraft('story', 'story', true),
+      ]);
+      const types = filled.map((b: any) => b.type);
+      expect(types).toContain('featured_products');
+      expect(types.filter((t: string) => t === 'story').length).toBe(1);
+    });
+
+    it('isCustomHomeBlock distinguishes custom vs section blocks', () => {
+      const env = build('home');
+      expect(env.c.isCustomHomeBlock({ type: 'text' } as any)).toBeTrue();
+      expect(env.c.isCustomHomeBlock({ type: 'story' } as any)).toBeFalse();
+    });
+
+    it('homeBlockLabel translates or falls back to type', () => {
+      const env = build('home');
+      expect(env.c.homeBlockLabel({ type: 'text' } as any)).toBe('text');
+      env.translate.instant = (k: string) => (k.endsWith('.cta') ? 'Call to action' : k);
+      expect(env.c.homeBlockLabel({ type: 'cta' } as any)).toBe('Call to action');
+    });
+
+    it('toggleHomeBlockEnabled + moveHomeBlock mutate immutably', () => {
+      const env = build('home');
+      env.c.homeBlocks = [
+        (env.c as any).makeHomeBlockDraft('a', 'text', true),
+        (env.c as any).makeHomeBlockDraft('b', 'cta', true),
+      ];
+      env.c.toggleHomeBlockEnabled(env.c.homeBlocks[0], { target: { checked: false } } as any);
+      expect(env.c.homeBlocks[0].enabled).toBeFalse();
+      env.c.moveHomeBlock('a', 1);
+      expect(env.c.homeBlocks.map((b) => b.key)).toEqual(['b', 'a']);
+      env.c.moveHomeBlock('ghost', 1);
+      env.c.moveHomeBlock('a', 5);
+      expect(env.c.homeBlocks.map((b) => b.key)).toEqual(['b', 'a']);
+      env.c.setHomeInsertDragActive(true);
+      expect(env.c.homeInsertDragActive).toBeTrue();
+    });
+  });
 });
