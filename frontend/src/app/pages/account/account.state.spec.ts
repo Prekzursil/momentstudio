@@ -144,7 +144,11 @@ describe('AccountState', () => {
   // isWebAuthnSupported() reads window.isSecureContext, window.PublicKeyCredential
   // and navigator.credentials. ES module exports cannot be spied on under esbuild,
   // so we steer the helper by shaping the real browser environment instead.
-  const savedEnv: { secure?: any; pkc?: any; credsDesc?: PropertyDescriptor } = {};
+  const savedEnv: {
+    secureDesc?: PropertyDescriptor;
+    pkc?: any;
+    credsDesc?: PropertyDescriptor;
+  } = {};
   function setWebAuthnSupport(supported: boolean): void {
     Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
     (window as any).PublicKeyCredential = supported ? function PublicKeyCredential() {} : undefined;
@@ -176,6 +180,12 @@ describe('AccountState', () => {
   beforeEach(() => {
     savedEnv.pkc = (window as any).PublicKeyCredential;
     savedEnv.credsDesc = Object.getOwnPropertyDescriptor(navigator, 'credentials');
+    // window.isSecureContext is a native read-only accessor on Chrome 149.
+    // setWebAuthnSupport() shadows it with an own data property, which strips the
+    // getter; capture the original descriptor so afterEach can restore it and
+    // not leak a getter-less property into later specs (e.g. webauthn.spec.ts,
+    // which relies on spyOnProperty(window, 'isSecureContext', 'get')).
+    savedEnv.secureDesc = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
     savedClipboardDesc = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     localStorage.removeItem('account.lastSection');
     routerEvents$ = new Subject<any>();
@@ -404,6 +414,11 @@ describe('AccountState', () => {
     (window as any).PublicKeyCredential = savedEnv.pkc;
     if (savedEnv.credsDesc) {
       Object.defineProperty(navigator, 'credentials', savedEnv.credsDesc);
+    }
+    if (savedEnv.secureDesc) {
+      Object.defineProperty(window, 'isSecureContext', savedEnv.secureDesc);
+    } else {
+      delete (window as { isSecureContext?: boolean }).isSecureContext;
     }
     if (savedClipboardDesc) {
       Object.defineProperty(navigator, 'clipboard', savedClipboardDesc);
