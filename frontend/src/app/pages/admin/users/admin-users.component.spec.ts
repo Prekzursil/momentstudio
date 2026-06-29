@@ -1,72 +1,54 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
-import { TranslateModule } from '@ngx-translate/core';
+import { TestBed } from '@angular/core/testing';
+import { TranslateService } from '@ngx-translate/core';
 import { of, throwError } from 'rxjs';
 
-import { AdminService } from '../../../core/admin.service';
+import {
+  AdminUserAliasesResponse,
+  AdminUserSession,
+  AdminService,
+} from '../../../core/admin.service';
 import { AdminCouponsV2Service } from '../../../core/admin-coupons-v2.service';
-import { AdminUsersService } from '../../../core/admin-users.service';
+import {
+  AdminUserListItem,
+  AdminUserProfileResponse,
+  AdminUsersService,
+} from '../../../core/admin-users.service';
 import { AuthService } from '../../../core/auth.service';
 import { AdminRecentService } from '../../../core/admin-recent.service';
-import { AdminFavoritesService } from '../../../core/admin-favorites.service';
+import { AdminFavoriteItem, AdminFavoritesService } from '../../../core/admin-favorites.service';
 import { ToastService } from '../../../core/toast.service';
-import { AdminOrdersService } from '../../../core/admin-orders.service';
-import { AdminSupportService } from '../../../core/admin-support.service';
-import { OpsService } from '../../../core/ops.service';
-import { signal } from '@angular/core';
-
 import { AdminUsersComponent } from './admin-users.component';
 
-const baseUser = () => ({
-  id: 'u1',
-  email: 'alice@example.com',
-  username: 'alice',
-  name: 'Alice',
-  name_tag: 1,
-  role: 'customer',
-  email_verified: false,
-  created_at: '2026-01-01T00:00:00Z',
-});
+function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem {
+  return {
+    id: 'u1',
+    email: 'user@example.com',
+    username: 'user',
+    name: 'User One',
+    name_tag: 1,
+    role: 'customer',
+    email_verified: false,
+    created_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
 
-const meta = () => ({ total_items: 1, total_pages: 1, page: 1, limit: 25 });
-
-const profileResponse = () =>
-  ({
+function makeProfile(): AdminUserProfileResponse {
+  return {
     user: {
-      ...baseUser(),
-      vip: true,
-      admin_note: 'note',
+      ...makeUser(),
+      vip: false,
+      admin_note: null,
       locked_until: null,
-      locked_reason: 'reason',
-      password_reset_required: true,
+      locked_reason: null,
+      password_reset_required: false,
     },
     addresses: [],
     orders: [],
     tickets: [],
     security_events: [],
-  }) as any;
-
-const aliasesResponse = () =>
-  ({
-    user: { id: 'u1', email: 'alice@example.com', username: 'alice', role: 'customer' },
-    usernames: [],
-    display_names: [],
-  }) as any;
-
-const sessionItem = () =>
-  ({
-    id: 's1',
-    created_at: '2026-01-01T00:00:00Z',
-    expires_at: '2026-02-01T00:00:00Z',
-    persistent: true,
-    is_current: false,
-    user_agent: 'Mozilla/5.0',
-    ip_address: '1.2.3.4',
-    country_code: 'RO',
-  }) as any;
-
-const promotion = () =>
-  ({ id: 'p1', name: 'Promo', discount_type: 'percentage', is_active: true }) as any;
+  };
+}
 
 describe('AdminUsersComponent', () => {
   let usersApi: jasmine.SpyObj<AdminUsersService>;
@@ -75,16 +57,15 @@ describe('AdminUsersComponent', () => {
   let auth: jasmine.SpyObj<AuthService>;
   let recent: jasmine.SpyObj<AdminRecentService>;
   let toast: jasmine.SpyObj<ToastService>;
-  let favItems: ReturnType<typeof signal<any[]>>;
-  let favLoading: ReturnType<typeof signal<boolean>>;
+  let translate: jasmine.SpyObj<TranslateService>;
   let favorites: jasmine.SpyObj<AdminFavoritesService>;
-  let role: string;
+  let favItems: AdminFavoriteItem[];
 
-  beforeEach(async () => {
-    role = 'admin';
-    favItems = signal<any[]>([]);
-    favLoading = signal<boolean>(false);
+  function build(): AdminUsersComponent {
+    return TestBed.inject(AdminUsersComponent);
+  }
 
+  beforeEach(() => {
     usersApi = jasmine.createSpyObj<AdminUsersService>('AdminUsersService', [
       'search',
       'getProfile',
@@ -102,11 +83,11 @@ describe('AdminUsersComponent', () => {
       'issueCouponToUser',
     ]);
     admin = jasmine.createSpyObj<AdminService>('AdminService', [
-      'updateUserRole',
-      'revokeSessions',
-      'revokeSession',
       'userAliases',
+      'revokeSessions',
       'listUserSessions',
+      'revokeSession',
+      'updateUserRole',
     ]);
     auth = jasmine.createSpyObj<AuthService>('AuthService', [
       'user',
@@ -116,1079 +97,1598 @@ describe('AdminUsersComponent', () => {
     ]);
     recent = jasmine.createSpyObj<AdminRecentService>('AdminRecentService', ['add']);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['success', 'error']);
-    favorites = jasmine.createSpyObj<AdminFavoritesService>(
-      'AdminFavoritesService',
-      ['init', 'isFavorite', 'add', 'remove'],
-      { items: favItems, loading: favLoading },
-    );
+    translate = jasmine.createSpyObj<TranslateService>('TranslateService', ['instant']);
+    favorites = jasmine.createSpyObj<AdminFavoritesService>('AdminFavoritesService', [
+      'init',
+      'items',
+      'isFavorite',
+      'add',
+      'remove',
+      'loading',
+    ]);
 
-    // Default happy-path returns.
-    usersApi.search.and.returnValue(of({ items: [baseUser()], meta: meta() }) as any);
-    usersApi.getProfile.and.returnValue(of(profileResponse()));
-    usersApi.updateInternal.and.returnValue(of({ vip: true, admin_note: 'note' } as any));
-    usersApi.impersonate.and.returnValue(of({ access_token: 'tok' } as any));
-    usersApi.updateSecurity.and.returnValue(
-      of({ locked_reason: 'r', password_reset_required: true } as any),
-    );
-    usersApi.getEmailVerificationHistory.and.returnValue(of({ tokens: [] } as any));
-    usersApi.resendEmailVerification.and.returnValue(of({ detail: 'ok' } as any));
-    usersApi.resendPasswordReset.and.returnValue(of({ detail: 'ok' } as any));
-    usersApi.overrideEmailVerification.and.returnValue(of({ email_verified: true } as any));
-    usersApi.executeGdprDeletion.and.returnValue(of(undefined as any));
+    favItems = [];
+    (favorites.items as unknown as jasmine.Spy).and.callFake(() => favItems);
+    (favorites.loading as unknown as jasmine.Spy).and.returnValue(false);
+    favorites.isFavorite.and.returnValue(false);
 
-    couponsApi.listPromotions.and.returnValue(of([promotion()]));
-    couponsApi.issueCouponToUser.and.returnValue(of({ code: 'CODE123' } as any));
+    translate.instant.and.callFake((key: string | string[]) => key as string);
 
-    admin.updateUserRole.and.returnValue(of({ role: 'support' } as any));
-    admin.revokeSessions.and.returnValue(of(undefined as any));
-    admin.revokeSession.and.returnValue(of(undefined as any));
-    admin.userAliases.and.returnValue(of(aliasesResponse()));
-    admin.listUserSessions.and.returnValue(of([sessionItem()]));
-
-    auth.user.and.returnValue({ id: 'admin-1', role: 'admin' } as any);
-    auth.role.and.callFake(() => role);
+    auth.user.and.returnValue({ id: 'admin-1' } as any);
+    auth.role.and.returnValue('owner');
     auth.isAdmin.and.returnValue(true);
     auth.canAccessAdminSection.and.returnValue(true);
 
-    // Timeline child dependencies (rendered when a user is selected).
-    const orders = jasmine.createSpyObj<AdminOrdersService>('AdminOrdersService', ['search']);
-    orders.search.and.returnValue(of({ items: [], meta: meta() }) as any);
-    const support = jasmine.createSpyObj<AdminSupportService>('AdminSupportService', ['list']);
-    support.list.and.returnValue(of({ items: [], meta: meta() }) as any);
-    const ops = jasmine.createSpyObj<OpsService>('OpsService', ['listEmailEvents']);
-    ops.listEmailEvents.and.returnValue(of([]) as any);
+    // Sensible default responses so subscribe() chains resolve.
+    usersApi.search.and.returnValue(of({ items: [], meta: null } as any));
+    usersApi.getProfile.and.returnValue(of(makeProfile()));
+    usersApi.updateInternal.and.returnValue(of({} as any));
+    usersApi.impersonate.and.returnValue(of({ access_token: 'tok' } as any));
+    usersApi.updateSecurity.and.returnValue(of({} as any));
+    usersApi.getEmailVerificationHistory.and.returnValue(of({ items: [] } as any));
+    usersApi.resendEmailVerification.and.returnValue(of({ detail: 'ok' }));
+    usersApi.resendPasswordReset.and.returnValue(of({ detail: 'ok' }));
+    usersApi.overrideEmailVerification.and.returnValue(of({} as any));
+    usersApi.executeGdprDeletion.and.returnValue(of(undefined));
 
-    await TestBed.configureTestingModule({
-      imports: [RouterTestingModule, TranslateModule.forRoot(), AdminUsersComponent],
+    couponsApi.listPromotions.and.returnValue(of([]));
+    couponsApi.issueCouponToUser.and.returnValue(of({ code: 'CODE-1' } as any));
+
+    admin.userAliases.and.returnValue(of({} as AdminUserAliasesResponse));
+    admin.revokeSessions.and.returnValue(of(undefined));
+    admin.listUserSessions.and.returnValue(of([] as AdminUserSession[]));
+    admin.revokeSession.and.returnValue(of(undefined));
+    admin.updateUserRole.and.returnValue(of({ role: 'admin' } as any));
+
+    TestBed.configureTestingModule({
       providers: [
+        AdminUsersComponent,
         { provide: AdminUsersService, useValue: usersApi },
         { provide: AdminCouponsV2Service, useValue: couponsApi },
         { provide: AdminService, useValue: admin },
         { provide: AuthService, useValue: auth },
         { provide: AdminRecentService, useValue: recent },
         { provide: ToastService, useValue: toast },
+        { provide: TranslateService, useValue: translate },
         { provide: AdminFavoritesService, useValue: favorites },
-        { provide: AdminOrdersService, useValue: orders },
-        { provide: AdminSupportService, useValue: support },
-        { provide: OpsService, useValue: ops },
       ],
-    }).compileComponents();
-  });
-
-  function build(): { fixture: ComponentFixture<AdminUsersComponent>; cmp: AdminUsersComponent } {
-    const fixture = TestBed.createComponent(AdminUsersComponent);
-    const cmp = fixture.componentInstance;
-    return { fixture, cmp };
-  }
-
-  function created(): AdminUsersComponent {
-    const { fixture, cmp } = build();
-    fixture.detectChanges();
-    return cmp;
-  }
-
-  it('initializes, loads users and renders the table', () => {
-    const { fixture, cmp } = build();
-    fixture.detectChanges();
-    expect(favorites.init).toHaveBeenCalled();
-    expect(usersApi.search).toHaveBeenCalled();
-    expect(cmp.users().length).toBe(1);
-    expect(cmp.loading()).toBeFalse();
-    const text = (fixture.nativeElement.textContent || '').replace(/\s+/g, ' ');
-    expect(text).toContain('adminUi.users.title');
-  });
-
-  it('applies prefill search + auto-select matching by email from history state', () => {
-    spyOnProperty(history, 'state', 'get').and.returnValue({
-      prefillUserSearch: '  alice@example.com  ',
-      autoSelectFirst: true,
     });
-    const cmp = created();
-    expect(cmp.q).toBe('alice@example.com');
-    expect(cmp.selectedUser()?.id).toBe('u1');
   });
 
-  it('auto-selects by id, then username, then falls back to first item', () => {
-    const cmp = created();
-
-    (cmp as any).autoSelectAfterLoad = true;
-    (cmp as any).pendingPrefillSearch = 'u1';
-    cmp.retryLoad();
-    expect(cmp.selectedUser()?.id).toBe('u1');
-
-    cmp.selectedUser.set(null);
-    (cmp as any).autoSelectAfterLoad = true;
-    (cmp as any).pendingPrefillSearch = 'alice';
-    cmp.retryLoad();
-    expect(cmp.selectedUser()?.username).toBe('alice');
-
-    cmp.selectedUser.set(null);
-    (cmp as any).autoSelectAfterLoad = true;
-    (cmp as any).pendingPrefillSearch = 'nomatch';
-    cmp.retryLoad();
-    expect(cmp.selectedUser()?.id).toBe('u1');
+  it('creates', () => {
+    expect(build()).toBeTruthy();
   });
 
-  it('refreshes the currently-selected user after a reload', () => {
-    const cmp = created();
-    cmp.selectedUser.set(baseUser() as any);
-    usersApi.search.and.returnValue(
-      of({ items: [{ ...baseUser(), role: 'support' }], meta: meta() }) as any,
-    );
-    cmp.retryLoad();
-    expect(cmp.selectedUser()?.role).toBe('support');
-  });
-
-  it('handles empty meta and ignores auto-select with no items', () => {
-    usersApi.search.and.returnValue(of({ items: [], meta: null } as any));
-    const cmp = created();
-    expect(cmp.meta()).toBeNull();
-    expect(cmp.users().length).toBe(0);
-  });
-
-  it('retries without PII on a 403 and surfaces a generic load error otherwise', () => {
-    const cmp = created();
-
-    cmp.piiReveal.set(true);
-    let first = true;
-    usersApi.search.and.callFake(() => {
-      if (first) {
-        first = false;
-        return throwError(() => ({ status: 403 })) as any;
-      }
-      return of({ items: [baseUser()], meta: meta() }) as any;
+  describe('ngOnInit', () => {
+    let originalState: any;
+    beforeEach(() => {
+      originalState = history.state;
     });
-    cmp.retryLoad();
-    expect(cmp.piiReveal()).toBeFalse();
-    expect(toast.error).toHaveBeenCalled();
+    afterEach(() => {
+      history.replaceState(originalState, '');
+    });
 
-    usersApi.search.and.returnValue(throwError(() => ({ status: 500 })) as any);
-    cmp.retryLoad();
-    expect(cmp.error()).toBeTruthy();
-    expect(cmp.loading()).toBeFalse();
-  });
+    it('initializes and loads with no special state', () => {
+      history.replaceState({}, '');
+      const c = build();
+      c.ngOnInit();
+      expect(favorites.init).toHaveBeenCalled();
+      expect(usersApi.search).toHaveBeenCalled();
+      expect(c.loading()).toBeFalse();
+    });
 
-  it('toggles layout modal, density and applies a table layout', () => {
-    const cmp = created();
-    cmp.openLayoutModal();
-    expect(cmp.layoutModalOpen()).toBeTrue();
-    cmp.closeLayoutModal();
-    expect(cmp.layoutModalOpen()).toBeFalse();
+    it('applies a prefill search from history state', () => {
+      history.replaceState({ prefillUserSearch: '  alice  ', autoSelectFirst: true }, '');
+      const c = build();
+      c.ngOnInit();
+      expect(c.q).toBe('alice');
+      expect(c.page).toBe(1);
+    });
 
-    const before = cmp.tableLayout().density;
-    cmp.toggleDensity();
-    expect(cmp.tableLayout().density).not.toBe(before);
-    expect(cmp.densityToggleLabelKey()).toContain('densityToggle');
-    cmp.toggleDensity();
-    expect(cmp.densityToggleLabelKey()).toContain('densityToggle');
+    it('ignores blank prefill search', () => {
+      history.replaceState({ prefillUserSearch: '   ', autoSelectFirst: false }, '');
+      const c = build();
+      c.ngOnInit();
+      expect(c.q).toBe('');
+    });
 
-    expect(cmp.visibleColumnIds().length).toBeGreaterThan(0);
-    expect(cmp.trackColumnId(0, 'identity')).toBe('identity');
-    expect(cmp.cellPaddingClass()).toBeTruthy();
-  });
+    it('handles non-string prefill search', () => {
+      history.replaceState({ prefillUserSearch: 42 }, '');
+      const c = build();
+      c.ngOnInit();
+      expect(c.q).toBe('');
+    });
 
-  it('uses an anonymous storage key when the auth user has no id', () => {
-    auth.user.and.returnValue(null as any);
-    const cmp = created();
-    cmp.applyTableLayout(cmp.tableLayout());
-    expect(cmp.tableLayout()).toBeTruthy();
-  });
-
-  it('applies and resets filters', () => {
-    const cmp = created();
-    cmp.q = 'x';
-    cmp.role = 'admin';
-    cmp.selectedSavedViewKey = 'k';
-    cmp.applyFilters();
-    expect(cmp.page).toBe(1);
-    expect(cmp.selectedSavedViewKey).toBe('');
-
-    cmp.q = 'y';
-    cmp.role = 'support';
-    cmp.resetFilters();
-    expect(cmp.q).toBe('');
-    expect(cmp.role).toBe('all');
-  });
-
-  it('lists saved views scoped to users and applies one (with and without limit)', () => {
-    const cmp = created();
-    favItems.set([
-      {
-        key: 'v1',
-        type: 'filter',
-        label: 'View 1',
-        state: {
+    it('applies saved-view filters from state and skips prefill', () => {
+      history.replaceState(
+        {
           adminFilterScope: 'users',
-          adminFilters: { q: 'bob', role: 'support', limit: 50 },
+          adminFilters: { q: 'bob', role: 'admin', limit: 50 },
+          prefillUserSearch: 'ignored',
         },
-      },
-      { key: 'other', type: 'filter', state: { adminFilterScope: 'orders' } },
-    ] as any);
-
-    expect(cmp.savedViews().length).toBe(1);
-
-    cmp.applySavedView('');
-    expect(cmp.selectedSavedViewKey).toBe('');
-
-    cmp.applySavedView('v1');
-    expect(cmp.q).toBe('bob');
-    expect(cmp.role).toBe('support');
-    expect(cmp.limit).toBe(50);
-
-    // View with non-numeric limit keeps existing limit.
-    favItems.set([
-      {
-        key: 'v2',
-        type: 'filter',
-        label: 'View 2',
-        state: { adminFilterScope: 'users', adminFilters: { q: 'c', limit: 'bad' } },
-      },
-    ] as any);
-    cmp.limit = 25;
-    cmp.applySavedView('v2');
-    expect(cmp.limit).toBe(25);
-    expect(cmp.role).toBe('all');
-  });
-
-  it('ignores saved views that are missing or have invalid filters', () => {
-    const cmp = created();
-    cmp.applySavedView('missing');
-    expect(cmp.selectedSavedViewKey).toBe('missing');
-
-    favItems.set([
-      { key: 'bad', type: 'filter', label: 'Bad', state: { adminFilterScope: 'users' } },
-    ] as any);
-    cmp.q = 'keep';
-    cmp.applySavedView('bad');
-    expect(cmp.q).toBe('keep');
-  });
-
-  it('pins and unpins the current view', () => {
-    const cmp = created();
-
-    // Unpin path: already a favorite, and it is the selected key.
-    favorites.isFavorite.and.returnValue(true);
-    cmp.selectedSavedViewKey = (cmp as any).currentViewFavoriteKey();
-    cmp.toggleCurrentViewPin();
-    expect(favorites.remove).toHaveBeenCalled();
-    expect(cmp.selectedSavedViewKey).toBe('');
-
-    // Pin path with a name.
-    favorites.isFavorite.and.returnValue(false);
-    spyOn(window, 'prompt').and.returnValue('My View');
-    cmp.toggleCurrentViewPin();
-    expect(favorites.add).toHaveBeenCalled();
-    expect(cmp.isCurrentViewPinned()).toBeFalse();
-  });
-
-  it('shows an error when pinning without a name', () => {
-    const cmp = created();
-    favorites.isFavorite.and.returnValue(false);
-    spyOn(window, 'prompt').and.returnValue('   ');
-    cmp.toggleCurrentViewPin();
-    expect(toast.error).toHaveBeenCalled();
-    expect(favorites.add).not.toHaveBeenCalled();
-  });
-
-  it('applies filters from navigation state with a valid scope', () => {
-    spyOnProperty(history, 'state', 'get').and.returnValue({
-      adminFilterScope: 'users',
-      adminFilters: { q: 'fromstate', role: 'admin', limit: 10 },
+        '',
+      );
+      const c = build();
+      c.ngOnInit();
+      expect(c.q).toBe('bob');
+      expect(c.role).toBe('admin');
+      expect(c.limit).toBe(50);
     });
-    const cmp = created();
-    expect(cmp.q).toBe('fromstate');
-    expect(cmp.role).toBe('admin');
-    expect(cmp.limit).toBe(10);
   });
 
-  it('paginates and tracks rows', () => {
-    const cmp = created();
-    cmp.goToPage(3);
-    expect(cmp.page).toBe(3);
-    expect(cmp.trackUserId(0, baseUser() as any)).toBe('u1');
-  });
-
-  it('selects a user (with and without email) and records recents', () => {
-    const cmp = created();
-    cmp.select(baseUser() as any);
-    expect(cmp.selectedUser()?.id).toBe('u1');
-    expect(recent.add).toHaveBeenCalled();
-    expect(admin.userAliases).toHaveBeenCalled();
-    expect(usersApi.getProfile).toHaveBeenCalled();
-    expect(admin.listUserSessions).toHaveBeenCalled();
-
-    recent.add.calls.reset();
-    cmp.select({ ...baseUser(), email: '' } as any);
-    const arg = recent.add.calls.mostRecent().args[0] as any;
-    expect(arg.state).toBeNull();
-  });
-
-  it('opens the role-change modal only when valid', () => {
-    const cmp = created();
-    cmp.updateRole();
-    expect(cmp.roleChangeOpen()).toBeFalse();
-
-    cmp.selectedUser.set({ ...baseUser(), role: 'owner' } as any);
-    cmp.updateRole();
-    expect(cmp.roleChangeOpen()).toBeFalse();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.selectedRole = 'customer';
-    cmp.updateRole();
-    expect(cmp.roleChangeOpen()).toBeFalse();
-
-    cmp.selectedRole = 'support';
-    cmp.updateRole();
-    expect(cmp.roleChangeOpen()).toBeTrue();
-    cmp.closeRoleChange();
-    expect(cmp.roleChangeOpen()).toBeFalse();
-  });
-
-  it('confirms a role change, requires a password, and handles success/failure', () => {
-    const cmp = created();
-    cmp.confirmRoleChange();
-
-    cmp.selectedUser.set({ ...baseUser(), role: 'owner' } as any);
-    cmp.confirmRoleChange();
-
-    // role unchanged -> closes
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.selectedRole = 'customer';
-    cmp.roleChangeOpen.set(true);
-    cmp.confirmRoleChange();
-    expect(cmp.roleChangeOpen()).toBeFalse();
-
-    // missing password
-    cmp.selectedRole = 'support';
-    cmp.roleChangePassword = '  ';
-    cmp.confirmRoleChange();
-    expect(cmp.roleChangeError()).toBeTruthy();
-
-    // success path updates lists + profile
-    cmp.users.set([baseUser() as any]);
-    cmp.profile.set(profileResponse());
-    cmp.roleChangePassword = 'pw';
-    cmp.confirmRoleChange();
-    expect(admin.updateUserRole).toHaveBeenCalled();
-    expect(cmp.selectedUser()?.role).toBe('support');
-    expect(toast.success).toHaveBeenCalled();
-
-    // success path without profile
-    cmp.profile.set(null);
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.selectedRole = 'support';
-    cmp.roleChangePassword = 'pw';
-    cmp.confirmRoleChange();
-
-    // error path
-    admin.updateUserRole.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })) as any);
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.selectedRole = 'admin';
-    cmp.roleChangePassword = 'pw';
-    cmp.confirmRoleChange();
-    expect(cmp.roleChangeError()).toBe('boom');
-    expect(cmp.roleChangeBusy()).toBeFalse();
-
-    // error path with fallback message
-    admin.updateUserRole.and.returnValue(throwError(() => ({})) as any);
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.selectedRole = 'admin';
-    cmp.roleChangePassword = 'pw';
-    cmp.confirmRoleChange();
-    expect(cmp.roleChangeError()).toBeTruthy();
-  });
-
-  it('opens/closes the delete-user modal only when valid', () => {
-    const cmp = created();
-    cmp.openDeleteUser();
-    expect(cmp.deleteUserOpen()).toBeFalse();
-
-    cmp.selectedUser.set({ ...baseUser(), role: 'owner' } as any);
-    cmp.openDeleteUser();
-    expect(cmp.deleteUserOpen()).toBeFalse();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.openDeleteUser();
-    expect(cmp.deleteUserOpen()).toBeTrue();
-    cmp.closeDeleteUser();
-    expect(cmp.deleteUserOpen()).toBeFalse();
-  });
-
-  it('confirms user deletion with validation and success/error handling', () => {
-    const cmp = created();
-    cmp.confirmDeleteUser();
-
-    cmp.selectedUser.set({ ...baseUser(), role: 'owner' } as any);
-    cmp.confirmDeleteUser();
-
-    // wrong confirm word
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.deleteUserConfirm = 'nope';
-    cmp.confirmDeleteUser();
-    expect(cmp.deleteUserError()).toBeTruthy();
-
-    // missing password
-    cmp.deleteUserConfirm = 'delete';
-    cmp.deleteUserPassword = '   ';
-    cmp.confirmDeleteUser();
-    expect(cmp.deleteUserError()).toBeTruthy();
-
-    // success
-    cmp.deleteUserPassword = 'pw';
-    cmp.confirmDeleteUser();
-    expect(usersApi.executeGdprDeletion).toHaveBeenCalled();
-    expect(cmp.selectedUser()).toBeNull();
-
-    // error with detail
-    usersApi.executeGdprDeletion.and.returnValue(
-      throwError(() => ({ error: { detail: 'cannot' } })) as any,
-    );
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.deleteUserConfirm = 'DELETE';
-    cmp.deleteUserPassword = 'pw';
-    cmp.confirmDeleteUser();
-    expect(cmp.deleteUserError()).toBe('cannot');
-
-    // error fallback
-    usersApi.executeGdprDeletion.and.returnValue(throwError(() => ({})) as any);
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.deleteUserConfirm = 'DELETE';
-    cmp.deleteUserPassword = 'pw';
-    cmp.confirmDeleteUser();
-    expect(cmp.deleteUserBusy()).toBeFalse();
-  });
-
-  it('force logs out all sessions (success and error)', () => {
-    const cmp = created();
-    cmp.forceLogout();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.forceLogout();
-    expect(cmp.sessions()).toEqual([]);
-
-    admin.revokeSessions.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.forceLogout();
-    expect(toast.error).toHaveBeenCalled();
-  });
-
-  it('refreshes sessions only when a user is selected', () => {
-    const cmp = created();
-    admin.listUserSessions.calls.reset();
-    cmp.refreshSessions();
-    expect(admin.listUserSessions).not.toHaveBeenCalled();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.refreshSessions();
-    expect(admin.listUserSessions).toHaveBeenCalledWith('u1');
-  });
-
-  it('revokes a single session (success with/without list, and error)', () => {
-    const cmp = created();
-    cmp.revokeOneSession('s1');
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.sessions.set([sessionItem(), { ...sessionItem(), id: 's2' }]);
-    cmp.revokeOneSession('s1');
-    expect(cmp.sessions()?.length).toBe(1);
-    expect(cmp.revokingSessionId()).toBeNull();
-
-    cmp.sessions.set(null);
-    cmp.revokeOneSession('s2');
-    expect(cmp.sessions()).toBeNull();
-
-    admin.revokeSession.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.revokeOneSession('s3');
-    expect(toast.error).toHaveBeenCalled();
-    expect(cmp.revokingSessionId()).toBeNull();
-  });
-
-  it('saves internal fields (success with/without profile, and error)', () => {
-    const cmp = created();
-    cmp.saveInternal();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.profile.set(profileResponse());
-    cmp.vip = false;
-    cmp.adminNote = ' x ';
-    cmp.saveInternal();
-    expect(usersApi.updateInternal).toHaveBeenCalled();
-    expect(cmp.vip).toBeTrue();
-
-    cmp.profile.set(null);
-    cmp.adminNote = '';
-    cmp.saveInternal();
-
-    usersApi.updateInternal.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.saveInternal();
-    expect(cmp.internalBusy()).toBeFalse();
-  });
-
-  it('reports lock state from the loaded profile', () => {
-    const cmp = created();
-    expect(cmp.isLocked()).toBeFalse();
-
-    cmp.profile.set({
-      ...profileResponse(),
-      user: { ...profileResponse().user, locked_until: '2999-01-01T00:00:00Z' },
+  describe('maybeApplyFiltersFromState branches (via ngOnInit)', () => {
+    let originalState: any;
+    beforeEach(() => {
+      originalState = history.state;
     });
-    expect(cmp.isLocked()).toBeTrue();
-
-    cmp.profile.set({
-      ...profileResponse(),
-      user: { ...profileResponse().user, locked_until: '2000-01-01T00:00:00Z' },
+    afterEach(() => {
+      history.replaceState(originalState, '');
     });
-    expect(cmp.isLocked()).toBeFalse();
-  });
 
-  it('exposes role-based capability flags', () => {
-    const cmp = created();
-    expect(cmp.canManageRoles()).toBeTrue();
-    expect(cmp.canIssueCoupons()).toBeTrue();
-
-    role = 'owner';
-    expect(cmp.isOwner()).toBeTrue();
-    role = 'support';
-    expect(cmp.isOwner()).toBeFalse();
-    auth.role.and.returnValue(null as any);
-    expect(cmp.isOwner()).toBeFalse();
-  });
-
-  it('ensures coupon promotions with guards and selection defaulting', () => {
-    const cmp = created();
-
-    auth.canAccessAdminSection.and.returnValue(false);
-    couponsApi.listPromotions.calls.reset();
-    cmp.ensureCouponPromotions();
-    expect(couponsApi.listPromotions).not.toHaveBeenCalled();
-
-    auth.canAccessAdminSection.and.returnValue(true);
-    cmp.couponPromotions.set(null);
-    cmp.couponPromotionId = '';
-    cmp.ensureCouponPromotions();
-    expect(cmp.couponPromotionId).toBe('p1');
-
-    // cached -> no refetch unless forced
-    couponsApi.listPromotions.calls.reset();
-    cmp.ensureCouponPromotions();
-    expect(couponsApi.listPromotions).not.toHaveBeenCalled();
-
-    // empty list keeps id empty
-    couponsApi.listPromotions.and.returnValue(of([]));
-    cmp.couponPromotionId = '';
-    cmp.ensureCouponPromotions(true);
-    expect(cmp.couponPromotionId).toBe('');
-
-    // error path
-    couponsApi.listPromotions.and.returnValue(throwError(() => new Error('x')));
-    cmp.ensureCouponPromotions(true);
-    expect(cmp.couponPromotionsError()).toBeTruthy();
-    expect(cmp.couponPromotions()).toEqual([]);
-  });
-
-  it('issues a coupon with validity parsing and error handling', () => {
-    const cmp = created();
-    cmp.issueCoupon();
-
-    cmp.selectedUser.set(baseUser() as any);
-    auth.canAccessAdminSection.and.returnValue(false);
-    cmp.issueCoupon();
-    expect(couponsApi.issueCouponToUser).not.toHaveBeenCalled();
-
-    auth.canAccessAdminSection.and.returnValue(true);
-    cmp.couponPromotionId = '   ';
-    cmp.issueCoupon();
-    expect(couponsApi.issueCouponToUser).not.toHaveBeenCalled();
-
-    // success with string validity + prefix
-    cmp.couponPromotionId = 'p1';
-    cmp.couponPrefix = ' VIP ';
-    cmp.couponValidityDays = '15';
-    cmp.issueCoupon();
-    expect(cmp.couponIssuedCode()).toBe('CODE123');
-
-    // numeric invalid validity -> null, no prefix
-    cmp.couponPrefix = '';
-    cmp.couponValidityDays = 0;
-    cmp.issueCoupon();
-    const payload = couponsApi.issueCouponToUser.calls.mostRecent().args[0] as any;
-    expect(payload.validity_days).toBeNull();
-    expect(payload.prefix).toBeNull();
-
-    // error
-    couponsApi.issueCouponToUser.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.couponValidityDays = 5;
-    cmp.issueCoupon();
-    expect(cmp.couponIssueError()).toBeTruthy();
-    expect(cmp.couponIssueBusy()).toBeFalse();
-  });
-
-  it('copies an issued coupon code only when present', () => {
-    const cmp = created();
-    cmp.copyIssuedCoupon();
-    expect(toast.success).not.toHaveBeenCalled();
-
-    if (navigator.clipboard) {
-      spyOn(navigator.clipboard, 'writeText').and.returnValue(Promise.resolve());
-    }
-    cmp.couponIssuedCode.set('CODE123');
-    cmp.copyIssuedCoupon();
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('locks an account for a duration (success with/without profile and reason; error)', () => {
-    const cmp = created();
-    cmp.lockForMinutes(60);
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.profile.set(profileResponse());
-    cmp.lockedReason = ' bad actor ';
-    cmp.lockForMinutes(60);
-    expect(usersApi.updateSecurity).toHaveBeenCalled();
-    expect(cmp.securityBusy()).toBeFalse();
-
-    cmp.profile.set(null);
-    cmp.lockedReason = '';
-    cmp.lockForMinutes(0);
-
-    usersApi.updateSecurity.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.lockForMinutes(60);
-    expect(toast.error).toHaveBeenCalled();
-  });
-
-  it('unlocks an account (success with/without profile and error)', () => {
-    const cmp = created();
-    cmp.unlock();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.profile.set(profileResponse());
-    cmp.unlock();
-    expect(cmp.lockedReason).toBe('');
-
-    cmp.profile.set(null);
-    cmp.unlock();
-
-    usersApi.updateSecurity.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.unlock();
-    expect(cmp.securityBusy()).toBeFalse();
-  });
-
-  it('saves security settings (success with/without profile and reason; error)', () => {
-    const cmp = created();
-    cmp.saveSecurity();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.profile.set(profileResponse());
-    cmp.lockedReason = ' reason ';
-    cmp.passwordResetRequired = true;
-    cmp.saveSecurity();
-    expect(usersApi.updateSecurity).toHaveBeenCalled();
-
-    cmp.profile.set(null);
-    cmp.lockedReason = '';
-    cmp.saveSecurity();
-
-    usersApi.updateSecurity.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.saveSecurity();
-    expect(cmp.securityBusy()).toBeFalse();
-  });
-
-  it('sends a password-reset email with a confirm gate (success and error)', () => {
-    const cmp = created();
-    cmp.sendPasswordResetEmail();
-
-    cmp.selectedUser.set(baseUser() as any);
-    const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
-    cmp.sendPasswordResetEmail();
-    expect(usersApi.resendPasswordReset).not.toHaveBeenCalled();
-
-    confirmSpy.and.returnValue(true);
-    cmp.sendPasswordResetEmail();
-    expect(usersApi.resendPasswordReset).toHaveBeenCalled();
-    expect(cmp.passwordResetEmailBusy()).toBeFalse();
-
-    usersApi.resendPasswordReset.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.sendPasswordResetEmail();
-    expect(toast.error).toHaveBeenCalled();
-  });
-
-  it('loads email verification history (success and error)', () => {
-    const cmp = created();
-    cmp.loadEmailHistory();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.loadEmailHistory();
-    expect(cmp.emailHistory()).toBeTruthy();
-    expect(cmp.emailHistoryLoading()).toBeFalse();
-
-    usersApi.getEmailVerificationHistory.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.loadEmailHistory();
-    expect(cmp.emailHistoryError()).toBeTruthy();
-  });
-
-  it('resends verification (success then loads history; error)', () => {
-    const cmp = created();
-    cmp.resendVerification();
-
-    cmp.selectedUser.set(baseUser() as any);
-    usersApi.getEmailVerificationHistory.calls.reset();
-    cmp.resendVerification();
-    expect(usersApi.resendEmailVerification).toHaveBeenCalled();
-    expect(usersApi.getEmailVerificationHistory).toHaveBeenCalled();
-
-    usersApi.resendEmailVerification.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.resendVerification();
-    expect(cmp.emailVerificationBusy()).toBeFalse();
-  });
-
-  it('opens the override-verification modal only for unverified users', () => {
-    const cmp = created();
-    cmp.overrideVerification();
-    expect(cmp.overrideVerificationOpen()).toBeFalse();
-
-    cmp.selectedUser.set({ ...baseUser(), email_verified: true } as any);
-    cmp.overrideVerification();
-    expect(cmp.overrideVerificationOpen()).toBeFalse();
-
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.overrideVerification();
-    expect(cmp.overrideVerificationOpen()).toBeTrue();
-    cmp.closeOverrideVerification();
-    expect(cmp.overrideVerificationOpen()).toBeFalse();
-  });
-
-  it('confirms override verification with validation and success/error handling', () => {
-    const cmp = created();
-    cmp.confirmOverrideVerification();
-
-    // already verified -> closes
-    cmp.selectedUser.set({ ...baseUser(), email_verified: true } as any);
-    cmp.overrideVerificationOpen.set(true);
-    cmp.confirmOverrideVerification();
-    expect(cmp.overrideVerificationOpen()).toBeFalse();
-
-    // missing password
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.overrideVerificationPassword = '   ';
-    cmp.confirmOverrideVerification();
-    expect(cmp.overrideVerificationError()).toBeTruthy();
-
-    // success (with profile + list update)
-    cmp.users.set([baseUser() as any]);
-    cmp.profile.set(profileResponse());
-    cmp.overrideVerificationPassword = 'pw';
-    cmp.confirmOverrideVerification();
-    expect(cmp.selectedUser()?.email_verified).toBeTrue();
-    expect(toast.success).toHaveBeenCalled();
-
-    // success without profile
-    cmp.profile.set(null);
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.overrideVerificationPassword = 'pw';
-    cmp.confirmOverrideVerification();
-
-    // error with detail
-    usersApi.overrideEmailVerification.and.returnValue(
-      throwError(() => ({ error: { detail: 'no' } })) as any,
-    );
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.overrideVerificationPassword = 'pw';
-    cmp.confirmOverrideVerification();
-    expect(cmp.overrideVerificationError()).toBe('no');
-
-    // error fallback
-    usersApi.overrideEmailVerification.and.returnValue(throwError(() => ({})) as any);
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.overrideVerificationPassword = 'pw';
-    cmp.confirmOverrideVerification();
-    expect(cmp.emailVerificationBusy()).toBeFalse();
-  });
-
-  it('impersonates a customer (success token, empty token, error)', () => {
-    const cmp = created();
-    cmp.impersonate();
-
-    const openSpy = spyOn(window, 'open');
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.impersonate();
-    expect(openSpy).toHaveBeenCalled();
-    expect(cmp.impersonateBusy()).toBeFalse();
-
-    usersApi.impersonate.and.returnValue(of({ access_token: '' } as any));
-    cmp.impersonate();
-    expect(toast.error).toHaveBeenCalled();
-
-    usersApi.impersonate.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.impersonate();
-    expect(cmp.impersonateBusy()).toBeFalse();
-  });
-
-  it('formats identity labels and session device labels', () => {
-    const cmp = created();
-    expect(cmp.identityLabel(baseUser() as any)).toContain('Alice');
-
-    expect(cmp.sessionDeviceLabel({ user_agent: '' } as any)).toContain('unknownDevice');
-    expect(cmp.sessionDeviceLabel({ user_agent: 'short' } as any)).toBe('short');
-    const long = 'x'.repeat(200);
-    expect(cmp.sessionDeviceLabel({ user_agent: long } as any).endsWith('…')).toBeTrue();
-  });
-
-  it('controls PII reveal capability and toggling', () => {
-    const cmp = created();
-
-    for (const r of ['owner', 'admin', 'support', 'fulfillment']) {
-      role = r;
-      expect(cmp.canRevealPii()).toBeTrue();
-    }
-    role = 'content';
-    expect(cmp.canRevealPii()).toBeFalse();
-    auth.role.and.returnValue(null as any);
-    expect(cmp.canRevealPii()).toBeFalse();
-
-    // togglePiiReveal blocked when not allowed
-    cmp.togglePiiReveal();
-    role = 'admin';
-    auth.role.and.callFake(() => role);
-    const before = cmp.piiReveal();
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.togglePiiReveal();
-    expect(cmp.piiReveal()).toBe(!before);
-    expect(admin.userAliases).toHaveBeenCalled();
-
-    // toggle again with no selected user
-    cmp.selectedUser.set(null);
-    cmp.togglePiiReveal();
-  });
-
-  it('maps role pill classes for every role', () => {
-    const cmp = created();
-    expect(cmp.rolePillClass('owner')).toContain('indigo');
-    expect(cmp.rolePillClass('admin')).toContain('emerald');
-    expect(cmp.rolePillClass('support')).toContain('sky');
-    expect(cmp.rolePillClass('fulfillment')).toContain('amber');
-    expect(cmp.rolePillClass('content')).toContain('fuchsia');
-    expect(cmp.rolePillClass('customer')).toContain('slate');
-  });
-
-  it('loads aliases and profile errors', () => {
-    const cmp = created();
-    admin.userAliases.and.returnValue(throwError(() => new Error('x')) as any);
-    usersApi.getProfile.and.returnValue(throwError(() => new Error('x')) as any);
-    admin.listUserSessions.and.returnValue(throwError(() => new Error('x')) as any);
-    cmp.select(baseUser() as any);
-    expect(cmp.aliasesError()).toBeTruthy();
-    expect(cmp.profileError()).toBeTruthy();
-    expect(cmp.sessionsError()).toBeTruthy();
-  });
-
-  it('loads profile and populates editable fields on success', () => {
-    const cmp = created();
-    cmp.select(baseUser() as any);
-    expect(cmp.profile()).toBeTruthy();
-    expect(cmp.vip).toBeTrue();
-    expect(cmp.adminNote).toBe('note');
-    expect(cmp.lockedReason).toBe('reason');
-    expect(cmp.passwordResetRequired).toBeTrue();
-    expect(cmp.sessions()?.length).toBe(1);
-  });
-
-  it('falls back to defaults for a saved view missing a query', () => {
-    const cmp = created();
-    favItems.set([
-      {
-        key: 'v3',
-        type: 'filter',
-        label: 'V3',
-        state: { adminFilterScope: 'users', adminFilters: { role: 'support' } },
-      },
-    ] as any);
-    cmp.applySavedView('v3');
-    expect(cmp.q).toBe('');
-    expect(cmp.role).toBe('support');
-  });
-
-  it('shows an error when pinning is cancelled (prompt returns null)', () => {
-    const cmp = created();
-    favorites.isFavorite.and.returnValue(false);
-    spyOn(window, 'prompt').and.returnValue(null);
-    cmp.toggleCurrentViewPin();
-    expect(toast.error).toHaveBeenCalled();
-    expect(favorites.add).not.toHaveBeenCalled();
-  });
-
-  it('ignores navigation state with a users scope but falsy filters', () => {
-    spyOnProperty(history, 'state', 'get').and.returnValue({
-      adminFilterScope: 'users',
-      adminFilters: null,
+    it('returns false when scope is not users', () => {
+      history.replaceState({ adminFilterScope: 'orders', adminFilters: { q: 'x' } }, '');
+      const c = build();
+      c.ngOnInit();
+      // prefill path ran (q stays '')
+      expect(c.q).toBe('');
     });
-    const cmp = created();
-    expect(cmp.q).toBe('');
-  });
 
-  it('applies navigation state defaults for an empty users filter object', () => {
-    spyOnProperty(history, 'state', 'get').and.returnValue({
-      adminFilterScope: 'users',
-      adminFilters: {},
+    it('returns false when filters missing', () => {
+      history.replaceState({ adminFilterScope: 'users' }, '');
+      const c = build();
+      c.ngOnInit();
+      expect(c.q).toBe('');
     });
-    const cmp = created();
-    expect(cmp.q).toBe('');
-    expect(cmp.role).toBe('all');
-    expect(cmp.limit).toBe(25);
+
+    it('uses defaults when filter fields absent and limit non-finite', () => {
+      history.replaceState(
+        { adminFilterScope: 'users', adminFilters: { limit: Infinity } },
+        '',
+      );
+      const c = build();
+      c.ngOnInit();
+      expect(c.q).toBe('');
+      expect(c.role).toBe('all');
+      expect(c.limit).toBe(25);
+    });
   });
 
-  it('confirms a role change with a blank password and updates non-matching rows', () => {
-    const cmp = created();
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.selectedRole = 'support';
-    cmp.roleChangePassword = '';
-    cmp.confirmRoleChange();
-    expect(cmp.roleChangeError()).toBeTruthy();
+  describe('table layout', () => {
+    it('opens and closes the layout modal', () => {
+      const c = build();
+      c.openLayoutModal();
+      expect(c.layoutModalOpen()).toBeTrue();
+      c.closeLayoutModal();
+      expect(c.layoutModalOpen()).toBeFalse();
+    });
 
-    cmp.users.set([{ ...baseUser(), id: 'other' } as any, baseUser() as any]);
-    cmp.profile.set(null);
-    cmp.roleChangePassword = 'pw';
-    cmp.confirmRoleChange();
-    expect(cmp.users().find((u) => u.id === 'other')?.role).toBe('customer');
+    it('applies a table layout and persists it', () => {
+      const c = build();
+      const layout = { ...c.tableLayout(), density: 'compact' as const };
+      c.applyTableLayout(layout);
+      expect(c.tableLayout().density).toBe('compact');
+    });
+
+    it('toggles density both ways and reports the label', () => {
+      const c = build();
+      c.applyTableLayout({ ...c.tableLayout(), density: 'comfortable' });
+      c.toggleDensity();
+      expect(c.tableLayout().density).toBe('compact');
+      expect(c.densityToggleLabelKey()).toBe('adminUi.tableLayout.densityToggle.toComfortable');
+      c.toggleDensity();
+      expect(c.tableLayout().density).toBe('comfortable');
+      expect(c.densityToggleLabelKey()).toBe('adminUi.tableLayout.densityToggle.toCompact');
+    });
+
+    it('exposes visible columns, padding class and column tracking', () => {
+      const c = build();
+      expect(Array.isArray(c.visibleColumnIds())).toBeTrue();
+      expect(typeof c.cellPaddingClass()).toBe('string');
+      expect(c.trackColumnId(0, 'email')).toBe('email');
+    });
+
+    it('falls back to anonymous storage key when no auth user id', () => {
+      auth.user.and.returnValue(null);
+      const c = build();
+      c.openLayoutModal();
+      c.applyTableLayout(c.tableLayout());
+      expect(c.layoutModalOpen()).toBeTrue();
+    });
   });
 
-  it('rejects deletion with a blank confirmation word and blank password', () => {
-    const cmp = created();
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.deleteUserConfirm = '';
-    cmp.confirmDeleteUser();
-    expect(cmp.deleteUserError()).toBeTruthy();
+  describe('filters and saved views', () => {
+    it('applyFilters resets page and clears saved view', () => {
+      const c = build();
+      c.page = 5;
+      c.selectedSavedViewKey = 'k';
+      c.applyFilters();
+      expect(c.page).toBe(1);
+      expect(c.selectedSavedViewKey).toBe('');
+    });
 
-    cmp.deleteUserConfirm = 'DELETE';
-    cmp.deleteUserPassword = '';
-    cmp.confirmDeleteUser();
-    expect(cmp.deleteUserError()).toBeTruthy();
-    expect(usersApi.executeGdprDeletion).not.toHaveBeenCalled();
+    it('resetFilters clears all filters', () => {
+      const c = build();
+      c.q = 'x';
+      c.role = 'admin';
+      c.page = 3;
+      c.resetFilters();
+      expect(c.q).toBe('');
+      expect(c.role).toBe('all');
+      expect(c.page).toBe(1);
+    });
+
+    it('savedViews returns only user-scoped filter favorites', () => {
+      favItems = [
+        { key: 'a', type: 'filter', state: { adminFilterScope: 'users' } } as any,
+        { key: 'b', type: 'filter', state: { adminFilterScope: 'orders' } } as any,
+        { key: 'c', type: 'user' } as any,
+        null as any,
+      ];
+      const c = build();
+      const views = c.savedViews();
+      expect(views.length).toBe(1);
+      expect(views[0].key).toBe('a');
+    });
+
+    it('applySavedView ignores empty key', () => {
+      const c = build();
+      c.applySavedView('');
+      expect(c.selectedSavedViewKey).toBe('');
+    });
+
+    it('applySavedView returns early when view not found', () => {
+      favItems = [];
+      const c = build();
+      c.applySavedView('missing');
+      expect(usersApi.search).not.toHaveBeenCalled();
+    });
+
+    it('applySavedView returns early when filters not an object', () => {
+      favItems = [
+        { key: 'k', type: 'filter', state: { adminFilterScope: 'users', adminFilters: 7 } } as any,
+      ];
+      const c = build();
+      c.applySavedView('k');
+      expect(usersApi.search).not.toHaveBeenCalled();
+    });
+
+    it('applySavedView applies stored filters and loads', () => {
+      favItems = [
+        {
+          key: 'k',
+          type: 'filter',
+          state: { adminFilterScope: 'users', adminFilters: { q: 'zoe', role: 'support', limit: 10 } },
+        } as any,
+      ];
+      const c = build();
+      c.applySavedView('k');
+      expect(c.q).toBe('zoe');
+      expect(c.role).toBe('support');
+      expect(c.limit).toBe(10);
+      expect(usersApi.search).toHaveBeenCalled();
+    });
+
+    it('applySavedView uses defaults for missing/non-finite limit and absent role', () => {
+      favItems = [
+        {
+          key: 'k',
+          type: 'filter',
+          state: { adminFilterScope: 'users', adminFilters: { limit: 'nope' } },
+        } as any,
+      ];
+      const c = build();
+      c.limit = 25;
+      c.applySavedView('k');
+      expect(c.q).toBe('');
+      expect(c.role).toBe('all');
+      expect(c.limit).toBe(25);
+    });
+
+    it('isCurrentViewPinned delegates to favorites', () => {
+      favorites.isFavorite.and.returnValue(true);
+      const c = build();
+      expect(c.isCurrentViewPinned()).toBeTrue();
+    });
+
+    it('toggleCurrentViewPin unpins a pinned current view', () => {
+      const c = build();
+      favorites.isFavorite.and.returnValue(true);
+      c.selectedSavedViewKey = c['currentViewFavoriteKey']();
+      c.toggleCurrentViewPin();
+      expect(favorites.remove).toHaveBeenCalled();
+      expect(c.selectedSavedViewKey).toBe('');
+    });
+
+    it('toggleCurrentViewPin unpins without clearing a different selected key', () => {
+      const c = build();
+      favorites.isFavorite.and.returnValue(true);
+      c.selectedSavedViewKey = 'other';
+      c.toggleCurrentViewPin();
+      expect(favorites.remove).toHaveBeenCalled();
+      expect(c.selectedSavedViewKey).toBe('other');
+    });
+
+    it('toggleCurrentViewPin shows error when name prompt is empty', () => {
+      spyOn(window, 'prompt').and.returnValue('   ');
+      const c = build();
+      c.toggleCurrentViewPin();
+      expect(toast.error).toHaveBeenCalled();
+      expect(favorites.add).not.toHaveBeenCalled();
+    });
+
+    it('toggleCurrentViewPin pins with a provided name (null prompt path)', () => {
+      spyOn(window, 'prompt').and.returnValue(null);
+      const c = build();
+      c.toggleCurrentViewPin();
+      // null -> '' -> trimmed empty -> error branch
+      expect(toast.error).toHaveBeenCalled();
+    });
+
+    it('toggleCurrentViewPin adds a favorite with the given name', () => {
+      spyOn(window, 'prompt').and.returnValue('My View');
+      const c = build();
+      c.toggleCurrentViewPin();
+      expect(favorites.add).toHaveBeenCalled();
+      expect(c.selectedSavedViewKey).toBeTruthy();
+    });
   });
 
-  it('clears the admin note when the saved internal response omits it', () => {
-    const cmp = created();
-    usersApi.updateInternal.and.returnValue(of({ vip: true } as any));
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.profile.set(null);
-    cmp.saveInternal();
-    expect(cmp.adminNote).toBe('');
+  describe('pagination and selection', () => {
+    it('goToPage loads the requested page', () => {
+      const c = build();
+      c.goToPage(4);
+      expect(c.page).toBe(4);
+      expect(usersApi.search).toHaveBeenCalled();
+    });
+
+    it('trackUserId returns the user id', () => {
+      const c = build();
+      expect(c.trackUserId(0, makeUser({ id: 'x9' }))).toBe('x9');
+    });
+
+    it('select records recent, resets fields and loads detail (with email)', () => {
+      const c = build();
+      c.select(makeUser({ id: 'u2', email: 'a@b.com' }));
+      expect(recent.add).toHaveBeenCalled();
+      expect(c.selectedUser()?.id).toBe('u2');
+      expect(admin.userAliases).toHaveBeenCalledWith('u2', jasmine.any(Object));
+      expect(usersApi.getProfile).toHaveBeenCalled();
+      expect(admin.listUserSessions).toHaveBeenCalled();
+    });
+
+    it('select with empty email passes null recent state', () => {
+      const c = build();
+      c.select(makeUser({ id: 'u3', email: '' }));
+      const arg = recent.add.calls.mostRecent().args[0] as any;
+      expect(arg.state).toBeNull();
+    });
   });
 
-  it('keeps a preselected coupon promotion when refetching', () => {
-    const cmp = created();
-    cmp.couponPromotions.set(null);
-    cmp.couponPromotionId = 'preset';
-    couponsApi.listPromotions.and.returnValue(of([promotion()]));
-    cmp.ensureCouponPromotions();
-    expect(cmp.couponPromotionId).toBe('preset');
+  describe('role change', () => {
+    it('updateRole no-ops with no selected user', () => {
+      const c = build();
+      c.updateRole();
+      expect(c.roleChangeOpen()).toBeFalse();
+    });
+
+    it('updateRole no-ops for owner user', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'owner' }));
+      c.updateRole();
+      expect(c.roleChangeOpen()).toBeFalse();
+    });
+
+    it('updateRole no-ops when role unchanged', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'customer' }));
+      c.selectedRole = 'customer';
+      c.updateRole();
+      expect(c.roleChangeOpen()).toBeFalse();
+    });
+
+    it('updateRole opens the modal when valid', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'customer' }));
+      c.selectedRole = 'admin';
+      c.updateRole();
+      expect(c.roleChangeOpen()).toBeTrue();
+    });
+
+    it('closeRoleChange resets state', () => {
+      const c = build();
+      c.roleChangeOpen.set(true);
+      c.roleChangePassword = 'x';
+      c.closeRoleChange();
+      expect(c.roleChangeOpen()).toBeFalse();
+      expect(c.roleChangePassword).toBe('');
+    });
+
+    it('confirmRoleChange no-ops without user', () => {
+      const c = build();
+      c.confirmRoleChange();
+      expect(admin.updateUserRole).not.toHaveBeenCalled();
+    });
+
+    it('confirmRoleChange no-ops for owner', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'owner' }));
+      c.confirmRoleChange();
+      expect(admin.updateUserRole).not.toHaveBeenCalled();
+    });
+
+    it('confirmRoleChange closes when role unchanged', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'customer' }));
+      c.selectedRole = 'customer';
+      c.roleChangeOpen.set(true);
+      c.confirmRoleChange();
+      expect(c.roleChangeOpen()).toBeFalse();
+    });
+
+    it('confirmRoleChange requires a password', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'customer' }));
+      c.selectedRole = 'admin';
+      c.roleChangePassword = '   ';
+      c.confirmRoleChange();
+      expect(c.roleChangeError()).toBeTruthy();
+      expect(toast.error).toHaveBeenCalled();
+    });
+
+    it('confirmRoleChange succeeds and updates lists and profile', () => {
+      const c = build();
+      const user = makeUser({ id: 'u1', role: 'customer' });
+      c.users.set([user]);
+      c.profile.set(makeProfile());
+      c.selectedUser.set(user);
+      c.selectedRole = 'admin';
+      c.roleChangePassword = 'pw';
+      admin.updateUserRole.and.returnValue(of({ role: 'admin' } as any));
+      c.confirmRoleChange();
+      expect(toast.success).toHaveBeenCalled();
+      expect(c.selectedUser()?.role).toBe('admin');
+      expect(c.users()[0].role).toBe('admin');
+      expect(c.profile()?.user.role).toBe('admin');
+      expect(c.roleChangeOpen()).toBeFalse();
+    });
+
+    it('confirmRoleChange succeeds when no profile loaded', () => {
+      const c = build();
+      const user = makeUser({ id: 'u1', role: 'customer' });
+      c.users.set([user]);
+      c.profile.set(null);
+      c.selectedUser.set(user);
+      c.selectedRole = 'admin';
+      c.roleChangePassword = 'pw';
+      c.confirmRoleChange();
+      expect(c.profile()).toBeNull();
+      expect(toast.success).toHaveBeenCalled();
+    });
+
+    it('confirmRoleChange surfaces server error detail', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'customer' }));
+      c.selectedRole = 'admin';
+      c.roleChangePassword = 'pw';
+      admin.updateUserRole.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })));
+      c.confirmRoleChange();
+      expect(c.roleChangeError()).toBe('boom');
+      expect(c.roleChangeBusy()).toBeFalse();
+    });
+
+    it('confirmRoleChange requires a password when field is empty (default branch)', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'customer' }));
+      c.selectedRole = 'admin';
+      c.roleChangePassword = '';
+      c.confirmRoleChange();
+      expect(c.roleChangeError()).toBeTruthy();
+      expect(admin.updateUserRole).not.toHaveBeenCalled();
+    });
+
+    it('confirmRoleChange leaves non-matching users untouched in the list', () => {
+      const c = build();
+      const user = makeUser({ id: 'u1', role: 'customer' });
+      const other = makeUser({ id: 'u2', role: 'customer' });
+      c.users.set([user, other]);
+      c.selectedUser.set(user);
+      c.selectedRole = 'admin';
+      c.roleChangePassword = 'pw';
+      admin.updateUserRole.and.returnValue(of({ role: 'admin' } as any));
+      c.confirmRoleChange();
+      const roles = c.users().map((u) => `${u.id}:${u.role}`);
+      expect(roles).toEqual(['u1:admin', 'u2:customer']);
+    });
+
+    it('confirmRoleChange falls back to generic error', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'customer' }));
+      c.selectedRole = 'admin';
+      c.roleChangePassword = 'pw';
+      admin.updateUserRole.and.returnValue(throwError(() => ({})));
+      c.confirmRoleChange();
+      expect(c.roleChangeError()).toBe('adminUi.users.errors.role');
+    });
   });
 
-  it('defaults to an empty promotion list when the response is null', () => {
-    const cmp = created();
-    cmp.couponPromotions.set(null);
-    cmp.couponPromotionId = '';
-    couponsApi.listPromotions.and.returnValue(of(null as any));
-    cmp.ensureCouponPromotions();
-    expect(cmp.couponPromotions()).toEqual([]);
-    expect(cmp.couponPromotionId).toBe('');
+  describe('delete user', () => {
+    it('openDeleteUser no-ops without user', () => {
+      const c = build();
+      c.openDeleteUser();
+      expect(c.deleteUserOpen()).toBeFalse();
+    });
+
+    it('openDeleteUser no-ops for owner', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'owner' }));
+      c.openDeleteUser();
+      expect(c.deleteUserOpen()).toBeFalse();
+    });
+
+    it('openDeleteUser opens for normal user', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.openDeleteUser();
+      expect(c.deleteUserOpen()).toBeTrue();
+    });
+
+    it('closeDeleteUser resets', () => {
+      const c = build();
+      c.deleteUserOpen.set(true);
+      c.deleteUserPassword = 'p';
+      c.closeDeleteUser();
+      expect(c.deleteUserOpen()).toBeFalse();
+      expect(c.deleteUserPassword).toBe('');
+    });
+
+    it('confirmDeleteUser no-ops without user', () => {
+      const c = build();
+      c.confirmDeleteUser();
+      expect(usersApi.executeGdprDeletion).not.toHaveBeenCalled();
+    });
+
+    it('confirmDeleteUser no-ops for owner', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ role: 'owner' }));
+      c.confirmDeleteUser();
+      expect(usersApi.executeGdprDeletion).not.toHaveBeenCalled();
+    });
+
+    it('confirmDeleteUser requires DELETE confirmation', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.deleteUserConfirm = 'nope';
+      c.confirmDeleteUser();
+      expect(c.deleteUserError()).toBeTruthy();
+      expect(usersApi.executeGdprDeletion).not.toHaveBeenCalled();
+    });
+
+    it('confirmDeleteUser requires confirmation when field is empty (default branch)', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.deleteUserConfirm = '';
+      c.confirmDeleteUser();
+      expect(c.deleteUserError()).toBeTruthy();
+      expect(usersApi.executeGdprDeletion).not.toHaveBeenCalled();
+    });
+
+    it('confirmDeleteUser requires a password when field is empty (default branch)', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.deleteUserConfirm = 'DELETE';
+      c.deleteUserPassword = '';
+      c.confirmDeleteUser();
+      expect(c.deleteUserError()).toBeTruthy();
+      expect(usersApi.executeGdprDeletion).not.toHaveBeenCalled();
+    });
+
+    it('confirmDeleteUser requires a password', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.deleteUserConfirm = 'delete';
+      c.deleteUserPassword = '  ';
+      c.confirmDeleteUser();
+      expect(c.deleteUserError()).toBeTruthy();
+      expect(usersApi.executeGdprDeletion).not.toHaveBeenCalled();
+    });
+
+    it('confirmDeleteUser succeeds', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(makeProfile());
+      c.deleteUserConfirm = 'DELETE';
+      c.deleteUserPassword = 'pw';
+      c.confirmDeleteUser();
+      expect(toast.success).toHaveBeenCalled();
+      expect(c.selectedUser()).toBeNull();
+      expect(c.profile()).toBeNull();
+    });
+
+    it('confirmDeleteUser surfaces server error detail', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.deleteUserConfirm = 'DELETE';
+      c.deleteUserPassword = 'pw';
+      usersApi.executeGdprDeletion.and.returnValue(
+        throwError(() => ({ error: { detail: 'nope' } })),
+      );
+      c.confirmDeleteUser();
+      expect(c.deleteUserError()).toBe('nope');
+      expect(c.deleteUserBusy()).toBeFalse();
+    });
+
+    it('confirmDeleteUser falls back to generic error', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.deleteUserConfirm = 'DELETE';
+      c.deleteUserPassword = 'pw';
+      usersApi.executeGdprDeletion.and.returnValue(throwError(() => ({})));
+      c.confirmDeleteUser();
+      expect(c.deleteUserError()).toBe('adminUi.users.errors.delete');
+    });
   });
 
-  it('skips issuing a coupon when the promotion id is blank', () => {
-    const cmp = created();
-    cmp.selectedUser.set(baseUser() as any);
-    auth.canAccessAdminSection.and.returnValue(true);
-    cmp.couponPromotionId = '';
-    cmp.issueCoupon();
-    expect(couponsApi.issueCouponToUser).not.toHaveBeenCalled();
+  describe('sessions', () => {
+    it('forceLogout no-ops without user', () => {
+      const c = build();
+      c.forceLogout();
+      expect(admin.revokeSessions).not.toHaveBeenCalled();
+    });
+
+    it('forceLogout success clears sessions', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.forceLogout();
+      expect(toast.success).toHaveBeenCalled();
+      expect(c.sessions()).toEqual([]);
+    });
+
+    it('forceLogout error toasts', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      admin.revokeSessions.and.returnValue(throwError(() => ({})));
+      c.forceLogout();
+      expect(toast.error).toHaveBeenCalled();
+    });
+
+    it('refreshSessions no-ops without user', () => {
+      const c = build();
+      c.refreshSessions();
+      expect(admin.listUserSessions).not.toHaveBeenCalled();
+    });
+
+    it('refreshSessions loads sessions', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.refreshSessions();
+      expect(admin.listUserSessions).toHaveBeenCalled();
+    });
+
+    it('revokeOneSession no-ops without user', () => {
+      const c = build();
+      c.revokeOneSession('s1');
+      expect(admin.revokeSession).not.toHaveBeenCalled();
+    });
+
+    it('revokeOneSession removes the session from the list', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.sessions.set([
+        { id: 's1' } as AdminUserSession,
+        { id: 's2' } as AdminUserSession,
+      ]);
+      c.revokeOneSession('s1');
+      expect(c.sessions()?.map((s) => s.id)).toEqual(['s2']);
+      expect(c.revokingSessionId()).toBeNull();
+    });
+
+    it('revokeOneSession success when sessions list is null', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.sessions.set(null);
+      c.revokeOneSession('s1');
+      expect(c.sessions()).toBeNull();
+      expect(toast.success).toHaveBeenCalled();
+    });
+
+    it('revokeOneSession error resets revoking id', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      admin.revokeSession.and.returnValue(throwError(() => ({})));
+      c.revokeOneSession('s1');
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.revokingSessionId()).toBeNull();
+    });
   });
 
-  it('clears the lock reason when lock/save responses omit it', () => {
-    const cmp = created();
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.profile.set(null);
+  describe('internal notes', () => {
+    it('saveInternal no-ops without user', () => {
+      const c = build();
+      c.saveInternal();
+      expect(usersApi.updateInternal).not.toHaveBeenCalled();
+    });
 
-    usersApi.updateSecurity.and.returnValue(of({ password_reset_required: true } as any));
-    cmp.lockForMinutes(60);
-    expect(cmp.lockedReason).toBe('');
+    it('saveInternal success with profile and trimmed note', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(makeProfile());
+      c.vip = true;
+      c.adminNote = '  note  ';
+      usersApi.updateInternal.and.returnValue(of({ vip: true, admin_note: 'note' } as any));
+      c.saveInternal();
+      expect(usersApi.updateInternal).toHaveBeenCalledWith('u1', {
+        vip: true,
+        admin_note: 'note',
+      });
+      expect(c.vip).toBeTrue();
+      expect(c.adminNote).toBe('note');
+      expect(c.internalBusy()).toBeFalse();
+    });
 
-    usersApi.updateSecurity.and.returnValue(of({ password_reset_required: false } as any));
-    cmp.lockedReason = 'stale';
-    cmp.saveSecurity();
-    expect(cmp.lockedReason).toBe('');
+    it('saveInternal success without profile and empty note', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(null);
+      c.adminNote = '   ';
+      usersApi.updateInternal.and.returnValue(of(null as any));
+      c.saveInternal();
+      expect(usersApi.updateInternal).toHaveBeenCalledWith('u1', {
+        vip: false,
+        admin_note: null,
+      });
+      expect(c.vip).toBeFalse();
+      expect(c.adminNote).toBe('');
+    });
+
+    it('saveInternal error toasts', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.updateInternal.and.returnValue(throwError(() => ({})));
+      c.saveInternal();
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.internalBusy()).toBeFalse();
+    });
   });
 
-  it('confirms override verification with a blank password and updates non-matching rows', () => {
-    const cmp = created();
-    cmp.selectedUser.set(baseUser() as any);
-    cmp.overrideVerificationPassword = '';
-    cmp.confirmOverrideVerification();
-    expect(cmp.overrideVerificationError()).toBeTruthy();
+  describe('lock helpers', () => {
+    it('isLocked false when no locked_until', () => {
+      const c = build();
+      c.profile.set(makeProfile());
+      expect(c.isLocked()).toBeFalse();
+    });
 
-    cmp.users.set([{ ...baseUser(), id: 'other' } as any, baseUser() as any]);
-    cmp.profile.set(null);
-    cmp.overrideVerificationPassword = 'pw';
-    cmp.confirmOverrideVerification();
-    expect(cmp.users().find((u) => u.id === 'other')?.email_verified).toBeFalse();
+    it('isLocked true when locked in the future', () => {
+      const c = build();
+      const p = makeProfile();
+      p.user.locked_until = new Date(Date.now() + 60_000).toISOString();
+      c.profile.set(p);
+      expect(c.isLocked()).toBeTrue();
+    });
+
+    it('isLocked false when locked time is in the past', () => {
+      const c = build();
+      const p = makeProfile();
+      p.user.locked_until = new Date(Date.now() - 60_000).toISOString();
+      c.profile.set(p);
+      expect(c.isLocked()).toBeFalse();
+    });
+
+    it('isLocked false when locked_until is unparseable', () => {
+      const c = build();
+      const p = makeProfile();
+      p.user.locked_until = 'not-a-date';
+      c.profile.set(p);
+      expect(c.isLocked()).toBeFalse();
+    });
   });
 
-  it('defaults an empty user list when the search response omits items', () => {
-    const cmp = created();
-    usersApi.search.and.returnValue(of({ meta: null } as any));
-    cmp.retryLoad();
-    expect(cmp.users()).toEqual([]);
+  describe('role/permission helpers', () => {
+    it('isOwner true for owner role', () => {
+      auth.role.and.returnValue('owner');
+      expect(build().isOwner()).toBeTrue();
+    });
+
+    it('isOwner false otherwise and handles null role', () => {
+      auth.role.and.returnValue(null);
+      expect(build().isOwner()).toBeFalse();
+    });
+
+    it('canManageRoles delegates to auth.isAdmin', () => {
+      auth.isAdmin.and.returnValue(false);
+      expect(build().canManageRoles()).toBeFalse();
+    });
+
+    it('canIssueCoupons delegates to auth section access', () => {
+      auth.canAccessAdminSection.and.returnValue(true);
+      expect(build().canIssueCoupons()).toBeTrue();
+    });
+
+    it('canRevealPii true for privileged roles, false otherwise', () => {
+      const c = build();
+      auth.role.and.returnValue('owner');
+      expect(c.canRevealPii()).toBeTrue();
+      auth.role.and.returnValue('admin');
+      expect(c.canRevealPii()).toBeTrue();
+      auth.role.and.returnValue('support');
+      expect(c.canRevealPii()).toBeTrue();
+      auth.role.and.returnValue('fulfillment');
+      expect(c.canRevealPii()).toBeTrue();
+      auth.role.and.returnValue('customer');
+      expect(c.canRevealPii()).toBeFalse();
+      auth.role.and.returnValue(null);
+      expect(c.canRevealPii()).toBeFalse();
+    });
   });
 
-  it('auto-selects the first item when the prefill needle is empty', () => {
-    const cmp = created();
-    usersApi.search.and.returnValue(of({ items: [baseUser()], meta: meta() }) as any);
-    (cmp as any).autoSelectAfterLoad = true;
-    (cmp as any).pendingPrefillSearch = null;
-    cmp.retryLoad();
-    expect(cmp.selectedUser()?.id).toBe('u1');
+  describe('coupon promotions', () => {
+    it('ensureCouponPromotions skips when not allowed', () => {
+      auth.canAccessAdminSection.and.returnValue(false);
+      const c = build();
+      c.ensureCouponPromotions();
+      expect(couponsApi.listPromotions).not.toHaveBeenCalled();
+    });
+
+    it('ensureCouponPromotions skips when already loaded and not forced', () => {
+      const c = build();
+      c.couponPromotions.set([]);
+      c.ensureCouponPromotions();
+      expect(couponsApi.listPromotions).not.toHaveBeenCalled();
+    });
+
+    it('ensureCouponPromotions force reloads and selects first promotion', () => {
+      const c = build();
+      c.couponPromotions.set([]);
+      couponsApi.listPromotions.and.returnValue(of([{ id: 'p1' }] as any));
+      c.ensureCouponPromotions(true);
+      expect(couponsApi.listPromotions).toHaveBeenCalled();
+      expect(c.couponPromotionId).toBe('p1');
+    });
+
+    it('ensureCouponPromotions keeps existing id when promotions empty', () => {
+      const c = build();
+      c.couponPromotionId = 'keep';
+      couponsApi.listPromotions.and.returnValue(of([] as any));
+      c.ensureCouponPromotions();
+      expect(c.couponPromotionId).toBe('keep');
+    });
+
+    it('ensureCouponPromotions handles null promotions response', () => {
+      const c = build();
+      couponsApi.listPromotions.and.returnValue(of(null as any));
+      c.ensureCouponPromotions();
+      expect(c.couponPromotions()).toEqual([]);
+    });
+
+    it('ensureCouponPromotions error sets error and empties', () => {
+      const c = build();
+      couponsApi.listPromotions.and.returnValue(throwError(() => ({})));
+      c.ensureCouponPromotions();
+      expect(c.couponPromotionsError()).toBeTruthy();
+      expect(c.couponPromotions()).toEqual([]);
+    });
   });
 
-  it('auto-selects the first item when candidate rows have blank identifiers', () => {
-    const cmp = created();
-    usersApi.search.and.returnValue(
-      of({
-        items: [
-          {
-            id: '',
-            username: '',
-            email: '',
-            role: 'customer',
-            email_verified: false,
-            created_at: '2026-01-01T00:00:00Z',
-          },
-        ],
-        meta: meta(),
-      }) as any,
-    );
-    (cmp as any).autoSelectAfterLoad = true;
-    (cmp as any).pendingPrefillSearch = 'zzz';
-    cmp.retryLoad();
-    expect(cmp.selectedUser()).toBeTruthy();
+  describe('issue coupon', () => {
+    it('no-ops without user', () => {
+      const c = build();
+      c.issueCoupon();
+      expect(couponsApi.issueCouponToUser).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when coupons not allowed', () => {
+      auth.canAccessAdminSection.and.returnValue(false);
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.issueCoupon();
+      expect(couponsApi.issueCouponToUser).not.toHaveBeenCalled();
+    });
+
+    it('no-ops without a promotion id', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.couponPromotionId = '  ';
+      c.issueCoupon();
+      expect(couponsApi.issueCouponToUser).not.toHaveBeenCalled();
+    });
+
+    it('no-ops when promotion id is empty (default branch)', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.couponPromotionId = '';
+      c.issueCoupon();
+      expect(couponsApi.issueCouponToUser).not.toHaveBeenCalled();
+    });
+
+    it('issues with prefix and numeric string validity days', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.couponPromotionId = 'p1';
+      c.couponPrefix = '  VIP ';
+      c.couponValidityDays = '45';
+      couponsApi.issueCouponToUser.and.returnValue(of({ code: 'X1' } as any));
+      c.issueCoupon();
+      expect(couponsApi.issueCouponToUser).toHaveBeenCalledWith(
+        jasmine.objectContaining({ prefix: 'VIP', validity_days: 45 }),
+      );
+      expect(c.couponIssuedCode()).toBe('X1');
+    });
+
+    it('issues with no prefix and invalid validity days (null)', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.couponPromotionId = 'p1';
+      c.couponPrefix = '   ';
+      c.couponValidityDays = 0;
+      c.issueCoupon();
+      expect(couponsApi.issueCouponToUser).toHaveBeenCalledWith(
+        jasmine.objectContaining({ prefix: null, validity_days: null }),
+      );
+    });
+
+    it('issue coupon error sets error', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.couponPromotionId = 'p1';
+      couponsApi.issueCouponToUser.and.returnValue(throwError(() => ({})));
+      c.issueCoupon();
+      expect(c.couponIssueError()).toBeTruthy();
+      expect(c.couponIssueBusy()).toBeFalse();
+    });
+
+    it('copyIssuedCoupon no-ops without a code', () => {
+      const c = build();
+      c.copyIssuedCoupon();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('copyIssuedCoupon writes to clipboard when available', () => {
+      const writeText = jasmine.createSpy('writeText').and.resolveTo(undefined);
+      const original = (navigator as any).clipboard;
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+      });
+      const c = build();
+      c.couponIssuedCode.set('CODE');
+      c.copyIssuedCoupon();
+      expect(writeText).toHaveBeenCalledWith('CODE');
+      expect(toast.success).toHaveBeenCalled();
+      Object.defineProperty(navigator, 'clipboard', {
+        value: original,
+        configurable: true,
+      });
+    });
+
+    it('copyIssuedCoupon tolerates missing clipboard', () => {
+      const original = (navigator as any).clipboard;
+      Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+      const c = build();
+      c.couponIssuedCode.set('CODE');
+      c.copyIssuedCoupon();
+      expect(toast.success).toHaveBeenCalled();
+      Object.defineProperty(navigator, 'clipboard', {
+        value: original,
+        configurable: true,
+      });
+    });
   });
 
-  it('clears editable profile fields when the profile omits note and lock reason', () => {
-    const cmp = created();
-    usersApi.getProfile.and.returnValue(
-      of({
-        user: { ...baseUser(), vip: false },
-        addresses: [],
-        orders: [],
-        tickets: [],
-        security_events: [],
-      } as any),
-    );
-    cmp.select(baseUser() as any);
-    expect(cmp.adminNote).toBe('');
-    expect(cmp.lockedReason).toBe('');
+  describe('security lock/unlock', () => {
+    it('lockForMinutes no-ops without user', () => {
+      const c = build();
+      c.lockForMinutes(5);
+      expect(usersApi.updateSecurity).not.toHaveBeenCalled();
+    });
+
+    it('lockForMinutes success with profile and reason', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(makeProfile());
+      c.lockedReason = '  abuse ';
+      usersApi.updateSecurity.and.returnValue(
+        of({ locked_reason: 'abuse', password_reset_required: true } as any),
+      );
+      c.lockForMinutes(10);
+      expect(usersApi.updateSecurity).toHaveBeenCalled();
+      expect(c.lockedReason).toBe('abuse');
+      expect(c.passwordResetRequired).toBeTrue();
+      expect(c.securityBusy()).toBeFalse();
+    });
+
+    it('lockForMinutes clamps invalid minutes and works without profile/reason', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(null);
+      c.lockedReason = '   ';
+      usersApi.updateSecurity.and.returnValue(of(null as any));
+      c.lockForMinutes(NaN as any);
+      const payload = usersApi.updateSecurity.calls.mostRecent().args[1] as any;
+      expect(payload.locked_reason).toBeNull();
+      expect(c.lockedReason).toBe('');
+      expect(c.passwordResetRequired).toBeFalse();
+    });
+
+    it('lockForMinutes error toasts', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.updateSecurity.and.returnValue(throwError(() => ({})));
+      c.lockForMinutes(5);
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.securityBusy()).toBeFalse();
+    });
+
+    it('unlock no-ops without user', () => {
+      const c = build();
+      c.unlock();
+      expect(usersApi.updateSecurity).not.toHaveBeenCalled();
+    });
+
+    it('unlock success with profile', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(makeProfile());
+      usersApi.updateSecurity.and.returnValue(of({ password_reset_required: true } as any));
+      c.unlock();
+      expect(c.lockedReason).toBe('');
+      expect(c.passwordResetRequired).toBeTrue();
+    });
+
+    it('unlock success without profile', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(null);
+      usersApi.updateSecurity.and.returnValue(of(null as any));
+      c.unlock();
+      expect(c.passwordResetRequired).toBeFalse();
+    });
+
+    it('unlock error toasts', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.updateSecurity.and.returnValue(throwError(() => ({})));
+      c.unlock();
+      expect(toast.error).toHaveBeenCalled();
+    });
+
+    it('saveSecurity no-ops without user', () => {
+      const c = build();
+      c.saveSecurity();
+      expect(usersApi.updateSecurity).not.toHaveBeenCalled();
+    });
+
+    it('saveSecurity success with profile and reason', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(makeProfile());
+      c.lockedReason = ' reason ';
+      usersApi.updateSecurity.and.returnValue(
+        of({ locked_reason: 'reason', password_reset_required: false } as any),
+      );
+      c.saveSecurity();
+      expect(c.lockedReason).toBe('reason');
+    });
+
+    it('saveSecurity success without profile and empty reason', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.profile.set(null);
+      c.lockedReason = '  ';
+      usersApi.updateSecurity.and.returnValue(of(null as any));
+      c.saveSecurity();
+      const payload = usersApi.updateSecurity.calls.mostRecent().args[1] as any;
+      expect(payload.locked_reason).toBeNull();
+    });
+
+    it('saveSecurity error toasts', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.updateSecurity.and.returnValue(throwError(() => ({})));
+      c.saveSecurity();
+      expect(toast.error).toHaveBeenCalled();
+    });
   });
 
-  it('defaults sessions to an empty list when the response is null', () => {
-    const cmp = created();
-    admin.listUserSessions.and.returnValue(of(null as any));
-    cmp.select(baseUser() as any);
-    expect(cmp.sessions()).toEqual([]);
+  describe('password reset email', () => {
+    it('no-ops without user', () => {
+      const c = build();
+      c.sendPasswordResetEmail();
+      expect(usersApi.resendPasswordReset).not.toHaveBeenCalled();
+    });
+
+    it('aborts when confirm declined', () => {
+      spyOn(window, 'confirm').and.returnValue(false);
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.sendPasswordResetEmail();
+      expect(usersApi.resendPasswordReset).not.toHaveBeenCalled();
+    });
+
+    it('sends on confirm and toasts success', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.sendPasswordResetEmail();
+      expect(usersApi.resendPasswordReset).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalled();
+      expect(c.passwordResetEmailBusy()).toBeFalse();
+    });
+
+    it('error toasts and resets busy', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.resendPasswordReset.and.returnValue(throwError(() => ({})));
+      c.sendPasswordResetEmail();
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.passwordResetEmailBusy()).toBeFalse();
+    });
+  });
+
+  describe('email verification', () => {
+    it('loadEmailHistory no-ops without user', () => {
+      const c = build();
+      c.loadEmailHistory();
+      expect(usersApi.getEmailVerificationHistory).not.toHaveBeenCalled();
+    });
+
+    it('loadEmailHistory success', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.getEmailVerificationHistory.and.returnValue(of({ items: [] } as any));
+      c.loadEmailHistory();
+      expect(c.emailHistory()).toBeTruthy();
+      expect(c.emailHistoryLoading()).toBeFalse();
+    });
+
+    it('loadEmailHistory error', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.getEmailVerificationHistory.and.returnValue(throwError(() => ({})));
+      c.loadEmailHistory();
+      expect(c.emailHistoryError()).toBeTruthy();
+    });
+
+    it('resendVerification no-ops without user', () => {
+      const c = build();
+      c.resendVerification();
+      expect(usersApi.resendEmailVerification).not.toHaveBeenCalled();
+    });
+
+    it('resendVerification success reloads history', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.resendVerification();
+      expect(toast.success).toHaveBeenCalled();
+      expect(usersApi.getEmailVerificationHistory).toHaveBeenCalled();
+      expect(c.emailVerificationBusy()).toBeFalse();
+    });
+
+    it('resendVerification error toasts', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.resendEmailVerification.and.returnValue(throwError(() => ({})));
+      c.resendVerification();
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.emailVerificationBusy()).toBeFalse();
+    });
+
+    it('overrideVerification no-ops without user', () => {
+      const c = build();
+      c.overrideVerification();
+      expect(c.overrideVerificationOpen()).toBeFalse();
+    });
+
+    it('overrideVerification no-ops for already-verified user', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ email_verified: true }));
+      c.overrideVerification();
+      expect(c.overrideVerificationOpen()).toBeFalse();
+    });
+
+    it('overrideVerification opens for unverified user', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ email_verified: false }));
+      c.overrideVerification();
+      expect(c.overrideVerificationOpen()).toBeTrue();
+    });
+
+    it('closeOverrideVerification resets', () => {
+      const c = build();
+      c.overrideVerificationOpen.set(true);
+      c.overrideVerificationPassword = 'x';
+      c.closeOverrideVerification();
+      expect(c.overrideVerificationOpen()).toBeFalse();
+      expect(c.overrideVerificationPassword).toBe('');
+    });
+
+    it('confirmOverrideVerification no-ops without user', () => {
+      const c = build();
+      c.confirmOverrideVerification();
+      expect(usersApi.overrideEmailVerification).not.toHaveBeenCalled();
+    });
+
+    it('confirmOverrideVerification closes when already verified', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ email_verified: true }));
+      c.overrideVerificationOpen.set(true);
+      c.confirmOverrideVerification();
+      expect(c.overrideVerificationOpen()).toBeFalse();
+    });
+
+    it('confirmOverrideVerification requires password', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ email_verified: false }));
+      c.overrideVerificationPassword = '  ';
+      c.confirmOverrideVerification();
+      expect(c.overrideVerificationError()).toBeTruthy();
+    });
+
+    it('confirmOverrideVerification requires password when field empty (default branch)', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ email_verified: false }));
+      c.overrideVerificationPassword = '';
+      c.confirmOverrideVerification();
+      expect(c.overrideVerificationError()).toBeTruthy();
+      expect(usersApi.overrideEmailVerification).not.toHaveBeenCalled();
+    });
+
+    it('confirmOverrideVerification leaves non-matching users untouched', () => {
+      const c = build();
+      const user = makeUser({ id: 'u1', email_verified: false });
+      const other = makeUser({ id: 'u2', email_verified: false });
+      c.users.set([user, other]);
+      c.selectedUser.set(user);
+      c.overrideVerificationPassword = 'pw';
+      usersApi.overrideEmailVerification.and.returnValue(of({ email_verified: true } as any));
+      c.confirmOverrideVerification();
+      const verified = c.users().map((u) => `${u.id}:${u.email_verified}`);
+      expect(verified).toEqual(['u1:true', 'u2:false']);
+    });
+
+    it('confirmOverrideVerification success updates lists and profile', () => {
+      const c = build();
+      const user = makeUser({ id: 'u1', email_verified: false });
+      c.users.set([user]);
+      c.profile.set(makeProfile());
+      c.selectedUser.set(user);
+      c.overrideVerificationPassword = 'pw';
+      usersApi.overrideEmailVerification.and.returnValue(of({ email_verified: true } as any));
+      c.confirmOverrideVerification();
+      expect(c.selectedUser()?.email_verified).toBeTrue();
+      expect(c.users()[0].email_verified).toBeTrue();
+      expect(c.overrideVerificationOpen()).toBeFalse();
+    });
+
+    it('confirmOverrideVerification success without profile', () => {
+      const c = build();
+      const user = makeUser({ id: 'u1', email_verified: false });
+      c.users.set([user]);
+      c.profile.set(null);
+      c.selectedUser.set(user);
+      c.overrideVerificationPassword = 'pw';
+      usersApi.overrideEmailVerification.and.returnValue(of({ email_verified: true } as any));
+      c.confirmOverrideVerification();
+      expect(c.profile()).toBeNull();
+      expect(c.selectedUser()?.email_verified).toBeTrue();
+    });
+
+    it('confirmOverrideVerification error detail', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ email_verified: false }));
+      c.overrideVerificationPassword = 'pw';
+      usersApi.overrideEmailVerification.and.returnValue(
+        throwError(() => ({ error: { detail: 'bad' } })),
+      );
+      c.confirmOverrideVerification();
+      expect(c.overrideVerificationError()).toBe('bad');
+      expect(c.emailVerificationBusy()).toBeFalse();
+    });
+
+    it('confirmOverrideVerification generic error', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ email_verified: false }));
+      c.overrideVerificationPassword = 'pw';
+      usersApi.overrideEmailVerification.and.returnValue(throwError(() => ({})));
+      c.confirmOverrideVerification();
+      expect(c.overrideVerificationError()).toBe('adminUi.users.errors.verificationOverridden');
+    });
+  });
+
+  describe('impersonate', () => {
+    it('no-ops without user', () => {
+      const c = build();
+      c.impersonate();
+      expect(usersApi.impersonate).not.toHaveBeenCalled();
+    });
+
+    it('opens a new window with the token', () => {
+      const openSpy = spyOn(window, 'open').and.returnValue(null);
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.impersonate.and.returnValue(of({ access_token: 'tok' } as any));
+      c.impersonate();
+      expect(openSpy).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalled();
+      expect(c.impersonateBusy()).toBeFalse();
+    });
+
+    it('errors when token missing', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.impersonate.and.returnValue(of({ access_token: '' } as any));
+      c.impersonate();
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.impersonateBusy()).toBeFalse();
+    });
+
+    it('errors on request failure', () => {
+      const c = build();
+      c.selectedUser.set(makeUser());
+      usersApi.impersonate.and.returnValue(throwError(() => ({})));
+      c.impersonate();
+      expect(toast.error).toHaveBeenCalled();
+      expect(c.impersonateBusy()).toBeFalse();
+    });
+  });
+
+  describe('presentation helpers', () => {
+    it('identityLabel formats the user identity', () => {
+      const c = build();
+      expect(typeof c.identityLabel(makeUser())).toBe('string');
+    });
+
+    it('rolePillClass returns a class per role', () => {
+      const c = build();
+      expect(c.rolePillClass('owner')).toContain('indigo');
+      expect(c.rolePillClass('admin')).toContain('emerald');
+      expect(c.rolePillClass('support')).toContain('sky');
+      expect(c.rolePillClass('fulfillment')).toContain('amber');
+      expect(c.rolePillClass('content')).toContain('fuchsia');
+      expect(c.rolePillClass('customer')).toContain('slate');
+    });
+
+    it('sessionDeviceLabel handles empty, short and long user agents', () => {
+      const c = build();
+      expect(c.sessionDeviceLabel({ user_agent: '' } as AdminUserSession)).toBe(
+        'adminUi.users.unknownDevice',
+      );
+      expect(c.sessionDeviceLabel({ user_agent: 'Mozilla' } as AdminUserSession)).toBe('Mozilla');
+      const long = 'x'.repeat(200);
+      const out = c.sessionDeviceLabel({ user_agent: long } as AdminUserSession);
+      expect(out.endsWith('…')).toBeTrue();
+      expect(out.length).toBe(141);
+    });
+  });
+
+  describe('pii reveal', () => {
+    it('togglePiiReveal no-ops when not allowed', () => {
+      auth.role.and.returnValue('customer');
+      const c = build();
+      const before = c.piiReveal();
+      c.togglePiiReveal();
+      expect(c.piiReveal()).toBe(before);
+    });
+
+    it('togglePiiReveal toggles and reloads with no selected user', () => {
+      auth.role.and.returnValue('admin');
+      const c = build();
+      c.selectedUser.set(null);
+      const before = c.piiReveal();
+      c.togglePiiReveal();
+      expect(c.piiReveal()).toBe(!before);
+      expect(usersApi.search).toHaveBeenCalled();
+    });
+
+    it('togglePiiReveal reloads selected user detail', () => {
+      auth.role.and.returnValue('admin');
+      const c = build();
+      c.selectedUser.set(makeUser());
+      c.togglePiiReveal();
+      expect(admin.userAliases).toHaveBeenCalled();
+      expect(usersApi.getProfile).toHaveBeenCalled();
+    });
+  });
+
+  describe('load (search) flows', () => {
+    it('retryLoad triggers a search', () => {
+      const c = build();
+      c.retryLoad();
+      expect(usersApi.search).toHaveBeenCalled();
+    });
+
+    it('load success keeps refreshed selected user', () => {
+      const c = build();
+      const sel = makeUser({ id: 'u1', role: 'customer' });
+      c.selectedUser.set(sel);
+      usersApi.search.and.returnValue(
+        of({ items: [makeUser({ id: 'u1', role: 'admin' })], meta: { total: 1 } } as any),
+      );
+      c.retryLoad();
+      expect(c.selectedUser()?.role).toBe('admin');
+      expect(c.meta()).toEqual({ total: 1 } as any);
+    });
+
+    it('load success when selected user not in new items', () => {
+      const c = build();
+      c.selectedUser.set(makeUser({ id: 'gone' }));
+      usersApi.search.and.returnValue(of({ items: [makeUser({ id: 'u1' })], meta: null } as any));
+      c.retryLoad();
+      expect(c.selectedUser()?.id).toBe('gone');
+    });
+
+    it('load handles undefined items/meta', () => {
+      const c = build();
+      usersApi.search.and.returnValue(of({} as any));
+      c.retryLoad();
+      expect(c.users()).toEqual([]);
+      expect(c.meta()).toBeNull();
+    });
+
+    it('load auto-selects by id', () => {
+      const c = build();
+      c['autoSelectAfterLoad'] = true;
+      c['pendingPrefillSearch'] = 'U1';
+      usersApi.search.and.returnValue(
+        of({ items: [makeUser({ id: 'u1', username: 'name', email: 'e@x.com' })], meta: null } as any),
+      );
+      c.retryLoad();
+      expect(c.selectedUser()?.id).toBe('u1');
+    });
+
+    it('load auto-selects by username', () => {
+      const c = build();
+      c['autoSelectAfterLoad'] = true;
+      c['pendingPrefillSearch'] = 'alice';
+      usersApi.search.and.returnValue(
+        of({
+          items: [makeUser({ id: 'u1', username: 'alice', email: 'e@x.com' })],
+          meta: null,
+        } as any),
+      );
+      c.retryLoad();
+      expect(c.selectedUser()?.username).toBe('alice');
+    });
+
+    it('load auto-selects by email', () => {
+      const c = build();
+      c['autoSelectAfterLoad'] = true;
+      c['pendingPrefillSearch'] = 'find@x.com';
+      usersApi.search.and.returnValue(
+        of({
+          items: [makeUser({ id: 'u1', username: 'name', email: 'find@x.com' })],
+          meta: null,
+        } as any),
+      );
+      c.retryLoad();
+      expect(c.selectedUser()?.email).toBe('find@x.com');
+    });
+
+    it('load auto-selects first item when no match', () => {
+      const c = build();
+      c['autoSelectAfterLoad'] = true;
+      c['pendingPrefillSearch'] = 'nomatch';
+      usersApi.search.and.returnValue(
+        of({ items: [makeUser({ id: 'first' })], meta: null } as any),
+      );
+      c.retryLoad();
+      expect(c.selectedUser()?.id).toBe('first');
+    });
+
+    it('load auto-select tolerates items with empty id/username/email fields', () => {
+      const c = build();
+      c['autoSelectAfterLoad'] = true;
+      c['pendingPrefillSearch'] = 'zzz';
+      usersApi.search.and.returnValue(
+        of({
+          items: [makeUser({ id: '', username: '', email: '' })],
+          meta: null,
+        } as any),
+      );
+      c.retryLoad();
+      expect(c.selectedUser()).toBeTruthy();
+    });
+
+    it('load auto-select with null pending needle still picks first', () => {
+      const c = build();
+      c['autoSelectAfterLoad'] = true;
+      c['pendingPrefillSearch'] = null;
+      usersApi.search.and.returnValue(
+        of({ items: [makeUser({ id: 'only' })], meta: null } as any),
+      );
+      c.retryLoad();
+      expect(c.selectedUser()?.id).toBe('only');
+    });
+
+    it('load 403 with pii reveal disables pii and retries', () => {
+      auth.role.and.returnValue('admin');
+      const c = build();
+      c.piiReveal.set(true);
+      let call = 0;
+      usersApi.search.and.callFake(() => {
+        call += 1;
+        if (call === 1) return throwError(() => ({ status: 403 }));
+        return of({ items: [], meta: null } as any);
+      });
+      c.retryLoad();
+      expect(c.piiReveal()).toBeFalse();
+      expect(toast.error).toHaveBeenCalled();
+      expect(call).toBe(2);
+    });
+
+    it('load generic error sets error message and request id', () => {
+      const c = build();
+      c.piiReveal.set(false);
+      usersApi.search.and.returnValue(throwError(() => ({ status: 500 })));
+      c.retryLoad();
+      expect(c.error()).toBe('adminUi.users.errors.load');
+      expect(c.loading()).toBeFalse();
+    });
+
+    it('load 403 without pii reveal is treated as generic error', () => {
+      const c = build();
+      c.piiReveal.set(false);
+      usersApi.search.and.returnValue(throwError(() => ({ status: 403 })));
+      c.retryLoad();
+      expect(c.error()).toBe('adminUi.users.errors.load');
+    });
+  });
+
+  describe('detail loaders (via select)', () => {
+    it('loadAliases error path sets aliases error', () => {
+      admin.userAliases.and.returnValue(throwError(() => ({})));
+      const c = build();
+      c.select(makeUser());
+      expect(c.aliasesError()).toBeTruthy();
+      expect(c.aliasesLoading()).toBeFalse();
+    });
+
+    it('loadProfile success populates fields', () => {
+      const p = makeProfile();
+      p.user.vip = true;
+      p.user.admin_note = 'note';
+      p.user.locked_reason = 'lr';
+      p.user.password_reset_required = true;
+      usersApi.getProfile.and.returnValue(of(p));
+      const c = build();
+      c.select(makeUser());
+      expect(c.vip).toBeTrue();
+      expect(c.adminNote).toBe('note');
+      expect(c.lockedReason).toBe('lr');
+      expect(c.passwordResetRequired).toBeTrue();
+    });
+
+    it('loadProfile handles null-ish profile fields', () => {
+      usersApi.getProfile.and.returnValue(of(null as any));
+      const c = build();
+      c.select(makeUser());
+      expect(c.vip).toBeFalse();
+      expect(c.adminNote).toBe('');
+      expect(c.profileLoading()).toBeFalse();
+    });
+
+    it('loadProfile error sets profile error', () => {
+      usersApi.getProfile.and.returnValue(throwError(() => ({})));
+      const c = build();
+      c.select(makeUser());
+      expect(c.profileError()).toBeTruthy();
+    });
+
+    it('loadSessions success stores sessions', () => {
+      admin.listUserSessions.and.returnValue(of([{ id: 's1' }] as any));
+      const c = build();
+      c.select(makeUser());
+      expect(c.sessions()?.length).toBe(1);
+    });
+
+    it('loadSessions handles null and error', () => {
+      admin.listUserSessions.and.returnValue(of(null as any));
+      const c = build();
+      c.select(makeUser());
+      expect(c.sessions()).toEqual([]);
+
+      admin.listUserSessions.and.returnValue(throwError(() => ({})));
+      c.select(makeUser());
+      expect(c.sessionsError()).toBeTruthy();
+    });
   });
 });
