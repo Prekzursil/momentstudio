@@ -1,0 +1,1268 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { DomSanitizer } from '@angular/platform-browser';
+import { ActivatedRoute } from '@angular/router';
+import { Subject, of, throwError } from 'rxjs';
+
+import { AdminComponent } from './admin.component';
+
+/**
+ * Branch-fill behavioural suite for AdminComponent.
+ *
+ * Drives the (very large) admin content component through the remaining
+ * untaken branch paths left by the existing specs. The component is
+ * instantiated directly (same pattern as the sibling specs) so individual
+ * methods can be exercised in isolation with focused service mocks. Every
+ * test asserts real behaviour — returned values, mutated component state,
+ * service calls with concrete arguments, or toast/error side effects — and
+ * targets a specific previously-untaken branch (the "other" side of a
+ * default/guard/ternary), never a no-assert coverage probe.
+ */
+
+type RouteStub = {
+  snapshot: { data: Record<string, unknown>; queryParams: Record<string, unknown> };
+  data: Subject<Record<string, unknown>>;
+  queryParams: Subject<Record<string, unknown>>;
+};
+
+function createRouteStub(section = 'home', query: Record<string, unknown> = {}): RouteStub {
+  return {
+    snapshot: { data: { section }, queryParams: query },
+    data: new Subject<Record<string, unknown>>(),
+    queryParams: new Subject<Record<string, unknown>>(),
+  };
+}
+
+interface Harness {
+  component: AdminComponent;
+  admin: any;
+  adminProducts: any;
+  blog: any;
+  fxAdmin: any;
+  taxesAdmin: any;
+  auth: any;
+  cmsPrefs: any;
+  toast: jasmine.SpyObj<any>;
+  translate: any;
+  markdown: any;
+  sanitizer: any;
+  route: RouteStub;
+}
+
+function makeAdminSpy(): any {
+  const methods = [
+    'products', 'coupons', 'lowStock', 'audit', 'getMaintenance', 'setMaintenance',
+    'content', 'getContent', 'createContent', 'updateContentBlock', 'deleteContent',
+    'getCategories', 'createCategory', 'updateCategory', 'deleteCategory',
+    'getCategoryTranslations', 'upsertCategoryTranslation', 'deleteCategoryTranslation',
+    'createProduct', 'updateProduct', 'getProduct', 'deleteProduct', 'duplicateProduct',
+    'uploadProductImage', 'deleteProductImage', 'transferOwner', 'revokeSessions',
+    'userAliases', 'updateUserRole', 'updateOrderStatus', 'createCoupon', 'updateCoupon',
+    'invalidateCouponStripeMappings', 'listContentVersions', 'getContentVersion',
+    'rollbackContentVersion', 'uploadContentImage', 'updateContentImageFocalPoint',
+    'listContentPages', 'renameContentPage', 'updateContentTranslationStatus',
+    'getSitemapPreview', 'validateStructuredData', 'deleteContentRedirect',
+    'exportContentRedirects', 'importContentRedirects', 'upsertContentRedirect',
+    'previewFindReplaceContent', 'applyFindReplaceContent', 'linkCheckContent',
+    'fetchSocialThumbnail', 'sendScheduledReport', 'createPagePreviewToken',
+    'createHomePreviewToken', 'listFeaturedCollections', 'createFeaturedCollection',
+    'updateFeaturedCollection', 'reorderCategories', 'listContentRedirects',
+    'linkCheckContentPreview',
+  ];
+  const spy: any = jasmine.createSpyObj('AdminService', methods);
+  for (const m of methods) spy[m].and.returnValue(of(undefined));
+  spy.products.and.returnValue(of([]));
+  spy.coupons.and.returnValue(of([]));
+  spy.lowStock.and.returnValue(of([]));
+  spy.audit.and.returnValue(of({ products: [], content: [], security: [] }));
+  spy.getMaintenance.and.returnValue(of({ enabled: false }));
+  spy.content.and.returnValue(of([]));
+  spy.getCategories.and.returnValue(of([]));
+  spy.listFeaturedCollections.and.returnValue(of([]));
+  spy.userAliases.and.returnValue(of({ aliases: [] }));
+  return spy;
+}
+
+function makeCmsPrefs(): any {
+  return {
+    mode: jasmine.createSpy('mode').and.returnValue('basic'),
+    previewDevice: jasmine.createSpy('previewDevice').and.returnValue('desktop'),
+    previewLayout: jasmine.createSpy('previewLayout').and.returnValue('stacked'),
+    previewLang: jasmine.createSpy('previewLang').and.returnValue('en'),
+    previewTheme: jasmine.createSpy('previewTheme').and.returnValue('light'),
+    translationLayout: jasmine.createSpy('translationLayout').and.returnValue('tabbed'),
+    setMode: jasmine.createSpy('setMode'),
+    setPreviewDevice: jasmine.createSpy('setPreviewDevice'),
+    setPreviewLayout: jasmine.createSpy('setPreviewLayout'),
+  };
+}
+
+function createComponent(route: RouteStub = createRouteStub()): Harness {
+  const admin = makeAdminSpy();
+  const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
+  adminProducts.search.and.returnValue(of({ items: [], total: 0 }));
+  const blog = jasmine.createSpyObj('BlogService', [
+    'listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin',
+    'unhideCommentAdmin', 'deleteComment', 'createPreviewToken',
+  ]);
+  blog.listFlaggedComments.and.returnValue(of([]));
+  blog.createPreviewToken.and.returnValue(of({ token: 't', expires_at: '' }));
+  const fxAdmin = jasmine.createSpyObj('FxAdminService', [
+    'getStatus', 'listOverrideAudit', 'restoreOverrideFromAudit', 'clearOverride', 'setOverride',
+  ]);
+  fxAdmin.getStatus.and.returnValue(of({ override: null }));
+  fxAdmin.listOverrideAudit.and.returnValue(of([]));
+  const taxesAdmin = jasmine.createSpyObj('TaxesAdminService', [
+    'listGroups', 'createGroup', 'updateGroup', 'deleteGroup', 'upsertRate', 'deleteRate',
+  ]);
+  taxesAdmin.listGroups.and.returnValue(of([]));
+  const auth = {
+    role: jasmine.createSpy('role').and.returnValue('owner'),
+    loadCurrentUser: jasmine.createSpy('loadCurrentUser').and.returnValue(of(null)),
+  };
+  const cmsPrefs = makeCmsPrefs();
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+  const translate = { instant: (k: string, p?: any) => (p ? `${k}:${JSON.stringify(p)}` : k) };
+  const markdown = { render: (v: string) => `<p>${v}</p>` };
+  const sanitizer = {
+    bypassSecurityTrustHtml: (v: string) => v,
+    bypassSecurityTrustResourceUrl: (v: string) => `safe:${v}`,
+  } as unknown as DomSanitizer;
+
+  const component = new AdminComponent(
+    {
+      snapshot: route.snapshot,
+      data: route.data.asObservable(),
+      queryParams: route.queryParams.asObservable(),
+    } as unknown as ActivatedRoute,
+    admin,
+    adminProducts,
+    blog,
+    fxAdmin,
+    taxesAdmin,
+    auth as any,
+    cmsPrefs,
+    toast,
+    translate as any,
+    markdown as any,
+    sanitizer,
+  );
+
+  return {
+    component, admin, adminProducts, blog, fxAdmin, taxesAdmin, auth,
+    cmsPrefs, toast, translate, markdown, sanitizer, route,
+  };
+}
+
+describe('AdminComponent — branch fill', () => {
+  let h: Harness;
+  let c: any;
+
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* ignore */
+    }
+    h = createComponent();
+    c = h.component as any;
+  });
+
+  describe('parsePageBlocksDraft', () => {
+    it('returns [] for non-array / empty blocks', () => {
+      expect(c.parsePageBlocksDraft(null)).toEqual([]);
+      expect(c.parsePageBlocksDraft({ blocks: 'nope' })).toEqual([]);
+      expect(c.parsePageBlocksDraft({ blocks: [] })).toEqual([]);
+    });
+
+    it('skips non-object entries, unknown types and duplicate keys', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          null,
+          'string-entry',
+          { type: 'unknown_kind' },
+          { type: 'text', key: 'dup', body_markdown: { en: 'A', ro: '' } },
+          { type: 'text', key: 'dup', body_markdown: { en: 'B', ro: '' } },
+        ],
+      });
+      expect(result.length).toBe(1);
+      expect(result[0].key).toBe('dup');
+    });
+
+    it('derives a fallback key from type + index and honours enabled:false', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', enabled: false, body_markdown: { en: 'x', ro: '' } }],
+      });
+      expect(result[0].key).toBe('text_1');
+      expect(result[0].enabled).toBe(false);
+    });
+
+    it('parses columns with breakpoint and a custom 3-column layout', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'columns',
+            key: 'cols',
+            breakpoint: 'lg',
+            columns: [
+              null,
+              { title: { en: 'c1', ro: '' }, body_markdown: { en: 'b1', ro: '' } },
+              { title: { en: 'c2', ro: '' }, body_markdown: { en: 'b2', ro: '' } },
+              { title: { en: 'c3', ro: '' }, body_markdown: { en: 'b3', ro: '' } },
+              { title: { en: 'c4', ro: '' }, body_markdown: { en: 'b4', ro: '' } },
+            ],
+          },
+        ],
+      });
+      expect(result[0].columns.length).toBe(3);
+      expect(result[0].columns_breakpoint).toBe('lg');
+    });
+
+    it('falls back to md breakpoint when invalid and keeps default columns when fewer than 2', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{ type: 'columns', key: 'cols2', columns_breakpoint: 'xx', columns: [{ title: { en: 'only', ro: '' }, body_markdown: { en: '', ro: '' } }] }],
+      });
+      expect(result[0].columns_breakpoint).toBe('md');
+      expect(result[0].columns.length).toBe(2);
+    });
+
+    it('parses cta with new-tab flag', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{ type: 'cta', key: 'cta', cta_url: '  /go  ', cta_new_tab: true, cta_label: { en: 'Go', ro: '' } }],
+      });
+      expect(result[0].cta_url).toBe('/go');
+      expect(result[0].cta_new_tab).toBe(true);
+    });
+
+    it('parses faq and testimonials items (and ignores invalid item entries)', () => {
+      const faq = c.parsePageBlocksDraft({
+        blocks: [{ type: 'faq', key: 'faq', items: [null, { question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] }],
+      });
+      expect(faq[0].faq_items.length).toBe(1);
+      const test = c.parsePageBlocksDraft({
+        blocks: [{ type: 'testimonials', key: 't', items: [3, { quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] }],
+      });
+      expect(test[0].testimonials.length).toBe(1);
+    });
+
+    it('parses product_grid with collection source and array slugs', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{
+          type: 'product_grid', key: 'pg', source: 'COLLECTION',
+          collection_slug: ' col ', category_slug: ' cat ',
+          product_slugs: ['a', 'a', 'b', 3], limit: 100,
+        }],
+      });
+      expect(result[0].product_grid_source).toBe('collection');
+      expect(result[0].product_grid_collection_slug).toBe('col');
+      expect(result[0].product_grid_product_slugs).toBe('a\nb');
+      expect(result[0].product_grid_limit).toBe(24);
+    });
+
+    it('parses product_grid with products source and comma/newline string slugs and non-finite limit', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{ type: 'product_grid', key: 'pg2', source: 'products', product_slugs: 'a, b\nc', limit: 'NaN' }],
+      });
+      expect(result[0].product_grid_source).toBe('products');
+      expect(result[0].product_grid_product_slugs).toBe('a\nb\nc');
+      expect(result[0].product_grid_limit).toBe(6);
+    });
+
+    it('parses form block with newsletter type and support topic', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{ type: 'form', key: 'f', form_type: 'NEWSLETTER', topic: 'support' }],
+      });
+      expect(result[0].form_type).toBe('newsletter');
+      expect(result[0].form_topic).toBe('support');
+    });
+
+    it('parses image, gallery (skipping urlless entries), banner and carousel blocks', () => {
+      const image = c.parsePageBlocksDraft({
+        blocks: [{ type: 'image', key: 'img', url: ' /u ', link_url: ' /l ', focal_x: 10, focal_y: 20 }],
+      });
+      expect(image[0].url).toBe('/u');
+      expect(image[0].link_url).toBe('/l');
+
+      const gallery = c.parsePageBlocksDraft({
+        blocks: [{ type: 'gallery', key: 'g', images: [null, { url: '' }, { url: ' /pic ' }] }],
+      });
+      expect(gallery[0].images.length).toBe(1);
+      expect(gallery[0].images[0].url).toBe('/pic');
+
+      const banner = c.parsePageBlocksDraft({ blocks: [{ type: 'banner', key: 'b', slide: {} }] });
+      expect(banner[0].type).toBe('banner');
+
+      const carousel = c.parsePageBlocksDraft({
+        blocks: [{ type: 'carousel', key: 'car', slides: [{}, {}], settings: {} }],
+      });
+      expect(carousel[0].slides.length).toBe(2);
+
+      const carouselEmpty = c.parsePageBlocksDraft({ blocks: [{ type: 'carousel', key: 'car2', slides: 'nope' }] });
+      expect(carouselEmpty[0].slides.length).toBe(1);
+    });
+  });
+
+  describe('insertPageMediaFiles', () => {
+    const png = (name = 'My Photo.png') => new File(['x'], name, { type: 'image/png' });
+
+    beforeEach(() => {
+      h.admin.uploadContentImage.and.returnValue(
+        of({ images: [{ url: 'https://cdn/test.png', focal_x: 40, focal_y: 60 }] }),
+      );
+    });
+
+    it('returns early when no valid image files survive normalisation', async () => {
+      await c.insertPageMediaFiles('page.about', 0, [new File(['x'], 'x.txt', { type: 'text/plain' })]);
+      expect(h.toast.error).toHaveBeenCalled();
+      expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+    });
+
+    it('inserts a single image block when one file is dropped on an image-capable page', async () => {
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      const blocks = c.pageBlocks['page.about'];
+      expect(blocks.length).toBe(1);
+      expect(blocks[0].type).toBe('image');
+      expect(blocks[0].url).toBe('https://cdn/test.png');
+      expect(blocks[0].alt.en).toBe('My Photo');
+      expect(h.toast.success).toHaveBeenCalled();
+    });
+
+    it('inserts a gallery block when multiple files are dropped and gallery is allowed', async () => {
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      const block = c.pageBlocks['page.about'].find((b: any) => b.type === 'gallery');
+      expect(block).toBeTruthy();
+      expect(block.images.length).toBe(2);
+    });
+
+    it('inserts multiple image blocks when gallery is disallowed but image is allowed', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['image']);
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      const imgs = c.pageBlocks['page.about'].filter((b: any) => b.type === 'image');
+      expect(imgs.length).toBe(2);
+    });
+
+    it('rejects a single file when neither image nor gallery is allowed', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['text']);
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'].length).toBe(0);
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.blockTypeNotAllowed');
+    });
+
+    it('rejects multiple files when neither image nor gallery is allowed', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['text']);
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      expect(c.pageBlocks['page.about'].length).toBe(0);
+      expect(h.toast.error).toHaveBeenCalled();
+    });
+
+    it('returns without inserting when uploads all fail to yield an image url', async () => {
+      h.admin.uploadContentImage.and.returnValue(of({ images: [] }));
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'].length).toBe(0);
+    });
+  });
+
+  describe('insertHomeMediaFiles', () => {
+    const png = (name = 'Home Pic.png') => new File(['x'], name, { type: 'image/png' });
+
+    beforeEach(() => {
+      h.admin.uploadContentImage.and.returnValue(
+        of({ images: [{ url: 'https://cdn/home.png', focal_x: 50, focal_y: 50 }] }),
+      );
+    });
+
+    it('returns early when normalisation removes every file', async () => {
+      await c.insertHomeMediaFiles(0, [new File(['x'], 'x.pdf', { type: 'application/pdf' })]);
+      expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+    });
+
+    it('inserts a single home image block for one file', async () => {
+      c.homeBlocks = [];
+      await c.insertHomeMediaFiles(0, [png()]);
+      expect(c.homeBlocks.length).toBe(1);
+      expect(c.homeBlocks[0].url).toBe('https://cdn/home.png');
+      expect(c.homeBlocks[0].alt.en).toBe('Home Pic');
+    });
+
+    it('inserts a home gallery block for multiple files', async () => {
+      c.homeBlocks = [];
+      await c.insertHomeMediaFiles(0, [png('a.png'), png('b.png')]);
+      const gallery = c.homeBlocks.find((b: any) => b.type === 'gallery');
+      expect(gallery.images.length).toBe(2);
+    });
+
+    it('returns without inserting when no upload produced a url', async () => {
+      h.admin.uploadContentImage.and.returnValue(of({ images: [] }));
+      c.homeBlocks = [];
+      await c.insertHomeMediaFiles(0, [png()]);
+      expect(c.homeBlocks.length).toBe(0);
+    });
+  });
+
+  describe('drag helpers', () => {
+    function dragEvent(dt: Partial<DataTransfer> | null): DragEvent {
+      return { preventDefault: () => undefined, dataTransfer: dt } as unknown as DragEvent;
+    }
+
+    it('dragEventHasFiles detects files, Files type, and absence', () => {
+      expect(c.dragEventHasFiles(dragEvent(null))).toBe(false);
+      expect(c.dragEventHasFiles(dragEvent({ files: [new File(['x'], 'a.png')] } as any))).toBe(true);
+      expect(c.dragEventHasFiles(dragEvent({ files: [], types: ['Files'] } as any))).toBe(true);
+      expect(c.dragEventHasFiles(dragEvent({ files: [], types: ['text/plain'] } as any))).toBe(false);
+    });
+
+    it('dragEventHasFiles swallows errors thrown while reading types', () => {
+      const dt = {
+        files: { length: 0 } as any,
+        get types(): string[] {
+          throw new Error('boom');
+        },
+      };
+      expect(c.dragEventHasFiles(dragEvent(dt as any))).toBe(false);
+    });
+  });
+
+  // A meta payload that yields one populated draft of every block type.
+  function richBlocksMeta(): Record<string, unknown> {
+    return {
+      blocks: [
+        { type: 'text', key: 'text_b', body_markdown: { en: 'B', ro: 'b' } },
+        {
+          type: 'columns', key: 'cols_b', breakpoint: 'sm',
+          columns: [
+            { title: { en: 't1', ro: '' }, body_markdown: { en: 'x1', ro: '' } },
+            { title: { en: 't2', ro: '' }, body_markdown: { en: 'x2', ro: '' } },
+          ],
+        },
+        { type: 'cta', key: 'cta_b', title: { en: 'T', ro: '' }, body_markdown: { en: 'B', ro: '' }, cta_label: { en: 'L', ro: '' }, cta_url: '/u', cta_new_tab: true },
+        { type: 'faq', key: 'faq_b', items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] },
+        { type: 'testimonials', key: 'test_b', items: [{ quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] },
+        { type: 'product_grid', key: 'pg_cat', source: 'category', category_slug: 'cat', limit: 8 },
+        { type: 'product_grid', key: 'pg_col', source: 'collection', collection_slug: 'col' },
+        { type: 'product_grid', key: 'pg_prd', source: 'products', product_slugs: 'a,b,a' },
+        { type: 'form', key: 'form_c', form_type: 'contact', topic: 'support' },
+        { type: 'form', key: 'form_n', form_type: 'newsletter' },
+        { type: 'image', key: 'img_b', url: '/img', alt: { en: 'a', ro: 'r' }, caption: { en: 'c', ro: '' }, link_url: '/l', focal_x: 10, focal_y: 20 },
+        { type: 'gallery', key: 'gal_b', images: [{ url: '/g', alt: { en: 'a', ro: 'r' } }] },
+        { type: 'banner', key: 'ban_b', slide: { image_url: '/b', alt: { en: 'a', ro: 'r' } } },
+        { type: 'carousel', key: 'car_b', slides: [{ image_url: '/c', alt: { en: 'a', ro: 'r' } }], settings: {} },
+      ],
+    };
+  }
+
+  describe('buildPageBlocksMeta', () => {
+    it('serialises every block type and keeps requires_auth when supported and flagged', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft(richBlocksMeta());
+      c.pageBlocks['page.about'][0].layout = null; // exercise layout default fallback
+      c.pageBlocksRequiresAuth['page.about'] = true;
+      const meta = c.buildPageBlocksMeta('page.about');
+      const blocks = meta['blocks'] as any[];
+      expect(blocks.length).toBe(14);
+      expect(meta['version']).toBe(2);
+      expect(meta['requires_auth']).toBe(true);
+      const pgPrd = blocks.find((b) => b.key === 'pg_prd');
+      expect(pgPrd.product_slugs).toEqual(['a', 'b']);
+      const catB = blocks.find((b) => b.key === 'pg_cat');
+      expect(catB.category_slug).toBe('cat');
+      const colB = blocks.find((b) => b.key === 'pg_col');
+      expect(colB.collection_slug).toBe('col');
+      const formC = blocks.find((b) => b.key === 'form_c');
+      expect(formC.topic).toBe('support');
+    });
+
+    it('drops requires_auth when the flag is unset', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 't', body_markdown: { en: 'x', ro: '' } }] });
+      c.pageBlocksRequiresAuth['page.about'] = false;
+      const meta = c.buildPageBlocksMeta('page.about');
+      expect('requires_auth' in meta).toBe(false);
+    });
+  });
+
+  describe('computePagePublishChecklistLocal', () => {
+    it('flags empty sections and missing translations for every empty block type', () => {
+      c.pageBlocksNeedsTranslationEn['page.about'] = true;
+      c.pageBlocksNeedsTranslationRo['page.about'] = true;
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'text', key: 'text_e' },
+          { type: 'columns', key: 'cols_e' },
+          { type: 'cta', key: 'cta_e' },
+          { type: 'faq', key: 'faq_e' },
+          { type: 'testimonials', key: 'test_e' },
+          { type: 'product_grid', key: 'pg_cat_e', source: 'category' },
+          { type: 'product_grid', key: 'pg_col_e', source: 'collection' },
+          { type: 'product_grid', key: 'pg_prd_e', source: 'products' },
+          { type: 'image', key: 'img_e' },
+          { type: 'gallery', key: 'gal_e' },
+          { type: 'banner', key: 'ban_e' },
+          { type: 'carousel', key: 'car_e' },
+        ],
+      });
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.missingTranslations).toEqual(['en', 'ro']);
+      expect(res.emptySections.length).toBeGreaterThanOrEqual(12);
+    });
+
+    it('reports an all-disabled page as a single empty section', () => {
+      const blocks = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'x', enabled: false, body_markdown: { en: 'hi', ro: '' } }] });
+      c.pageBlocks['page.about'] = blocks;
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.emptySections).toEqual(['adminUi.content.publishChecklist.emptyAllDisabled']);
+    });
+
+    it('flags missing alt text for populated media blocks with blank alt', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'image', key: 'img_a', url: '/i' },
+          { type: 'gallery', key: 'gal_a', images: [{ url: '/g' }] },
+          { type: 'banner', key: 'ban_a', slide: { image_url: '/b' } },
+          { type: 'carousel', key: 'car_a', slides: [{ image_url: '/c' }] },
+          { type: 'form', key: 'form_ok' },
+        ],
+      });
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.missingAlt.length).toBeGreaterThanOrEqual(8);
+      expect(res.emptySections.length).toBe(0);
+    });
+
+    it('treats fully populated content blocks as complete', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft(richBlocksMeta());
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.emptySections.length).toBe(0);
+    });
+  });
+
+  describe('publish checklist modal flow', () => {
+    it('computes a local checklist and merges link issues from the preview endpoint', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(of({ issues: [{ url: '/x', status: 404 }] }));
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }] });
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistOpen).toBe(true);
+      expect(c.pagePublishChecklistLoading).toBe(false);
+      expect(c.pagePublishChecklistResult.linkIssues.length).toBe(1);
+      expect(c.pagePublishChecklistHasIssues()).toBe(true);
+    });
+
+    it('falls back to empty link issues when the preview returns none', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(of({}));
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistResult.linkIssues).toEqual([]);
+    });
+
+    it('surfaces a link-check error detail', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(throwError(() => ({ error: { detail: 'nope' } })));
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistError).toBe('nope');
+    });
+
+    it('uses the default link-check error when no detail is present', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(throwError(() => ({})));
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistError).toBe('adminUi.content.publishChecklist.errors.linkCheck');
+    });
+
+    it('hasIssues returns false without a result', () => {
+      c.pagePublishChecklistResult = null;
+      expect(c.pagePublishChecklistHasIssues()).toBe(false);
+    });
+
+    it('confirm saves with the checklist bypass; no-op without a key', () => {
+      const save = spyOn(c, 'savePageBlocks');
+      c.pagePublishChecklistKey = null;
+      c.confirmPagePublishChecklist();
+      expect(save).not.toHaveBeenCalled();
+      c.pagePublishChecklistKey = 'page.about';
+      c.confirmPagePublishChecklist();
+      expect(save).toHaveBeenCalledWith('page.about', { bypassChecklist: true });
+      expect(c.pagePublishChecklistOpen).toBe(false);
+    });
+  });
+
+  describe('savePageBlocks', () => {
+    beforeEach(() => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }] });
+    });
+
+    it('opens the publish checklist when publishing without bypass', () => {
+      const open = spyOn(c, 'openPagePublishChecklist');
+      c.pageBlocksStatus['page.about'] = 'published';
+      c.savePageBlocks('page.about');
+      expect(open).toHaveBeenCalledWith('page.about');
+    });
+
+    it('saves a published page (bypassing checklist) with ISO publish window and maps a published response', () => {
+      c.pageBlocksStatus['page.about'] = 'published';
+      c.pageBlocksPublishedAt['page.about'] = '2026-01-01T10:00';
+      c.pageBlocksPublishedUntil['page.about'] = '2026-02-01T10:00';
+      h.admin.updateContentBlock.and.returnValue(of({ status: 'published', published_at: '2026-01-01T10:00:00Z', published_until: '2026-02-01T10:00:00Z', meta: { requires_auth: true } }));
+      c.savePageBlocks('page.about', { bypassChecklist: true });
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.published_at).toContain('2026-01-01');
+      expect(c.pageBlocksStatus['page.about']).toBe('published');
+      expect(c.pageBlocksRequiresAuth['page.about']).toBe(true);
+      expect(c.pageBlocksMessage['page.about']).toBe('adminUi.site.pages.builder.success.save');
+    });
+
+    it('maps a review response and clears the publish window for drafts', () => {
+      c.pageBlocksStatus['page.about'] = 'draft';
+      h.admin.updateContentBlock.and.returnValue(of({ status: 'review', meta: {} }));
+      c.savePageBlocks('page.about');
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.published_at).toBeNull();
+      expect(c.pageBlocksStatus['page.about']).toBe('review');
+    });
+
+    it('maps an unknown response status to draft', () => {
+      c.pageBlocksStatus['page.about'] = 'draft';
+      h.admin.updateContentBlock.and.returnValue(of({ status: 'weird', meta: {} }));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksStatus['page.about']).toBe('draft');
+    });
+
+    it('handles a 409 conflict by surfacing the save error', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+      h.admin.getContent.and.returnValue(of({ status: 'draft', meta: {} }));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksError['page.about']).toBe('adminUi.site.pages.builder.errors.save');
+    });
+
+    it('creates the page on a 404 and maps the created review response', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(of({ status: 'review', meta: { requires_auth: true } }));
+      c.savePageBlocks('page.about');
+      expect(h.admin.createContent).toHaveBeenCalled();
+      expect(c.pageBlocksStatus['page.about']).toBe('review');
+      expect(c.pageBlocksMessage['page.about']).toBe('adminUi.site.pages.builder.success.save');
+    });
+
+    it('reports an error when the 404 create path also fails', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(throwError(() => ({ status: 500 })));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksError['page.about']).toBe('adminUi.site.pages.builder.errors.save');
+    });
+
+    it('reports a generic save error for other failures', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksError['page.about']).toBe('adminUi.site.pages.builder.errors.save');
+    });
+
+    it('publishes with an empty publish window (null dates) and a null response meta, refreshing a matching preview', () => {
+      c.pageBlocksStatus['page.about'] = 'published';
+      c.pageBlocksPublishedAt['page.about'] = '';
+      c.pageBlocksPublishedUntil['page.about'] = '';
+      c.pagePreviewForSlug = 'about';
+      const refresh = spyOn(c, 'refreshPagePreview');
+      h.admin.updateContentBlock.and.returnValue(of({ status: 'published', meta: null }));
+      c.savePageBlocks('page.about', { bypassChecklist: true });
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.published_at).toBeNull();
+      expect(c.pageBlocksRequiresAuth['page.about']).toBe(false);
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it('maps a created published response with a publish window and refreshes a matching preview', () => {
+      c.pagePreviewForSlug = 'about';
+      const refresh = spyOn(c, 'refreshPagePreview');
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(
+        of({ status: 'published', published_at: '2026-01-01T00:00:00Z', published_until: '2026-02-01T00:00:00Z', meta: null }),
+      );
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksStatus['page.about']).toBe('published');
+      expect(c.pageBlocksPublishedAt['page.about']).toBeTruthy();
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it('maps a created draft response for an unknown status', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(of({ status: 'mystery', meta: {} }));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksStatus['page.about']).toBe('draft');
+    });
+  });
+
+  describe('loadSections', () => {
+    it('parses meta.blocks with built-ins, duplicates, every custom type and key collisions', () => {
+      h.admin.getContent.and.returnValue(
+        of({
+          meta: {
+            blocks: [
+              null,
+              { type: 'story' },
+              { type: 'story' }, // duplicate built-in skipped
+              { type: 'bogus_type' }, // unknown -> skipped
+              { type: 'text', key: 'dup', body_markdown: { en: 'B', ro: '' } },
+              { type: 'text', key: 'dup' }, // key collision -> dup-1
+              { type: 'columns', breakpoint: 'lg', columns: [{ title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } }, { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } }] },
+              { type: 'cta', cta_url: '/u', cta_new_tab: true },
+              { type: 'faq', items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] },
+              { type: 'testimonials', items: [{ quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] },
+              { type: 'image', url: '/i', link_url: '/l' },
+              { type: 'gallery', images: [null, { url: '' }, { url: '/g' }] },
+              { type: 'banner', slide: {} },
+              { type: 'carousel', slides: [{}, {}], settings: {} },
+            ],
+          },
+        }),
+      );
+      c.loadSections();
+      const keys = c.homeBlocks.map((b: any) => b.key);
+      expect(keys).toContain('dup');
+      expect(keys).toContain('dup-1');
+      expect(c.homeBlocks.some((b: any) => b.type === 'story')).toBe(true);
+      expect(c.cmsHomeDraft.isReady()).toBe(true);
+    });
+
+    it('derives sections from meta.sections when no blocks are present', () => {
+      h.admin.getContent.and.returnValue(
+        of({ meta: { sections: [null, { id: 'story', enabled: false }, { id: 'collections' }] } }),
+      );
+      c.loadSections();
+      const story = c.homeBlocks.find((b: any) => b.type === 'story');
+      expect(story.enabled).toBe(false);
+      expect(c.homeBlocks.some((b: any) => b.type === 'featured_collections')).toBe(true);
+    });
+
+    it('falls back to legacy meta.order', () => {
+      h.admin.getContent.and.returnValue(of({ meta: { order: ['story', 'new'] } }));
+      c.loadSections();
+      expect(c.homeBlocks.some((b: any) => b.type === 'new_arrivals')).toBe(true);
+    });
+
+    it('uses defaults when meta has no usable layout', () => {
+      h.admin.getContent.and.returnValue(of({ meta: { blocks: ['only-a-string'] } }));
+      c.loadSections();
+      expect(c.homeBlocks.length).toBeGreaterThan(0);
+    });
+
+    it('falls back to defaults and forgets the version on error', () => {
+      c.contentVersions['home.sections'] = { version: 5 };
+      h.admin.getContent.and.returnValue(throwError(() => ({ status: 500 })));
+      c.loadSections();
+      expect(c.contentVersions['home.sections']).toBeUndefined();
+      expect(c.homeBlocks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('saveSections', () => {
+    function populateHomeBlocks(): void {
+      h.admin.getContent.and.returnValue(
+        of({
+          meta: {
+            blocks: [
+              { type: 'story' },
+              { type: 'text', key: 'tx', body_markdown: { en: 'B', ro: '' } },
+              { type: 'columns', key: 'co', columns: [{ title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } }, { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } }] },
+              { type: 'cta', key: 'ct', cta_url: '/u' },
+              { type: 'faq', key: 'fa', items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] },
+              { type: 'testimonials', key: 'te', items: [{ quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] },
+              { type: 'image', key: 'im', url: '/i' },
+              { type: 'gallery', key: 'ga', images: [{ url: '/g' }] },
+              { type: 'banner', key: 'ba', slide: { image_url: '/b' } },
+              { type: 'carousel', key: 'ca', slides: [{ image_url: '/c' }], settings: {} },
+            ],
+          },
+        }),
+      );
+      c.loadSections();
+    }
+
+    it('serialises every block type and built-in section then persists', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(of({ meta: {} }));
+      const refresh = spyOn(c, 'refreshHomePreview');
+      c.saveSections();
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.meta.version).toBe(2);
+      expect(payload.meta.sections.some((s: any) => s.id === 'story')).toBe(true);
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.success.save');
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it('surfaces a conflict error', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+      h.admin.getContent.and.returnValue(of({ meta: {} }));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.errors.save');
+    });
+
+    it('creates content on a 404 and reports success', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(of({ meta: {} }));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.success.save');
+    });
+
+    it('reports an error when the 404 create path fails', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(throwError(() => ({ status: 500 })));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.errors.save');
+    });
+
+    it('reports a generic error for other failures', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.errors.save');
+    });
+  });
+
+  describe('normalizeHomeSectionId aliases', () => {
+    it('maps legacy aliases to canonical section ids', () => {
+      expect(c.normalizeHomeSectionId('collections')).toBe('featured_collections');
+      expect(c.normalizeHomeSectionId('featured')).toBe('featured_products');
+      expect(c.normalizeHomeSectionId('bestsellers')).toBe('featured_products');
+      expect(c.normalizeHomeSectionId('sales')).toBe('sale_products');
+      expect(c.normalizeHomeSectionId('new')).toBe('new_arrivals');
+      expect(c.normalizeHomeSectionId('recent')).toBe('recently_viewed');
+      expect(c.normalizeHomeSectionId('recentlyViewed')).toBe('recently_viewed');
+      expect(c.normalizeHomeSectionId('totally-unknown')).toBeNull();
+      expect(c.normalizeHomeSectionId(42)).toBeNull();
+      expect(c.normalizeHomeSectionId('   ')).toBeNull();
+    });
+  });
+
+  describe('collections', () => {
+    it('loads collections and resets to empty on error', () => {
+      h.admin.listFeaturedCollections.and.returnValue(of([{ slug: 's', name: 'n' }]));
+      c.loadCollections();
+      expect(c.featuredCollections.length).toBe(1);
+      h.admin.listFeaturedCollections.and.returnValue(throwError(() => ({})));
+      c.loadCollections();
+      expect(c.featuredCollections).toEqual([]);
+    });
+
+    it('editCollection copies a collection into the form with description/product fallbacks', () => {
+      c.editCollection({ slug: 's', name: 'n', description: null, product_ids: null } as any);
+      expect(c.editingCollection).toBe('s');
+      expect(c.collectionForm.description).toBe('');
+      expect(c.collectionForm.product_ids).toEqual([]);
+    });
+
+    it('saveCollection requires a name', () => {
+      c.collectionForm = { name: '', description: '', product_ids: [] };
+      c.saveCollection();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.home.collections.errors.required');
+    });
+
+    it('saveCollection creates a new collection and prepends it', () => {
+      c.editingCollection = null;
+      c.collectionForm = { name: 'New', description: 'd', product_ids: [] };
+      h.admin.createFeaturedCollection.and.returnValue(of({ slug: 'new', name: 'New' }));
+      c.saveCollection();
+      expect(c.featuredCollections[0].slug).toBe('new');
+      expect(c.collectionMessage).toBe('adminUi.home.collections.success.saved');
+    });
+
+    it('saveCollection updates an existing collection in place', () => {
+      c.featuredCollections = [{ slug: 'x', name: 'old' }];
+      c.editingCollection = 'x';
+      c.collectionForm = { name: 'upd', description: '', product_ids: [] };
+      h.admin.updateFeaturedCollection.and.returnValue(of({ slug: 'x', name: 'upd' }));
+      c.saveCollection();
+      expect(c.featuredCollections[0].name).toBe('upd');
+    });
+
+    it('saveCollection reports an error toast on failure', () => {
+      c.editingCollection = null;
+      c.collectionForm = { name: 'New', description: '', product_ids: [] };
+      h.admin.createFeaturedCollection.and.returnValue(throwError(() => ({})));
+      c.saveCollection();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.home.collections.errors.save');
+    });
+  });
+
+  describe('loadCategories', () => {
+    it('sorts categories by sort_order with a default of 0 and resets on error', () => {
+      h.admin.getCategories.and.returnValue(of([{ slug: 'b', sort_order: 2 }, { slug: 'a' }]));
+      c.loadCategories();
+      expect(c.categories[0].slug).toBe('a');
+      expect(c.categories[0].sort_order).toBe(0);
+      h.admin.getCategories.and.returnValue(throwError(() => ({})));
+      c.loadCategories();
+      expect(c.categories).toEqual([]);
+    });
+  });
+
+  describe('parse/serialise edge cases', () => {
+    it('parsePageBlocksDraft handles non-string type/source, limit breaks and empty slugs', () => {
+      const manySlugs = Array.from({ length: 60 }, (_, i) => `s${i}`);
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 123 }, // non-string type -> skipped (covers ternary else)
+          { type: 'faq', key: 'faqmax', items: Array.from({ length: 25 }, () => ({ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } })) },
+          { type: 'testimonials', key: 'tmax', items: Array.from({ length: 15 }, () => ({ quote_markdown: { en: 'q', ro: '' }, author: { en: 'a', ro: '' }, role: { en: 'r', ro: '' } })) },
+          { type: 'product_grid', key: 'pgnum', source: 5, product_slugs: ['  ', 'ok', ...manySlugs] },
+          { type: 'product_grid', key: 'pgstr', source: 'products', product_slugs: ['x', ...manySlugs].join(',') },
+        ],
+      });
+      expect(result.find((b: any) => b.key === 'faqmax').faq_items.length).toBe(20);
+      expect(result.find((b: any) => b.key === 'tmax').testimonials.length).toBe(12);
+      const pgnum = result.find((b: any) => b.key === 'pgnum');
+      expect(pgnum.product_grid_source).toBe('category'); // non-string source falls through
+      expect(pgnum.product_grid_product_slugs.split('\n').length).toBe(50);
+      expect(result.find((b: any) => b.key === 'pgstr').product_grid_product_slugs.split('\n').length).toBe(50);
+    });
+
+    it('buildPageBlocksMeta tolerates blocks with missing array/limit fields', () => {
+      const blocks = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'columns', key: 'co' },
+          { type: 'faq', key: 'fa' },
+          { type: 'testimonials', key: 'te' },
+          { type: 'carousel', key: 'ca' },
+          { type: 'product_grid', key: 'pg', source: 'collection' },
+          { type: 'product_grid', key: 'pg2', source: 'products' },
+        ],
+      });
+      // Null out the array/limit fields to exercise the `|| []` / `|| 6` fallbacks.
+      const co = blocks.find((b: any) => b.key === 'co'); co.columns = null;
+      const fa = blocks.find((b: any) => b.key === 'fa'); fa.faq_items = null;
+      const te = blocks.find((b: any) => b.key === 'te'); te.testimonials = null;
+      const ca = blocks.find((b: any) => b.key === 'ca'); ca.slides = null;
+      const pg = blocks.find((b: any) => b.key === 'pg'); pg.product_grid_collection_slug = undefined;
+      const pg2 = blocks.find((b: any) => b.key === 'pg2');
+      pg2.product_grid_product_slugs = ['  ', 'a', ...Array.from({ length: 60 }, (_, i) => `s${i}`)].join(',');
+      pg2.product_grid_limit = 'abc';
+      c.pageBlocks['page.about'] = blocks;
+      const meta = c.buildPageBlocksMeta('page.about');
+      const out = meta['blocks'] as any[];
+      expect(out.find((b) => b.key === 'co').columns).toEqual([]);
+      expect(out.find((b) => b.key === 'pg2').product_slugs.length).toBe(50);
+      expect(out.find((b) => b.key === 'pg2').limit).toBe(6);
+    });
+
+    it('computePagePublishChecklistLocal tolerates blocks with null collections', () => {
+      const blocks = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'columns', key: 'co' },
+          { type: 'faq', key: 'fa' },
+          { type: 'testimonials', key: 'te' },
+          { type: 'gallery', key: 'ga' },
+          { type: 'carousel', key: 'ca' },
+        ],
+      });
+      blocks.find((b: any) => b.key === 'co').columns = null;
+      blocks.find((b: any) => b.key === 'fa').faq_items = null;
+      blocks.find((b: any) => b.key === 'te').testimonials = null;
+      blocks.find((b: any) => b.key === 'ga').images = null;
+      blocks.find((b: any) => b.key === 'ca').slides = null;
+      c.pageBlocks['page.about'] = blocks;
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.emptySections.length).toBe(5);
+    });
+
+    it('loadSections covers limit breaks, non-string fields, null entries and empty carousels', () => {
+      h.admin.getContent.and.returnValue(
+        of({
+          meta: {
+            blocks: [
+              { type: 456 }, // non-string type
+              { type: 'columns', key: 'co4', columns: [null, { title: { en: 'a', ro: '' } }, { title: { en: 'b', ro: '' } }, { title: { en: 'c', ro: '' } }, { title: { en: 'd', ro: '' } }] },
+              { type: 'cta', key: 'cta_n', cta_url: 99 },
+              { type: 'faq', key: 'faq_max', items: [null, ...Array.from({ length: 25 }, () => ({ question: { en: 'q', ro: '' } }))] },
+              { type: 'testimonials', key: 't_max', items: [3, ...Array.from({ length: 15 }, () => ({ quote_markdown: { en: 'q', ro: '' } }))] },
+              { type: 'image', key: 'img_n', url: 12, link_url: 7 },
+              { type: 'gallery', key: 'gal_n', images: [{ url: 5 }] },
+              { type: 'carousel', key: 'car_empty', slides: [] },
+            ],
+          },
+        }),
+      );
+      c.loadSections();
+      expect(c.homeBlocks.find((b: any) => b.key === 'faq_max').faq_items.length).toBe(20);
+      expect(c.homeBlocks.find((b: any) => b.key === 't_max').testimonials.length).toBe(12);
+      expect(c.homeBlocks.find((b: any) => b.key === 'car_empty').slides.length).toBe(1);
+      expect(c.homeBlocks.find((b: any) => b.key === 'co4').columns.length).toBe(3);
+    });
+
+    it('loadSections uses an empty meta when the block has no meta', () => {
+      h.admin.getContent.and.returnValue(of({}));
+      c.loadSections();
+      expect(c.homeBlocks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('insertPageMediaFiles createdKey + array fallbacks', () => {
+    const png = (n = 'a.png') => new File(['x'], n, { type: 'image/png' });
+    beforeEach(() => {
+      h.admin.uploadContentImage.and.returnValue(of({ images: [{ url: 'https://cdn/x.png', focal_x: 50, focal_y: 50 }] }));
+    });
+
+    it('aborts single-image insertion when the block could not be created', async () => {
+      spyOn(c, 'insertPageBlockAt').and.returnValue(null);
+      delete c.pageBlocks['page.about'];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'] || []).toEqual([]);
+    });
+
+    it('aborts gallery insertion when the block could not be created', async () => {
+      spyOn(c, 'insertPageBlockAt').and.returnValue(null);
+      delete c.pageBlocks['page.about'];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      expect(c.pageBlocks['page.about'] || []).toEqual([]);
+    });
+
+    it('stops multi-image insertion as soon as a block cannot be created', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['image']);
+      spyOn(c, 'insertPageBlockAt').and.returnValue(null);
+      delete c.pageBlocks['page.about'];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      expect(c.pageBlocks['page.about'] || []).toEqual([]);
+    });
+
+    it('leaves an unrelated block untouched while inserting a single image', async () => {
+      const existing = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'keep', body_markdown: { en: 'x', ro: '' } }] });
+      c.pageBlocks['page.about'] = existing;
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'].some((b: any) => b.key === 'keep')).toBe(true);
+      expect(c.pageBlocks['page.about'].some((b: any) => b.type === 'image')).toBe(true);
+    });
+  });
+
+  function blogPost(key: string, meta: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): any {
+    return { key, title: key, status: 'published', meta, ...extra };
+  }
+
+  describe('blog pins', () => {
+    it('pinnedSlotFromMeta interprets boolean/number/string pinned flags and pin_order', () => {
+      expect(c.pinnedSlotFromMeta(null)).toBeNull();
+      expect(c.pinnedSlotFromMeta({ pinned: false })).toBeNull();
+      expect(c.pinnedSlotFromMeta({ pinned: 2 })).toBeNull(); // number !== 1 -> not pinned
+      expect(c.pinnedSlotFromMeta({ pinned: 1, pin_order: 3 })).toBe(3);
+      expect(c.pinnedSlotFromMeta({ pinned: 'yes', pin_order: '4' })).toBe(4);
+      expect(c.pinnedSlotFromMeta({ pinned: 'no' })).toBeNull();
+      expect(c.pinnedSlotFromMeta({ pinned: true, pin_order: 'bad' })).toBe(1);
+      expect(c.pinnedSlotFromMeta({ pinned: true, pin_order: -5 })).toBe(1);
+    });
+
+    it('blogPinnedPosts sorts by order then publish date then updated_at', () => {
+      c.contentBlocks = [
+        blogPost('blog.a', { pinned: true, pin_order: 1 }, { published_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01' }),
+        blogPost('blog.b', { pinned: true, pin_order: 1 }, { published_at: '2026-03-01T00:00:00Z', updated_at: '2026-02-01' }),
+        blogPost('blog.c', { pinned: true, pin_order: 1 }, { updated_at: '2026-05-01' }),
+        blogPost('blog.d', { pinned: true, pin_order: 1 }, { updated_at: '2026-04-01' }),
+        blogPost('blog.x', {}),
+      ];
+      const order = c.blogPinnedPosts().map((p: any) => p.key);
+      // Same order: newest published first (b), then those without a date sorted by updated_at desc (c before d), then a.
+      expect(order[0]).toBe('blog.b');
+      expect(order).not.toContain('blog.x');
+      expect(order.indexOf('blog.c')).toBeLessThan(order.indexOf('blog.d'));
+    });
+
+    it('nextBlogPinOrder returns one past the max pinned order', () => {
+      c.contentBlocks = [
+        blogPost('blog.a', { pinned: true, pin_order: 2 }),
+        blogPost('blog.b', { pinned: true, pin_order: 5 }),
+        blogPost('blog.c', {}),
+      ];
+      expect(c.nextBlogPinOrder()).toBe(6);
+      c.contentBlocks = [blogPost('blog.z', {})];
+      expect(c.nextBlogPinOrder()).toBe(1);
+    });
+
+    it('onBlogPinDrop ignores empty / identical / in-flight drops', async () => {
+      c.draggingBlogPinKey = null;
+      await c.onBlogPinDrop('blog.a');
+      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+
+      c.draggingBlogPinKey = 'blog.a';
+      c.blogPinsSaving = true;
+      await c.onBlogPinDrop('blog.b');
+      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+      c.blogPinsSaving = false;
+
+      c.draggingBlogPinKey = 'blog.a';
+      await c.onBlogPinDrop('blog.a');
+      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+    });
+
+    it('onBlogPinDrop returns when a key is not among the pinned posts', async () => {
+      c.contentBlocks = [blogPost('blog.a', { pinned: true, pin_order: 1 })];
+      c.draggingBlogPinKey = 'blog.a';
+      await c.onBlogPinDrop('blog.missing');
+      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+    });
+
+    it('onBlogPinDrop reorders pinned posts and persists changed orders', async () => {
+      c.contentBlocks = [
+        blogPost('blog.a', { pinned: true, pin_order: 1 }),
+        blogPost('blog.b', { pinned: true, pin_order: 2 }),
+        blogPost('blog.c', { pinned: true, pin_order: 3 }),
+      ];
+      h.admin.updateContentBlock.and.returnValue(of({ key: 'blog.a' }));
+      const reload = spyOn(c, 'reloadContentBlocks');
+      c.draggingBlogPinKey = 'blog.a';
+      await c.onBlogPinDrop('blog.c');
+      expect(h.admin.updateContentBlock).toHaveBeenCalled();
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.blog.pins.success.reordered');
+      expect(reload).toHaveBeenCalled();
+    });
+
+    it('onBlogPinDrop reports an error when persistence fails', async () => {
+      c.contentBlocks = [
+        blogPost('blog.a', { pinned: true, pin_order: 1 }),
+        blogPost('blog.b', { pinned: true, pin_order: 2 }),
+      ];
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+      spyOn(c, 'reloadContentBlocks');
+      c.draggingBlogPinKey = 'blog.b';
+      await c.onBlogPinDrop('blog.a');
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.blog.pins.errors.reorder');
+      expect(c.blogPinsSaving).toBe(false);
+    });
+
+    it('onBlogPinDrop is a no-op when the new ordering matches the current one', async () => {
+      c.contentBlocks = [
+        blogPost('blog.a', { pinned: true, pin_order: 1 }),
+        blogPost('blog.b', { pinned: true, pin_order: 2 }),
+        blogPost('blog.c', { pinned: true, pin_order: 3 }),
+      ];
+      c.draggingBlogPinKey = 'blog.a';
+      // Dropping a (index 0) onto its immediate successor b reinserts a at index 0,
+      // so every order is unchanged and no update request is issued.
+      await c.onBlogPinDrop('blog.b');
+      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createBlogPost', () => {
+    function primeCreate(over: Record<string, unknown> = {}): void {
+      c.blogCreate = {
+        baseLang: 'en', status: 'draft', published_at: '', published_until: '',
+        title: 'My Post', body_markdown: 'Body', summary: '', tags: '', series: '',
+        cover_image_url: '', reading_time_minutes: '', pinned: false, pin_order: '',
+        includeTranslation: false, translationTitle: '', translationBody: '', ...over,
+      };
+    }
+
+    it('requires a slug derived from the title', async () => {
+      primeCreate({ title: '' });
+      await c.createBlogPost();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.blog.errors.slugRequiredTitle', 'adminUi.blog.errors.slugRequiredCopy');
+      expect(h.admin.createContent).not.toHaveBeenCalled();
+    });
+
+    it('requires both a title and a body', async () => {
+      primeCreate({ body_markdown: '   ' });
+      await c.createBlogPost();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.blog.errors.titleBodyRequired');
+    });
+
+    it('creates a fully populated post with meta, publish window and translation', async () => {
+      primeCreate({
+        summary: 'Sum', tags: 'a, b', series: 'S', cover_image_url: '/cov',
+        reading_time_minutes: '5', pinned: true, pin_order: '3',
+        published_at: '2026-01-01T10:00', published_until: '2026-02-01T10:00',
+        includeTranslation: true, translationTitle: 'TT', translationBody: 'TB',
+      });
+      h.admin.createContent.and.returnValue(of({ key: 'blog.my-post' }));
+      h.admin.updateContentBlock.and.returnValue(of({ key: 'blog.my-post' }));
+      const load = spyOn(c, 'loadBlogEditor');
+      spyOn(c, 'reloadContentBlocks');
+      await c.createBlogPost();
+      const meta = h.admin.createContent.calls.mostRecent().args[1].meta;
+      expect(meta.summary).toEqual({ en: 'Sum' });
+      expect(meta.tags).toEqual(['a', 'b']);
+      expect(meta.series).toBe('S');
+      expect(meta.cover_image_url).toBe('/cov');
+      expect(meta.reading_time_minutes).toBe(5);
+      expect(meta.pin_order).toBe(3);
+      expect(h.admin.updateContentBlock).toHaveBeenCalled();
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.blog.success.created');
+      expect(load).toHaveBeenCalledWith('blog.my-post');
+    });
+
+    it('falls back to nextBlogPinOrder when pinned without a valid order, and to base title/body for an empty translation', async () => {
+      c.contentBlocks = [blogPost('blog.z', { pinned: true, pin_order: 4 })];
+      primeCreate({ pinned: true, pin_order: '', includeTranslation: true, translationTitle: '', translationBody: 'only body' });
+      h.admin.createContent.and.returnValue(of({ key: 'blog.my-post' }));
+      h.admin.updateContentBlock.and.returnValue(of({}));
+      spyOn(c, 'loadBlogEditor');
+      spyOn(c, 'reloadContentBlocks');
+      await c.createBlogPost();
+      expect(h.admin.createContent.calls.mostRecent().args[1].meta.pin_order).toBe(5);
+      expect(h.admin.updateContentBlock.calls.mostRecent().args[1].title).toBe('My Post');
+    });
+
+    it('retries with a suffixed slug when the key already exists', async () => {
+      primeCreate();
+      let calls = 0;
+      h.admin.createContent.and.callFake((key: string) => {
+        calls += 1;
+        if (calls === 1) return throwError(() => ({ error: { detail: 'Content key exists' } }));
+        return of({ key });
+      });
+      spyOn(c, 'loadBlogEditor');
+      spyOn(c, 'reloadContentBlocks');
+      await c.createBlogPost();
+      expect(calls).toBe(2);
+      expect(h.admin.createContent.calls.mostRecent().args[0]).toBe('blog.my-post-2');
+    });
+
+    it('reports a create error for non-conflict failures', async () => {
+      primeCreate();
+      h.admin.createContent.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })));
+      await c.createBlogPost();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.blog.errors.create');
+    });
+
+    it('skips the translation request when both translation fields are empty', async () => {
+      primeCreate({ includeTranslation: true, translationTitle: '', translationBody: '' });
+      h.admin.createContent.and.returnValue(of({ key: 'blog.my-post' }));
+      spyOn(c, 'loadBlogEditor');
+      spyOn(c, 'reloadContentBlocks');
+      await c.createBlogPost();
+      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setBlogEditLang', () => {
+    it('returns immediately without a selected post', () => {
+      c.selectedBlogKey = null;
+      c.setBlogEditLang('ro');
+      expect(h.admin.getContent).not.toHaveBeenCalled();
+    });
+
+    it('loads the base language and applies status + publish window', () => {
+      c.selectedBlogKey = 'blog.a';
+      c.blogBaseLang = 'en';
+      h.admin.getContent.and.returnValue(of({ title: 'T', body_markdown: 'B', status: 'published', published_at: '2026-01-01T00:00:00Z', published_until: '2026-02-01T00:00:00Z', meta: { summary: { en: 's' } } }));
+      c.setBlogEditLang('en');
+      expect(c.blogForm.status).toBe('published');
+      expect(c.blogForm.published_at).toBeTruthy();
+      expect(h.admin.getContent).toHaveBeenCalledWith('blog.a', undefined);
+    });
+
+    it('loads a translation language without touching status and falls back to existing meta', () => {
+      c.selectedBlogKey = 'blog.a';
+      c.blogBaseLang = 'en';
+      c.blogForm.status = 'draft';
+      c.blogMeta = { existing: true };
+      h.admin.getContent.and.returnValue(of({ title: 'T', body_markdown: 'B', status: 'published', meta: null }));
+      c.setBlogEditLang('ro');
+      expect(c.blogForm.status).toBe('draft');
+      expect(c.blogMeta).toEqual({ existing: true });
+      expect(h.admin.getContent).toHaveBeenCalledWith('blog.a', 'ro');
+    });
+
+    it('reports a load error', () => {
+      c.selectedBlogKey = 'blog.a';
+      h.admin.getContent.and.returnValue(throwError(() => ({})));
+      c.setBlogEditLang('en');
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.blog.errors.loadContent');
+    });
+  });
+});
