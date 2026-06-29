@@ -71,6 +71,14 @@ describe('AnalyticsService', () => {
     expect(sessionStorage.getItem('analytics.session_started.v1')).toBe('1');
   });
 
+  it('does not start a session while analytics is disabled', () => {
+    const service = configure();
+    expect(service.enabled()).toBeFalse();
+    service.startSession();
+    expect(post).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('analytics.session_started.v1')).toBeNull();
+  });
+
   it('does not start a session twice', () => {
     sessionStorage.setItem('analytics.session_started.v1', '1');
     const service = configure();
