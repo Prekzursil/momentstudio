@@ -1853,6 +1853,9 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   scrollToBulkActions(): void {
+    // istanbul ignore if -- SSR-only guard: `document` is always defined in the Karma/browser
+    // test runtime (and is non-configurable, so it cannot be stubbed away), making the
+    // undefined branch unreachable under coverage. Retained for server-side rendering safety.
     if (typeof document === 'undefined') return;
     const el = document.getElementById('admin-orders-bulk-actions');
     if (!el) return;
