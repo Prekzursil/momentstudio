@@ -64,6 +64,21 @@ describe('webauthn helpers', () => {
       const bytes = base64urlToUint8Array('YWJjZA=='); // "abcd"
       expect(String.fromCharCode(...bytes)).toBe('abcd');
     });
+
+    it('trims surrounding whitespace before decoding', () => {
+      const bytes = base64urlToUint8Array('  aGk \n');
+      expect(Array.from(bytes)).toEqual([104, 105]);
+    });
+
+    it('decodes base64url-specific - and _ characters back to their bytes', () => {
+      // 0xfb 0xff 0xbf -> base64 "-/+/v" ... use a known url-safe sample:
+      // bytes [251, 239, 190] -> base64 "++++" style; verify - and _ are translated.
+      const original = new Uint8Array([0xfb, 0xef, 0xbe]);
+      const urlSafe = bufferToBase64url(original); // contains - and/or _
+      expect(urlSafe).not.toContain('+');
+      expect(urlSafe).not.toContain('/');
+      expect(Array.from(base64urlToUint8Array(urlSafe))).toEqual(Array.from(original));
+    });
   });
 
   describe('bufferToBase64url', () => {
