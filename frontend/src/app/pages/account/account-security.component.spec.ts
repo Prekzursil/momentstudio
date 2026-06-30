@@ -160,7 +160,9 @@ function toggleButtonFor(root: HTMLElement, inputName: string): HTMLButtonElemen
 }
 
 function inputType(root: HTMLElement, inputName: string): string | null {
-  return root.querySelector<HTMLInputElement>(`input[name="${inputName}"]`)?.getAttribute('type') ?? null;
+  return (
+    root.querySelector<HTMLInputElement>(`input[name="${inputName}"]`)?.getAttribute('type') ?? null
+  );
 }
 
 describe('AccountSecurityComponent', () => {
@@ -396,9 +398,7 @@ describe('AccountSecurityComponent', () => {
           user_agent: 'Chrome',
         },
       ],
-      secondaryEmails: () => [
-        { id: 'se1', email: 'sec@example.com', verified: true },
-      ],
+      secondaryEmails: () => [{ id: 'se1', email: 'sec@example.com', verified: true }],
     });
     const host = fixture.nativeElement as HTMLElement;
     const text = host.textContent ?? '';

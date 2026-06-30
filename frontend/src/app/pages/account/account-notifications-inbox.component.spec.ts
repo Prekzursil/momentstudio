@@ -35,11 +35,7 @@ describe('AccountNotificationsInboxComponent', () => {
     api.get.and.returnValue(of({ items: [] }));
 
     TestBed.configureTestingModule({
-      imports: [
-        RouterTestingModule,
-        TranslateModule.forRoot(),
-        AccountNotificationsInboxComponent,
-      ],
+      imports: [RouterTestingModule, TranslateModule.forRoot(), AccountNotificationsInboxComponent],
       providers: [
         { provide: ApiService, useValue: api },
         { provide: NotificationsService, useValue: notifications },
@@ -227,11 +223,7 @@ describe('AccountNotificationsInboxComponent', () => {
     api.get.and.returnValue(getReturn);
 
     TestBed.configureTestingModule({
-      imports: [
-        RouterTestingModule,
-        TranslateModule.forRoot(),
-        AccountNotificationsInboxComponent,
-      ],
+      imports: [RouterTestingModule, TranslateModule.forRoot(), AccountNotificationsInboxComponent],
       providers: [
         { provide: ApiService, useValue: api },
         { provide: NotificationsService, useValue: notifications },

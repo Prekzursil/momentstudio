@@ -31,7 +31,10 @@ function spyObj(name: string, methods: string[], obsValue: unknown = undefined):
   return spy;
 }
 
-function build(section = 'home', query: Record<string, unknown> = {}): { c: AdminComponent } & Mocks {
+function build(
+  section = 'home',
+  query: Record<string, unknown> = {},
+): { c: AdminComponent } & Mocks {
   const route = {
     snapshot: { data: { section }, queryParams: query },
     data: new Subject<Record<string, unknown>>(),
@@ -39,41 +42,102 @@ function build(section = 'home', query: Record<string, unknown> = {}): { c: Admi
   };
 
   const admin = spyObj('AdminService', [
-    'products', 'coupons', 'lowStock', 'audit', 'content', 'getMaintenance', 'setMaintenance',
-    'getCategories', 'createCategory', 'updateCategory', 'deleteCategory', 'reorderCategories',
-    'getCategoryTranslations', 'upsertCategoryTranslation', 'deleteCategoryTranslation',
-    'listFeaturedCollections', 'createFeaturedCollection', 'updateFeaturedCollection',
-    'getProduct', 'createProduct', 'updateProduct', 'deleteProduct', 'duplicateProduct',
-    'uploadProductImage', 'deleteProductImage',
-    'getContent', 'createContent', 'updateContentBlock', 'deleteContent', 'getContentVersion',
-    'listContentVersions', 'rollbackContentVersion', 'updateContentTranslationStatus',
-    'uploadContentImage', 'updateContentImageFocalPoint',
-    'listContentPages', 'renameContentPage', 'createPagePreviewToken', 'createHomePreviewToken',
-    'listContentRedirects', 'deleteContentRedirect', 'exportContentRedirects',
-    'importContentRedirects', 'upsertContentRedirect',
-    'previewFindReplaceContent', 'applyFindReplaceContent', 'linkCheckContent', 'linkCheckContentPreview',
-    'getSitemapPreview', 'validateStructuredData', 'sendScheduledReport',
-    'updateOrderStatus', 'createCoupon', 'updateCoupon', 'invalidateCouponStripeMappings',
-    'updateUserRole', 'userAliases', 'revokeSessions', 'transferOwner', 'fetchSocialThumbnail',
+    'products',
+    'coupons',
+    'lowStock',
+    'audit',
+    'content',
+    'getMaintenance',
+    'setMaintenance',
+    'getCategories',
+    'createCategory',
+    'updateCategory',
+    'deleteCategory',
+    'reorderCategories',
+    'getCategoryTranslations',
+    'upsertCategoryTranslation',
+    'deleteCategoryTranslation',
+    'listFeaturedCollections',
+    'createFeaturedCollection',
+    'updateFeaturedCollection',
+    'getProduct',
+    'createProduct',
+    'updateProduct',
+    'deleteProduct',
+    'duplicateProduct',
+    'uploadProductImage',
+    'deleteProductImage',
+    'getContent',
+    'createContent',
+    'updateContentBlock',
+    'deleteContent',
+    'getContentVersion',
+    'listContentVersions',
+    'rollbackContentVersion',
+    'updateContentTranslationStatus',
+    'uploadContentImage',
+    'updateContentImageFocalPoint',
+    'listContentPages',
+    'renameContentPage',
+    'createPagePreviewToken',
+    'createHomePreviewToken',
+    'listContentRedirects',
+    'deleteContentRedirect',
+    'exportContentRedirects',
+    'importContentRedirects',
+    'upsertContentRedirect',
+    'previewFindReplaceContent',
+    'applyFindReplaceContent',
+    'linkCheckContent',
+    'linkCheckContentPreview',
+    'getSitemapPreview',
+    'validateStructuredData',
+    'sendScheduledReport',
+    'updateOrderStatus',
+    'createCoupon',
+    'updateCoupon',
+    'invalidateCouponStripeMappings',
+    'updateUserRole',
+    'userAliases',
+    'revokeSessions',
+    'transferOwner',
+    'fetchSocialThumbnail',
   ]);
   const adminProducts = spyObj('AdminProductsService', ['search'], []);
-  const blog = spyObj('BlogService', [
-    'createPreviewToken', 'deleteComment', 'hideCommentAdmin', 'listFlaggedComments',
-    'resolveCommentFlagsAdmin', 'unhideCommentAdmin',
-  ], []);
-  const fxAdmin = spyObj('FxAdminService', [
-    'clearOverride', 'getStatus', 'listOverrideAudit', 'restoreOverrideFromAudit', 'setOverride',
-  ], []);
-  const taxesAdmin = spyObj('TaxesAdminService', [
-    'deleteGroup', 'deleteRate', 'listGroups', 'updateGroup', 'createGroup', 'upsertRate',
-  ], []);
+  const blog = spyObj(
+    'BlogService',
+    [
+      'createPreviewToken',
+      'deleteComment',
+      'hideCommentAdmin',
+      'listFlaggedComments',
+      'resolveCommentFlagsAdmin',
+      'unhideCommentAdmin',
+    ],
+    [],
+  );
+  const fxAdmin = spyObj(
+    'FxAdminService',
+    ['clearOverride', 'getStatus', 'listOverrideAudit', 'restoreOverrideFromAudit', 'setOverride'],
+    [],
+  );
+  const taxesAdmin = spyObj(
+    'TaxesAdminService',
+    ['deleteGroup', 'deleteRate', 'listGroups', 'updateGroup', 'createGroup', 'upsertRate'],
+    [],
+  );
 
   const auth = jasmine.createSpyObj('AuthService', ['role', 'loadCurrentUser']);
   auth.role.and.returnValue('owner');
   auth.loadCurrentUser.and.returnValue(of(null));
 
   const cmsPrefs = jasmine.createSpyObj('CmsEditorPrefsService', [
-    'mode', 'previewDevice', 'previewLang', 'previewLayout', 'previewTheme', 'translationLayout',
+    'mode',
+    'previewDevice',
+    'previewLang',
+    'previewLayout',
+    'previewTheme',
+    'translationLayout',
   ]);
   cmsPrefs.mode.and.returnValue('basic');
   cmsPrefs.previewDevice.and.returnValue('desktop');
@@ -107,7 +171,21 @@ function build(section = 'home', query: Record<string, unknown> = {}): { c: Admi
     sanitizer as unknown as DomSanitizer,
   );
 
-  return { c, route, admin, adminProducts, blog, fxAdmin, taxesAdmin, auth, cmsPrefs, toast, translate, markdown, sanitizer };
+  return {
+    c,
+    route,
+    admin,
+    adminProducts,
+    blog,
+    fxAdmin,
+    taxesAdmin,
+    auth,
+    cmsPrefs,
+    toast,
+    translate,
+    markdown,
+    sanitizer,
+  };
 }
 
 describe('AdminComponent', () => {
@@ -226,9 +304,16 @@ describe('AdminComponent', () => {
 
     it('loads the full pages workspace', () => {
       const env = build('pages');
-      const spies = ['loadInfo', 'loadLegalPage', 'loadCategories', 'loadCollections',
-        'loadContentPages', 'loadReusableBlocks', 'loadPageBlocks', 'loadContentRedirects']
-        .map((m) => spyOn<any>(env.c, m).and.stub());
+      const spies = [
+        'loadInfo',
+        'loadLegalPage',
+        'loadCategories',
+        'loadCollections',
+        'loadContentPages',
+        'loadReusableBlocks',
+        'loadPageBlocks',
+        'loadContentRedirects',
+      ].map((m) => spyOn<any>(env.c, m).and.stub());
       (env.c as any).loadForSection('pages');
       spies.forEach((s) => expect(s).toHaveBeenCalled());
       expect(env.c.loading()).toBeFalse();
@@ -246,9 +331,18 @@ describe('AdminComponent', () => {
     it('loads the settings workspace and audit data', () => {
       const env = build('settings');
       spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      ['loadCategories', 'loadTaxGroups', 'loadAssets', 'loadSocial', 'loadCompany',
-        'loadNavigation', 'loadCheckoutSettings', 'loadReportsSettings', 'loadSeo', 'loadFxStatus']
-        .forEach((m) => spyOn<any>(env.c, m).and.stub());
+      [
+        'loadCategories',
+        'loadTaxGroups',
+        'loadAssets',
+        'loadSocial',
+        'loadCompany',
+        'loadNavigation',
+        'loadCheckoutSettings',
+        'loadReportsSettings',
+        'loadSeo',
+        'loadFxStatus',
+      ].forEach((m) => spyOn<any>(env.c, m).and.stub());
       env.admin.coupons.and.returnValue(of([{ code: 'A' }]));
       env.admin.lowStock.and.returnValue(of([{ id: 'l1' }]));
       env.admin.audit.and.returnValue(of({ products: [1], content: [2], security: [3] }));
@@ -265,9 +359,18 @@ describe('AdminComponent', () => {
     it('handles settings load failures defensively', () => {
       const env = build('settings');
       spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      ['loadCategories', 'loadTaxGroups', 'loadAssets', 'loadSocial', 'loadCompany',
-        'loadNavigation', 'loadCheckoutSettings', 'loadReportsSettings', 'loadSeo', 'loadFxStatus']
-        .forEach((m) => spyOn<any>(env.c, m).and.stub());
+      [
+        'loadCategories',
+        'loadTaxGroups',
+        'loadAssets',
+        'loadSocial',
+        'loadCompany',
+        'loadNavigation',
+        'loadCheckoutSettings',
+        'loadReportsSettings',
+        'loadSeo',
+        'loadFxStatus',
+      ].forEach((m) => spyOn<any>(env.c, m).and.stub());
       env.admin.coupons.and.returnValue(throwError(() => new Error('x')));
       env.admin.lowStock.and.returnValue(throwError(() => new Error('x')));
       env.admin.audit.and.returnValue(throwError(() => new Error('x')));
@@ -351,7 +454,11 @@ describe('AdminComponent', () => {
       const env = build('home');
       window.localStorage.setItem(
         'adrianaart.cms.autosave.home.sections',
-        JSON.stringify({ v: 1, ts: '2026-01-01T00:00:00.000Z', state_json: JSON.stringify([{ key: 'restored' }]) }),
+        JSON.stringify({
+          v: 1,
+          ts: '2026-01-01T00:00:00.000Z',
+          state_json: JSON.stringify([{ key: 'restored' }]),
+        }),
       );
       const mgr = (env.c as any).cmsHomeDraft;
       mgr.initFromServer([{ key: 'server' }]);
@@ -568,7 +675,11 @@ describe('AdminComponent', () => {
       env.admin.transferOwner.and.returnValue(of({}));
       const loadAudit = spyOn(env.c, 'loadAudit').and.stub();
       env.c.submitOwnerTransfer();
-      expect(env.admin.transferOwner).toHaveBeenCalledWith({ identifier: 'new-owner', confirm: 'yes', password: 'pw' });
+      expect(env.admin.transferOwner).toHaveBeenCalledWith({
+        identifier: 'new-owner',
+        confirm: 'yes',
+        password: 'pw',
+      });
       expect(env.c.ownerTransferIdentifier).toBe('');
       expect(env.toast.success).toHaveBeenCalled();
       expect(loadAudit).toHaveBeenCalled();
@@ -598,10 +709,12 @@ describe('AdminComponent', () => {
   describe('FX overrides', () => {
     it('loads status + audit and seeds the override form', () => {
       const env = build('settings');
-      env.fxAdmin.getStatus.and.returnValue(of({
-        override: { eur_per_ron: '0.2', usd_per_ron: '0.22', as_of: '2026-01-01' },
-        effective: { eur_per_ron: '0.1', usd_per_ron: '0.11', as_of: '' },
-      }));
+      env.fxAdmin.getStatus.and.returnValue(
+        of({
+          override: { eur_per_ron: '0.2', usd_per_ron: '0.22', as_of: '2026-01-01' },
+          effective: { eur_per_ron: '0.1', usd_per_ron: '0.11', as_of: '' },
+        }),
+      );
       env.fxAdmin.listOverrideAudit.and.returnValue(of([{ id: 'a1' }]));
       env.c.loadFxStatus();
       expect(env.c.fxOverrideForm.eur_per_ron).toBe(0.2);
@@ -611,9 +724,11 @@ describe('AdminComponent', () => {
 
     it('uses effective rates when no override exists', () => {
       const env = build('settings');
-      env.fxAdmin.getStatus.and.returnValue(of({
-        effective: { eur_per_ron: '0.1', usd_per_ron: '0.11', as_of: '2025-12-31' },
-      }));
+      env.fxAdmin.getStatus.and.returnValue(
+        of({
+          effective: { eur_per_ron: '0.1', usd_per_ron: '0.11', as_of: '2025-12-31' },
+        }),
+      );
       env.c.loadFxStatus();
       expect(env.c.fxOverrideForm.usd_per_ron).toBe(0.11);
       expect(env.c.fxOverrideForm.as_of).toBe('2025-12-31');
@@ -655,9 +770,11 @@ describe('AdminComponent', () => {
     it('restoreFxOverrideFromAudit applies restored status on success', () => {
       const env = build('settings');
       spyOn(window, 'confirm').and.returnValue(true);
-      env.fxAdmin.restoreOverrideFromAudit.and.returnValue(of({
-        effective: { eur_per_ron: '0.3', usd_per_ron: '0.33', as_of: 'x' },
-      }));
+      env.fxAdmin.restoreOverrideFromAudit.and.returnValue(
+        of({
+          effective: { eur_per_ron: '0.3', usd_per_ron: '0.33', as_of: 'x' },
+        }),
+      );
       env.c.restoreFxOverrideFromAudit({ id: 'a1' } as any);
       expect(env.c.fxOverrideForm.eur_per_ron).toBe(0.3);
       expect(env.toast.success).toHaveBeenCalled();
@@ -677,7 +794,9 @@ describe('AdminComponent', () => {
       env.c.fxStatus.set(null);
       env.c.resetFxOverrideForm();
       expect(env.c.fxOverrideForm.eur_per_ron).toBe(0);
-      env.c.fxStatus.set({ effective: { eur_per_ron: '0.5', usd_per_ron: '0.55', as_of: 'y' } } as any);
+      env.c.fxStatus.set({
+        effective: { eur_per_ron: '0.5', usd_per_ron: '0.55', as_of: 'y' },
+      } as any);
       env.c.resetFxOverrideForm();
       expect(env.c.fxOverrideForm.eur_per_ron).toBe(0.5);
     });
@@ -696,7 +815,11 @@ describe('AdminComponent', () => {
       env.fxAdmin.setOverride.and.returnValue(of({}));
       const reload = spyOn(env.c, 'loadFxStatus').and.stub();
       env.c.saveFxOverride();
-      expect(env.fxAdmin.setOverride).toHaveBeenCalledWith({ eur_per_ron: 0.2, usd_per_ron: 0.22, as_of: '2026-01-01' });
+      expect(env.fxAdmin.setOverride).toHaveBeenCalledWith({
+        eur_per_ron: 0.2,
+        usd_per_ron: 0.22,
+        as_of: '2026-01-01',
+      });
       expect(reload).toHaveBeenCalled();
     });
 
@@ -705,7 +828,9 @@ describe('AdminComponent', () => {
       env.c.fxOverrideForm = { eur_per_ron: 0.2, usd_per_ron: 0.22, as_of: '' };
       env.fxAdmin.setOverride.and.returnValue(throwError(() => new Error('x')));
       env.c.saveFxOverride();
-      expect(env.fxAdmin.setOverride).toHaveBeenCalledWith(jasmine.objectContaining({ as_of: null }));
+      expect(env.fxAdmin.setOverride).toHaveBeenCalledWith(
+        jasmine.objectContaining({ as_of: null }),
+      );
       expect(env.toast.error).toHaveBeenCalled();
     });
 
@@ -746,11 +871,21 @@ describe('AdminComponent', () => {
 
     it('loadProduct hydrates the form from a detail payload', () => {
       const env = build('settings');
-      env.admin.getProduct.and.returnValue(of({
-        slug: 's1', name: 'N', category_id: 'c1', price: 10, stock_quantity: 5,
-        status: 'active', sku: 'SKU', long_description: 'desc', publish_at: '2026-01-01T10:00:00Z',
-        tags: ['bestseller'], images: [{ id: 'i1', url: 'u' }],
-      }));
+      env.admin.getProduct.and.returnValue(
+        of({
+          slug: 's1',
+          name: 'N',
+          category_id: 'c1',
+          price: 10,
+          stock_quantity: 5,
+          status: 'active',
+          sku: 'SKU',
+          long_description: 'desc',
+          publish_at: '2026-01-01T10:00:00Z',
+          tags: ['bestseller'],
+          images: [{ id: 'i1', url: 'u' }],
+        }),
+      );
       env.c.loadProduct('s1');
       expect(env.c.editingId).toBe('s1');
       expect(env.c.form.is_bestseller).toBeTrue();
@@ -791,7 +926,10 @@ describe('AdminComponent', () => {
 
     it('deleteSelected removes the first selected product', () => {
       const env = build('settings');
-      env.c.products = [{ id: 'p1', slug: 's1' }, { id: 'p2', slug: 's2' }] as any;
+      env.c.products = [
+        { id: 'p1', slug: 's1' },
+        { id: 'p2', slug: 's2' },
+      ] as any;
       env.c.selectedIds = new Set(['p1']);
       env.admin.deleteProduct.and.returnValue(of({}));
       env.c.deleteSelected();
@@ -821,7 +959,9 @@ describe('AdminComponent', () => {
     it('duplicateProduct reloads and opens the new slug', () => {
       const env = build('settings');
       env.admin.duplicateProduct.and.returnValue(of({ slug: 'dup' }));
-      env.admin.getProduct.and.returnValue(of({ slug: 'dup', name: '', price: 0, stock_quantity: 0, status: 'draft', tags: [] }));
+      env.admin.getProduct.and.returnValue(
+        of({ slug: 'dup', name: '', price: 0, stock_quantity: 0, status: 'draft', tags: [] }),
+      );
       spyOn(env.c, 'loadAll').and.stub();
       env.c.duplicateProduct('orig');
       expect(env.c.editingId).toBe('dup');
@@ -856,7 +996,10 @@ describe('AdminComponent', () => {
 
     it('saveBulkStock applies the bulk value to every selected product', async () => {
       const env = build('settings');
-      env.c.products = [{ id: 'p1', slug: 's1', stock_quantity: 0 }, { id: 'p2', slug: 's2', stock_quantity: 0 }] as any;
+      env.c.products = [
+        { id: 'p1', slug: 's1', stock_quantity: 0 },
+        { id: 'p2', slug: 's2', stock_quantity: 0 },
+      ] as any;
       env.c.selectedIds = new Set(['p1', 'p2', 'ghost']);
       env.c.bulkStock = 7;
       env.admin.updateProduct.and.returnValue(of({}));
@@ -907,7 +1050,9 @@ describe('AdminComponent', () => {
 
     it('toLocalDateTime trims an ISO string to minutes', () => {
       const env = build('settings');
-      expect(env.c.toLocalDateTime('2026-01-01T10:00:00Z')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+      expect(env.c.toLocalDateTime('2026-01-01T10:00:00Z')).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/,
+      );
     });
   });
 
@@ -992,10 +1137,17 @@ describe('AdminComponent', () => {
 
     it('categoryParentLabel resolves parent names', () => {
       const env = build('settings');
-      env.c.categories = [{ id: 'p', name: 'Parent' }, { id: 'c', name: 'Child', parent_id: 'p' }] as any;
-      expect(env.c.categoryParentLabel({ parent_id: '' } as any)).toBe('adminUi.categories.parentNone');
+      env.c.categories = [
+        { id: 'p', name: 'Parent' },
+        { id: 'c', name: 'Child', parent_id: 'p' },
+      ] as any;
+      expect(env.c.categoryParentLabel({ parent_id: '' } as any)).toBe(
+        'adminUi.categories.parentNone',
+      );
       expect(env.c.categoryParentLabel({ parent_id: 'p' } as any)).toBe('Parent');
-      expect(env.c.categoryParentLabel({ parent_id: 'missing' } as any)).toBe('adminUi.categories.parentNone');
+      expect(env.c.categoryParentLabel({ parent_id: 'missing' } as any)).toBe(
+        'adminUi.categories.parentNone',
+      );
     });
 
     it('categoryParentOptions excludes self + descendants', () => {
@@ -1100,7 +1252,9 @@ describe('AdminComponent', () => {
 
     it('toggleCategoryTranslations opens + closes', () => {
       const env = build('settings');
-      env.admin.getCategoryTranslations.and.returnValue(of([{ lang: 'en', name: 'N', description: 'D' }]));
+      env.admin.getCategoryTranslations.and.returnValue(
+        of([{ lang: 'en', name: 'N', description: 'D' }]),
+      );
       env.c.toggleCategoryTranslations('s');
       expect(env.c.categoryTranslationsSlug).toBe('s');
       expect(env.c.categoryTranslationExists.en).toBeTrue();
@@ -1117,7 +1271,9 @@ describe('AdminComponent', () => {
       env.c.saveCategoryTranslation('en');
       expect(env.toast.error).toHaveBeenCalled();
       env.c.categoryTranslations.en = { name: 'Name', description: 'Desc' };
-      env.admin.upsertCategoryTranslation.and.returnValue(of({ name: 'Name', description: 'Desc' }));
+      env.admin.upsertCategoryTranslation.and.returnValue(
+        of({ name: 'Name', description: 'Desc' }),
+      );
       env.c.saveCategoryTranslation('en');
       expect(env.c.categoryTranslationExists.en).toBeTrue();
     });
@@ -1142,15 +1298,19 @@ describe('AdminComponent', () => {
       expect(env.c.categoryTranslationExists.en).toBeFalse();
       env.admin.deleteCategoryTranslation.and.returnValue(throwError(() => new Error('x')));
       env.c.deleteCategoryTranslation('ro');
-      expect(env.c.categoryTranslationsError()).toBe('adminUi.categories.translations.errors.delete');
+      expect(env.c.categoryTranslationsError()).toBe(
+        'adminUi.categories.translations.errors.delete',
+      );
     });
 
     it('loadCategoryTranslations maps + errors', () => {
       const env = build('settings');
-      env.admin.getCategoryTranslations.and.returnValue(of([
-        { lang: 'en', name: 'EN', description: 'd' },
-        { lang: 'fr', name: 'skip' },
-      ]));
+      env.admin.getCategoryTranslations.and.returnValue(
+        of([
+          { lang: 'en', name: 'EN', description: 'd' },
+          { lang: 'fr', name: 'skip' },
+        ]),
+      );
       (env.c as any).loadCategoryTranslations('s');
       expect(env.c.categoryTranslationExists.en).toBeTrue();
       expect(env.c.categoryTranslationExists.ro).toBeFalse();
@@ -1181,7 +1341,9 @@ describe('AdminComponent', () => {
       env.taxesAdmin.createGroup.and.returnValue(of({}));
       const reload = spyOn(env.c, 'loadTaxGroups').and.stub();
       env.c.createTaxGroup();
-      expect(env.taxesAdmin.createGroup).toHaveBeenCalledWith(jasmine.objectContaining({ code: 'C', description: 'd', is_default: true }));
+      expect(env.taxesAdmin.createGroup).toHaveBeenCalledWith(
+        jasmine.objectContaining({ code: 'C', description: 'd', is_default: true }),
+      );
       expect(reload).toHaveBeenCalled();
     });
 
@@ -1242,7 +1404,10 @@ describe('AdminComponent', () => {
       env.c.taxRatePercent['g'] = '19';
       env.taxesAdmin.upsertRate.and.returnValue(of({}));
       env.c.upsertTaxRate({ id: 'g' } as any);
-      expect(env.taxesAdmin.upsertRate).toHaveBeenCalledWith('g', { country_code: 'RO', vat_rate_percent: 19 });
+      expect(env.taxesAdmin.upsertRate).toHaveBeenCalledWith('g', {
+        country_code: 'RO',
+        vat_rate_percent: 19,
+      });
       expect(env.c.taxRateCountry['g']).toBe('');
     });
 
@@ -1271,8 +1436,16 @@ describe('AdminComponent', () => {
   describe('category reorder + drag', () => {
     it('moveCategory swaps sort order and persists', () => {
       const env = build('settings');
-      env.c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }] as any;
-      env.admin.reorderCategories.and.returnValue(of([{ slug: 'b', sort_order: 0 }, { slug: 'a', sort_order: 1 }]));
+      env.c.categories = [
+        { slug: 'a', sort_order: 0 },
+        { slug: 'b', sort_order: 1 },
+      ] as any;
+      env.admin.reorderCategories.and.returnValue(
+        of([
+          { slug: 'b', sort_order: 0 },
+          { slug: 'a', sort_order: 1 },
+        ]),
+      );
       env.c.moveCategory({ slug: 'a' } as any, 1);
       expect(env.admin.reorderCategories).toHaveBeenCalled();
       expect(env.c.categories[0].slug).toBe('b');
@@ -1287,7 +1460,10 @@ describe('AdminComponent', () => {
 
     it('moveCategory toasts on failure', () => {
       const env = build('settings');
-      env.c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }] as any;
+      env.c.categories = [
+        { slug: 'a', sort_order: 0 },
+        { slug: 'b', sort_order: 1 },
+      ] as any;
       env.admin.reorderCategories.and.returnValue(throwError(() => new Error('x')));
       env.c.moveCategory({ slug: 'a' } as any, 1);
       expect(env.toast.error).toHaveBeenCalled();
@@ -1295,13 +1471,21 @@ describe('AdminComponent', () => {
 
     it('drag start/over/drop reorders categories', () => {
       const env = build('settings');
-      env.c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }] as any;
+      env.c.categories = [
+        { slug: 'a', sort_order: 0 },
+        { slug: 'b', sort_order: 1 },
+      ] as any;
       env.c.onCategoryDragStart('a');
       expect(env.c.draggingSlug).toBe('a');
       const evt = { preventDefault: jasmine.createSpy('pd') } as any;
       env.c.onCategoryDragOver(evt);
       expect(evt.preventDefault).toHaveBeenCalled();
-      env.admin.reorderCategories.and.returnValue(of([{ slug: 'b', sort_order: 0 }, { slug: 'a', sort_order: 1 }]));
+      env.admin.reorderCategories.and.returnValue(
+        of([
+          { slug: 'b', sort_order: 0 },
+          { slug: 'a', sort_order: 1 },
+        ]),
+      );
       env.c.onCategoryDrop('b');
       expect(env.admin.reorderCategories).toHaveBeenCalled();
       expect(env.c.draggingSlug).toBeNull();
@@ -1332,7 +1516,10 @@ describe('AdminComponent', () => {
 
     it('filteredOrders honours the active filter', () => {
       const env = build('settings');
-      env.c.orders = [{ id: 'o1', status: 'paid' }, { id: 'o2', status: 'shipped' }] as any;
+      env.c.orders = [
+        { id: 'o1', status: 'paid' },
+        { id: 'o2', status: 'shipped' },
+      ] as any;
       expect(env.c.filteredOrders().length).toBe(2);
       env.c.orderFilter = 'paid';
       expect(env.c.filteredOrders().map((o) => o.id)).toEqual(['o1']);
@@ -1494,7 +1681,15 @@ describe('AdminComponent', () => {
   describe('content blocks', () => {
     it('selectContent hydrates the form from a content block', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ key: 'site.about', title: 'About', body_markdown: 'Body', status: 'published', version: 3 }));
+      env.admin.getContent.and.returnValue(
+        of({
+          key: 'site.about',
+          title: 'About',
+          body_markdown: 'Body',
+          status: 'published',
+          version: 3,
+        }),
+      );
       env.c.selectContent({ key: 'site.about', title: 'About' } as any);
       expect(env.c.contentForm.body_markdown).toBe('Body');
       expect(env.c.contentForm.status).toBe('published');
@@ -1524,7 +1719,9 @@ describe('AdminComponent', () => {
       env.c.selectedContent = { key: 'site.about' } as any;
       spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
       env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-      env.admin.getContent.and.returnValue(of({ key: 'site.about', title: 'A', body_markdown: '', status: 'draft' }));
+      env.admin.getContent.and.returnValue(
+        of({ key: 'site.about', title: 'A', body_markdown: '', status: 'draft' }),
+      );
       env.c.saveContent();
       expect(env.toast.error).toHaveBeenCalled();
     });
@@ -1783,11 +1980,21 @@ describe('AdminComponent', () => {
     it('toCmsBlockLayout coerces known + unknown values', () => {
       const env = build('pages');
       const l = (v: unknown) => (env.c as any).toCmsBlockLayout(v);
-      expect(l({ spacing: 'md', background: 'accent', align: 'center', max_width: 'prose' }))
-        .toEqual({ spacing: 'md', background: 'accent', align: 'center', max_width: 'prose' });
-      expect(l({ spacing: 'huge', maxWidth: 'wide' }))
-        .toEqual({ spacing: 'none', background: 'none', align: 'left', max_width: 'wide' });
-      expect(l(null)).toEqual({ spacing: 'none', background: 'none', align: 'left', max_width: 'full' });
+      expect(
+        l({ spacing: 'md', background: 'accent', align: 'center', max_width: 'prose' }),
+      ).toEqual({ spacing: 'md', background: 'accent', align: 'center', max_width: 'prose' });
+      expect(l({ spacing: 'huge', maxWidth: 'wide' })).toEqual({
+        spacing: 'none',
+        background: 'none',
+        align: 'left',
+        max_width: 'wide',
+      });
+      expect(l(null)).toEqual({
+        spacing: 'none',
+        background: 'none',
+        align: 'left',
+        max_width: 'full',
+      });
     });
 
     it('focalPosition builds a CSS position string', () => {
@@ -1797,7 +2004,13 @@ describe('AdminComponent', () => {
 
     it('toSlideDraft hydrates from a partial record', () => {
       const env = build('home');
-      const draft = (env.c as any).toSlideDraft({ image: 'u.png', variant: 'full', size: 'S', text_style: 'light', focal_x: 10 });
+      const draft = (env.c as any).toSlideDraft({
+        image: 'u.png',
+        variant: 'full',
+        size: 'S',
+        text_style: 'light',
+        focal_x: 10,
+      });
       expect(draft.image_url).toBe('u.png');
       expect(draft.variant).toBe('full');
       expect(draft.size).toBe('S');
@@ -1808,7 +2021,11 @@ describe('AdminComponent', () => {
 
     it('toCarouselSettingsDraft applies defaults + overrides', () => {
       const env = build('home');
-      const d = (env.c as any).toCarouselSettingsDraft({ autoplay: true, interval_ms: 3000, show_dots: false });
+      const d = (env.c as any).toCarouselSettingsDraft({
+        autoplay: true,
+        interval_ms: 3000,
+        show_dots: false,
+      });
       expect(d.autoplay).toBeTrue();
       expect(d.interval_ms).toBe(3000);
       expect(d.show_dots).toBeFalse();
@@ -1819,7 +2036,12 @@ describe('AdminComponent', () => {
 
     it('serializeSlideDraft trims + clamps', () => {
       const env = build('home');
-      const slide = { ...(env.c as any).emptySlideDraft(), image_url: ' x ', cta_url: ' y ', focal_x: 200 };
+      const slide = {
+        ...(env.c as any).emptySlideDraft(),
+        image_url: ' x ',
+        cta_url: ' y ',
+        focal_x: 200,
+      };
       const out = (env.c as any).serializeSlideDraft(slide);
       expect(out['image_url']).toBe('x');
       expect(out['cta_url']).toBe('y');
@@ -1828,7 +2050,11 @@ describe('AdminComponent', () => {
 
     it('toPreviewSlide prefers active lang then falls back', () => {
       const env = build('home');
-      const slide = { ...(env.c as any).emptySlideDraft(), headline: { en: 'Hello', ro: '' }, image_url: 'u' };
+      const slide = {
+        ...(env.c as any).emptySlideDraft(),
+        headline: { en: 'Hello', ro: '' },
+        image_url: 'u',
+      };
       expect(env.c.toPreviewSlide(slide, 'ro').headline).toBe('Hello');
       expect(env.c.toPreviewSlide(slide, 'en').headline).toBe('Hello');
       expect(env.c.toPreviewSlides([slide], 'en').length).toBe(1);
@@ -1892,7 +2118,9 @@ describe('AdminComponent', () => {
   describe('site settings load/save', () => {
     it('loadAssets hydrates + clears form on error', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ meta: { logo_url: 'L', favicon_url: 'F', social_image_url: 'S' }, version: 1 }));
+      env.admin.getContent.and.returnValue(
+        of({ meta: { logo_url: 'L', favicon_url: 'F', social_image_url: 'S' }, version: 1 }),
+      );
       env.c.loadAssets();
       expect(env.c.assetsForm.logo_url).toBe('L');
       env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
@@ -1934,11 +2162,23 @@ describe('AdminComponent', () => {
 
     it('loadCheckoutSettings parses meta + falls back on error', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
-        shipping_fee_ron: 15, free_shipping_threshold_ron: 250, phone_required_home: 'no',
-        fee_enabled: 1, fee_type: 'percent', fee_value: 5, vat_enabled: false, vat_rate_percent: 19,
-        receipt_share_days: 30, money_rounding: 'down',
-      } }));
+      env.admin.getContent.and.returnValue(
+        of({
+          version: 1,
+          meta: {
+            shipping_fee_ron: 15,
+            free_shipping_threshold_ron: 250,
+            phone_required_home: 'no',
+            fee_enabled: 1,
+            fee_type: 'percent',
+            fee_value: 5,
+            vat_enabled: false,
+            vat_rate_percent: 19,
+            receipt_share_days: 30,
+            money_rounding: 'down',
+          },
+        }),
+      );
       env.c.loadCheckoutSettings();
       expect(env.c.checkoutSettingsForm.shipping_fee_ron).toBe(15);
       expect(env.c.checkoutSettingsForm.fee_type).toBe('percent');
@@ -1961,10 +2201,18 @@ describe('AdminComponent', () => {
 
     it('loadReportsSettings parses recipients + falls back', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
-        reports_weekly_enabled: true, reports_weekly_weekday: 9, reports_monthly_day: 40,
-        reports_recipients: 'a@b.com, c@d.com', reports_weekly_last_error: 'boom',
-      } }));
+      env.admin.getContent.and.returnValue(
+        of({
+          version: 1,
+          meta: {
+            reports_weekly_enabled: true,
+            reports_weekly_weekday: 9,
+            reports_monthly_day: 40,
+            reports_recipients: 'a@b.com, c@d.com',
+            reports_weekly_last_error: 'boom',
+          },
+        }),
+      );
       env.c.loadReportsSettings();
       expect(env.c.reportsSettingsForm.weekly_enabled).toBeTrue();
       expect(env.c.reportsSettingsForm.weekly_weekday).toBe(6);
@@ -1978,7 +2226,9 @@ describe('AdminComponent', () => {
     it('saveReportsSettings filters invalid emails + create fallback', () => {
       const env = build('settings');
       env.c.reportsSettingsForm.recipients = 'a@b.com, not-an-email, a@b.com';
-      env.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { reports_recipients: ['a@b.com'] } }));
+      env.admin.updateContentBlock.and.returnValue(
+        of({ version: 2, meta: { reports_recipients: ['a@b.com'] } }),
+      );
       env.c.saveReportsSettings();
       const payload = env.admin.updateContentBlock.calls.mostRecent().args[1];
       expect(payload.meta.reports_recipients).toEqual(['a@b.com']);
@@ -2004,7 +2254,9 @@ describe('AdminComponent', () => {
 
     it('loadCompany hydrates + clears on error', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ version: 1, meta: { company: { name: 'Acme', cui: 'RO1' } } }));
+      env.admin.getContent.and.returnValue(
+        of({ version: 1, meta: { company: { name: 'Acme', cui: 'RO1' } } }),
+      );
       env.c.loadCompany();
       expect(env.c.companyForm.name).toBe('Acme');
       env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
@@ -2015,7 +2267,14 @@ describe('AdminComponent', () => {
     it('companyMissingFields lists empty fields', () => {
       const env = build('settings');
       expect(env.c.companyMissingFields().length).toBe(6);
-      env.c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+      env.c.companyForm = {
+        name: 'A',
+        registration_number: 'B',
+        cui: 'C',
+        address: 'D',
+        phone: 'E',
+        email: 'F',
+      };
       expect(env.c.companyMissingFields().length).toBe(0);
     });
 
@@ -2023,7 +2282,14 @@ describe('AdminComponent', () => {
       const env = build('settings');
       env.c.saveCompany();
       expect(env.c.companyError).toBe('adminUi.site.company.errors.required');
-      env.c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+      env.c.companyForm = {
+        name: 'A',
+        registration_number: 'B',
+        cui: 'C',
+        address: 'D',
+        phone: 'E',
+        email: 'F',
+      };
       env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
       env.c.saveCompany();
       expect(env.c.companyMessage).toBe('adminUi.site.company.success.save');
@@ -2031,10 +2297,15 @@ describe('AdminComponent', () => {
 
     it('loadSocial parses pages + survives errors', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
-        contact: { phone: '123', email: 'a@b.com' },
-        instagram_pages: [{ label: 'IG', url: 'https://ig', thumbnail_url: '' }],
-      } }));
+      env.admin.getContent.and.returnValue(
+        of({
+          version: 1,
+          meta: {
+            contact: { phone: '123', email: 'a@b.com' },
+            instagram_pages: [{ label: 'IG', url: 'https://ig', thumbnail_url: '' }],
+          },
+        }),
+      );
       env.c.loadSocial();
       expect(env.c.socialForm.phone).toBe('123');
       env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
@@ -2067,7 +2338,9 @@ describe('AdminComponent', () => {
       env.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '' }));
       env.c.fetchSocialThumbnail('instagram', 0);
       expect(env.c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.noThumbnail');
-      env.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({ error: { detail: 'bad-url' } })));
+      env.admin.fetchSocialThumbnail.and.returnValue(
+        throwError(() => ({ error: { detail: 'bad-url' } })),
+      );
       env.c.fetchSocialThumbnail('instagram', 0);
       expect(env.c.socialThumbErrors['instagram-0']).toBe('bad-url');
     });
@@ -2083,12 +2356,17 @@ describe('AdminComponent', () => {
   describe('navigation', () => {
     it('loadNavigation parses links + falls back to defaults', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ version: 1, meta: {
-        header_links: [
-          { id: 'h1', url: '/', label: { en: 'Home', ro: 'Acasa' } },
-          { url: '', label: {} },
-        ],
-      } }));
+      env.admin.getContent.and.returnValue(
+        of({
+          version: 1,
+          meta: {
+            header_links: [
+              { id: 'h1', url: '/', label: { en: 'Home', ro: 'Acasa' } },
+              { url: '', label: {} },
+            ],
+          },
+        }),
+      );
       env.c.loadNavigation();
       expect(env.c.navigationForm.header_links.length).toBe(1);
       env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
@@ -2111,16 +2389,30 @@ describe('AdminComponent', () => {
       expect(env.c.navigationForm.header_links[1].id).toBe(first);
       env.c.moveNavigationLink('header', first, 99);
       env.c.moveNavigationLink('header', '', 1);
-      env.c.removeNavigationLink('footer_handcrafted', env.c.navigationForm.footer_handcrafted_links.slice(-1)[0].id);
-      env.c.removeNavigationLink('footer_legal', env.c.navigationForm.footer_legal_links.slice(-1)[0].id);
-      env.c.moveNavigationLink('footer_handcrafted', env.c.navigationForm.footer_handcrafted_links[0].id, 1);
+      env.c.removeNavigationLink(
+        'footer_handcrafted',
+        env.c.navigationForm.footer_handcrafted_links.slice(-1)[0].id,
+      );
+      env.c.removeNavigationLink(
+        'footer_legal',
+        env.c.navigationForm.footer_legal_links.slice(-1)[0].id,
+      );
+      env.c.moveNavigationLink(
+        'footer_handcrafted',
+        env.c.navigationForm.footer_handcrafted_links[0].id,
+        1,
+      );
       env.c.moveNavigationLink('footer_legal', env.c.navigationForm.footer_legal_links[0].id, 1);
     });
 
     it('resetNavigationDefaults requires confirmation', () => {
       const env = build('settings');
       const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
-      env.c.navigationForm = { header_links: [], footer_handcrafted_links: [], footer_legal_links: [] };
+      env.c.navigationForm = {
+        header_links: [],
+        footer_handcrafted_links: [],
+        footer_legal_links: [],
+      };
       env.c.resetNavigationDefaults();
       expect(env.c.navigationForm.header_links.length).toBe(0);
       confirmSpy.and.returnValue(true);
@@ -2155,7 +2447,10 @@ describe('AdminComponent', () => {
       env.c.saveNavigation();
       expect(env.c.navigationError).toBe('adminUi.site.navigation.errors.invalid');
       env.c.navigationForm = {
-        header_links: [{ id: 'h1', url: '/x', label: { en: 'X', ro: 'X' } }, { id: 'blank', url: '', label: { en: '', ro: '' } }],
+        header_links: [
+          { id: 'h1', url: '/x', label: { en: 'X', ro: 'X' } },
+          { id: 'blank', url: '', label: { en: '', ro: '' } },
+        ],
         footer_handcrafted_links: [],
         footer_legal_links: [],
       };
@@ -2172,7 +2467,9 @@ describe('AdminComponent', () => {
   describe('seo + sitemap + structured data', () => {
     it('selectSeoLang + loadSeo hydrate the form', () => {
       const env = build('settings');
-      env.admin.getContent.and.returnValue(of({ title: 'T', meta: { description: 'D' }, version: 1 }));
+      env.admin.getContent.and.returnValue(
+        of({ title: 'T', meta: { description: 'D' }, version: 1 }),
+      );
       env.c.selectSeoLang('ro');
       expect(env.c.seoLang).toBe('ro');
       expect(env.c.seoForm.title).toBe('T');
@@ -2200,18 +2497,30 @@ describe('AdminComponent', () => {
       env.admin.getSitemapPreview.and.returnValue(of({ by_lang: { en: ['/'] } }));
       env.c.loadSitemapPreview();
       expect(env.c.sitemapPreviewByLang).toEqual({ en: ['/'] });
-      env.admin.getSitemapPreview.and.returnValue(throwError(() => ({ error: { detail: 'down' } })));
+      env.admin.getSitemapPreview.and.returnValue(
+        throwError(() => ({ error: { detail: 'down' } })),
+      );
       env.c.loadSitemapPreview();
       expect(env.c.sitemapPreviewError).toBe('down');
     });
 
     it('structuredDataIssueUrl maps entity types', () => {
       const env = build('settings');
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'mug' })).toBe('/products/mug');
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe('/about');
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' })).toBe('/contact');
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe('/pages/faq');
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.' })).toBe('/pages');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'mug' })).toBe(
+        '/products/mug',
+      );
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe(
+        '/about',
+      );
+      expect(
+        env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' }),
+      ).toBe('/contact');
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe(
+        '/pages/faq',
+      );
+      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.' })).toBe(
+        '/pages',
+      );
       expect(env.c.structuredDataIssueUrl({ entity_type: 'other', entity_key: 'x' })).toBe('/');
     });
 
@@ -2220,7 +2529,9 @@ describe('AdminComponent', () => {
       env.admin.validateStructuredData.and.returnValue(of({ ok: true }));
       env.c.runStructuredDataValidation();
       expect(env.c.structuredDataResult).toEqual({ ok: true } as any);
-      env.admin.validateStructuredData.and.returnValue(throwError(() => ({ error: { detail: 'invalid' } })));
+      env.admin.validateStructuredData.and.returnValue(
+        throwError(() => ({ error: { detail: 'invalid' } })),
+      );
       env.c.runStructuredDataValidation();
       expect(env.c.structuredDataError).toBe('invalid');
     });
@@ -2236,7 +2547,11 @@ describe('AdminComponent', () => {
     const allTypesMeta = {
       blocks: [
         { key: 'b_text', type: 'text', body_markdown: { en: 'Hi', ro: 'Salut' } },
-        { type: 'columns', columns: [{ title: 'A' }, { title: 'B' }, { title: 'C' }, { title: 'D' }], columns_breakpoint: 'lg' },
+        {
+          type: 'columns',
+          columns: [{ title: 'A' }, { title: 'B' }, { title: 'C' }, { title: 'D' }],
+          columns_breakpoint: 'lg',
+        },
         { type: 'cta', cta_url: '/go', cta_new_tab: 'yes' },
         { type: 'faq', items: [{ question: 'Q' }] },
         { type: 'testimonials', items: [{ author: 'Jo' }] },
@@ -2262,8 +2577,17 @@ describe('AdminComponent', () => {
       const blocks = pageWithAllBlocks(env);
       const types = blocks.map((b) => b.type);
       expect(types).toEqual([
-        'text', 'columns', 'cta', 'faq', 'testimonials', 'product_grid',
-        'form', 'image', 'gallery', 'banner', 'carousel',
+        'text',
+        'columns',
+        'cta',
+        'faq',
+        'testimonials',
+        'product_grid',
+        'form',
+        'image',
+        'gallery',
+        'banner',
+        'carousel',
       ]);
       const grid = blocks.find((b) => b.type === 'product_grid')!;
       expect(grid.product_grid_source).toBe('products');
@@ -2281,10 +2605,15 @@ describe('AdminComponent', () => {
 
     it('loadPageBlocks hydrates from server meta', () => {
       const env = build('pages');
-      env.admin.getContent.and.returnValue(of({
-        status: 'published', published_at: '2026-01-01T10:00:00Z', version: 1,
-        needs_translation_en: true, meta: { requires_auth: true, ...allTypesMeta },
-      }));
+      env.admin.getContent.and.returnValue(
+        of({
+          status: 'published',
+          published_at: '2026-01-01T10:00:00Z',
+          version: 1,
+          needs_translation_en: true,
+          meta: { requires_auth: true, ...allTypesMeta },
+        }),
+      );
       env.c.loadPageBlocks('page.about');
       expect(env.c.pageBlocks['page.about'].length).toBe(11);
       expect(env.c.pageBlocksStatus['page.about']).toBe('published');
@@ -2354,11 +2683,19 @@ describe('AdminComponent', () => {
       expect(cur.slides.length).toBe(2);
       env.c.movePageCarouselSlide('page.about', block.key, 0, 1);
       env.c.movePageCarouselSlide('page.about', block.key, 0, 99);
-      env.c.setPageCarouselSlideImage('page.about', block.key, 0, { url: 'new.png', focal_x: 1, focal_y: 2 } as any);
+      env.c.setPageCarouselSlideImage('page.about', block.key, 0, {
+        url: 'new.png',
+        focal_x: 1,
+        focal_y: 2,
+      } as any);
       cur = env.c.pageBlocks['page.about'].find((b) => b.type === 'carousel')!;
       expect(cur.slides[0].image_url).toBe('new.png');
       env.c.removePageCarouselSlide('page.about', block.key, 0);
-      env.c.setPageBannerSlideImage('page.about', env.c.pageBlocks['page.about'].find((b) => b.type === 'banner')!.key, { url: 'b.png' } as any);
+      env.c.setPageBannerSlideImage(
+        'page.about',
+        env.c.pageBlocks['page.about'].find((b) => b.type === 'banner')!.key,
+        { url: 'b.png' } as any,
+      );
     });
 
     it('gallery + columns + faq + testimonial manipulators', () => {
@@ -2366,11 +2703,19 @@ describe('AdminComponent', () => {
       pageWithAllBlocks(env);
       const gallery = env.c.pageBlocks['page.about'].find((b) => b.type === 'gallery')!;
       env.c.addPageGalleryImage('page.about', gallery.key);
-      env.c.addPageGalleryImageFromAsset('page.about', gallery.key, { url: 'a.png', focal_x: 1, focal_y: 2 } as any);
+      env.c.addPageGalleryImageFromAsset('page.about', gallery.key, {
+        url: 'a.png',
+        focal_x: 1,
+        focal_y: 2,
+      } as any);
       let cur = env.c.pageBlocks['page.about'].find((b) => b.type === 'gallery')!;
       expect(cur.images.length).toBeGreaterThanOrEqual(3);
       env.c.removePageGalleryImage('page.about', gallery.key, 0);
-      env.c.setPageImageBlockUrl('page.about', env.c.pageBlocks['page.about'].find((b) => b.type === 'image')!.key, { url: 'x.png', focal_x: 5, focal_y: 6 } as any);
+      env.c.setPageImageBlockUrl(
+        'page.about',
+        env.c.pageBlocks['page.about'].find((b) => b.type === 'image')!.key,
+        { url: 'x.png', focal_x: 5, focal_y: 6 } as any,
+      );
 
       const columns = env.c.pageBlocks['page.about'].find((b) => b.type === 'columns')!;
       env.c.addPageColumnsColumn('page.about', columns.key);
@@ -2408,7 +2753,9 @@ describe('AdminComponent', () => {
       expect(env.c.productGridProductSearchResults['blk'].length).toBe(1);
       env.adminProducts.search.and.returnValue(throwError(() => new Error('x')));
       env.c.searchProductGridProducts('blk');
-      expect(env.c.productGridProductSearchError['blk']).toBe('adminUi.home.sections.errors.searchProducts');
+      expect(env.c.productGridProductSearchError['blk']).toBe(
+        'adminUi.home.sections.errors.searchProducts',
+      );
     });
 
     it('queueProductGridProductSearch debounces + clears', () => {

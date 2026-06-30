@@ -454,11 +454,15 @@ describe('AdminLayoutComponent', () => {
     });
 
     it('ignores shortcuts originating from form fields', () => {
-      component.onDocumentKeydown(keyEvent({ ctrlKey: true, key: 'k', target: { tagName: 'INPUT' } }));
+      component.onDocumentKeydown(
+        keyEvent({ ctrlKey: true, key: 'k', target: { tagName: 'INPUT' } }),
+      );
       component.onDocumentKeydown(
         keyEvent({ ctrlKey: true, key: 'k', target: { tagName: 'DIV', isContentEditable: true } }),
       );
-      component.onDocumentKeydown(keyEvent({ ctrlKey: true, key: 'k', target: { isContentEditable: false } }));
+      component.onDocumentKeydown(
+        keyEvent({ ctrlKey: true, key: 'k', target: { isContentEditable: false } }),
+      );
       expect(stubs.router.navigate).not.toHaveBeenCalled();
     });
 
@@ -481,13 +485,17 @@ describe('AdminLayoutComponent', () => {
 
     it('Cmd+K on the dashboard without an input does nothing extra', () => {
       stubs.router.url = '/admin/dashboard';
-      component.onDocumentKeydown(keyEvent({ metaKey: true, key: 'k', target: { tagName: 'DIV' } }));
+      component.onDocumentKeydown(
+        keyEvent({ metaKey: true, key: 'k', target: { tagName: 'DIV' } }),
+      );
       expect(stubs.router.navigate).not.toHaveBeenCalled();
     });
 
     it('Ctrl+K off the dashboard navigates to the dashboard search', () => {
       stubs.router.url = '/admin/orders';
-      component.onDocumentKeydown(keyEvent({ ctrlKey: true, key: 'k', target: { tagName: 'DIV' } }));
+      component.onDocumentKeydown(
+        keyEvent({ ctrlKey: true, key: 'k', target: { tagName: 'DIV' } }),
+      );
       expect(stubs.router.navigate).toHaveBeenCalledWith(['/admin/dashboard'], {
         state: { focusGlobalSearch: true },
       });
@@ -495,7 +503,9 @@ describe('AdminLayoutComponent', () => {
 
     it('Ctrl+K with an empty current url navigates to the dashboard search', () => {
       stubs.router.url = '';
-      component.onDocumentKeydown(keyEvent({ ctrlKey: true, key: 'k', target: { tagName: 'DIV' } }));
+      component.onDocumentKeydown(
+        keyEvent({ ctrlKey: true, key: 'k', target: { tagName: 'DIV' } }),
+      );
       expect(stubs.router.navigate).toHaveBeenCalledWith(['/admin/dashboard'], {
         state: { focusGlobalSearch: true },
       });
@@ -683,7 +693,9 @@ describe('AdminLayoutComponent', () => {
       stubs.uiPrefs.mode.set('advanced');
       recompute();
       expect(component.filteredNavItemsView.length).toBe(10);
-      expect(component.groupedFilteredNavItemsView.some((g) => g.key === 'operationsSecurity')).toBeTrue();
+      expect(
+        component.groupedFilteredNavItemsView.some((g) => g.key === 'operationsSecurity'),
+      ).toBeTrue();
       const dashboard = component.filteredNavItemsView.find((i) => i.section === 'dashboard');
       expect(dashboard?.highlightMatch).toBe('');
     });
@@ -736,14 +748,18 @@ describe('AdminLayoutComponent', () => {
       recompute();
       const favPaths = component.favoriteNavItemsView.map((i) => i.path);
       expect(favPaths).toEqual(['/admin/orders']);
-      expect(component.filteredNavItemsView.find((i) => i.path === '/admin/orders')?.isFavorite).toBeTrue();
+      expect(
+        component.filteredNavItemsView.find((i) => i.path === '/admin/orders')?.isFavorite,
+      ).toBeTrue();
     });
 
     it('uses the operationsSecurity fallback group for unmapped sections', () => {
       const map = (component as any).sectionGroupMap as Record<string, string>;
       delete map['dashboard'];
       recompute();
-      const opsGroup = component.groupedFilteredNavItemsView.find((g) => g.key === 'operationsSecurity');
+      const opsGroup = component.groupedFilteredNavItemsView.find(
+        (g) => g.key === 'operationsSecurity',
+      );
       expect(opsGroup?.items.some((i) => i.section === 'dashboard')).toBeTrue();
     });
 

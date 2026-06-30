@@ -296,9 +296,9 @@ describe('VerifyEmailComponent', () => {
       const fixture = TestBed.createComponent(VerifyEmailComponent);
       fixture.detectChanges();
 
-      const ctaTexts = Array.from(
-        fixture.nativeElement.querySelectorAll('app-button span'),
-      ).map((el) => (el as HTMLElement).textContent?.trim());
+      const ctaTexts = Array.from(fixture.nativeElement.querySelectorAll('app-button span')).map(
+        (el) => (el as HTMLElement).textContent?.trim(),
+      );
       expect(ctaTexts).toContain('auth.verifyEmail.ctaLogin');
       expect(ctaTexts).not.toContain('auth.verifyEmail.ctaAccount');
       expect(ctaTexts).not.toContain('auth.verifyEmail.ctaCheckout');
@@ -311,10 +311,9 @@ describe('VerifyEmailComponent', () => {
       auth.confirmEmailVerification.and.returnValue(of({ detail: 'ok', email_verified: true }));
       const cmp = create();
       router.navigateByUrl.calls.reset();
-      (cmp as unknown as { safeNavigateNext(next: string, fallback: string): void }).safeNavigateNext(
-        target,
-        '/fallback',
-      );
+      (
+        cmp as unknown as { safeNavigateNext(next: string, fallback: string): void }
+      ).safeNavigateNext(target, '/fallback');
       return router;
     }
 
@@ -359,9 +358,7 @@ describe('VerifyEmailComponent', () => {
       const cmp = create();
 
       expect(() =>
-        (
-          cmp as unknown as { navigateSilently(url: string): void }
-        ).navigateSilently('/checkout'),
+        (cmp as unknown as { navigateSilently(url: string): void }).navigateSilently('/checkout'),
       ).not.toThrow();
 
       await Promise.resolve();

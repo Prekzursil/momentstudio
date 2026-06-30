@@ -281,8 +281,9 @@ describe('AccountPrivacyComponent', () => {
     const passwordInput = (): HTMLInputElement =>
       fixture.debugElement.query(By.css('input[name="deletionPassword"]')).nativeElement;
     const toggle = (): HTMLButtonElement =>
-      fixture.debugElement.query(By.css('input[name="deletionPassword"] ~ button, .relative button'))
-        .nativeElement;
+      fixture.debugElement.query(
+        By.css('input[name="deletionPassword"] ~ button, .relative button'),
+      ).nativeElement;
 
     expect(passwordInput().type).toBe('password');
     expect(component.showDeletionPassword).toBeFalse();

@@ -273,7 +273,11 @@ describe('AdminOrderDetailComponent', () => {
   });
 
   it('load falls back to the id prefix and blank email when missing', () => {
-    const order = makeOrder({ reference_code: null, customer_email: null, status: undefined as any });
+    const order = makeOrder({
+      reference_code: null,
+      customer_email: null,
+      status: undefined as any,
+    });
     api.get.and.returnValue(of(order));
     paramMap$.next(makeParamMap({ orderId: order.id }));
     component.ngOnInit();
@@ -332,9 +336,7 @@ describe('AdminOrderDetailComponent', () => {
     queryParamMap$.next(makeParamMap({ nav: '1', nav_page: '0', nav_limit: 'abc' }));
     component.ngOnInit();
     expect(component.navEnabled()).toBeTrue();
-    expect((component as any).navContext).toEqual(
-      jasmine.objectContaining({ page: 1, limit: 20 }),
-    );
+    expect((component as any).navContext).toEqual(jasmine.objectContaining({ page: 1, limit: 20 }));
   });
 
   it('applyNavContext captures all optional filters and clamps the limit', () => {
@@ -536,7 +538,12 @@ describe('AdminOrderDetailComponent', () => {
   it('onDocumentKeydown triggers save on Ctrl+S', () => {
     prime();
     spyOn(component, 'save');
-    const evt = { key: 's', ctrlKey: true, target: document.body, preventDefault: jasmine.createSpy() } as any;
+    const evt = {
+      key: 's',
+      ctrlKey: true,
+      target: document.body,
+      preventDefault: jasmine.createSpy(),
+    } as any;
     component.onDocumentKeydown(evt);
     expect(evt.preventDefault).toHaveBeenCalled();
     expect(component.save).toHaveBeenCalled();
@@ -545,7 +552,12 @@ describe('AdminOrderDetailComponent', () => {
   it('onDocumentKeydown opens the refund wizard on Shift+R', () => {
     prime();
     spyOn(component, 'openRefundWizard');
-    const evt = { key: 'R', shiftKey: true, target: document.body, preventDefault: jasmine.createSpy() } as any;
+    const evt = {
+      key: 'R',
+      shiftKey: true,
+      target: document.body,
+      preventDefault: jasmine.createSpy(),
+    } as any;
     component.onDocumentKeydown(evt);
     expect(component.openRefundWizard).toHaveBeenCalled();
   });
@@ -553,7 +565,12 @@ describe('AdminOrderDetailComponent', () => {
   it('onDocumentKeydown downloads the packing slip on Shift+P', () => {
     prime();
     spyOn(component, 'downloadPackingSlip');
-    const evt = { key: 'p', shiftKey: true, target: document.body, preventDefault: jasmine.createSpy() } as any;
+    const evt = {
+      key: 'p',
+      shiftKey: true,
+      target: document.body,
+      preventDefault: jasmine.createSpy(),
+    } as any;
     component.onDocumentKeydown(evt);
     expect(component.downloadPackingSlip).toHaveBeenCalled();
   });
@@ -573,7 +590,9 @@ describe('AdminOrderDetailComponent', () => {
     const ignore = (e: any) => (component as any).shouldIgnoreShortcut(e);
     expect(ignore({ defaultPrevented: true })).toBeTrue();
     expect(ignore({ defaultPrevented: false, target: null })).toBeFalse();
-    expect(ignore({ defaultPrevented: false, target: { tagName: 'DIV', isContentEditable: true } })).toBeTrue();
+    expect(
+      ignore({ defaultPrevented: false, target: { tagName: 'DIV', isContentEditable: true } }),
+    ).toBeTrue();
     expect(
       ignore({ defaultPrevented: false, target: { tagName: 'SPAN', isContentEditable: false } }),
     ).toBeFalse();
@@ -824,7 +843,13 @@ describe('AdminOrderDetailComponent', () => {
   it('addressNeedsAttention reflects whether there are issues', () => {
     expect(
       component.addressNeedsAttention(
-        { line1: 'x', city: 'y', postal_code: '012345', country: 'RO', phone: '+40721234567' } as any,
+        {
+          line1: 'x',
+          city: 'y',
+          postal_code: '012345',
+          country: 'RO',
+          phone: '+40721234567',
+        } as any,
         'shipping',
       ),
     ).toBeFalse();
@@ -832,7 +857,11 @@ describe('AdminOrderDetailComponent', () => {
   });
 
   it('phoneState (via addressIssueKeys) covers every phone branch', () => {
-    const phoneIssues = (phone: string, country = 'RO', kind: 'shipping' | 'billing' = 'shipping') =>
+    const phoneIssues = (
+      phone: string,
+      country = 'RO',
+      kind: 'shipping' | 'billing' = 'shipping',
+    ) =>
       component.addressIssueKeys(
         { line1: 'x', city: 'y', postal_code: '012345', country, phone } as any,
         kind,
@@ -853,7 +882,13 @@ describe('AdminOrderDetailComponent', () => {
   it('postalState (via addressIssueKeys) treats valid non-RO postals as ok', () => {
     expect(
       component.addressIssueKeys(
-        { line1: 'x', city: 'y', postal_code: '10115', country: 'DE', phone: '+49301234567' } as any,
+        {
+          line1: 'x',
+          city: 'y',
+          postal_code: '10115',
+          country: 'DE',
+          phone: '+49301234567',
+        } as any,
         'shipping',
       ),
     ).toEqual([]);
@@ -889,7 +924,9 @@ describe('AdminOrderDetailComponent', () => {
     component.addressPostalCode = 'bad';
     expect(component.addressPostalHint()).toBe('adminUi.orders.addressValidate.postalInvalidRo');
     component.addressPostalCode = '01 23 45';
-    expect(component.addressPostalHint()).toBe('adminUi.orders.addressValidate.postalNonStandardRo');
+    expect(component.addressPostalHint()).toBe(
+      'adminUi.orders.addressValidate.postalNonStandardRo',
+    );
     component.addressPostalCode = '012345';
     expect(component.addressPostalHint()).toBe('');
     component.addressCountry = 'DE';
@@ -946,7 +983,11 @@ describe('AdminOrderDetailComponent', () => {
   });
 
   it('openAddressEditor populates the form for the billing address with blank defaults', () => {
-    component.order.set(makeOrder({ billing_address: { line1: 'B1', city: 'B', postal_code: '1', country: 'RO' } as any }));
+    component.order.set(
+      makeOrder({
+        billing_address: { line1: 'B1', city: 'B', postal_code: '1', country: 'RO' } as any,
+      }),
+    );
     component.openAddressEditor('billing');
     expect(component.addressEditorKind()).toBe('billing');
     expect(component.addressLabel).toBe('');
@@ -1017,8 +1058,7 @@ describe('AdminOrderDetailComponent', () => {
   // ---------------------------------------------------------------------------
 
   it('validateTrackingFields accepts empty values and valid urls but rejects bad ones', () => {
-    const call = (n: string, u: string) =>
-      (component as any).validateTrackingFields('dhl', n, u);
+    const call = (n: string, u: string) => (component as any).validateTrackingFields('dhl', n, u);
     expect(call('', '')).toBeNull();
     expect(call('AWB1', 'https://track.example.com/AWB1')).toBeNull();
     expect(call('AWB1', 'ftp://track.example.com')).toBe(
@@ -1210,9 +1250,7 @@ describe('AdminOrderDetailComponent', () => {
       created_at: '2026-01-01T00:00:00Z',
       data: { changes: { tracking_number: { from: 'A', to: 'B' } } },
     });
-    expect(rows).toEqual([
-      jasmine.objectContaining({ from: 'A', to: 'B' }),
-    ]);
+    expect(rows).toEqual([jasmine.objectContaining({ from: 'A', to: 'B' })]);
   });
 
   it('eventDiffRows parses a status_change note arrow when there are no structured changes', () => {
@@ -1482,7 +1520,16 @@ describe('AdminOrderDetailComponent', () => {
       makeOrder({
         refunds: [
           { data: { items: 'not-array' } },
-          { data: { items: [null, { order_item_id: 'other', quantity: 5 }, { order_item_id: 'item-1', quantity: -2 }, { order_item_id: 'item-1', quantity: 3 }] } },
+          {
+            data: {
+              items: [
+                null,
+                { order_item_id: 'other', quantity: 5 },
+                { order_item_id: 'item-1', quantity: -2 },
+                { order_item_id: 'item-1', quantity: 3 },
+              ],
+            },
+          },
         ] as any,
       }),
     );
@@ -2466,9 +2513,7 @@ describe('AdminOrderDetailComponent', () => {
   });
 
   it('customerLabel falls back to guest when email and username are nullish', () => {
-    component.order.set(
-      makeOrder({ customer_email: undefined, customer_username: undefined }),
-    );
+    component.order.set(makeOrder({ customer_email: undefined, customer_username: undefined }));
     expect(component.customerLabel()).toBe('adminUi.orders.guest');
   });
 
@@ -2541,7 +2586,13 @@ describe('AdminOrderDetailComponent', () => {
     prime();
     component.fulfillmentQty = { 'item-1': 5 };
     api.fulfillItem.and.returnValue(
-      of(makeOrder({ items: [{ id: 'item-1', product_id: 'p', quantity: 0, unit_price: 0, subtotal: 0 }] as any })),
+      of(
+        makeOrder({
+          items: [
+            { id: 'item-1', product_id: 'p', quantity: 0, unit_price: 0, subtotal: 0 },
+          ] as any,
+        }),
+      ),
     );
     component.saveFulfillment('item-1', null as any);
     expect(api.fulfillItem).toHaveBeenCalledWith('order-1234567890', 'item-1', 0, {
@@ -2552,7 +2603,11 @@ describe('AdminOrderDetailComponent', () => {
   it('saveFulfillment defaults a missing shipped_quantity when refreshing', () => {
     prime();
     api.fulfillItem.and.returnValue(
-      of(makeOrder({ items: [{ id: 'i9', product_id: 'p', quantity: 1, unit_price: 1, subtotal: 1 }] as any })),
+      of(
+        makeOrder({
+          items: [{ id: 'i9', product_id: 'p', quantity: 1, unit_price: 1, subtotal: 1 }] as any,
+        }),
+      ),
     );
     component.saveFulfillment('item-1', 2);
     expect(component.fulfillmentQty['i9']).toBe(0);
@@ -2732,7 +2787,9 @@ describe('AdminOrderDetailComponent', () => {
   });
 
   it('save tolerates a falsy current and response status, and clears tracking to null', () => {
-    prime(makeOrder({ status: undefined as any, tracking_number: 'OLD', tracking_url: 'https://old' }));
+    prime(
+      makeOrder({ status: undefined as any, tracking_number: 'OLD', tracking_url: 'https://old' }),
+    );
     component.statusValue = 'paid';
     component.trackingNumber = '';
     component.trackingUrl = '';
@@ -2825,7 +2882,9 @@ describe('AdminOrderDetailComponent', () => {
 
   it('createReturnRequest defaults missing items and nullish quantities', () => {
     component.order.set(
-      makeOrder({ items: [{ id: 'x', product_id: 'p', quantity: null as any, unit_price: 0, subtotal: 0 }] }),
+      makeOrder({
+        items: [{ id: 'x', product_id: 'p', quantity: null as any, unit_price: 0, subtotal: 0 }],
+      }),
     );
     component.returnReason = 'broken';
     component.returnQty = {};

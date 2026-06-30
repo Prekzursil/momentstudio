@@ -6,11 +6,7 @@ import { of, throwError } from 'rxjs';
 
 import { AccountService, Order } from '../../core/account.service';
 import { ToastService } from '../../core/toast.service';
-import {
-  TicketsService,
-  TicketListItem,
-  TicketRead,
-} from '../../core/tickets.service';
+import { TicketsService, TicketListItem, TicketRead } from '../../core/tickets.service';
 import { TicketsComponent } from './tickets.component';
 
 function listItem(over: Partial<TicketListItem> = {}): TicketListItem {
@@ -334,7 +330,9 @@ describe('TicketsComponent', () => {
 
   describe('orderLabel', () => {
     it('appends a formatted date when created_at is present', () => {
-      const label = create().orderLabel(order({ reference_code: 'REF-1', created_at: '2024-03-04T00:00:00Z' }));
+      const label = create().orderLabel(
+        order({ reference_code: 'REF-1', created_at: '2024-03-04T00:00:00Z' }),
+      );
       expect(label.startsWith('REF-1 · ')).toBe(true);
     });
 
@@ -349,7 +347,10 @@ describe('TicketsComponent', () => {
   describe('filteredOrders', () => {
     it('returns all orders when the query is empty', () => {
       const cmp = create();
-      cmp.orders.set([order({ reference_code: 'AAA' }), order({ id: 'o2', reference_code: 'BBB' })]);
+      cmp.orders.set([
+        order({ reference_code: 'AAA' }),
+        order({ id: 'o2', reference_code: 'BBB' }),
+      ]);
       cmp.orderQuery = '';
       expect(cmp.filteredOrders().length).toBe(2);
     });

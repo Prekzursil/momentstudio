@@ -236,7 +236,9 @@ describe('AdminClientErrorLoggerService', () => {
 
     it('swallows API errors via the error subscriber', () => {
       admin.shouldError = true;
-      expect(() => internal.send(internal.buildBasePayload('window_error', 'boom', null))).not.toThrow();
+      expect(() =>
+        internal.send(internal.buildBasePayload('window_error', 'boom', null)),
+      ).not.toThrow();
     });
   });
 
@@ -259,7 +261,9 @@ describe('AdminClientErrorLoggerService', () => {
 
       expect(payload.message).toBe('Unknown error');
       expect(payload.stack).toBeNull();
-      expect(payload.context).not.toEqual(jasmine.objectContaining({ app_version: jasmine.anything() }));
+      expect(payload.context).not.toEqual(
+        jasmine.objectContaining({ app_version: jasmine.anything() }),
+      );
     });
 
     it('handles a nullish message', () => {
@@ -278,7 +282,13 @@ describe('AdminClientErrorLoggerService', () => {
       const error = new Error('explode');
       error.stack = 'deep-stack';
       internal.onWindowError(
-        new ErrorEvent('error', { error, message: 'fallback', filename: 'a.js', lineno: 1, colno: 2 }),
+        new ErrorEvent('error', {
+          error,
+          message: 'fallback',
+          filename: 'a.js',
+          lineno: 1,
+          colno: 2,
+        }),
       );
 
       expect(admin.payloads.length).toBe(1);

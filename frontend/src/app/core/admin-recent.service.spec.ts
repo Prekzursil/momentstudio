@@ -15,10 +15,9 @@ function storageKey(userId: string): string {
   return `${STORAGE_BASE}:${userId}`;
 }
 
-function newItem(overrides: Partial<Omit<AdminRecentItem, 'viewed_at'>> = {}): Omit<
-  AdminRecentItem,
-  'viewed_at'
-> {
+function newItem(
+  overrides: Partial<Omit<AdminRecentItem, 'viewed_at'>> = {},
+): Omit<AdminRecentItem, 'viewed_at'> {
   return {
     key: 'k1',
     type: 'page' as AdminRecentItemType,
@@ -187,7 +186,9 @@ describe('AdminRecentService', () => {
       const service = setup();
       TestBed.tick();
       service.add(newItem({ key: 'withState', state: { a: 1 } }));
-      service.add(newItem({ key: 'badState', state: 'nope' as unknown as Record<string, unknown> }));
+      service.add(
+        newItem({ key: 'badState', state: 'nope' as unknown as Record<string, unknown> }),
+      );
       const withState = service.list().find((it) => it.key === 'withState');
       const badState = service.list().find((it) => it.key === 'badState');
       expect(withState?.state).toEqual({ a: 1 });

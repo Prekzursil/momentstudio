@@ -75,7 +75,10 @@ describe('AdminReturnsComponent', () => {
     }).compileComponents();
   });
 
-  function make(): { fixture: ComponentFixture<AdminReturnsComponent>; cmp: AdminReturnsComponent } {
+  function make(): {
+    fixture: ComponentFixture<AdminReturnsComponent>;
+    cmp: AdminReturnsComponent;
+  } {
     const fixture = TestBed.createComponent(AdminReturnsComponent);
     return { fixture, cmp: fixture.componentInstance };
   }

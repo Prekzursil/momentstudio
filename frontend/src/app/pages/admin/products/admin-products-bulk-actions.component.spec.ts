@@ -56,11 +56,7 @@ describe('AdminProductsBulkActionsComponent', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [
-        RouterTestingModule,
-        TranslateModule.forRoot(),
-        AdminProductsBulkActionsComponent,
-      ],
+      imports: [RouterTestingModule, TranslateModule.forRoot(), AdminProductsBulkActionsComponent],
     });
 
     const translate = TestBed.inject(TranslateService);

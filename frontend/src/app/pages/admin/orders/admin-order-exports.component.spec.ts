@@ -115,9 +115,7 @@ describe('AdminOrderExportsComponent', () => {
 
   it('records the error state and request id when loading fails', () => {
     api.listDocumentExports.and.returnValue(
-      throwError(
-        () => new HttpErrorResponse({ status: 500, error: { request_id: 'req-99' } }),
-      ),
+      throwError(() => new HttpErrorResponse({ status: 500, error: { request_id: 'req-99' } })),
     );
 
     const component = createComponent();
@@ -188,9 +186,7 @@ describe('AdminOrderExportsComponent', () => {
     });
 
     it('maps every known kind to its translation key', () => {
-      expect(component.kindLabel('packing_slip')).toBe(
-        'adminUi.orders.exports.kinds.packingSlip',
-      );
+      expect(component.kindLabel('packing_slip')).toBe('adminUi.orders.exports.kinds.packingSlip');
       expect(component.kindLabel('packing_slips_batch')).toBe(
         'adminUi.orders.exports.kinds.packingSlipsBatch',
       );

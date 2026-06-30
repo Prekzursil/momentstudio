@@ -240,9 +240,7 @@ function setup(opts: SetupOpts = {}) {
     listProducts: jasmine
       .createSpy('listProducts')
       .and.returnValue(of(opts.productResponse ?? emptyResponse())),
-    listCategories: jasmine
-      .createSpy('listCategories')
-      .and.returnValue(of(opts.categories ?? [])),
+    listCategories: jasmine.createSpy('listCategories').and.returnValue(of(opts.categories ?? [])),
   };
 
   const admin = jasmine.createSpyObj<AdminService>('AdminService', [
@@ -660,9 +658,7 @@ describe('ShopComponent behavior', () => {
 
     it('drop error restores order', () => {
       const { cmp, admin, toast } = ready();
-      admin.bulkUpdateProducts.and.returnValue(
-        new Subject<any>().asObservable().pipe() as any,
-      );
+      admin.bulkUpdateProducts.and.returnValue(new Subject<any>().asObservable().pipe() as any);
       admin.bulkUpdateProducts.and.callFake(() => {
         return { subscribe: (h: any) => h.error(new Error('x')) } as any;
       });
@@ -1227,9 +1223,10 @@ describe('ShopComponent behavior', () => {
       cmp.renameNameRo = 'Ro';
       cmp.renameNameEn = 'En';
       admin.updateCategory.and.callFake(
-        () => ({
-          pipe: () => ({ subscribe: (h: any) => h.error(new Error('x')) }),
-        }) as any,
+        () =>
+          ({
+            pipe: () => ({ subscribe: (h: any) => h.error(new Error('x')) }),
+          }) as any,
       );
       cmp.saveRenameCategory();
       expect(cmp.renameError).toBeTruthy();
@@ -1305,7 +1302,12 @@ describe('ShopComponent behavior', () => {
       expect(cmp.mergePreview).toBeTruthy();
 
       admin.previewMergeCategory.and.returnValue(
-        of({ can_merge: false, reason: 'different_parent', product_count: 0, child_count: 0 }) as any,
+        of({
+          can_merge: false,
+          reason: 'different_parent',
+          product_count: 0,
+          child_count: 0,
+        }) as any,
       );
       cmp.previewCategoryMerge(cat('a'));
       expect(cmp.mergeError).toBeTruthy();
@@ -1522,9 +1524,10 @@ describe('ShopComponent behavior', () => {
       cmp.createNameRo = 'Ro';
       cmp.createNameEn = 'En';
       admin.createCategory.and.callFake(
-        () => ({
-          pipe: () => ({ subscribe: (h: any) => h.error(new Error('x')) }),
-        }) as any,
+        () =>
+          ({
+            pipe: () => ({ subscribe: (h: any) => h.error(new Error('x')) }),
+          }) as any,
       );
       cmp.saveCreateCategory();
       expect(cmp.createError).toBeTruthy();

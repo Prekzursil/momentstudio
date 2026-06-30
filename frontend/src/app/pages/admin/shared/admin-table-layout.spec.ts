@@ -92,11 +92,7 @@ describe('sanitizeAdminTableLayout', () => {
 
   it('returns the fallback when the version is not 1', () => {
     const fallback = baseLayout();
-    const result = sanitizeAdminTableLayout(
-      { version: 2, order: ['name'] },
-      COLUMNS,
-      fallback,
-    );
+    const result = sanitizeAdminTableLayout({ version: 2, order: ['name'] }, COLUMNS, fallback);
     expect(result).toBe(fallback);
   });
 

@@ -132,8 +132,9 @@ describe('ReceiptComponent', () => {
     expect(html).toContain('Refunds / Rambursări');
 
     // Slug item renders a product link; no-slug item renders plain text.
-    const productLink: HTMLAnchorElement | null =
-      fixture.nativeElement.querySelector('a[href$="/products/product-one"]');
+    const productLink: HTMLAnchorElement | null = fixture.nativeElement.querySelector(
+      'a[href$="/products/product-one"]',
+    );
     expect(productLink?.textContent?.trim()).toBe('Product One');
   });
 

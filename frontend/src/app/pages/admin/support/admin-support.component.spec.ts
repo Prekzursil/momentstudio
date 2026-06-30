@@ -61,9 +61,7 @@ function makeDetail(
   };
 }
 
-function makeCanned(
-  overrides: Partial<SupportCannedResponseRead> = {},
-): SupportCannedResponseRead {
+function makeCanned(overrides: Partial<SupportCannedResponseRead> = {}): SupportCannedResponseRead {
   return {
     id: 'canned-1',
     title: 'Greeting',
@@ -380,7 +378,9 @@ describe('AdminSupportComponent', () => {
     it('marks resolution (triaged) tickets due soon in amber', () => {
       const cmp = create();
       cmp.slaResolutionHours = 1; // due within an hour from now -> dueSoon window
-      const info = cmp.slaInfo(makeItem({ status: 'triaged', created_at: new Date().toISOString() }));
+      const info = cmp.slaInfo(
+        makeItem({ status: 'triaged', created_at: new Date().toISOString() }),
+      );
       expect(info).not.toBeNull();
       expect(info!.class).toContain('amber');
     });
@@ -388,7 +388,9 @@ describe('AdminSupportComponent', () => {
     it('marks far-out tickets in slate', () => {
       const cmp = create();
       cmp.slaResolutionHours = 720;
-      const info = cmp.slaInfo(makeItem({ status: 'triaged', created_at: new Date().toISOString() }));
+      const info = cmp.slaInfo(
+        makeItem({ status: 'triaged', created_at: new Date().toISOString() }),
+      );
       expect(info).not.toBeNull();
       expect(info!.class).toContain('slate');
     });
@@ -475,7 +477,9 @@ describe('AdminSupportComponent', () => {
 
     it('editTemplate loads the selected template into the form', () => {
       const cmp = create();
-      cmp.editTemplate(makeCanned({ id: 'z', title: 'T', body_en: 'E', body_ro: 'R', is_active: false }));
+      cmp.editTemplate(
+        makeCanned({ id: 'z', title: 'T', body_en: 'E', body_ro: 'R', is_active: false }),
+      );
       expect(cmp.templateEditingId).toBe('z');
       expect(cmp.templateTitle).toBe('T');
       expect(cmp.templateBodyEn).toBe('E');
@@ -617,7 +621,9 @@ describe('AdminSupportComponent', () => {
     it('leaves non-matching rows unchanged on success', () => {
       const cmp = create();
       cmp.cannedResponses.set([makeCanned({ id: 'other', is_active: true })]);
-      api.updateCannedResponse.and.returnValue(of(makeCanned({ id: 'canned-1', is_active: false })));
+      api.updateCannedResponse.and.returnValue(
+        of(makeCanned({ id: 'canned-1', is_active: false })),
+      );
       cmp.toggleTemplateActive(makeCanned({ id: 'canned-1', is_active: true }));
       expect(cmp.cannedResponses()[0].id).toBe('other');
     });
@@ -791,7 +797,9 @@ describe('AdminSupportComponent', () => {
       cmp.editStatus = 'resolved';
       cmp.editNote = ' done ';
       cmp.editAssigneeId = 'agent-1';
-      api.update.and.returnValue(of(makeDetail({ id: 'ticket-1', status: 'resolved', admin_note: null, assignee: null })));
+      api.update.and.returnValue(
+        of(makeDetail({ id: 'ticket-1', status: 'resolved', admin_note: null, assignee: null })),
+      );
       cmp.save();
       expect(api.update).toHaveBeenCalledWith('ticket-1', {
         status: 'resolved',

@@ -241,10 +241,7 @@ describe('AdminUsersComponent', () => {
     });
 
     it('uses defaults when filter fields absent and limit non-finite', () => {
-      history.replaceState(
-        { adminFilterScope: 'users', adminFilters: { limit: Infinity } },
-        '',
-      );
+      history.replaceState({ adminFilterScope: 'users', adminFilters: { limit: Infinity } }, '');
       const c = build();
       c.ngOnInit();
       expect(c.q).toBe('');
@@ -357,7 +354,10 @@ describe('AdminUsersComponent', () => {
         {
           key: 'k',
           type: 'filter',
-          state: { adminFilterScope: 'users', adminFilters: { q: 'zoe', role: 'support', limit: 10 } },
+          state: {
+            adminFilterScope: 'users',
+            adminFilters: { q: 'zoe', role: 'support', limit: 10 },
+          },
         } as any,
       ];
       const c = build();
@@ -773,10 +773,7 @@ describe('AdminUsersComponent', () => {
     it('revokeOneSession removes the session from the list', () => {
       const c = build();
       c.selectedUser.set(makeUser());
-      c.sessions.set([
-        { id: 's1' } as AdminUserSession,
-        { id: 's2' } as AdminUserSession,
-      ]);
+      c.sessions.set([{ id: 's1' } as AdminUserSession, { id: 's2' } as AdminUserSession]);
       c.revokeOneSession('s1');
       expect(c.sessions()?.map((s) => s.id)).toEqual(['s2']);
       expect(c.revokingSessionId()).toBeNull();
@@ -1529,7 +1526,10 @@ describe('AdminUsersComponent', () => {
       c['autoSelectAfterLoad'] = true;
       c['pendingPrefillSearch'] = 'U1';
       usersApi.search.and.returnValue(
-        of({ items: [makeUser({ id: 'u1', username: 'name', email: 'e@x.com' })], meta: null } as any),
+        of({
+          items: [makeUser({ id: 'u1', username: 'name', email: 'e@x.com' })],
+          meta: null,
+        } as any),
       );
       c.retryLoad();
       expect(c.selectedUser()?.id).toBe('u1');
@@ -1592,9 +1592,7 @@ describe('AdminUsersComponent', () => {
       const c = build();
       c['autoSelectAfterLoad'] = true;
       c['pendingPrefillSearch'] = null;
-      usersApi.search.and.returnValue(
-        of({ items: [makeUser({ id: 'only' })], meta: null } as any),
-      );
+      usersApi.search.and.returnValue(of({ items: [makeUser({ id: 'only' })], meta: null } as any));
       c.retryLoad();
       expect(c.selectedUser()?.id).toBe('only');
     });

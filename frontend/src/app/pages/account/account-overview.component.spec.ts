@@ -69,9 +69,9 @@ describe('AccountOverviewComponent', () => {
 
   it('injects the parent account component', () => {
     const fixture = TestBed.createComponent(AccountOverviewComponent);
-    expect(
-      (fixture.componentInstance as unknown as { account: AccountStub }).account,
-    ).toBe(account);
+    expect((fixture.componentInstance as unknown as { account: AccountStub }).account).toBe(
+      account,
+    );
   });
 
   it('renders the overview section with an aria label', () => {
@@ -113,9 +113,7 @@ describe('AccountOverviewComponent', () => {
     account.ordersLoaded.set(false);
     const { native } = setup();
 
-    const loadingCard = native.querySelector(
-      '[aria-label="account.overview.aria.ordersLoading"]',
-    );
+    const loadingCard = native.querySelector('[aria-label="account.overview.aria.ordersLoading"]');
     expect(loadingCard).not.toBeNull();
     expect(loadingCard?.querySelectorAll('app-skeleton').length).toBeGreaterThan(0);
     expect(native.querySelector('a[routerLink="/account/orders"]')).toBeNull();

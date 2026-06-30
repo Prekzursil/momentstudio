@@ -107,7 +107,10 @@ describe('SuccessComponent', () => {
 
     expect(cmp.summary).not.toBeNull();
     expect(analytics.track).toHaveBeenCalledTimes(1);
-    const [event, payload] = analytics.track.calls.mostRecent().args as [string, Record<string, unknown>];
+    const [event, payload] = analytics.track.calls.mostRecent().args as [
+      string,
+      Record<string, unknown>,
+    ];
     expect(event).toBe('checkout_success');
     expect(payload).toEqual(
       jasmine.objectContaining({
@@ -141,7 +144,10 @@ describe('SuccessComponent', () => {
     const cmp = create();
 
     expect(cmp.summary).not.toBeNull();
-    const [, payload] = analytics.track.calls.mostRecent().args as [string, Record<string, unknown>];
+    const [, payload] = analytics.track.calls.mostRecent().args as [
+      string,
+      Record<string, unknown>,
+    ];
     expect(payload['line_items']).toBe(0);
     expect(payload['units']).toBe(0);
     expect(payload['fee']).toBe(0);
@@ -161,7 +167,10 @@ describe('SuccessComponent', () => {
 
     create();
 
-    const [, payload] = analytics.track.calls.mostRecent().args as [string, Record<string, unknown>];
+    const [, payload] = analytics.track.calls.mostRecent().args as [
+      string,
+      Record<string, unknown>,
+    ];
     expect(payload['line_items']).toBe(2);
     expect(payload['units']).toBe(4);
   });

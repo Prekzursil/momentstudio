@@ -50,22 +50,65 @@ interface Harness {
 
 function makeAdminSpy(): any {
   const methods = [
-    'products', 'coupons', 'lowStock', 'audit', 'getMaintenance', 'setMaintenance',
-    'content', 'getContent', 'createContent', 'updateContentBlock', 'deleteContent',
-    'getCategories', 'createCategory', 'updateCategory', 'deleteCategory',
-    'getCategoryTranslations', 'upsertCategoryTranslation', 'deleteCategoryTranslation',
-    'createProduct', 'updateProduct', 'getProduct', 'deleteProduct', 'duplicateProduct',
-    'uploadProductImage', 'deleteProductImage', 'transferOwner', 'revokeSessions',
-    'userAliases', 'updateUserRole', 'updateOrderStatus', 'createCoupon', 'updateCoupon',
-    'invalidateCouponStripeMappings', 'listContentVersions', 'getContentVersion',
-    'rollbackContentVersion', 'uploadContentImage', 'updateContentImageFocalPoint',
-    'listContentPages', 'renameContentPage', 'updateContentTranslationStatus',
-    'getSitemapPreview', 'validateStructuredData', 'deleteContentRedirect',
-    'exportContentRedirects', 'importContentRedirects', 'upsertContentRedirect',
-    'previewFindReplaceContent', 'applyFindReplaceContent', 'linkCheckContent',
-    'fetchSocialThumbnail', 'sendScheduledReport', 'createPagePreviewToken',
-    'createHomePreviewToken', 'listFeaturedCollections', 'createFeaturedCollection',
-    'updateFeaturedCollection', 'reorderCategories', 'listContentRedirects',
+    'products',
+    'coupons',
+    'lowStock',
+    'audit',
+    'getMaintenance',
+    'setMaintenance',
+    'content',
+    'getContent',
+    'createContent',
+    'updateContentBlock',
+    'deleteContent',
+    'getCategories',
+    'createCategory',
+    'updateCategory',
+    'deleteCategory',
+    'getCategoryTranslations',
+    'upsertCategoryTranslation',
+    'deleteCategoryTranslation',
+    'createProduct',
+    'updateProduct',
+    'getProduct',
+    'deleteProduct',
+    'duplicateProduct',
+    'uploadProductImage',
+    'deleteProductImage',
+    'transferOwner',
+    'revokeSessions',
+    'userAliases',
+    'updateUserRole',
+    'updateOrderStatus',
+    'createCoupon',
+    'updateCoupon',
+    'invalidateCouponStripeMappings',
+    'listContentVersions',
+    'getContentVersion',
+    'rollbackContentVersion',
+    'uploadContentImage',
+    'updateContentImageFocalPoint',
+    'listContentPages',
+    'renameContentPage',
+    'updateContentTranslationStatus',
+    'getSitemapPreview',
+    'validateStructuredData',
+    'deleteContentRedirect',
+    'exportContentRedirects',
+    'importContentRedirects',
+    'upsertContentRedirect',
+    'previewFindReplaceContent',
+    'applyFindReplaceContent',
+    'linkCheckContent',
+    'fetchSocialThumbnail',
+    'sendScheduledReport',
+    'createPagePreviewToken',
+    'createHomePreviewToken',
+    'listFeaturedCollections',
+    'createFeaturedCollection',
+    'updateFeaturedCollection',
+    'reorderCategories',
+    'listContentRedirects',
     'linkCheckContentPreview',
   ];
   const spy: any = jasmine.createSpyObj('AdminService', methods);
@@ -101,18 +144,31 @@ function createComponent(route: RouteStub = createRouteStub()): Harness {
   const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
   adminProducts.search.and.returnValue(of({ items: [], total: 0 }));
   const blog = jasmine.createSpyObj('BlogService', [
-    'listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin',
-    'unhideCommentAdmin', 'deleteComment', 'createPreviewToken',
+    'listFlaggedComments',
+    'resolveCommentFlagsAdmin',
+    'hideCommentAdmin',
+    'unhideCommentAdmin',
+    'deleteComment',
+    'createPreviewToken',
   ]);
   blog.listFlaggedComments.and.returnValue(of([]));
   blog.createPreviewToken.and.returnValue(of({ token: 't', expires_at: '' }));
   const fxAdmin = jasmine.createSpyObj('FxAdminService', [
-    'getStatus', 'listOverrideAudit', 'restoreOverrideFromAudit', 'clearOverride', 'setOverride',
+    'getStatus',
+    'listOverrideAudit',
+    'restoreOverrideFromAudit',
+    'clearOverride',
+    'setOverride',
   ]);
   fxAdmin.getStatus.and.returnValue(of({ override: null }));
   fxAdmin.listOverrideAudit.and.returnValue(of([]));
   const taxesAdmin = jasmine.createSpyObj('TaxesAdminService', [
-    'listGroups', 'createGroup', 'updateGroup', 'deleteGroup', 'upsertRate', 'deleteRate',
+    'listGroups',
+    'createGroup',
+    'updateGroup',
+    'deleteGroup',
+    'upsertRate',
+    'deleteRate',
   ]);
   taxesAdmin.listGroups.and.returnValue(of([]));
   const auth = {
@@ -148,8 +204,19 @@ function createComponent(route: RouteStub = createRouteStub()): Harness {
   );
 
   return {
-    component, admin, adminProducts, blog, fxAdmin, taxesAdmin, auth,
-    cmsPrefs, toast, translate, markdown, sanitizer, route,
+    component,
+    admin,
+    adminProducts,
+    blog,
+    fxAdmin,
+    taxesAdmin,
+    auth,
+    cmsPrefs,
+    toast,
+    translate,
+    markdown,
+    sanitizer,
+    route,
   };
 }
 
@@ -219,7 +286,14 @@ describe('AdminComponent — branch fill', () => {
 
     it('falls back to md breakpoint when invalid and keeps default columns when fewer than 2', () => {
       const result = c.parsePageBlocksDraft({
-        blocks: [{ type: 'columns', key: 'cols2', columns_breakpoint: 'xx', columns: [{ title: { en: 'only', ro: '' }, body_markdown: { en: '', ro: '' } }] }],
+        blocks: [
+          {
+            type: 'columns',
+            key: 'cols2',
+            columns_breakpoint: 'xx',
+            columns: [{ title: { en: 'only', ro: '' }, body_markdown: { en: '', ro: '' } }],
+          },
+        ],
       });
       expect(result[0].columns_breakpoint).toBe('md');
       expect(result[0].columns.length).toBe(2);
@@ -227,7 +301,15 @@ describe('AdminComponent — branch fill', () => {
 
     it('parses cta with new-tab flag', () => {
       const result = c.parsePageBlocksDraft({
-        blocks: [{ type: 'cta', key: 'cta', cta_url: '  /go  ', cta_new_tab: true, cta_label: { en: 'Go', ro: '' } }],
+        blocks: [
+          {
+            type: 'cta',
+            key: 'cta',
+            cta_url: '  /go  ',
+            cta_new_tab: true,
+            cta_label: { en: 'Go', ro: '' },
+          },
+        ],
       });
       expect(result[0].cta_url).toBe('/go');
       expect(result[0].cta_new_tab).toBe(true);
@@ -235,22 +317,47 @@ describe('AdminComponent — branch fill', () => {
 
     it('parses faq and testimonials items (and ignores invalid item entries)', () => {
       const faq = c.parsePageBlocksDraft({
-        blocks: [{ type: 'faq', key: 'faq', items: [null, { question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] }],
+        blocks: [
+          {
+            type: 'faq',
+            key: 'faq',
+            items: [null, { question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+          },
+        ],
       });
       expect(faq[0].faq_items.length).toBe(1);
       const test = c.parsePageBlocksDraft({
-        blocks: [{ type: 'testimonials', key: 't', items: [3, { quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] }],
+        blocks: [
+          {
+            type: 'testimonials',
+            key: 't',
+            items: [
+              3,
+              {
+                quote_markdown: { en: 'q', ro: '' },
+                author: { en: 'me', ro: '' },
+                role: { en: 'r', ro: '' },
+              },
+            ],
+          },
+        ],
       });
       expect(test[0].testimonials.length).toBe(1);
     });
 
     it('parses product_grid with collection source and array slugs', () => {
       const result = c.parsePageBlocksDraft({
-        blocks: [{
-          type: 'product_grid', key: 'pg', source: 'COLLECTION',
-          collection_slug: ' col ', category_slug: ' cat ',
-          product_slugs: ['a', 'a', 'b', 3], limit: 100,
-        }],
+        blocks: [
+          {
+            type: 'product_grid',
+            key: 'pg',
+            source: 'COLLECTION',
+            collection_slug: ' col ',
+            category_slug: ' cat ',
+            product_slugs: ['a', 'a', 'b', 3],
+            limit: 100,
+          },
+        ],
       });
       expect(result[0].product_grid_source).toBe('collection');
       expect(result[0].product_grid_collection_slug).toBe('col');
@@ -260,7 +367,15 @@ describe('AdminComponent — branch fill', () => {
 
     it('parses product_grid with products source and comma/newline string slugs and non-finite limit', () => {
       const result = c.parsePageBlocksDraft({
-        blocks: [{ type: 'product_grid', key: 'pg2', source: 'products', product_slugs: 'a, b\nc', limit: 'NaN' }],
+        blocks: [
+          {
+            type: 'product_grid',
+            key: 'pg2',
+            source: 'products',
+            product_slugs: 'a, b\nc',
+            limit: 'NaN',
+          },
+        ],
       });
       expect(result[0].product_grid_source).toBe('products');
       expect(result[0].product_grid_product_slugs).toBe('a\nb\nc');
@@ -277,7 +392,9 @@ describe('AdminComponent — branch fill', () => {
 
     it('parses image, gallery (skipping urlless entries), banner and carousel blocks', () => {
       const image = c.parsePageBlocksDraft({
-        blocks: [{ type: 'image', key: 'img', url: ' /u ', link_url: ' /l ', focal_x: 10, focal_y: 20 }],
+        blocks: [
+          { type: 'image', key: 'img', url: ' /u ', link_url: ' /l ', focal_x: 10, focal_y: 20 },
+        ],
       });
       expect(image[0].url).toBe('/u');
       expect(image[0].link_url).toBe('/l');
@@ -296,7 +413,9 @@ describe('AdminComponent — branch fill', () => {
       });
       expect(carousel[0].slides.length).toBe(2);
 
-      const carouselEmpty = c.parsePageBlocksDraft({ blocks: [{ type: 'carousel', key: 'car2', slides: 'nope' }] });
+      const carouselEmpty = c.parsePageBlocksDraft({
+        blocks: [{ type: 'carousel', key: 'car2', slides: 'nope' }],
+      });
       expect(carouselEmpty[0].slides.length).toBe(1);
     });
   });
@@ -311,7 +430,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('returns early when no valid image files survive normalisation', async () => {
-      await c.insertPageMediaFiles('page.about', 0, [new File(['x'], 'x.txt', { type: 'text/plain' })]);
+      await c.insertPageMediaFiles('page.about', 0, [
+        new File(['x'], 'x.txt', { type: 'text/plain' }),
+      ]);
       expect(h.toast.error).toHaveBeenCalled();
       expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
     });
@@ -348,7 +469,9 @@ describe('AdminComponent — branch fill', () => {
       c.pageBlocks['page.about'] = [];
       await c.insertPageMediaFiles('page.about', 0, [png()]);
       expect(c.pageBlocks['page.about'].length).toBe(0);
-      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.blockTypeNotAllowed');
+      expect(h.toast.error).toHaveBeenCalledWith(
+        'adminUi.site.pages.builder.errors.blockTypeNotAllowed',
+      );
     });
 
     it('rejects multiple files when neither image nor gallery is allowed', async () => {
@@ -411,9 +534,13 @@ describe('AdminComponent — branch fill', () => {
 
     it('dragEventHasFiles detects files, Files type, and absence', () => {
       expect(c.dragEventHasFiles(dragEvent(null))).toBe(false);
-      expect(c.dragEventHasFiles(dragEvent({ files: [new File(['x'], 'a.png')] } as any))).toBe(true);
+      expect(c.dragEventHasFiles(dragEvent({ files: [new File(['x'], 'a.png')] } as any))).toBe(
+        true,
+      );
       expect(c.dragEventHasFiles(dragEvent({ files: [], types: ['Files'] } as any))).toBe(true);
-      expect(c.dragEventHasFiles(dragEvent({ files: [], types: ['text/plain'] } as any))).toBe(false);
+      expect(c.dragEventHasFiles(dragEvent({ files: [], types: ['text/plain'] } as any))).toBe(
+        false,
+      );
     });
 
     it('dragEventHasFiles swallows errors thrown while reading types', () => {
@@ -433,24 +560,62 @@ describe('AdminComponent — branch fill', () => {
       blocks: [
         { type: 'text', key: 'text_b', body_markdown: { en: 'B', ro: 'b' } },
         {
-          type: 'columns', key: 'cols_b', breakpoint: 'sm',
+          type: 'columns',
+          key: 'cols_b',
+          breakpoint: 'sm',
           columns: [
             { title: { en: 't1', ro: '' }, body_markdown: { en: 'x1', ro: '' } },
             { title: { en: 't2', ro: '' }, body_markdown: { en: 'x2', ro: '' } },
           ],
         },
-        { type: 'cta', key: 'cta_b', title: { en: 'T', ro: '' }, body_markdown: { en: 'B', ro: '' }, cta_label: { en: 'L', ro: '' }, cta_url: '/u', cta_new_tab: true },
-        { type: 'faq', key: 'faq_b', items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] },
-        { type: 'testimonials', key: 'test_b', items: [{ quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] },
+        {
+          type: 'cta',
+          key: 'cta_b',
+          title: { en: 'T', ro: '' },
+          body_markdown: { en: 'B', ro: '' },
+          cta_label: { en: 'L', ro: '' },
+          cta_url: '/u',
+          cta_new_tab: true,
+        },
+        {
+          type: 'faq',
+          key: 'faq_b',
+          items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+        },
+        {
+          type: 'testimonials',
+          key: 'test_b',
+          items: [
+            {
+              quote_markdown: { en: 'q', ro: '' },
+              author: { en: 'me', ro: '' },
+              role: { en: 'r', ro: '' },
+            },
+          ],
+        },
         { type: 'product_grid', key: 'pg_cat', source: 'category', category_slug: 'cat', limit: 8 },
         { type: 'product_grid', key: 'pg_col', source: 'collection', collection_slug: 'col' },
         { type: 'product_grid', key: 'pg_prd', source: 'products', product_slugs: 'a,b,a' },
         { type: 'form', key: 'form_c', form_type: 'contact', topic: 'support' },
         { type: 'form', key: 'form_n', form_type: 'newsletter' },
-        { type: 'image', key: 'img_b', url: '/img', alt: { en: 'a', ro: 'r' }, caption: { en: 'c', ro: '' }, link_url: '/l', focal_x: 10, focal_y: 20 },
+        {
+          type: 'image',
+          key: 'img_b',
+          url: '/img',
+          alt: { en: 'a', ro: 'r' },
+          caption: { en: 'c', ro: '' },
+          link_url: '/l',
+          focal_x: 10,
+          focal_y: 20,
+        },
         { type: 'gallery', key: 'gal_b', images: [{ url: '/g', alt: { en: 'a', ro: 'r' } }] },
         { type: 'banner', key: 'ban_b', slide: { image_url: '/b', alt: { en: 'a', ro: 'r' } } },
-        { type: 'carousel', key: 'car_b', slides: [{ image_url: '/c', alt: { en: 'a', ro: 'r' } }], settings: {} },
+        {
+          type: 'carousel',
+          key: 'car_b',
+          slides: [{ image_url: '/c', alt: { en: 'a', ro: 'r' } }],
+          settings: {},
+        },
       ],
     };
   }
@@ -476,7 +641,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('drops requires_auth when the flag is unset', () => {
-      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 't', body_markdown: { en: 'x', ro: '' } }] });
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 't', body_markdown: { en: 'x', ro: '' } }],
+      });
       c.pageBlocksRequiresAuth['page.about'] = false;
       const meta = c.buildPageBlocksMeta('page.about');
       expect('requires_auth' in meta).toBe(false);
@@ -509,7 +676,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('reports an all-disabled page as a single empty section', () => {
-      const blocks = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'x', enabled: false, body_markdown: { en: 'hi', ro: '' } }] });
+      const blocks = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'x', enabled: false, body_markdown: { en: 'hi', ro: '' } }],
+      });
       c.pageBlocks['page.about'] = blocks;
       const res = c.computePagePublishChecklistLocal('page.about');
       expect(res.emptySections).toEqual(['adminUi.content.publishChecklist.emptyAllDisabled']);
@@ -540,7 +709,9 @@ describe('AdminComponent — branch fill', () => {
   describe('publish checklist modal flow', () => {
     it('computes a local checklist and merges link issues from the preview endpoint', () => {
       h.admin.linkCheckContentPreview.and.returnValue(of({ issues: [{ url: '/x', status: 404 }] }));
-      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }] });
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }],
+      });
       c.openPagePublishChecklist('page.about');
       expect(c.pagePublishChecklistOpen).toBe(true);
       expect(c.pagePublishChecklistLoading).toBe(false);
@@ -555,7 +726,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('surfaces a link-check error detail', () => {
-      h.admin.linkCheckContentPreview.and.returnValue(throwError(() => ({ error: { detail: 'nope' } })));
+      h.admin.linkCheckContentPreview.and.returnValue(
+        throwError(() => ({ error: { detail: 'nope' } })),
+      );
       c.openPagePublishChecklist('page.about');
       expect(c.pagePublishChecklistError).toBe('nope');
     });
@@ -585,7 +758,9 @@ describe('AdminComponent — branch fill', () => {
 
   describe('savePageBlocks', () => {
     beforeEach(() => {
-      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }] });
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }],
+      });
     });
 
     it('opens the publish checklist when publishing without bypass', () => {
@@ -599,7 +774,14 @@ describe('AdminComponent — branch fill', () => {
       c.pageBlocksStatus['page.about'] = 'published';
       c.pageBlocksPublishedAt['page.about'] = '2026-01-01T10:00';
       c.pageBlocksPublishedUntil['page.about'] = '2026-02-01T10:00';
-      h.admin.updateContentBlock.and.returnValue(of({ status: 'published', published_at: '2026-01-01T10:00:00Z', published_until: '2026-02-01T10:00:00Z', meta: { requires_auth: true } }));
+      h.admin.updateContentBlock.and.returnValue(
+        of({
+          status: 'published',
+          published_at: '2026-01-01T10:00:00Z',
+          published_until: '2026-02-01T10:00:00Z',
+          meta: { requires_auth: true },
+        }),
+      );
       c.savePageBlocks('page.about', { bypassChecklist: true });
       const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
       expect(payload.published_at).toContain('2026-01-01');
@@ -633,7 +815,9 @@ describe('AdminComponent — branch fill', () => {
 
     it('creates the page on a 404 and maps the created review response', () => {
       h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
-      h.admin.createContent.and.returnValue(of({ status: 'review', meta: { requires_auth: true } }));
+      h.admin.createContent.and.returnValue(
+        of({ status: 'review', meta: { requires_auth: true } }),
+      );
       c.savePageBlocks('page.about');
       expect(h.admin.createContent).toHaveBeenCalled();
       expect(c.pageBlocksStatus['page.about']).toBe('review');
@@ -672,7 +856,12 @@ describe('AdminComponent — branch fill', () => {
       const refresh = spyOn(c, 'refreshPagePreview');
       h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
       h.admin.createContent.and.returnValue(
-        of({ status: 'published', published_at: '2026-01-01T00:00:00Z', published_until: '2026-02-01T00:00:00Z', meta: null }),
+        of({
+          status: 'published',
+          published_at: '2026-01-01T00:00:00Z',
+          published_until: '2026-02-01T00:00:00Z',
+          meta: null,
+        }),
       );
       c.savePageBlocks('page.about');
       expect(c.pageBlocksStatus['page.about']).toBe('published');
@@ -700,10 +889,29 @@ describe('AdminComponent — branch fill', () => {
               { type: 'bogus_type' }, // unknown -> skipped
               { type: 'text', key: 'dup', body_markdown: { en: 'B', ro: '' } },
               { type: 'text', key: 'dup' }, // key collision -> dup-1
-              { type: 'columns', breakpoint: 'lg', columns: [{ title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } }, { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } }] },
+              {
+                type: 'columns',
+                breakpoint: 'lg',
+                columns: [
+                  { title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } },
+                  { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } },
+                ],
+              },
               { type: 'cta', cta_url: '/u', cta_new_tab: true },
-              { type: 'faq', items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] },
-              { type: 'testimonials', items: [{ quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] },
+              {
+                type: 'faq',
+                items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+              },
+              {
+                type: 'testimonials',
+                items: [
+                  {
+                    quote_markdown: { en: 'q', ro: '' },
+                    author: { en: 'me', ro: '' },
+                    role: { en: 'r', ro: '' },
+                  },
+                ],
+              },
               { type: 'image', url: '/i', link_url: '/l' },
               { type: 'gallery', images: [null, { url: '' }, { url: '/g' }] },
               { type: 'banner', slide: {} },
@@ -759,10 +967,31 @@ describe('AdminComponent — branch fill', () => {
             blocks: [
               { type: 'story' },
               { type: 'text', key: 'tx', body_markdown: { en: 'B', ro: '' } },
-              { type: 'columns', key: 'co', columns: [{ title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } }, { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } }] },
+              {
+                type: 'columns',
+                key: 'co',
+                columns: [
+                  { title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } },
+                  { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } },
+                ],
+              },
               { type: 'cta', key: 'ct', cta_url: '/u' },
-              { type: 'faq', key: 'fa', items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }] },
-              { type: 'testimonials', key: 'te', items: [{ quote_markdown: { en: 'q', ro: '' }, author: { en: 'me', ro: '' }, role: { en: 'r', ro: '' } }] },
+              {
+                type: 'faq',
+                key: 'fa',
+                items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+              },
+              {
+                type: 'testimonials',
+                key: 'te',
+                items: [
+                  {
+                    quote_markdown: { en: 'q', ro: '' },
+                    author: { en: 'me', ro: '' },
+                    role: { en: 'r', ro: '' },
+                  },
+                ],
+              },
               { type: 'image', key: 'im', url: '/i' },
               { type: 'gallery', key: 'ga', images: [{ url: '/g' }] },
               { type: 'banner', key: 'ba', slide: { image_url: '/b' } },
@@ -901,10 +1130,35 @@ describe('AdminComponent — branch fill', () => {
       const result = c.parsePageBlocksDraft({
         blocks: [
           { type: 123 }, // non-string type -> skipped (covers ternary else)
-          { type: 'faq', key: 'faqmax', items: Array.from({ length: 25 }, () => ({ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } })) },
-          { type: 'testimonials', key: 'tmax', items: Array.from({ length: 15 }, () => ({ quote_markdown: { en: 'q', ro: '' }, author: { en: 'a', ro: '' }, role: { en: 'r', ro: '' } })) },
-          { type: 'product_grid', key: 'pgnum', source: 5, product_slugs: ['  ', 'ok', ...manySlugs] },
-          { type: 'product_grid', key: 'pgstr', source: 'products', product_slugs: ['x', ...manySlugs].join(',') },
+          {
+            type: 'faq',
+            key: 'faqmax',
+            items: Array.from({ length: 25 }, () => ({
+              question: { en: 'q', ro: '' },
+              answer_markdown: { en: 'a', ro: '' },
+            })),
+          },
+          {
+            type: 'testimonials',
+            key: 'tmax',
+            items: Array.from({ length: 15 }, () => ({
+              quote_markdown: { en: 'q', ro: '' },
+              author: { en: 'a', ro: '' },
+              role: { en: 'r', ro: '' },
+            })),
+          },
+          {
+            type: 'product_grid',
+            key: 'pgnum',
+            source: 5,
+            product_slugs: ['  ', 'ok', ...manySlugs],
+          },
+          {
+            type: 'product_grid',
+            key: 'pgstr',
+            source: 'products',
+            product_slugs: ['x', ...manySlugs].join(','),
+          },
         ],
       });
       expect(result.find((b: any) => b.key === 'faqmax').faq_items.length).toBe(20);
@@ -912,7 +1166,9 @@ describe('AdminComponent — branch fill', () => {
       const pgnum = result.find((b: any) => b.key === 'pgnum');
       expect(pgnum.product_grid_source).toBe('category'); // non-string source falls through
       expect(pgnum.product_grid_product_slugs.split('\n').length).toBe(50);
-      expect(result.find((b: any) => b.key === 'pgstr').product_grid_product_slugs.split('\n').length).toBe(50);
+      expect(
+        result.find((b: any) => b.key === 'pgstr').product_grid_product_slugs.split('\n').length,
+      ).toBe(50);
     });
 
     it('buildPageBlocksMeta tolerates blocks with missing array/limit fields', () => {
@@ -927,13 +1183,22 @@ describe('AdminComponent — branch fill', () => {
         ],
       });
       // Null out the array/limit fields to exercise the `|| []` / `|| 6` fallbacks.
-      const co = blocks.find((b: any) => b.key === 'co'); co.columns = null;
-      const fa = blocks.find((b: any) => b.key === 'fa'); fa.faq_items = null;
-      const te = blocks.find((b: any) => b.key === 'te'); te.testimonials = null;
-      const ca = blocks.find((b: any) => b.key === 'ca'); ca.slides = null;
-      const pg = blocks.find((b: any) => b.key === 'pg'); pg.product_grid_collection_slug = undefined;
+      const co = blocks.find((b: any) => b.key === 'co');
+      co.columns = null;
+      const fa = blocks.find((b: any) => b.key === 'fa');
+      fa.faq_items = null;
+      const te = blocks.find((b: any) => b.key === 'te');
+      te.testimonials = null;
+      const ca = blocks.find((b: any) => b.key === 'ca');
+      ca.slides = null;
+      const pg = blocks.find((b: any) => b.key === 'pg');
+      pg.product_grid_collection_slug = undefined;
       const pg2 = blocks.find((b: any) => b.key === 'pg2');
-      pg2.product_grid_product_slugs = ['  ', 'a', ...Array.from({ length: 60 }, (_, i) => `s${i}`)].join(',');
+      pg2.product_grid_product_slugs = [
+        '  ',
+        'a',
+        ...Array.from({ length: 60 }, (_, i) => `s${i}`),
+      ].join(',');
       pg2.product_grid_limit = 'abc';
       c.pageBlocks['page.about'] = blocks;
       const meta = c.buildPageBlocksMeta('page.about');
@@ -969,10 +1234,34 @@ describe('AdminComponent — branch fill', () => {
           meta: {
             blocks: [
               { type: 456 }, // non-string type
-              { type: 'columns', key: 'co4', columns: [null, { title: { en: 'a', ro: '' } }, { title: { en: 'b', ro: '' } }, { title: { en: 'c', ro: '' } }, { title: { en: 'd', ro: '' } }] },
+              {
+                type: 'columns',
+                key: 'co4',
+                columns: [
+                  null,
+                  { title: { en: 'a', ro: '' } },
+                  { title: { en: 'b', ro: '' } },
+                  { title: { en: 'c', ro: '' } },
+                  { title: { en: 'd', ro: '' } },
+                ],
+              },
               { type: 'cta', key: 'cta_n', cta_url: 99 },
-              { type: 'faq', key: 'faq_max', items: [null, ...Array.from({ length: 25 }, () => ({ question: { en: 'q', ro: '' } }))] },
-              { type: 'testimonials', key: 't_max', items: [3, ...Array.from({ length: 15 }, () => ({ quote_markdown: { en: 'q', ro: '' } }))] },
+              {
+                type: 'faq',
+                key: 'faq_max',
+                items: [
+                  null,
+                  ...Array.from({ length: 25 }, () => ({ question: { en: 'q', ro: '' } })),
+                ],
+              },
+              {
+                type: 'testimonials',
+                key: 't_max',
+                items: [
+                  3,
+                  ...Array.from({ length: 15 }, () => ({ quote_markdown: { en: 'q', ro: '' } })),
+                ],
+              },
               { type: 'image', key: 'img_n', url: 12, link_url: 7 },
               { type: 'gallery', key: 'gal_n', images: [{ url: 5 }] },
               { type: 'carousel', key: 'car_empty', slides: [] },
@@ -997,7 +1286,9 @@ describe('AdminComponent — branch fill', () => {
   describe('insertPageMediaFiles createdKey + array fallbacks', () => {
     const png = (n = 'a.png') => new File(['x'], n, { type: 'image/png' });
     beforeEach(() => {
-      h.admin.uploadContentImage.and.returnValue(of({ images: [{ url: 'https://cdn/x.png', focal_x: 50, focal_y: 50 }] }));
+      h.admin.uploadContentImage.and.returnValue(
+        of({ images: [{ url: 'https://cdn/x.png', focal_x: 50, focal_y: 50 }] }),
+      );
     });
 
     it('aborts single-image insertion when the block could not be created', async () => {
@@ -1023,7 +1314,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('leaves an unrelated block untouched while inserting a single image', async () => {
-      const existing = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'keep', body_markdown: { en: 'x', ro: '' } }] });
+      const existing = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'keep', body_markdown: { en: 'x', ro: '' } }],
+      });
       c.pageBlocks['page.about'] = existing;
       await c.insertPageMediaFiles('page.about', 0, [png()]);
       expect(c.pageBlocks['page.about'].some((b: any) => b.key === 'keep')).toBe(true);
@@ -1031,7 +1324,11 @@ describe('AdminComponent — branch fill', () => {
     });
   });
 
-  function blogPost(key: string, meta: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): any {
+  function blogPost(
+    key: string,
+    meta: Record<string, unknown> = {},
+    extra: Record<string, unknown> = {},
+  ): any {
     return { key, title: key, status: 'published', meta, ...extra };
   }
 
@@ -1049,8 +1346,16 @@ describe('AdminComponent — branch fill', () => {
 
     it('blogPinnedPosts sorts by order then publish date then updated_at', () => {
       c.contentBlocks = [
-        blogPost('blog.a', { pinned: true, pin_order: 1 }, { published_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01' }),
-        blogPost('blog.b', { pinned: true, pin_order: 1 }, { published_at: '2026-03-01T00:00:00Z', updated_at: '2026-02-01' }),
+        blogPost(
+          'blog.a',
+          { pinned: true, pin_order: 1 },
+          { published_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01' },
+        ),
+        blogPost(
+          'blog.b',
+          { pinned: true, pin_order: 1 },
+          { published_at: '2026-03-01T00:00:00Z', updated_at: '2026-02-01' },
+        ),
         blogPost('blog.c', { pinned: true, pin_order: 1 }, { updated_at: '2026-05-01' }),
         blogPost('blog.d', { pinned: true, pin_order: 1 }, { updated_at: '2026-04-01' }),
         blogPost('blog.x', {}),
@@ -1141,17 +1446,33 @@ describe('AdminComponent — branch fill', () => {
   describe('createBlogPost', () => {
     function primeCreate(over: Record<string, unknown> = {}): void {
       c.blogCreate = {
-        baseLang: 'en', status: 'draft', published_at: '', published_until: '',
-        title: 'My Post', body_markdown: 'Body', summary: '', tags: '', series: '',
-        cover_image_url: '', reading_time_minutes: '', pinned: false, pin_order: '',
-        includeTranslation: false, translationTitle: '', translationBody: '', ...over,
+        baseLang: 'en',
+        status: 'draft',
+        published_at: '',
+        published_until: '',
+        title: 'My Post',
+        body_markdown: 'Body',
+        summary: '',
+        tags: '',
+        series: '',
+        cover_image_url: '',
+        reading_time_minutes: '',
+        pinned: false,
+        pin_order: '',
+        includeTranslation: false,
+        translationTitle: '',
+        translationBody: '',
+        ...over,
       };
     }
 
     it('requires a slug derived from the title', async () => {
       primeCreate({ title: '' });
       await c.createBlogPost();
-      expect(h.toast.error).toHaveBeenCalledWith('adminUi.blog.errors.slugRequiredTitle', 'adminUi.blog.errors.slugRequiredCopy');
+      expect(h.toast.error).toHaveBeenCalledWith(
+        'adminUi.blog.errors.slugRequiredTitle',
+        'adminUi.blog.errors.slugRequiredCopy',
+      );
       expect(h.admin.createContent).not.toHaveBeenCalled();
     });
 
@@ -1163,10 +1484,18 @@ describe('AdminComponent — branch fill', () => {
 
     it('creates a fully populated post with meta, publish window and translation', async () => {
       primeCreate({
-        summary: 'Sum', tags: 'a, b', series: 'S', cover_image_url: '/cov',
-        reading_time_minutes: '5', pinned: true, pin_order: '3',
-        published_at: '2026-01-01T10:00', published_until: '2026-02-01T10:00',
-        includeTranslation: true, translationTitle: 'TT', translationBody: 'TB',
+        summary: 'Sum',
+        tags: 'a, b',
+        series: 'S',
+        cover_image_url: '/cov',
+        reading_time_minutes: '5',
+        pinned: true,
+        pin_order: '3',
+        published_at: '2026-01-01T10:00',
+        published_until: '2026-02-01T10:00',
+        includeTranslation: true,
+        translationTitle: 'TT',
+        translationBody: 'TB',
       });
       h.admin.createContent.and.returnValue(of({ key: 'blog.my-post' }));
       h.admin.updateContentBlock.and.returnValue(of({ key: 'blog.my-post' }));
@@ -1187,7 +1516,13 @@ describe('AdminComponent — branch fill', () => {
 
     it('falls back to nextBlogPinOrder when pinned without a valid order, and to base title/body for an empty translation', async () => {
       c.contentBlocks = [blogPost('blog.z', { pinned: true, pin_order: 4 })];
-      primeCreate({ pinned: true, pin_order: '', includeTranslation: true, translationTitle: '', translationBody: 'only body' });
+      primeCreate({
+        pinned: true,
+        pin_order: '',
+        includeTranslation: true,
+        translationTitle: '',
+        translationBody: 'only body',
+      });
       h.admin.createContent.and.returnValue(of({ key: 'blog.my-post' }));
       h.admin.updateContentBlock.and.returnValue(of({}));
       spyOn(c, 'loadBlogEditor');
@@ -1239,7 +1574,16 @@ describe('AdminComponent — branch fill', () => {
     it('loads the base language and applies status + publish window', () => {
       c.selectedBlogKey = 'blog.a';
       c.blogBaseLang = 'en';
-      h.admin.getContent.and.returnValue(of({ title: 'T', body_markdown: 'B', status: 'published', published_at: '2026-01-01T00:00:00Z', published_until: '2026-02-01T00:00:00Z', meta: { summary: { en: 's' } } }));
+      h.admin.getContent.and.returnValue(
+        of({
+          title: 'T',
+          body_markdown: 'B',
+          status: 'published',
+          published_at: '2026-01-01T00:00:00Z',
+          published_until: '2026-02-01T00:00:00Z',
+          meta: { summary: { en: 's' } },
+        }),
+      );
       c.setBlogEditLang('en');
       expect(c.blogForm.status).toBe('published');
       expect(c.blogForm.published_at).toBeTruthy();
@@ -1251,7 +1595,9 @@ describe('AdminComponent — branch fill', () => {
       c.blogBaseLang = 'en';
       c.blogForm.status = 'draft';
       c.blogMeta = { existing: true };
-      h.admin.getContent.and.returnValue(of({ title: 'T', body_markdown: 'B', status: 'published', meta: null }));
+      h.admin.getContent.and.returnValue(
+        of({ title: 'T', body_markdown: 'B', status: 'published', meta: null }),
+      );
       c.setBlogEditLang('ro');
       expect(c.blogForm.status).toBe('draft');
       expect(c.blogMeta).toEqual({ existing: true });
@@ -1271,7 +1617,14 @@ describe('AdminComponent — branch fill', () => {
       c.selectedBlogKey = 'blog.a';
       c.blogBaseLang = 'en';
       c.blogEditLang = 'en';
-      c.blogForm = { ...c.blogForm, title: 'Title', body_markdown: 'Body', status: 'draft', published_at: '', published_until: '' };
+      c.blogForm = {
+        ...c.blogForm,
+        title: 'Title',
+        body_markdown: 'Body',
+        status: 'draft',
+        published_at: '',
+        published_until: '',
+      };
       c.blogMeta = {};
       spyOn(c, 'reloadContentBlocks');
       spyOn(c, 'loadBlogEditor');
@@ -1421,7 +1774,9 @@ describe('AdminComponent — branch fill', () => {
 
     it('flags an over-long title', () => {
       spyOn(c, 'blogSeoTitleFull').and.returnValue('a'.repeat(80));
-      spyOn(c, 'blogSeoDescriptionFull').and.returnValue('a fully sufficient meta description that is comfortably beyond seventy characters total');
+      spyOn(c, 'blogSeoDescriptionFull').and.returnValue(
+        'a fully sufficient meta description that is comfortably beyond seventy characters total',
+      );
       spyOn(c, 'blogSeoDescriptionSource').and.returnValue('short source');
       spyOn(c, 'getBlogSummary').and.returnValue('summary');
       const keys = keysOf(c.blogSeoIssues('en'));
@@ -1450,7 +1805,9 @@ describe('AdminComponent — branch fill', () => {
   describe('extractMarkdownHeadings', () => {
     it('skips fenced code, deep levels and empty headings, and caps at 40', () => {
       const many = Array.from({ length: 45 }, (_, i) => `# Heading ${i}`).join('\n');
-      const md = ['```', '# inside code', '```', '#### too deep', '# ![](http://x)', many].join('\n');
+      const md = ['```', '# inside code', '```', '#### too deep', '# ![](http://x)', many].join(
+        '\n',
+      );
       const headings = c.extractMarkdownHeadings(md);
       expect(headings.length).toBe(40);
       expect(headings.every((h: any) => h.text !== 'inside code')).toBe(true);
@@ -1553,7 +1910,13 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('appends a new image with finite/non-finite focal fallbacks', () => {
-      c.selectBlogCoverAsset({ url: '/u', id: 'i', sort_order: 'x', focal_x: 'y', focal_y: 5 } as any);
+      c.selectBlogCoverAsset({
+        url: '/u',
+        id: 'i',
+        sort_order: 'x',
+        focal_x: 'y',
+        focal_y: 5,
+      } as any);
       expect(c.blogImages.length).toBe(1);
       expect(c.blogImages[0].sort_order).toBe(0);
       expect(c.blogImages[0].focal_x).toBe(50);
@@ -1562,7 +1925,13 @@ describe('AdminComponent — branch fill', () => {
 
     it('merges into an existing image row by id', () => {
       c.blogImages = [{ id: 'i', url: '/old', sort_order: 2, focal_x: 10, focal_y: 10 }];
-      c.selectBlogCoverAsset({ url: '/new', id: 'i', sort_order: 1, focal_x: 20, focal_y: 30 } as any);
+      c.selectBlogCoverAsset({
+        url: '/new',
+        id: 'i',
+        sort_order: 1,
+        focal_x: 20,
+        focal_y: 30,
+      } as any);
       const row = c.blogImages.find((x: any) => x.id === 'i');
       expect(row.url).toBe('/new');
       expect(row.focal_x).toBe(20);
@@ -1662,7 +2031,10 @@ describe('AdminComponent — branch fill', () => {
 
     it('returns without a selected post or a file', () => {
       c.selectedBlogKey = null;
-      c.uploadAndInsertBlogImage({ insertMarkdown: () => undefined } as any, evt(new File(['x'], 'a.png')));
+      c.uploadAndInsertBlogImage(
+        { insertMarkdown: () => undefined } as any,
+        evt(new File(['x'], 'a.png')),
+      );
       c.selectedBlogKey = 'blog.a';
       c.uploadAndInsertBlogImage({ insertMarkdown: () => undefined } as any, evt());
       expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
@@ -1680,7 +2052,9 @@ describe('AdminComponent — branch fill', () => {
       c.blogImageLayout = 'wide';
       const ta = document.createElement('textarea');
       const insert = spyOn(c, 'insertAtCursor');
-      h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: '1', url: '/x.png', sort_order: 1, focal_x: 10, focal_y: 20 }] }));
+      h.admin.uploadContentImage.and.returnValue(
+        of({ images: [{ id: '1', url: '/x.png', sort_order: 1, focal_x: 10, focal_y: 20 }] }),
+      );
       c.uploadAndInsertBlogImage(ta, evt(new File(['x'], '.png')));
       expect(insert.calls.mostRecent().args[1]).toBe('![image](/x.png "wide")');
     });
@@ -1710,16 +2084,25 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('ignores drops without image files or without a selected post', async () => {
-      await c.onBlogImageDrop({ insertMarkdown: () => undefined } as any, dropEvent([new File(['x'], 'a.txt', { type: 'text/plain' })]));
+      await c.onBlogImageDrop(
+        { insertMarkdown: () => undefined } as any,
+        dropEvent([new File(['x'], 'a.txt', { type: 'text/plain' })]),
+      );
       c.selectedBlogKey = null;
-      await c.onBlogImageDrop({ insertMarkdown: () => undefined } as any, dropEvent([new File(['x'], 'a.png', { type: 'image/png' })]));
+      await c.onBlogImageDrop(
+        { insertMarkdown: () => undefined } as any,
+        dropEvent([new File(['x'], 'a.png', { type: 'image/png' })]),
+      );
       expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
     });
 
     it('uploads and inserts dropped images into a rich editor', async () => {
       const editor = { insertMarkdown: jasmine.createSpy('insertMarkdown') };
       h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: '1', url: '/d.png' }] }));
-      await c.onBlogImageDrop(editor as any, dropEvent([new File(['x'], 'Drop.png', { type: 'image/png' })]));
+      await c.onBlogImageDrop(
+        editor as any,
+        dropEvent([new File(['x'], 'Drop.png', { type: 'image/png' })]),
+      );
       expect(editor.insertMarkdown).toHaveBeenCalledWith('![Drop](/d.png)');
       expect(h.toast.success).toHaveBeenCalledWith('adminUi.blog.images.success.uploaded');
     });
@@ -1727,13 +2110,19 @@ describe('AdminComponent — branch fill', () => {
     it('continues when an uploaded image lacks a url', async () => {
       const editor = { insertMarkdown: jasmine.createSpy('insertMarkdown') };
       h.admin.uploadContentImage.and.returnValue(of({ images: [] }));
-      await c.onBlogImageDrop(editor as any, dropEvent([new File(['x'], 'a.png', { type: 'image/png' })]));
+      await c.onBlogImageDrop(
+        editor as any,
+        dropEvent([new File(['x'], 'a.png', { type: 'image/png' })]),
+      );
       expect(editor.insertMarkdown).not.toHaveBeenCalled();
     });
 
     it('reports an error and aborts when an upload fails', async () => {
       h.admin.uploadContentImage.and.returnValue(throwError(() => ({})));
-      await c.onBlogImageDrop({ insertMarkdown: () => undefined } as any, dropEvent([new File(['x'], 'a.png', { type: 'image/png' })]));
+      await c.onBlogImageDrop(
+        { insertMarkdown: () => undefined } as any,
+        dropEvent([new File(['x'], 'a.png', { type: 'image/png' })]),
+      );
       expect(h.toast.error).toHaveBeenCalledWith('adminUi.blog.images.errors.upload');
     });
 
@@ -1762,7 +2151,9 @@ describe('AdminComponent — branch fill', () => {
 
     it('deleteContentRedirect surfaces a detail message then a default', () => {
       spyOn(window, 'confirm').and.returnValue(true);
-      h.admin.deleteContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'nope' } })));
+      h.admin.deleteContentRedirect.and.returnValue(
+        throwError(() => ({ error: { detail: 'nope' } })),
+      );
       c.deleteContentRedirect('id1');
       expect(h.toast.error).toHaveBeenCalledWith('nope');
       h.admin.deleteContentRedirect.and.returnValue(throwError(() => ({})));
@@ -1785,7 +2176,9 @@ describe('AdminComponent — branch fill', () => {
 
     it('exportContentRedirects reports an error detail and a default, sending undefined for a blank query', () => {
       c.redirectsQuery = '';
-      h.admin.exportContentRedirects.and.returnValue(throwError(() => ({ error: { detail: 'x' } })));
+      h.admin.exportContentRedirects.and.returnValue(
+        throwError(() => ({ error: { detail: 'x' } })),
+      );
       c.exportContentRedirects();
       expect(h.admin.exportContentRedirects).toHaveBeenCalledWith({ q: undefined });
       expect(h.toast.error).toHaveBeenCalledWith('x');
@@ -1815,7 +2208,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('importContentRedirects reports an error detail and a default', () => {
-      h.admin.importContentRedirects.and.returnValue(throwError(() => ({ error: { detail: 'bad' } })));
+      h.admin.importContentRedirects.and.returnValue(
+        throwError(() => ({ error: { detail: 'bad' } })),
+      );
       c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
       expect(h.toast.error).toHaveBeenCalledWith('bad');
       h.admin.importContentRedirects.and.returnValue(throwError(() => ({})));
@@ -1837,14 +2232,19 @@ describe('AdminComponent — branch fill', () => {
       spyOn(c, 'loadContentRedirects');
       h.admin.upsertContentRedirect.and.returnValue(of({}));
       c.createContentRedirect();
-      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({ from_key: 'from', to_key: 'to' });
+      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({
+        from_key: 'from',
+        to_key: 'to',
+      });
       expect(c.redirectCreateFrom).toBe('');
     });
 
     it('createContentRedirect reports an error detail and a default', () => {
       c.redirectCreateFrom = 'from';
       c.redirectCreateTo = 'to';
-      h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'oops' } })));
+      h.admin.upsertContentRedirect.and.returnValue(
+        throwError(() => ({ error: { detail: 'oops' } })),
+      );
       c.createContentRedirect();
       expect(h.toast.error).toHaveBeenCalledWith('oops');
       c.redirectCreateFrom = 'from';
@@ -1866,14 +2266,20 @@ describe('AdminComponent — branch fill', () => {
       expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.findRequired');
 
       const scopes: Array<[string, string | undefined]> = [
-        ['blog', 'blog.'], ['home', 'home.'], ['site', 'site.'], ['pages', 'page.'], ['all', undefined],
+        ['blog', 'blog.'],
+        ['home', 'home.'],
+        ['site', 'site.'],
+        ['pages', 'page.'],
+        ['all', undefined],
       ];
       h.admin.previewFindReplaceContent.and.returnValue(of({ total_items: 1, total_matches: 2 }));
       for (const [scope, prefix] of scopes) {
         c.findReplaceFind = 'foo';
         c.findReplaceScope = scope;
         c.previewFindReplace();
-        expect(h.admin.previewFindReplaceContent.calls.mostRecent().args[0].key_prefix).toBe(prefix);
+        expect(h.admin.previewFindReplaceContent.calls.mostRecent().args[0].key_prefix).toBe(
+          prefix,
+        );
       }
       expect(c.findReplacePreviewKey).toBeTruthy();
     });
@@ -1881,7 +2287,9 @@ describe('AdminComponent — branch fill', () => {
     it('previewFindReplace reports an error detail and a default', () => {
       c.findReplaceFind = 'foo';
       c.findReplaceScope = 'all';
-      h.admin.previewFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'pe' } })));
+      h.admin.previewFindReplaceContent.and.returnValue(
+        throwError(() => ({ error: { detail: 'pe' } })),
+      );
       c.previewFindReplace();
       expect(c.findReplaceError).toBe('pe');
       h.admin.previewFindReplaceContent.and.returnValue(throwError(() => ({})));
@@ -1909,7 +2317,12 @@ describe('AdminComponent — branch fill', () => {
       c.findReplaceReplace = 'bar';
       c.findReplaceCaseSensitive = false;
       c.findReplacePreview = { total_items: 1, total_matches: 1 };
-      c.findReplacePreviewKey = c.findReplacePayloadKey({ find: 'foo', replace: 'bar', key_prefix: null, case_sensitive: false });
+      c.findReplacePreviewKey = c.findReplacePayloadKey({
+        find: 'foo',
+        replace: 'bar',
+        key_prefix: null,
+        case_sensitive: false,
+      });
       spyOn(window, 'confirm').and.returnValue(false);
       c.applyFindReplace();
       expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
@@ -1923,7 +2336,12 @@ describe('AdminComponent — branch fill', () => {
       c.findReplaceReplace = 'bar';
       c.findReplaceCaseSensitive = false;
       c.findReplacePreview = { total_items: 1, total_matches: 1 };
-      c.findReplacePreviewKey = c.findReplacePayloadKey({ find: 'foo', replace: 'bar', key_prefix: null, case_sensitive: false });
+      c.findReplacePreviewKey = c.findReplacePayloadKey({
+        find: 'foo',
+        replace: 'bar',
+        key_prefix: null,
+        case_sensitive: false,
+      });
     }
 
     it('applyFindReplace applies with default counts on a null response', () => {
@@ -1938,7 +2356,9 @@ describe('AdminComponent — branch fill', () => {
     it('applyFindReplace surfaces an error detail', () => {
       primeApply();
       spyOn(window, 'confirm').and.returnValue(true);
-      h.admin.applyFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'ae' } })));
+      h.admin.applyFindReplaceContent.and.returnValue(
+        throwError(() => ({ error: { detail: 'ae' } })),
+      );
       c.applyFindReplace();
       expect(h.toast.error).toHaveBeenCalledWith('ae');
       expect(c.findReplaceApplying).toBe(false);
@@ -1999,22 +2419,36 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('onPageBlockDrop inserts a library block at the target index', () => {
-      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'k1', body_markdown: { en: 'a', ro: '' } }] });
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'k1', body_markdown: { en: 'a', ro: '' } }],
+      });
       const insertAt = spyOn(c, 'insertPageBlockAt').and.returnValue('new');
-      c.onPageBlockDrop(blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }), 'page.about', 'k1');
+      c.onPageBlockDrop(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }),
+        'page.about',
+        'k1',
+      );
       expect(insertAt).toHaveBeenCalledWith('page.about', 'cta', 0, 'blank');
     });
 
     it('onPageBlockDrop does not insert a library block when the target is missing', () => {
       c.pageBlocks['page.about'] = [];
       const insertAt = spyOn(c, 'insertPageBlockAt');
-      c.onPageBlockDrop(blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }), 'page.about', 'nope');
+      c.onPageBlockDrop(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }),
+        'page.about',
+        'nope',
+      );
       expect(insertAt).not.toHaveBeenCalled();
     });
 
     it('onPageBlockDrop reorders an existing block onto a target', () => {
       c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
-        blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }, { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } }, { type: 'text', key: 'c', body_markdown: { en: '3', ro: '' } }],
+        blocks: [
+          { type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } },
+          { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } },
+          { type: 'text', key: 'c', body_markdown: { en: '3', ro: '' } },
+        ],
       });
       c.draggingPageBlocksKey = 'page.about';
       c.draggingPageBlockKey = 'a';
@@ -2023,7 +2457,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('onPageBlockDrop ignores reorders with missing drag context, mismatched page or identical key', () => {
-      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({ blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }] });
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }],
+      });
       c.draggingPageBlocksKey = null;
       c.draggingPageBlockKey = null;
       c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'a');
@@ -2038,7 +2474,10 @@ describe('AdminComponent — branch fill', () => {
 
     it('onPageBlockDropZone reorders to a zone index and ends the drag', () => {
       c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
-        blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }, { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } }],
+        blocks: [
+          { type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } },
+          { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } },
+        ],
       });
       c.draggingPageBlocksKey = 'page.about';
       c.draggingPageBlockKey = 'a';
@@ -2058,7 +2497,11 @@ describe('AdminComponent — branch fill', () => {
     it('onPageBlockDropZone inserts a library block and resets the active flag', () => {
       c.pageBlocks['page.about'] = [];
       const insertAt = spyOn(c, 'insertPageBlockAt').and.returnValue('k');
-      c.onPageBlockDropZone(blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'image', template: 'starter' }), 'page.about', 0);
+      c.onPageBlockDropZone(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'image', template: 'starter' }),
+        'page.about',
+        0,
+      );
       expect(insertAt).toHaveBeenCalledWith('page.about', 'image', 0, 'starter');
       expect(c.pageInsertDragActive).toBe(false);
     });
@@ -2066,7 +2509,11 @@ describe('AdminComponent — branch fill', () => {
     it('onPageBlockDropZone ends the drag for a non-page payload', () => {
       c.pageBlocks['page.about'] = [];
       const end = spyOn(c, 'onPageBlockDragEnd');
-      c.onPageBlockDropZone(blockPayloadEvent({ kind: 'cms-block', scope: 'home', type: 'text' }), 'page.about', 0);
+      c.onPageBlockDropZone(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'home', type: 'text' }),
+        'page.about',
+        0,
+      );
       expect(end).toHaveBeenCalled();
     });
   });
@@ -2097,7 +2544,10 @@ describe('AdminComponent — branch fill', () => {
     it('rejects a reserved slug', () => {
       spyOn(window, 'prompt').and.returnValue('about');
       c.renameCustomPageUrl();
-      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.errors.reservedTitle', 'adminUi.site.pages.errors.reservedCopy');
+      expect(h.toast.error).toHaveBeenCalledWith(
+        'adminUi.site.pages.errors.reservedTitle',
+        'adminUi.site.pages.errors.reservedCopy',
+      );
     });
 
     it('returns when the change confirm is declined', () => {
@@ -2113,11 +2563,16 @@ describe('AdminComponent — branch fill', () => {
       spyOn(c, 'loadContentPages');
       spyOn(c, 'loadPageBlocks');
       spyOn(c, 'loadContentRedirects');
-      h.admin.renameContentPage.and.returnValue(of({ new_key: 'page.renamed', old_key: 'page.custom' }));
+      h.admin.renameContentPage.and.returnValue(
+        of({ new_key: 'page.renamed', old_key: 'page.custom' }),
+      );
       h.admin.upsertContentRedirect.and.returnValue(of({}));
       c.renameCustomPageUrl();
       expect(c.pageBlocksKey).toBe('page.renamed');
-      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({ from_key: 'page.custom', to_key: 'page.renamed' });
+      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({
+        from_key: 'page.custom',
+        to_key: 'page.renamed',
+      });
       expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.created');
     });
 
@@ -2126,7 +2581,9 @@ describe('AdminComponent — branch fill', () => {
       const confirm = spyOn(window, 'confirm').and.returnValues(true, false);
       spyOn(c, 'loadContentPages');
       spyOn(c, 'loadPageBlocks');
-      h.admin.renameContentPage.and.returnValue(of({ new_key: 'page.renamed', old_key: 'page.custom' }));
+      h.admin.renameContentPage.and.returnValue(
+        of({ new_key: 'page.renamed', old_key: 'page.custom' }),
+      );
       c.renameCustomPageUrl();
       expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
       expect(confirm).toHaveBeenCalledTimes(2);
@@ -2138,8 +2595,12 @@ describe('AdminComponent — branch fill', () => {
       spyOn(c, 'loadContentPages');
       spyOn(c, 'loadPageBlocks');
       spyOn(c, 'loadContentRedirects');
-      h.admin.renameContentPage.and.returnValue(of({ new_key: 'page.renamed', old_key: 'page.custom' }));
-      h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'rdr' } })));
+      h.admin.renameContentPage.and.returnValue(
+        of({ new_key: 'page.renamed', old_key: 'page.custom' }),
+      );
+      h.admin.upsertContentRedirect.and.returnValue(
+        throwError(() => ({ error: { detail: 'rdr' } })),
+      );
       c.renameCustomPageUrl();
       expect(h.toast.error).toHaveBeenCalledWith('rdr');
     });
@@ -2159,7 +2620,16 @@ describe('AdminComponent — branch fill', () => {
 
   describe('category management', () => {
     function cat(over: Record<string, unknown> = {}): any {
-      return { id: 'id', slug: 'slug', name: 'name', sort_order: 0, parent_id: null, low_stock_threshold: null, tax_group_id: null, ...over };
+      return {
+        id: 'id',
+        slug: 'slug',
+        name: 'name',
+        sort_order: 0,
+        parent_id: null,
+        low_stock_threshold: null,
+        tax_group_id: null,
+        ...over,
+      };
     }
 
     it('categoryDescendantIds resolves nested children, ignoring cycles', () => {
@@ -2177,10 +2647,15 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('categoryParentLabel resolves none/found/missing parents', () => {
-      c.categories = [cat({ id: 'p', slug: 'p', name: 'Parent' }), cat({ id: 'child', slug: 'child', parent_id: 'p' })];
+      c.categories = [
+        cat({ id: 'p', slug: 'p', name: 'Parent' }),
+        cat({ id: 'child', slug: 'child', parent_id: 'p' }),
+      ];
       expect(c.categoryParentLabel(cat({ parent_id: null }))).toBe('adminUi.categories.parentNone');
       expect(c.categoryParentLabel(cat({ parent_id: 'p' }))).toBe('Parent');
-      expect(c.categoryParentLabel(cat({ parent_id: 'gone' }))).toBe('adminUi.categories.parentNone');
+      expect(c.categoryParentLabel(cat({ parent_id: 'gone' }))).toBe(
+        'adminUi.categories.parentNone',
+      );
     });
 
     it('categoryParentOptions excludes self and descendants and sorts by name', () => {
@@ -2196,12 +2671,18 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('moveCategory ignores out-of-range moves and reorders/persists otherwise', () => {
-      c.categories = [cat({ slug: 'a', sort_order: 0 }), cat({ slug: 'b' /* missing sort_order */ }), cat({ slug: 'c', sort_order: 2 })];
+      c.categories = [
+        cat({ slug: 'a', sort_order: 0 }),
+        cat({ slug: 'b' /* missing sort_order */ }),
+        cat({ slug: 'c', sort_order: 2 }),
+      ];
       c.moveCategory(cat({ slug: 'a' }), -1); // swapIndex < 0
       c.moveCategory(cat({ slug: 'c', sort_order: 2 }), 1); // swapIndex >= length
       c.moveCategory(cat({ slug: 'missing' }), 1); // index < 0
       expect(h.admin.reorderCategories).not.toHaveBeenCalled();
-      h.admin.reorderCategories.and.returnValue(of([cat({ slug: 'b', sort_order: 0 }), cat({ slug: 'a', sort_order: 1 })]));
+      h.admin.reorderCategories.and.returnValue(
+        of([cat({ slug: 'b', sort_order: 0 }), cat({ slug: 'a', sort_order: 1 })]),
+      );
       c.moveCategory(cat({ slug: 'a', sort_order: 0 }), 1);
       expect(h.toast.success).toHaveBeenCalledWith('adminUi.categories.success.reorder');
     });
@@ -2225,7 +2706,11 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('onCategoryDrop reorders, persists and clears the dragging slug', () => {
-      c.categories = [cat({ slug: 'a', sort_order: 0 }), cat({ slug: 'b', sort_order: 1 }), cat({ slug: 'c', sort_order: 2 })];
+      c.categories = [
+        cat({ slug: 'a', sort_order: 0 }),
+        cat({ slug: 'b', sort_order: 1 }),
+        cat({ slug: 'c', sort_order: 2 }),
+      ];
       h.admin.reorderCategories.and.returnValue(of([cat({ slug: 'b', sort_order: 0 })]));
       c.draggingSlug = 'a';
       c.onCategoryDrop('c');
@@ -2245,7 +2730,9 @@ describe('AdminComponent — branch fill', () => {
       const bad = cat({ slug: 's', low_stock_threshold: 5 });
       c.updateCategoryLowStockThreshold(bad, '-3');
       expect(bad.low_stock_threshold).toBe(5);
-      expect(h.toast.error).toHaveBeenCalledWith('adminUi.categories.errors.updateLowStockThreshold');
+      expect(h.toast.error).toHaveBeenCalledWith(
+        'adminUi.categories.errors.updateLowStockThreshold',
+      );
 
       const same = cat({ slug: 's', low_stock_threshold: null });
       c.updateCategoryLowStockThreshold(same, '   ');
@@ -2327,7 +2814,9 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('loadReportsSettings parses a string recipient list and resets on error', () => {
-      h.admin.getContent.and.returnValue(of({ meta: { reports_recipients: 'a@b.com; c@d.com\ne@f.com' } }));
+      h.admin.getContent.and.returnValue(
+        of({ meta: { reports_recipients: 'a@b.com; c@d.com\ne@f.com' } }),
+      );
       c.loadReportsSettings();
       expect(c.reportsSettingsForm.recipients).toBe('a@b.com, c@d.com, e@f.com');
 
@@ -2340,8 +2829,18 @@ describe('AdminComponent — branch fill', () => {
 
     it('saveReportsSettings normalises numbers, dedupes valid recipients and persists', () => {
       c.reportsSettingsMeta = {};
-      c.reportsSettingsForm = { weekly_enabled: true, weekly_weekday: 0, weekly_hour_utc: 0, monthly_enabled: false, monthly_day: '', monthly_hour_utc: 0, recipients: 'a@b.com, a@b.com, bad, c@d.com' };
-      h.admin.updateContentBlock.and.returnValue(of({ meta: { reports_recipients: ['a@b.com', 'c@d.com'] } }));
+      c.reportsSettingsForm = {
+        weekly_enabled: true,
+        weekly_weekday: 0,
+        weekly_hour_utc: 0,
+        monthly_enabled: false,
+        monthly_day: '',
+        monthly_hour_utc: 0,
+        recipients: 'a@b.com, a@b.com, bad, c@d.com',
+      };
+      h.admin.updateContentBlock.and.returnValue(
+        of({ meta: { reports_recipients: ['a@b.com', 'c@d.com'] } }),
+      );
       c.saveReportsSettings();
       const meta = h.admin.updateContentBlock.calls.mostRecent().args[1].meta;
       expect(meta.reports_monthly_day).toBe(1);
@@ -2351,8 +2850,20 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('saveReportsSettings drops recipients when none are valid and keeps preset limits', () => {
-      c.reportsSettingsMeta = { reports_top_products_limit: 9, reports_low_stock_limit: 9, reports_retry_cooldown_minutes: 9 };
-      c.reportsSettingsForm = { weekly_enabled: false, weekly_weekday: 9, weekly_hour_utc: 9, monthly_enabled: true, monthly_day: '15', monthly_hour_utc: 9, recipients: 'not-an-email' };
+      c.reportsSettingsMeta = {
+        reports_top_products_limit: 9,
+        reports_low_stock_limit: 9,
+        reports_retry_cooldown_minutes: 9,
+      };
+      c.reportsSettingsForm = {
+        weekly_enabled: false,
+        weekly_weekday: 9,
+        weekly_hour_utc: 9,
+        monthly_enabled: true,
+        monthly_day: '15',
+        monthly_hour_utc: 9,
+        recipients: 'not-an-email',
+      };
       h.admin.updateContentBlock.and.returnValue(of(null));
       c.saveReportsSettings();
       const meta = h.admin.updateContentBlock.calls.mostRecent().args[1].meta;
@@ -2362,7 +2873,15 @@ describe('AdminComponent — branch fill', () => {
 
     it('saveReportsSettings surfaces a conflict, then creates on a generic error', () => {
       c.reportsSettingsMeta = {};
-      c.reportsSettingsForm = { weekly_enabled: false, weekly_weekday: 0, weekly_hour_utc: 8, monthly_enabled: false, monthly_day: '1', monthly_hour_utc: 8, recipients: '' };
+      c.reportsSettingsForm = {
+        weekly_enabled: false,
+        weekly_weekday: 0,
+        weekly_hour_utc: 8,
+        monthly_enabled: false,
+        monthly_day: '1',
+        monthly_hour_utc: 8,
+        recipients: '',
+      };
       h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
       h.admin.getContent.and.returnValue(of({ meta: {} }));
       c.saveReportsSettings();
@@ -2397,10 +2916,19 @@ describe('AdminComponent — branch fill', () => {
   });
 
   describe('company', () => {
-    const filled = { name: 'N', registration_number: 'R', cui: 'C', address: 'A', phone: 'P', email: 'E' };
+    const filled = {
+      name: 'N',
+      registration_number: 'R',
+      cui: 'C',
+      address: 'A',
+      phone: 'P',
+      email: 'E',
+    };
 
     it('loadCompany maps the nested company meta and resets on error', () => {
-      h.admin.getContent.and.returnValue(of({ meta: { company: { name: ' Acme ', email: 'x@y.z' } } }));
+      h.admin.getContent.and.returnValue(
+        of({ meta: { company: { name: ' Acme ', email: 'x@y.z' } } }),
+      );
       c.loadCompany();
       expect(c.companyForm.name).toBe('Acme');
       expect(c.companyForm.registration_number).toBe('');
@@ -2454,7 +2982,9 @@ describe('AdminComponent — branch fill', () => {
 
     it('loadSocial merges contact info and parses page lists; ignores errors', () => {
       c.socialForm = { phone: 'old', email: '', instagram_pages: [], facebook_pages: [] };
-      h.admin.getContent.and.returnValue(of({ meta: { contact: { email: 'm@e.co' }, instagram_pages: [{ url: 'ig' }] } }));
+      h.admin.getContent.and.returnValue(
+        of({ meta: { contact: { email: 'm@e.co' }, instagram_pages: [{ url: 'ig' }] } }),
+      );
       c.loadSocial();
       expect(c.socialForm.phone).toBe('old');
       expect(c.socialForm.email).toBe('m@e.co');
@@ -2466,7 +2996,12 @@ describe('AdminComponent — branch fill', () => {
     });
 
     it('fetchSocialThumbnail validates the url and applies/falls-back/errors', () => {
-      c.socialForm = { phone: '', email: '', instagram_pages: [{ label: '', url: '', thumbnail_url: '' }], facebook_pages: [] };
+      c.socialForm = {
+        phone: '',
+        email: '',
+        instagram_pages: [{ label: '', url: '', thumbnail_url: '' }],
+        facebook_pages: [],
+      };
       c.socialThumbErrors = {};
       c.socialThumbLoading = {};
       c.fetchSocialThumbnail('instagram', 0);

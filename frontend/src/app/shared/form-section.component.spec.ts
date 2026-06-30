@@ -47,9 +47,7 @@ describe('FormSectionComponent', () => {
   });
 
   function titleText(): string {
-    return fixture.debugElement
-      .query(By.css('p.font-semibold'))
-      .nativeElement.textContent.trim();
+    return fixture.debugElement.query(By.css('p.font-semibold')).nativeElement.textContent.trim();
   }
 
   function descriptionEl() {
@@ -57,9 +55,8 @@ describe('FormSectionComponent', () => {
   }
 
   it('creates the component with empty defaults', () => {
-    const component = fixture.debugElement.query(
-      By.directive(FormSectionComponent),
-    ).componentInstance as FormSectionComponent;
+    const component = fixture.debugElement.query(By.directive(FormSectionComponent))
+      .componentInstance as FormSectionComponent;
     expect(component.title).toBe('');
     expect(component.titleKey).toBe('');
     expect(component.description).toBe('');
@@ -100,27 +97,21 @@ describe('FormSectionComponent', () => {
     host.description = 'Where should we send it?';
     fixture.detectChanges();
     expect(descriptionEl()).not.toBeNull();
-    expect(descriptionEl().nativeElement.textContent.trim()).toBe(
-      'Where should we send it?',
-    );
+    expect(descriptionEl().nativeElement.textContent.trim()).toBe('Where should we send it?');
   });
 
   it('falls back to the translated descriptionKey when description is empty', () => {
     host.descriptionKey = 'description.key';
     fixture.detectChanges();
     expect(descriptionEl()).not.toBeNull();
-    expect(descriptionEl().nativeElement.textContent.trim()).toBe(
-      'Translated Description',
-    );
+    expect(descriptionEl().nativeElement.textContent.trim()).toBe('Translated Description');
   });
 
   it('prefers the literal description over the descriptionKey', () => {
     host.description = 'Literal description';
     host.descriptionKey = 'description.key';
     fixture.detectChanges();
-    expect(descriptionEl().nativeElement.textContent.trim()).toBe(
-      'Literal description',
-    );
+    expect(descriptionEl().nativeElement.textContent.trim()).toBe('Literal description');
   });
 
   it('projects default content and the formSectionActions slot', () => {

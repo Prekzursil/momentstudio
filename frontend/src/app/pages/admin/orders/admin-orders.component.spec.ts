@@ -222,9 +222,7 @@ describe('AdminOrdersComponent', () => {
       spyOn(window, 'prompt').and.returnValue('   ');
       const order = makeOrder({ id: 'a', status: 'paid' });
       comp.onKanbanDrop(dropEvent(order), 'cancelled' as any);
-      expect(toast.error).toHaveBeenCalledWith(
-        'adminUi.orders.kanban.errors.cancelReasonRequired',
-      );
+      expect(toast.error).toHaveBeenCalledWith('adminUi.orders.kanban.errors.cancelReasonRequired');
       expect(ordersApi.update).not.toHaveBeenCalled();
     });
 
@@ -492,9 +490,7 @@ describe('AdminOrdersComponent', () => {
     it('toggleCurrentViewPin requires a name when adding', () => {
       spyOn(window, 'prompt').and.returnValue('  ');
       comp.toggleCurrentViewPin();
-      expect(toast.error).toHaveBeenCalledWith(
-        'adminUi.favorites.savedViews.errors.nameRequired',
-      );
+      expect(toast.error).toHaveBeenCalledWith('adminUi.favorites.savedViews.errors.nameRequired');
       expect(favorites.add).not.toHaveBeenCalled();
     });
 
@@ -546,10 +542,7 @@ describe('AdminOrdersComponent', () => {
 
     it('keeps current limit when state limit invalid', () => {
       comp.limit = 99;
-      history.replaceState(
-        { adminFilterScope: 'orders', adminFilters: { limit: 'bad' } },
-        '',
-      );
+      history.replaceState({ adminFilterScope: 'orders', adminFilters: { limit: 'bad' } }, '');
       comp['maybeApplyFiltersFromState']();
       expect(comp.limit).toBe(99);
     });
@@ -771,7 +764,10 @@ describe('AdminOrdersComponent', () => {
 
     it('auto-assigns selected files by reference then short id', () => {
       comp.openShippingLabelsModal();
-      const input: any = { files: [makeFile('REF-100-label.pdf'), makeFile('order-ab.pdf')], value: 'x' };
+      const input: any = {
+        files: [makeFile('REF-100-label.pdf'), makeFile('order-ab.pdf')],
+        value: 'x',
+      };
       comp.onShippingLabelsSelected({ target: input } as any);
       expect(comp.shippingLabelsUploads.length).toBe(2);
       expect(comp.shippingLabelsUploads[0].assignedOrderId).toBe('order-abcdef12');
@@ -788,7 +784,12 @@ describe('AdminOrdersComponent', () => {
 
     it('uploadAllShippingLabels uploads pending items and reports success', () => {
       comp.shippingLabelsUploads = [
-        { file: makeFile('a.pdf'), assignedOrderId: 'order-abcdef12', status: 'pending', error: null },
+        {
+          file: makeFile('a.pdf'),
+          assignedOrderId: 'order-abcdef12',
+          status: 'pending',
+          error: null,
+        },
       ];
       comp.uploadAllShippingLabels();
       expect(ordersApi.uploadShippingLabel).toHaveBeenCalled();
@@ -869,7 +870,9 @@ describe('AdminOrdersComponent', () => {
         throwError(() => ({ error: { detail: { missing_shipping_label_order_ids: ['a', 'b'] } } })),
       );
       comp.downloadSelectedShippingLabelsZip();
-      expect(toast.error).toHaveBeenCalledWith('adminUi.orders.shippingLabelsModal.errors.missingLabels');
+      expect(toast.error).toHaveBeenCalledWith(
+        'adminUi.orders.shippingLabelsModal.errors.missingLabels',
+      );
     });
 
     it('downloadSelectedShippingLabelsZip reports a generic failure', () => {
@@ -1249,11 +1252,11 @@ describe('AdminOrdersComponent', () => {
     });
 
     it('slaBadge returns null for missing or invalid data', () => {
-      expect(comp.slaBadge(makeOrder({ sla_kind: '', sla_due_at: '2026-01-01T00:00:00Z' }))).toBeNull();
-      expect(comp.slaBadge(makeOrder({ sla_kind: 'accept', sla_due_at: '' }))).toBeNull();
       expect(
-        comp.slaBadge(makeOrder({ sla_kind: 'accept', sla_due_at: 'not-a-date' })),
+        comp.slaBadge(makeOrder({ sla_kind: '', sla_due_at: '2026-01-01T00:00:00Z' })),
       ).toBeNull();
+      expect(comp.slaBadge(makeOrder({ sla_kind: 'accept', sla_due_at: '' }))).toBeNull();
+      expect(comp.slaBadge(makeOrder({ sla_kind: 'accept', sla_due_at: 'not-a-date' }))).toBeNull();
       expect(
         comp.slaBadge(makeOrder({ sla_kind: 'other', sla_due_at: '2026-01-01T00:00:00Z' })),
       ).toBeNull();
@@ -1282,9 +1285,13 @@ describe('AdminOrdersComponent', () => {
 
     it('fraudBadge styles each severity', () => {
       expect(comp.fraudBadge(makeOrder({ fraud_severity: 'high' }))?.className).toContain('rose');
-      expect(comp.fraudBadge(makeOrder({ fraud_severity: 'medium' }))?.className).toContain('amber');
+      expect(comp.fraudBadge(makeOrder({ fraud_severity: 'medium' }))?.className).toContain(
+        'amber',
+      );
       expect(comp.fraudBadge(makeOrder({ fraud_severity: 'low' }))?.className).toContain('sky');
-      expect(comp.fraudBadge(makeOrder({ fraud_severity: 'unknown' }))?.className).toContain('slate');
+      expect(comp.fraudBadge(makeOrder({ fraud_severity: 'unknown' }))?.className).toContain(
+        'slate',
+      );
     });
 
     it('fraudBadge uses a translated severity label when available', () => {
@@ -1334,7 +1341,9 @@ describe('AdminOrdersComponent', () => {
       comp.status = 'pending';
       ordersApi.search.and.callFake((params: any) => {
         if (params.status === 'pending_payment') {
-          return of(listResponse([makeOrder({ id: 'p1', status: 'pending_payment' })], { total_items: 5 }));
+          return of(
+            listResponse([makeOrder({ id: 'p1', status: 'pending_payment' })], { total_items: 5 }),
+          );
         }
         return of({ items: undefined, meta: undefined } as any);
       });
@@ -1508,9 +1517,7 @@ describe('AdminOrdersComponent', () => {
       spyOn(window, 'prompt').and.returnValue(null);
       const order = makeOrder({ id: 'a', status: 'paid' });
       comp.onKanbanDrop(dropEvent(order), 'cancelled' as any);
-      expect(toast.error).toHaveBeenCalledWith(
-        'adminUi.orders.kanban.errors.cancelReasonRequired',
-      );
+      expect(toast.error).toHaveBeenCalledWith('adminUi.orders.kanban.errors.cancelReasonRequired');
     });
 
     it('onKanbanDrop moves a card even when columns are untracked', () => {
@@ -1602,9 +1609,9 @@ describe('AdminOrdersComponent', () => {
     });
 
     it('customerLabel falls back to guest for null fields', () => {
-      expect(
-        comp.customerLabel(makeOrder({ customer_email: null, customer_username: null })),
-      ).toBe('adminUi.orders.guest');
+      expect(comp.customerLabel(makeOrder({ customer_email: null, customer_username: null }))).toBe(
+        'adminUi.orders.guest',
+      );
     });
 
     it('filteredTagManagerRows tolerates empty tag rows while filtering', () => {
@@ -1694,7 +1701,11 @@ describe('AdminOrdersComponent', () => {
       localStorage.setItem(
         'admin.orders.filters.v1:user-1',
         JSON.stringify([
-          { id: 'a', name: 'A', filters: { sla: 'any_overdue', fraud: 'queue', includeTestOrders: false } },
+          {
+            id: 'a',
+            name: 'A',
+            filters: { sla: 'any_overdue', fraud: 'queue', includeTestOrders: false },
+          },
           { id: 'b', name: 'B', filters: { sla: 'accept_overdue', fraud: 'flagged' } },
           { id: 'c', name: 'C', filters: { sla: 'ship_overdue', fraud: 'approved' } },
         ]),

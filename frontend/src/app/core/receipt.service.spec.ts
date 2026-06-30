@@ -33,7 +33,12 @@ describe('ReceiptService', () => {
           { product_id: 'p-1', name: 'Mug', quantity: 2, unit_price: '10.00', subtotal: '20.00' },
         ],
         refunds: [
-          { currency: 'RON', provider: 'stripe', created_at: '2026-02-01T00:00:00Z', amount: '5.00' },
+          {
+            currency: 'RON',
+            provider: 'stripe',
+            created_at: '2026-02-01T00:00:00Z',
+            amount: '5.00',
+          },
         ],
       };
       apiMock.get.and.returnValue(of(raw));

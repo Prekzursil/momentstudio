@@ -190,12 +190,18 @@ describe('DamAssetLibraryComponent', () => {
       }),
     );
     admin.getMediaTelemetry.and.returnValue(of(telemetry()));
-    admin.requestMediaUsageReconcile.and.returnValue(of(makeJob({ id: 'job-1', job_type: 'usage_reconcile', asset_id: null })));
-    admin.retryMediaJob.and.returnValue(of(makeJob({ id: 'job-2', status: 'queued', triage_state: 'retrying' })));
+    admin.requestMediaUsageReconcile.and.returnValue(
+      of(makeJob({ id: 'job-1', job_type: 'usage_reconcile', asset_id: null })),
+    );
+    admin.retryMediaJob.and.returnValue(
+      of(makeJob({ id: 'job-2', status: 'queued', triage_state: 'retrying' })),
+    );
     admin.retryMediaJobsBulk.and.returnValue(
       of({ items: [], meta: { total_items: 0, total_pages: 1, page: 1, limit: 1 } }),
     );
-    admin.updateMediaJobTriage.and.returnValue(of(makeJob({ id: 'job-2', triage_state: 'resolved' })));
+    admin.updateMediaJobTriage.and.returnValue(
+      of(makeJob({ id: 'job-2', triage_state: 'resolved' })),
+    );
     admin.listMediaJobEvents.and.returnValue(of({ items: [] }));
     admin.uploadMediaAsset.and.returnValue(of(baseAsset));
     admin.updateMediaAsset.and.returnValue(of(baseAsset));
@@ -291,7 +297,11 @@ describe('DamAssetLibraryComponent', () => {
             actor_user_id: 'owner-1',
             preset_key: null,
             before_policy: snapshot(),
-            after_policy: snapshot({ max_attempts: 6, backoff_schedule_seconds: [10, 30, 120], jitter_ratio: 0.2 }),
+            after_policy: snapshot({
+              max_attempts: 6,
+              backoff_schedule_seconds: [10, 30, 120],
+              jitter_ratio: 0.2,
+            }),
             note: null,
             created_at: '2026-02-16T03:00:00Z',
           },
@@ -384,7 +394,9 @@ describe('DamAssetLibraryComponent', () => {
 
     expect(component.tab()).toBe('review');
     expect(component.statusFilter).toBe('draft');
-    expect(admin.listMediaAssets).toHaveBeenCalledWith(jasmine.objectContaining({ status: 'draft' }));
+    expect(admin.listMediaAssets).toHaveBeenCalledWith(
+      jasmine.objectContaining({ status: 'draft' }),
+    );
   });
 
   it('uses preview_url for image rendering when available', () => {
@@ -393,7 +405,9 @@ describe('DamAssetLibraryComponent', () => {
 
     const image: HTMLImageElement | null = fixture.nativeElement.querySelector('img');
     expect(image).toBeTruthy();
-    expect(image?.getAttribute('src')).toContain('/api/v1/content/admin/media/assets/asset-1/preview');
+    expect(image?.getAttribute('src')).toContain(
+      '/api/v1/content/admin/media/assets/asset-1/preview',
+    );
   });
 
   it('loads persistent job list when switching to queue tab', () => {
@@ -419,7 +433,9 @@ describe('DamAssetLibraryComponent', () => {
 
     component.setQueueMode('dead_letter');
 
-    expect(admin.listMediaJobs).toHaveBeenCalledWith(jasmine.objectContaining({ dead_letter_only: true }));
+    expect(admin.listMediaJobs).toHaveBeenCalledWith(
+      jasmine.objectContaining({ dead_letter_only: true }),
+    );
   });
 
   it('saves retry policy edits from the jobs tab', async () => {
@@ -465,7 +481,11 @@ describe('DamAssetLibraryComponent', () => {
     component.toggleRetryPolicyHistory('ingest');
     await Promise.resolve();
 
-    expect(admin.listMediaRetryPolicyHistory).toHaveBeenCalledWith({ job_type: 'ingest', page: 1, limit: 10 });
+    expect(admin.listMediaRetryPolicyHistory).toHaveBeenCalledWith({
+      job_type: 'ingest',
+      page: 1,
+      limit: 10,
+    });
     expect(admin.getMediaRetryPolicyPresets).toHaveBeenCalledWith('ingest');
     expect(component.isRetryPolicyHistoryOpen('ingest')).toBeTrue();
   });
@@ -485,7 +505,9 @@ describe('DamAssetLibraryComponent', () => {
 
     await component.applyRetryPolicyRollbackPreview();
 
-    expect(admin.rollbackMediaRetryPolicy).toHaveBeenCalledWith('ingest', { preset_key: 'factory_default' });
+    expect(admin.rollbackMediaRetryPolicy).toHaveBeenCalledWith('ingest', {
+      preset_key: 'factory_default',
+    });
     expect(toast.success).toHaveBeenCalled();
   });
 
@@ -585,7 +607,9 @@ describe('DamAssetLibraryComponent', () => {
     const component = fixture.componentInstance;
     component.switchTab('trash');
     expect(component.statusFilter).toBe('trashed');
-    expect(admin.listMediaAssets).toHaveBeenCalledWith(jasmine.objectContaining({ include_trashed: true }));
+    expect(admin.listMediaAssets).toHaveBeenCalledWith(
+      jasmine.objectContaining({ include_trashed: true }),
+    );
   });
 
   it('clears draft/trashed filter when returning to library tab', () => {
@@ -874,7 +898,9 @@ describe('DamAssetLibraryComponent', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     expect(component.retryPolicyError('ingest')).toBeNull();
-    (component as unknown as { retryPolicyRowErrors: Record<string, string> }).retryPolicyRowErrors['ingest'] = 'oops';
+    (component as unknown as { retryPolicyRowErrors: Record<string, string> }).retryPolicyRowErrors[
+      'ingest'
+    ] = 'oops';
     expect(component.retryPolicyError('ingest')).toBe('oops');
   });
 
@@ -1131,16 +1157,18 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    (component as unknown as { retryPolicyHistoryLoadingByType: Record<string, boolean> }).retryPolicyHistoryLoadingByType[
-      'ingest'
-    ] = true;
+    (
+      component as unknown as { retryPolicyHistoryLoadingByType: Record<string, boolean> }
+    ).retryPolicyHistoryLoadingByType['ingest'] = true;
     admin.listMediaRetryPolicyHistory.calls.reset();
     await component.loadMoreRetryPolicyHistory('ingest');
     expect(admin.listMediaRetryPolicyHistory).not.toHaveBeenCalled();
   });
 
   it('defaults history meta when the response omits it', async () => {
-    admin.listMediaRetryPolicyHistory.and.returnValue(of({ items: [] } as unknown as MediaRetryPolicyHistoryResponse));
+    admin.listMediaRetryPolicyHistory.and.returnValue(
+      of({ items: [] } as unknown as MediaRetryPolicyHistoryResponse),
+    );
     const fixture = make();
     fixture.detectChanges();
     const component = fixture.componentInstance;
@@ -1172,7 +1200,9 @@ describe('DamAssetLibraryComponent', () => {
     component.toggleRetryPolicyHistory('ingest');
     await Promise.resolve();
     await Promise.resolve();
-    expect(component.retryPolicyHistoryError('ingest')).toBe('Failed to load retry policy presets.');
+    expect(component.retryPolicyHistoryError('ingest')).toBe(
+      'Failed to load retry policy presets.',
+    );
   });
 
   it('summarises retry policy presets and falls back while loading', async () => {
@@ -1180,8 +1210,22 @@ describe('DamAssetLibraryComponent', () => {
       of({
         job_type: 'ingest',
         items: [
-          { preset_key: 'factory_default', label: 'Factory default', policy: snapshot(), source_event_id: null, fallback_used: false, updated_at: null },
-          { preset_key: 'known_good', label: 'Known good', policy: snapshot(), source_event_id: null, fallback_used: true, updated_at: null },
+          {
+            preset_key: 'factory_default',
+            label: 'Factory default',
+            policy: snapshot(),
+            source_event_id: null,
+            fallback_used: false,
+            updated_at: null,
+          },
+          {
+            preset_key: 'known_good',
+            label: 'Known good',
+            policy: snapshot(),
+            source_event_id: null,
+            fallback_used: true,
+            updated_at: null,
+          },
         ],
       }),
     );
@@ -1193,7 +1237,9 @@ describe('DamAssetLibraryComponent', () => {
     component.toggleRetryPolicyHistory('ingest');
     await Promise.resolve();
     await Promise.resolve();
-    expect(component.retryPolicyPresetSummary('ingest')).toBe('Factory default · Known good (fallback)');
+    expect(component.retryPolicyPresetSummary('ingest')).toBe(
+      'Factory default · Known good (fallback)',
+    );
   });
 
   it('formats a policy snapshot for display', () => {
@@ -1209,7 +1255,12 @@ describe('DamAssetLibraryComponent', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     const before = snapshot();
-    const after = snapshot({ max_attempts: 6, backoff_schedule_seconds: [10, 30], jitter_ratio: 0.4, enabled: false });
+    const after = snapshot({
+      max_attempts: 6,
+      backoff_schedule_seconds: [10, 30],
+      jitter_ratio: 0.4,
+      enabled: false,
+    });
     const chips = component.retryPolicyDiffChips(before, after);
     expect(chips).toEqual(['Max attempts', 'Schedule (seconds)', 'Jitter ratio', 'Enabled']);
 
@@ -1480,7 +1531,9 @@ describe('DamAssetLibraryComponent', () => {
     const component = fixture.componentInstance;
     component.selectedQueueJobIds.set(new Set(['job-2']));
     await component.bulkAssignSelectedJobs();
-    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', { assigned_to_user_id: 'user-9' });
+    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', {
+      assigned_to_user_id: 'user-9',
+    });
   });
 
   it('clears the assignee when bulk assign receives a blank value', async () => {
@@ -1650,7 +1703,9 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     await fixture.componentInstance.assignJob(makeJob({ id: 'job-2', assigned_to_user_id: null }));
-    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', { assigned_to_user_id: 'u-5' });
+    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', {
+      assigned_to_user_id: 'u-5',
+    });
   });
 
   it('clears a single job assignee with a blank prompt value', async () => {
@@ -1665,7 +1720,9 @@ describe('DamAssetLibraryComponent', () => {
     spyOn(window, 'prompt').and.returnValue(null);
     const fixture = make();
     fixture.detectChanges();
-    await fixture.componentInstance.setSla(makeJob({ id: 'job-2', sla_due_at: '2026-02-16T00:00:00Z' }));
+    await fixture.componentInstance.setSla(
+      makeJob({ id: 'job-2', sla_due_at: '2026-02-16T00:00:00Z' }),
+    );
     expect(admin.updateMediaJobTriage).not.toHaveBeenCalled();
   });
 
@@ -1675,7 +1732,9 @@ describe('DamAssetLibraryComponent', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     await component.setSla(makeJob({ id: 'job-2', sla_due_at: null }));
-    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', { sla_due_at: '2026-03-01T10:00:00' });
+    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', {
+      sla_due_at: '2026-03-01T10:00:00',
+    });
     await component.setSla(makeJob({ id: 'job-2', sla_due_at: '2026-02-16T00:00:00Z' }));
     expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', { clear_sla_due_at: true });
     expect(promptSpy).toHaveBeenCalledTimes(2);
@@ -1695,7 +1754,9 @@ describe('DamAssetLibraryComponent', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     await component.setIncident(makeJob({ id: 'job-2', incident_url: null }));
-    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', { incident_url: 'https://incident/1' });
+    expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', {
+      incident_url: 'https://incident/1',
+    });
     await component.setIncident(makeJob({ id: 'job-2' }));
     expect(admin.updateMediaJobTriage).toHaveBeenCalledWith('job-2', { clear_incident_url: true });
   });
@@ -1770,7 +1831,19 @@ describe('DamAssetLibraryComponent', () => {
 
   it('opens job events and loads the event list', async () => {
     admin.listMediaJobEvents.and.returnValue(
-      of({ items: [{ id: 'e1', job_id: 'job-2', action: 'queued', actor_user_id: null, note: null, meta_json: null, created_at: '2026-02-16T00:00:00Z' }] }),
+      of({
+        items: [
+          {
+            id: 'e1',
+            job_id: 'job-2',
+            action: 'queued',
+            actor_user_id: null,
+            note: null,
+            meta_json: null,
+            created_at: '2026-02-16T00:00:00Z',
+          },
+        ],
+      }),
     );
     const fixture = make();
     fixture.detectChanges();
@@ -1800,7 +1873,17 @@ describe('DamAssetLibraryComponent', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.activeJobEventsFor.set(makeJob({ id: 'job-2' }));
-    component.jobEvents.set([{ id: 'e1', job_id: 'job-2', action: 'x', actor_user_id: null, note: null, meta_json: null, created_at: '2026-02-16T00:00:00Z' }]);
+    component.jobEvents.set([
+      {
+        id: 'e1',
+        job_id: 'job-2',
+        action: 'x',
+        actor_user_id: null,
+        note: null,
+        meta_json: null,
+        created_at: '2026-02-16T00:00:00Z',
+      },
+    ]);
     component.closeJobEvents();
     expect(component.activeJobEventsFor()).toBeNull();
     expect(component.jobEvents()).toEqual([]);
@@ -1831,7 +1914,10 @@ describe('DamAssetLibraryComponent', () => {
     const file = new File(['x'], 'a.png', { type: 'image/png' });
     const input = { files: [file], value: 'a.png' };
     await fixture.componentInstance.upload({ target: input } as unknown as Event);
-    expect(admin.uploadMediaAsset).toHaveBeenCalledWith(file, { visibility: 'private', auto_finalize: true });
+    expect(admin.uploadMediaAsset).toHaveBeenCalledWith(file, {
+      visibility: 'private',
+      auto_finalize: true,
+    });
     expect(toast.success).toHaveBeenCalledWith('Media uploaded.');
     expect(input.value).toBe('');
   });
@@ -1841,7 +1927,9 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     const file = new File(['x'], 'a.png', { type: 'image/png' });
-    await fixture.componentInstance.upload({ target: { files: [file], value: 'a.png' } } as unknown as Event);
+    await fixture.componentInstance.upload({
+      target: { files: [file], value: 'a.png' },
+    } as unknown as Event);
     expect(toast.error).toHaveBeenCalledWith('boom');
   });
 
@@ -1943,7 +2031,9 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     await fixture.componentInstance.editTags(baseAsset);
-    expect(admin.updateMediaAsset).toHaveBeenCalledWith('asset-1', { tags: ['one', 'two', 'three'] });
+    expect(admin.updateMediaAsset).toHaveBeenCalledWith('asset-1', {
+      tags: ['one', 'two', 'three'],
+    });
   });
 
   it('reports an error when updating tags fails', async () => {
@@ -2014,7 +2104,9 @@ describe('DamAssetLibraryComponent', () => {
   });
 
   it('alerts that no usage exists when the list is empty', async () => {
-    admin.getMediaAssetUsage.and.returnValue(of({ asset_id: 'asset-1', public_url: '/x', items: [] }));
+    admin.getMediaAssetUsage.and.returnValue(
+      of({ asset_id: 'asset-1', public_url: '/x', items: [] }),
+    );
     const alertSpy = spyOn(window, 'alert');
     const fixture = make();
     fixture.detectChanges();
@@ -2165,7 +2257,11 @@ describe('DamAssetLibraryComponent', () => {
     component.newCollectionSlug = 'New-Slug';
     component.newCollectionVisibility = 'public';
     await component.createCollection();
-    expect(admin.createMediaCollection).toHaveBeenCalledWith({ name: 'New', slug: 'new-slug', visibility: 'public' });
+    expect(admin.createMediaCollection).toHaveBeenCalledWith({
+      name: 'New',
+      slug: 'new-slug',
+      visibility: 'public',
+    });
     expect(component.newCollectionName).toBe('');
     expect(component.newCollectionVisibility).toBe('private');
   });
@@ -2210,7 +2306,11 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     await fixture.componentInstance.editCollection(makeCollection());
-    expect(admin.updateMediaCollection).toHaveBeenCalledWith('col-1', { name: 'Name', slug: 'new-slug', visibility: 'public' });
+    expect(admin.updateMediaCollection).toHaveBeenCalledWith('col-1', {
+      name: 'Name',
+      slug: 'new-slug',
+      visibility: 'public',
+    });
   });
 
   it('coerces unknown visibility to private when updating a collection', async () => {
@@ -2218,7 +2318,11 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     await fixture.componentInstance.editCollection(makeCollection());
-    expect(admin.updateMediaCollection).toHaveBeenCalledWith('col-1', { name: 'Name', slug: 'slug', visibility: 'private' });
+    expect(admin.updateMediaCollection).toHaveBeenCalledWith('col-1', {
+      name: 'Name',
+      slug: 'slug',
+      visibility: 'private',
+    });
   });
 
   it('reports an error when updating a collection fails', async () => {
@@ -2329,7 +2433,9 @@ describe('DamAssetLibraryComponent', () => {
     await component.resetAllRetryPolicies();
     expect(component.retryPolicyDraft('ingest').scheduleText).toBe('');
 
-    admin.resetAllMediaRetryPolicies.and.returnValue(of({} as unknown as MediaRetryPolicyListResponse));
+    admin.resetAllMediaRetryPolicies.and.returnValue(
+      of({} as unknown as MediaRetryPolicyListResponse),
+    );
     await component.resetAllRetryPolicies();
     expect(component.retryPolicies()).toEqual([]);
   });
@@ -2383,7 +2489,11 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     const component = fixture.componentInstance;
-    const sparse = snapshot({ backoff_schedule_seconds: undefined as never, jitter_ratio: 0, enabled: false });
+    const sparse = snapshot({
+      backoff_schedule_seconds: undefined as never,
+      jitter_ratio: 0,
+      enabled: false,
+    });
     expect(component.retryPolicyDiffChips(sparse, sparse)).toEqual([]);
     const grown = component.retryPolicyEventDiffRows({
       id: 'evt-grow',
@@ -2479,7 +2589,9 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     const file = new File(['x'], 'a.png', { type: 'image/png' });
-    await fixture.componentInstance.upload({ target: { files: [file], value: 'a.png' } } as unknown as Event);
+    await fixture.componentInstance.upload({
+      target: { files: [file], value: 'a.png' },
+    } as unknown as Event);
     expect(toast.error).toHaveBeenCalledWith('Upload failed.');
   });
 
@@ -2587,7 +2699,10 @@ describe('DamAssetLibraryComponent', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     component.switchTab('queue');
-    component.retryPolicies.set([makePolicy({ job_type: 'variant' }), makePolicy({ job_type: 'ingest' })]);
+    component.retryPolicies.set([
+      makePolicy({ job_type: 'variant' }),
+      makePolicy({ job_type: 'ingest' }),
+    ]);
     component.retryPolicyDraft('ingest').scheduleText = '10,30';
     await component.saveRetryPolicy('ingest');
     expect(component.retryPolicies().some((p) => p.job_type === 'variant')).toBeTrue();
@@ -2610,13 +2725,18 @@ describe('DamAssetLibraryComponent', () => {
 
   it('defaults history paging fields for a fresh append with a sparse response', async () => {
     admin.listMediaRetryPolicyHistory.and.returnValue(
-      of({ items: undefined, meta: { page: 0, total_pages: 0 } } as unknown as MediaRetryPolicyHistoryResponse),
+      of({
+        items: undefined,
+        meta: { page: 0, total_pages: 0 },
+      } as unknown as MediaRetryPolicyHistoryResponse),
     );
     const fixture = make();
     fixture.detectChanges();
     const component = fixture.componentInstance;
     await (
-      component as unknown as { loadRetryPolicyHistory: (jobType: string, append: boolean) => Promise<void> }
+      component as unknown as {
+        loadRetryPolicyHistory: (jobType: string, append: boolean) => Promise<void>;
+      }
     ).loadRetryPolicyHistory('variant', true);
     expect(component.retryPolicyHistoryItems('variant')).toEqual([]);
     expect(component.retryPolicyHistoryHasMore('variant')).toBeFalse();
@@ -2631,7 +2751,9 @@ describe('DamAssetLibraryComponent', () => {
     component.toggleRetryPolicyHistory('ingest');
     await Promise.resolve();
     await Promise.resolve();
-    expect(component.retryPolicyHistoryError('ingest')).toBe('Failed to load retry policy history.');
+    expect(component.retryPolicyHistoryError('ingest')).toBe(
+      'Failed to load retry policy history.',
+    );
   });
 
   it('sorts loaded retry policies by job type', () => {
@@ -2641,7 +2763,10 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     fixture.componentInstance.loadRetryPolicies();
-    expect(fixture.componentInstance.retryPolicies().map((p) => p.job_type)).toEqual(['ingest', 'variant']);
+    expect(fixture.componentInstance.retryPolicies().map((p) => p.job_type)).toEqual([
+      'ingest',
+      'variant',
+    ]);
   });
 
   it('sorts retry policies by job type after a reset-all', async () => {
@@ -2651,7 +2776,10 @@ describe('DamAssetLibraryComponent', () => {
     const fixture = make();
     fixture.detectChanges();
     await fixture.componentInstance.resetAllRetryPolicies();
-    expect(fixture.componentInstance.retryPolicies().map((p) => p.job_type)).toEqual(['ingest', 'variant']);
+    expect(fixture.componentInstance.retryPolicies().map((p) => p.job_type)).toEqual([
+      'ingest',
+      'variant',
+    ]);
   });
 
   it('deduplicates the pushed job and keeps other queue entries', async () => {

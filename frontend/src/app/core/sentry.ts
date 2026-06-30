@@ -18,9 +18,7 @@ let loadSentry: () => Promise<SentryModule> = defaultLoadSentry;
  * which is otherwise impossible because `initPromise` is a one-shot singleton.
  * Greppable name keeps it trivially auditable; it is inert in production.
  */
-export function __resetSentryForTests(
-  loader: (() => Promise<SentryModule>) | null = null,
-): void {
+export function __resetSentryForTests(loader: (() => Promise<SentryModule>) | null = null): void {
   initPromise = null;
   loadSentry = loader ?? defaultLoadSentry;
 }

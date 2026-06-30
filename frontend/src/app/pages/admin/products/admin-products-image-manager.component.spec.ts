@@ -17,7 +17,9 @@ type ImageItem = { id: string; url: string; alt_text?: string | null };
 
 type ImageMetaByLang = Record<'en' | 'ro', { alt_text: string; caption: string }>;
 
-function makeUpload(overrides: Partial<AdminProductImageUploadItem> = {}): AdminProductImageUploadItem {
+function makeUpload(
+  overrides: Partial<AdminProductImageUploadItem> = {},
+): AdminProductImageUploadItem {
   return {
     id: 'u1',
     fileName: 'photo.png',
@@ -151,9 +153,9 @@ describe('AdminProductsImageManagerComponent', () => {
     });
 
     it('falls back to the queued key for an unknown status (default branch)', () => {
-      expect(
-        component.uploadStatusLabelKey('weird' as AdminProductImageUploadStatus),
-      ).toBe('adminUi.products.form.uploadStatus.queued');
+      expect(component.uploadStatusLabelKey('weird' as AdminProductImageUploadStatus)).toBe(
+        'adminUi.products.form.uploadStatus.queued',
+      );
     });
   });
 
@@ -191,9 +193,7 @@ describe('AdminProductsImageManagerComponent', () => {
     });
 
     it('does not flag descriptive, human-friendly alt text', () => {
-      images.set([
-        { id: 'good', url: '/g.png', alt_text: 'A red ceramic mug on a wooden table' },
-      ]);
+      images.set([{ id: 'good', url: '/g.png', alt_text: 'A red ceramic mug on a wooden table' }]);
       expect(component.altHelperImages()).toEqual([]);
     });
   });
