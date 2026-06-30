@@ -267,10 +267,6 @@ function legalDetails(fixture: ComponentFixture<AdminComponent>): DebugElement {
     )!;
 }
 
-afterEach(() => {
-  TestBed.resetTestingModule();
-});
-
 describe('NET admin cms-content-save :: content block save (settings)', () => {
   async function openEditor(): Promise<Env> {
     const env = await setup('settings');
