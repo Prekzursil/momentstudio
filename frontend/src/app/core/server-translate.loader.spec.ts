@@ -26,6 +26,7 @@ class TestServerTranslateLoader extends ServerTranslateLoader {
   }
 
   protected override async loadNode(): Promise<ServerTranslateFs> {
+    await Promise.resolve();
     return {
       cwd: '/app',
       existsSync: (path: string) => {

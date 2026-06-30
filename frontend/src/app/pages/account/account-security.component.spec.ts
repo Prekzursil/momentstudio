@@ -85,7 +85,7 @@ function makeAccount(overrides: Overrides = {}): Record<string, unknown> {
     makePrimaryPassword: '',
     makingPrimaryEmail: false,
     makePrimaryError: '',
-    secondaryEmailResendRemainingSeconds: (_id: string) => 0,
+    secondaryEmailResendRemainingSeconds: () => 0,
     addSecondaryEmail: noop,
     resendSecondaryEmailVerification: noop,
     startSecondaryEmailVerification: noop,
@@ -339,7 +339,7 @@ describe('AccountSecurityComponent', () => {
     const email = { id: 'e3', email: 'verify@example.com', verified: false };
     const { fixture } = setup({
       secondaryEmails: () => [email],
-      secondaryEmailResendRemainingSeconds: (_id: string) => 30,
+      secondaryEmailResendRemainingSeconds: () => 30,
     });
     const host = fixture.nativeElement as HTMLElement;
     const text = host.textContent ?? '';
