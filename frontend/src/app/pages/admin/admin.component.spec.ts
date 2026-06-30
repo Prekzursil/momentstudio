@@ -337,7 +337,6 @@ describe('AdminComponent', () => {
         'loadAssets',
         'loadSocial',
         'loadNavigation',
-        'loadCheckoutSettings',
         'loadReportsSettings',
         'loadSeo',
         'loadFxStatus',
@@ -364,7 +363,6 @@ describe('AdminComponent', () => {
         'loadAssets',
         'loadSocial',
         'loadNavigation',
-        'loadCheckoutSettings',
         'loadReportsSettings',
         'loadSeo',
         'loadFxStatus',
@@ -2156,45 +2154,6 @@ describe('AdminComponent', () => {
       env.admin.createContent.and.returnValue(throwError(() => new Error('x')));
       env.c.saveAssets();
       expect(env.c.assetsError).toBe('adminUi.site.assets.errors.save');
-    });
-
-    it('loadCheckoutSettings parses meta + falls back on error', () => {
-      const env = build('settings');
-      env.admin.getContent.and.returnValue(
-        of({
-          version: 1,
-          meta: {
-            shipping_fee_ron: 15,
-            free_shipping_threshold_ron: 250,
-            phone_required_home: 'no',
-            fee_enabled: 1,
-            fee_type: 'percent',
-            fee_value: 5,
-            vat_enabled: false,
-            vat_rate_percent: 19,
-            receipt_share_days: 30,
-            money_rounding: 'down',
-          },
-        }),
-      );
-      env.c.loadCheckoutSettings();
-      expect(env.c.checkoutSettingsForm.shipping_fee_ron).toBe(15);
-      expect(env.c.checkoutSettingsForm.fee_type).toBe('percent');
-      expect(env.c.checkoutSettingsForm.money_rounding).toBe('down');
-      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-      env.c.loadCheckoutSettings();
-      expect(env.c.checkoutSettingsForm.shipping_fee_ron).toBe(20);
-    });
-
-    it('saveCheckoutSettings persists + create fallback', () => {
-      const env = build('settings');
-      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-      env.c.saveCheckoutSettings();
-      expect(env.c.checkoutSettingsMessage).toBe('adminUi.site.checkout.success.save');
-      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
-      env.admin.createContent.and.returnValue(of({ version: 1 }));
-      env.c.saveCheckoutSettings();
-      expect(env.admin.createContent).toHaveBeenCalled();
     });
 
     it('loadReportsSettings parses recipients + falls back', () => {

@@ -2599,48 +2599,6 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
     h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 })); // safe reload
   });
 
-  it('saveCheckoutSettings normalises values and persists', () => {
-    c.checkoutSettingsForm = {
-      shipping_fee_ron: '15.5',
-      free_shipping_threshold_ron: '-1',
-      fee_type: 'percent',
-      fee_value: '5',
-      vat_enabled: true,
-      vat_rate_percent: '200',
-      money_rounding: 'down',
-      receipt_share_days: '5000',
-    };
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-    c.saveCheckoutSettings();
-    const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
-    expect(payload.meta.shipping_fee_ron).toBe(15.5);
-    expect(payload.meta.free_shipping_threshold_ron).toBe(300); // negative → default
-    expect(payload.meta.fee_type).toBe('percent');
-    expect(payload.meta.vat_rate_percent).toBe(10); // out of range → default
-    expect(payload.meta.money_rounding).toBe('down');
-    expect(payload.meta.receipt_share_days).toBe(365); // out of range → default
-    expect(c.checkoutSettingsMessage).toBeTruthy();
-  });
-
-  it('saveCheckoutSettings handles a version conflict', () => {
-    c.checkoutSettingsForm = {};
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-    c.saveCheckoutSettings();
-    expect(c.checkoutSettingsError).toBeTruthy();
-  });
-
-  it('saveCheckoutSettings falls back to create then reports errors', () => {
-    c.checkoutSettingsForm = {};
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
-    h.admin.createContent.and.returnValue(of({ version: 1 }));
-    c.saveCheckoutSettings();
-    expect(c.checkoutSettingsMessage).toBeTruthy();
-
-    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
-    c.saveCheckoutSettings();
-    expect(c.checkoutSettingsError).toBeTruthy();
-  });
-
   it('loadReportsSettings parses meta and resets on error', () => {
     h.admin.getContent.and.returnValue(
       of({
@@ -2769,32 +2727,6 @@ describe('AdminComponent — site settings load/save (assets, social, seo)', () 
     h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
     c.loadAssets();
     expect(c.assetsForm.logo_url).toBe('');
-  });
-
-  it('loadCheckoutSettings parses meta and resets on error', () => {
-    h.admin.getContent.and.returnValue(
-      of({
-        version: 2,
-        meta: {
-          shipping_fee_ron: 12,
-          fee_type: 'percent',
-          fee_value: 3,
-          vat_rate_percent: 19,
-          money_rounding: 'up',
-          receipt_share_days: 30,
-          phone_required_home: 'no',
-        },
-      }),
-    );
-    c.loadCheckoutSettings();
-    expect(c.checkoutSettingsForm.shipping_fee_ron).toBe(12);
-    expect(c.checkoutSettingsForm.fee_type).toBe('percent');
-    expect(c.checkoutSettingsForm.money_rounding).toBe('up');
-    expect(c.checkoutSettingsForm.phone_required_home).toBe(false);
-
-    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-    c.loadCheckoutSettings();
-    expect(c.checkoutSettingsForm.shipping_fee_ron).toBe(20);
   });
 
   it('loadSocial maps contact + pages and keeps defaults on error', () => {
