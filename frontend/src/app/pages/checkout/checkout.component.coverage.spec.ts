@@ -1500,7 +1500,6 @@ describe('CheckoutComponent (coverage)', () => {
       checkoutPricingSettings: { phone_required_home: false, phone_required_locker: false },
     };
     (cmp as any).applyPrefetchedPricingSettings();
-    (cmp as any).phoneRequiredHome = (cmp as any).phoneRequiredHome;
     expect((cmp as any).phoneRequiredHome).toBeFalse();
   });
 

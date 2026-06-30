@@ -159,7 +159,7 @@ describe('SuccessComponent', () => {
       }),
     });
 
-    const cmp = create();
+    create();
 
     const [, payload] = analytics.track.calls.mostRecent().args as [string, Record<string, unknown>];
     expect(payload['line_items']).toBe(2);

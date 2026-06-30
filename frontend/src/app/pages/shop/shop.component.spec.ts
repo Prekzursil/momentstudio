@@ -333,7 +333,6 @@ function dragEvent(dt?: unknown, target?: unknown): DragEvent {
 }
 
 function fileEvent(file: File | null): Event {
-  const input = document.createElement('input');
   return {
     target: file
       ? ({ files: [file], value: 'x' } as unknown as HTMLInputElement)
@@ -341,7 +340,6 @@ function fileEvent(file: File | null): Event {
     preventDefault() {},
     stopPropagation() {},
   } as unknown as Event;
-  void input;
 }
 
 function checkboxEvent(checked: boolean): Event {
