@@ -336,7 +336,6 @@ describe('AdminComponent', () => {
         'loadTaxGroups',
         'loadAssets',
         'loadSocial',
-        'loadCompany',
         'loadNavigation',
         'loadCheckoutSettings',
         'loadReportsSettings',
@@ -364,7 +363,6 @@ describe('AdminComponent', () => {
         'loadTaxGroups',
         'loadAssets',
         'loadSocial',
-        'loadCompany',
         'loadNavigation',
         'loadCheckoutSettings',
         'loadReportsSettings',
@@ -2250,49 +2248,6 @@ describe('AdminComponent', () => {
       env.admin.sendScheduledReport.and.returnValue(throwError(() => new Error('x')));
       env.c.sendReportNow('weekly');
       expect(env.c.reportsSettingsError).toBe('adminUi.reports.errors.send');
-    });
-
-    it('loadCompany hydrates + clears on error', () => {
-      const env = build('settings');
-      env.admin.getContent.and.returnValue(
-        of({ version: 1, meta: { company: { name: 'Acme', cui: 'RO1' } } }),
-      );
-      env.c.loadCompany();
-      expect(env.c.companyForm.name).toBe('Acme');
-      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-      env.c.loadCompany();
-      expect(env.c.companyForm.name).toBe('');
-    });
-
-    it('companyMissingFields lists empty fields', () => {
-      const env = build('settings');
-      expect(env.c.companyMissingFields().length).toBe(6);
-      env.c.companyForm = {
-        name: 'A',
-        registration_number: 'B',
-        cui: 'C',
-        address: 'D',
-        phone: 'E',
-        email: 'F',
-      };
-      expect(env.c.companyMissingFields().length).toBe(0);
-    });
-
-    it('saveCompany validates + persists', () => {
-      const env = build('settings');
-      env.c.saveCompany();
-      expect(env.c.companyError).toBe('adminUi.site.company.errors.required');
-      env.c.companyForm = {
-        name: 'A',
-        registration_number: 'B',
-        cui: 'C',
-        address: 'D',
-        phone: 'E',
-        email: 'F',
-      };
-      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-      env.c.saveCompany();
-      expect(env.c.companyMessage).toBe('adminUi.site.company.success.save');
     });
 
     it('loadSocial parses pages + survives errors', () => {

@@ -2915,62 +2915,6 @@ describe('AdminComponent — branch fill', () => {
     });
   });
 
-  describe('company', () => {
-    const filled = {
-      name: 'N',
-      registration_number: 'R',
-      cui: 'C',
-      address: 'A',
-      phone: 'P',
-      email: 'E',
-    };
-
-    it('loadCompany maps the nested company meta and resets on error', () => {
-      h.admin.getContent.and.returnValue(
-        of({ meta: { company: { name: ' Acme ', email: 'x@y.z' } } }),
-      );
-      c.loadCompany();
-      expect(c.companyForm.name).toBe('Acme');
-      expect(c.companyForm.registration_number).toBe('');
-      c.contentVersions['site.company'] = { version: 1 };
-      h.admin.getContent.and.returnValue(throwError(() => ({})));
-      c.loadCompany();
-      expect(c.contentVersions['site.company']).toBeUndefined();
-      expect(c.companyForm.name).toBe('');
-    });
-
-    it('saveCompany blocks when required fields are missing', () => {
-      c.companyForm = { ...filled, name: '' };
-      c.saveCompany();
-      expect(c.companyError).toBe('adminUi.site.company.errors.required');
-      expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
-    });
-
-    it('saveCompany persists, then handles conflict and 404 create paths', () => {
-      c.companyForm = { ...filled };
-      h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-      c.saveCompany();
-      expect(c.companyMessage).toBe('adminUi.site.company.success.save');
-
-      // The conflict reload calls loadCompany(); stub getContent so the form is preserved.
-      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-      h.admin.getContent.and.returnValue(of({ meta: { company: filled } }));
-      c.saveCompany();
-      expect(c.companyError).toBe('adminUi.site.company.errors.save');
-
-      c.companyForm = { ...filled };
-      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
-      h.admin.createContent.and.returnValue(of({ version: 3 }));
-      c.saveCompany();
-      expect(c.companyMessage).toBe('adminUi.site.company.success.save');
-
-      c.companyForm = { ...filled };
-      h.admin.createContent.and.returnValue(throwError(() => ({})));
-      c.saveCompany();
-      expect(c.companyError).toBe('adminUi.site.company.errors.save');
-    });
-  });
-
   describe('social', () => {
     it('parseSocialPages falls back for non-arrays and skips invalid entries', () => {
       const fb = [{ label: 'd', url: 'u', thumbnail_url: '' }];

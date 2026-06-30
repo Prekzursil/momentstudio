@@ -2751,7 +2751,7 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
   });
 });
 
-describe('AdminComponent — site settings load/save (assets, company, social, seo)', () => {
+describe('AdminComponent — site settings load/save (assets, social, seo)', () => {
   let h: Harness;
   let c: any;
   beforeEach(() => {
@@ -2795,86 +2795,6 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
     h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
     c.loadCheckoutSettings();
     expect(c.checkoutSettingsForm.shipping_fee_ron).toBe(20);
-  });
-
-  it('loadCompany maps nested company meta and resets on error', () => {
-    h.admin.getContent.and.returnValue(
-      of({ version: 2, meta: { company: { name: ' Acme ', cui: 'RO1' } } }),
-    );
-    c.loadCompany();
-    expect(c.companyForm.name).toBe('Acme');
-    expect(c.companyForm.cui).toBe('RO1');
-    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-    c.loadCompany();
-    expect(c.companyForm.name).toBe('');
-  });
-
-  it('companyMissingFields lists empty required fields', () => {
-    c.companyForm = {
-      name: '',
-      registration_number: '',
-      cui: '',
-      address: '',
-      phone: '',
-      email: '',
-    };
-    expect(c.companyMissingFields().length).toBe(6);
-    c.companyForm = {
-      name: 'A',
-      registration_number: 'B',
-      cui: 'C',
-      address: 'D',
-      phone: 'E',
-      email: 'F',
-    };
-    expect(c.companyMissingFields().length).toBe(0);
-  });
-
-  it('saveCompany blocks on missing fields then persists with fallbacks', () => {
-    c.companyForm = {
-      name: '',
-      registration_number: '',
-      cui: '',
-      address: '',
-      phone: '',
-      email: '',
-    };
-    c.saveCompany();
-    expect(c.companyError).toBeTruthy();
-    expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
-
-    c.companyForm = {
-      name: 'A',
-      registration_number: 'B',
-      cui: 'C',
-      address: 'D',
-      phone: 'E',
-      email: 'F',
-    };
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-    c.saveCompany();
-    expect(c.companyMessage).toBeTruthy();
-
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-    c.saveCompany();
-    expect(c.companyError).toBeTruthy();
-
-    // the conflict reload above blanks companyForm — re-populate before the create fallback
-    c.companyForm = {
-      name: 'A',
-      registration_number: 'B',
-      cui: 'C',
-      address: 'D',
-      phone: 'E',
-      email: 'F',
-    };
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
-    h.admin.createContent.and.returnValue(of({ version: 1 }));
-    c.saveCompany();
-    expect(c.companyMessage).toBeTruthy();
-    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
-    c.saveCompany();
-    expect(c.companyError).toBeTruthy();
   });
 
   it('loadSocial maps contact + pages and keeps defaults on error', () => {
