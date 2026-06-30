@@ -57,14 +57,28 @@ describe('AdminOrdersComponent', () => {
   let auth: Spy<AuthService>;
   let favorites: Spy<AdminFavoritesService>;
   let comp: AdminOrdersComponent;
+  // Controlled stand-in for history.state. Chrome 149 silently drops
+  // history.replaceState() once its navigation throttle trips (which it does
+  // mid-suite after thousands of calls), so reading the real history.state is
+  // non-deterministic across specs. We shadow history.state with a configurable
+  // own getter we fully control and remove it in afterEach so no global state
+  // leaks to sibling specs.
+  let historyState: unknown = {};
 
   beforeEach(() => {
     localStorage.clear();
-    try {
-      history.replaceState({}, '');
-    } catch {
-      /* ignore */
-    }
+    historyState = {};
+    Object.defineProperty(window.history, 'state', {
+      configurable: true,
+      get: () => historyState,
+    });
+    // Sibling specs (e.g. admin-products) install a throwing stub as an OWN
+    // `randomUUID` property on the shared global `crypto` instance and fail to
+    // remove it (their getOwnPropertyDescriptor-based restore is a no-op because
+    // randomUUID is inherited from Crypto.prototype, so it has no own
+    // descriptor). Drop any such leaked override so this cluster's id-generating
+    // paths use the genuine platform crypto.randomUUID().
+    Reflect.deleteProperty(crypto, 'randomUUID');
 
     ordersApi = jasmine.createSpyObj<AdminOrdersService>('AdminOrdersService', [
       'search',
@@ -119,6 +133,12 @@ describe('AdminOrdersComponent', () => {
     favorites.isFavorite.and.returnValue(false);
 
     comp = new AdminOrdersComponent(ordersApi, router, toast, translate, auth, favorites);
+  });
+
+  afterEach(() => {
+    // Remove the own history.state getter so the real platform accessor is
+    // restored for other specs.
+    Reflect.deleteProperty(window.history, 'state');
   });
 
   it('ngOnInit primes state and loads orders', () => {
@@ -391,6 +411,11 @@ describe('AdminOrdersComponent', () => {
       comp.savePreset();
       expect(comp.presets.length).toBe(1);
       expect(comp.presets[0].name).toBe('Saved view');
+      // The id must come from crypto.randomUUID() (RFC 4122 shape), not the
+      // `${Date.now()}-${Math.random()}` fallback branch.
+      expect(comp.presets[0].id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      );
       expect(toast.success).toHaveBeenCalledWith('adminUi.orders.presets.success.saved');
       expect(localStorage.getItem('admin.orders.filters.v1:user-1')).toBeTruthy();
     });
@@ -504,35 +529,32 @@ describe('AdminOrdersComponent', () => {
 
   describe('maybeApplyFiltersFromState', () => {
     it('ignores non-orders scopes', () => {
-      history.replaceState({ adminFilterScope: 'other' }, '');
+      historyState = { adminFilterScope: 'other' };
       comp['maybeApplyFiltersFromState']();
       expect(comp.q).toBe('');
     });
 
     it('ignores missing filters', () => {
-      history.replaceState({ adminFilterScope: 'orders' }, '');
+      historyState = { adminFilterScope: 'orders' };
       comp['maybeApplyFiltersFromState']();
       expect(comp.q).toBe('');
     });
 
     it('applies filters from navigation state', () => {
-      history.replaceState(
-        {
-          adminFilterScope: 'orders',
-          adminFilters: {
-            q: 'state-q',
-            status: 'delivered',
-            sla: 'accept_overdue',
-            fraud: 'approved',
-            tag: 'gift',
-            fromDate: '2026-03-01',
-            toDate: '2026-04-01',
-            includeTestOrders: false,
-            limit: 33,
-          },
+      historyState = {
+        adminFilterScope: 'orders',
+        adminFilters: {
+          q: 'state-q',
+          status: 'delivered',
+          sla: 'accept_overdue',
+          fraud: 'approved',
+          tag: 'gift',
+          fromDate: '2026-03-01',
+          toDate: '2026-04-01',
+          includeTestOrders: false,
+          limit: 33,
         },
-        '',
-      );
+      };
       comp['maybeApplyFiltersFromState']();
       expect(comp.q).toBe('state-q');
       expect(comp.status).toBe('delivered');
@@ -542,7 +564,7 @@ describe('AdminOrdersComponent', () => {
 
     it('keeps current limit when state limit invalid', () => {
       comp.limit = 99;
-      history.replaceState({ adminFilterScope: 'orders', adminFilters: { limit: 'bad' } }, '');
+      historyState = { adminFilterScope: 'orders', adminFilters: { limit: 'bad' } };
       comp['maybeApplyFiltersFromState']();
       expect(comp.limit).toBe(99);
     });
