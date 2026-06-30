@@ -3067,4 +3067,86 @@ describe('AdminComponent — branch fill', () => {
       expect(c.navigationForm.footer_legal_links.map((l: any) => l.id)).toEqual(['l2', 'l1']);
     });
   });
+
+  describe('category branch fill', () => {
+    it('categoryParentOptions sorts nullish-name categories and skips descendants/self', () => {
+      c.categories = [
+        { id: 'a', slug: 'a', name: null, parent_id: null },
+        { id: 'b', slug: 'b', name: 'Beta', parent_id: null },
+        { id: 'c', slug: 'c', name: 'Alpha', parent_id: 'x' },
+      ];
+      const opts = c.categoryParentOptions({ id: 'x' });
+      // 'x' (self) and 'c' (descendant of x) excluded; '' (null name) sorts before 'Beta'.
+      expect(opts.map((o: any) => o.id)).toEqual(['a', 'b']);
+    });
+
+    it('categoryDescendantIds resolves a parent cycle without looping forever', () => {
+      c.categories = [
+        { id: 'p', slug: 'p', name: 'P', parent_id: 'c2' },
+        { id: 'c1', slug: 'c1', name: 'C1', parent_id: 'p' },
+        { id: 'c2', slug: 'c2', name: 'C2', parent_id: 'c1' },
+      ];
+      const opts = c.categoryParentOptions({ id: 'p' });
+      // p plus its descendants (c1, c2 via the cycle) are all excluded.
+      expect(opts).toEqual([]);
+    });
+
+    it('updateCategoryParent clears the parent when raw is nullish and echoes a null response', () => {
+      const cat: any = { slug: 's', parent_id: 'old' };
+      h.admin.updateCategory.and.returnValue(of({ parent_id: null }));
+      c.updateCategoryParent(cat, null as any);
+      expect(h.admin.updateCategory).toHaveBeenCalledWith('s', { parent_id: null });
+      expect(cat.parent_id).toBeNull();
+      expect(h.toast.success).toHaveBeenCalled();
+    });
+
+    it('updateCategoryLowStockThreshold clears the threshold for nullish input and echoes null', () => {
+      const cat: any = { slug: 's', low_stock_threshold: 5 };
+      h.admin.updateCategory.and.returnValue(of({ low_stock_threshold: null }));
+      c.updateCategoryLowStockThreshold(cat, null as any);
+      expect(h.admin.updateCategory).toHaveBeenCalledWith('s', { low_stock_threshold: null });
+      expect(cat.low_stock_threshold).toBeNull();
+    });
+
+    it('updateCategoryTaxGroup clears the group when raw is nullish and echoes null', () => {
+      const cat: any = { slug: 's', tax_group_id: 'g1' };
+      h.admin.updateCategory.and.returnValue(of({ tax_group_id: null }));
+      c.updateCategoryTaxGroup(cat, null as any);
+      expect(h.admin.updateCategory).toHaveBeenCalledWith('s', { tax_group_id: null });
+      expect(cat.tax_group_id).toBeNull();
+    });
+
+    it('moveCategory reorders categories whose sort_order is undefined', () => {
+      c.categories = [
+        { slug: 'a', sort_order: undefined },
+        { slug: 'b', sort_order: undefined },
+      ];
+      h.admin.reorderCategories.and.returnValue(of([{ slug: 'b' }, { slug: 'a' }]));
+      c.moveCategory(c.categories[0], 1);
+      expect(h.admin.reorderCategories).toHaveBeenCalledWith([
+        { slug: 'a', sort_order: 0 },
+        { slug: 'b', sort_order: 0 },
+      ]);
+      expect(c.categories.map((x: any) => x.slug)).toEqual(['b', 'a']);
+      expect(h.toast.success).toHaveBeenCalled();
+    });
+
+    it('onCategoryDrop reorders categories whose sort_order is undefined', () => {
+      c.categories = [
+        { slug: 'a', sort_order: undefined },
+        { slug: 'b', sort_order: undefined },
+      ];
+      c.draggingSlug = 'a';
+      h.admin.reorderCategories.and.returnValue(of([{ slug: 'b' }, { slug: 'a' }]));
+      c.onCategoryDrop('b');
+      expect(h.admin.reorderCategories).toHaveBeenCalled();
+      expect(c.categories.map((x: any) => x.slug)).toEqual(['b', 'a']);
+      expect(c.draggingSlug).toBeNull();
+    });
+
+    it('deleteTaxRate ignores a blank country code', () => {
+      c.deleteTaxRate({ id: 'g' } as any, '   ');
+      expect(h.taxesAdmin.deleteRate).not.toHaveBeenCalled();
+    });
+  });
 });
