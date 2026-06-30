@@ -236,14 +236,15 @@ describe('AnalyticsService', () => {
   });
 
   it('falls back to a timestamp id when crypto.randomUUID is unavailable', () => {
-    const original = crypto.randomUUID;
-    (crypto as unknown as { randomUUID?: unknown }).randomUUID = undefined;
+    // crypto.randomUUID is inherited and non-writable in modern Chromium; shadow
+    // it with a configurable own property and delete it afterwards to restore.
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
     try {
       const service = configure();
       service.setEnabled(true);
       expect(sessionStorage.getItem('analytics.session_id.v1')).toBeTruthy();
     } finally {
-      (crypto as unknown as { randomUUID?: unknown }).randomUUID = original;
+      delete (crypto as unknown as { randomUUID?: unknown }).randomUUID;
     }
   });
 

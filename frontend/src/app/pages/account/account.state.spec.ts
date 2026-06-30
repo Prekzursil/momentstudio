@@ -144,7 +144,11 @@ describe('AccountState', () => {
   // isWebAuthnSupported() reads window.isSecureContext, window.PublicKeyCredential
   // and navigator.credentials. ES module exports cannot be spied on under esbuild,
   // so we steer the helper by shaping the real browser environment instead.
-  const savedEnv: { secure?: any; pkc?: any; credsDesc?: PropertyDescriptor } = {};
+  const savedEnv: {
+    secureDesc?: PropertyDescriptor;
+    pkc?: any;
+    credsDesc?: PropertyDescriptor;
+  } = {};
   function setWebAuthnSupport(supported: boolean): void {
     Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
     (window as any).PublicKeyCredential = supported ? function PublicKeyCredential() {} : undefined;
@@ -175,6 +179,7 @@ describe('AccountState', () => {
 
   beforeEach(() => {
     savedEnv.pkc = (window as any).PublicKeyCredential;
+    savedEnv.secureDesc = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
     savedEnv.credsDesc = Object.getOwnPropertyDescriptor(navigator, 'credentials');
     savedClipboardDesc = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     localStorage.removeItem('account.lastSection');
@@ -402,6 +407,13 @@ describe('AccountState', () => {
 
   afterEach(() => {
     (window as any).PublicKeyCredential = savedEnv.pkc;
+    // Restore window.isSecureContext to its original (inherited accessor) form so
+    // later specs can spyOnProperty it; a leaked data property breaks that.
+    if (savedEnv.secureDesc) {
+      Object.defineProperty(window, 'isSecureContext', savedEnv.secureDesc);
+    } else {
+      delete (window as any).isSecureContext;
+    }
     if (savedEnv.credsDesc) {
       Object.defineProperty(navigator, 'credentials', savedEnv.credsDesc);
     }

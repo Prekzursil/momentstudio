@@ -3348,7 +3348,9 @@ describe('AdminProductsComponent branch coverage', () => {
   // guard */` directive in the component, matching admin-ops/analytics.
 
   it('newImageUploadId falls back when randomUUID throws', () => {
-    const orig = Object.getOwnPropertyDescriptor(crypto, 'randomUUID');
+    // randomUUID is inherited from Crypto.prototype, so getOwnPropertyDescriptor
+    // returns undefined; shadow it with a configurable own property and remove
+    // that own property afterwards to restore the native implementation.
     Object.defineProperty(crypto, 'randomUUID', {
       configurable: true,
       value: () => {
@@ -3358,7 +3360,7 @@ describe('AdminProductsComponent branch coverage', () => {
     try {
       expect((component as any).newImageUploadId()).toContain('-');
     } finally {
-      if (orig) Object.defineProperty(crypto, 'randomUUID', orig);
+      delete (crypto as { randomUUID?: unknown }).randomUUID;
     }
   });
 
