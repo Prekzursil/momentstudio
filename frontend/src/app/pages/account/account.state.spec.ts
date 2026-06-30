@@ -181,12 +181,6 @@ describe('AccountState', () => {
     savedEnv.pkc = (window as any).PublicKeyCredential;
     savedEnv.secureDesc = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
     savedEnv.credsDesc = Object.getOwnPropertyDescriptor(navigator, 'credentials');
-    // window.isSecureContext is a native read-only accessor on Chrome 149.
-    // setWebAuthnSupport() shadows it with an own data property, which strips the
-    // getter; capture the original descriptor so afterEach can restore it and
-    // not leak a getter-less property into later specs (e.g. webauthn.spec.ts,
-    // which relies on spyOnProperty(window, 'isSecureContext', 'get')).
-    savedEnv.secureDesc = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
     savedClipboardDesc = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     localStorage.removeItem('account.lastSection');
     routerEvents$ = new Subject<any>();
@@ -422,11 +416,6 @@ describe('AccountState', () => {
     }
     if (savedEnv.credsDesc) {
       Object.defineProperty(navigator, 'credentials', savedEnv.credsDesc);
-    }
-    if (savedEnv.secureDesc) {
-      Object.defineProperty(window, 'isSecureContext', savedEnv.secureDesc);
-    } else {
-      delete (window as { isSecureContext?: boolean }).isSecureContext;
     }
     if (savedClipboardDesc) {
       Object.defineProperty(navigator, 'clipboard', savedClipboardDesc);
