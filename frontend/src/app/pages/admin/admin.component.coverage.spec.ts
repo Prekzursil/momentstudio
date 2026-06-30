@@ -49,22 +49,65 @@ function makeAdminSpy(): any {
   // Every admin-service method used by the component, defaulting to a benign
   // observable. Individual tests override return values per scenario.
   const methods = [
-    'products', 'coupons', 'lowStock', 'audit', 'getMaintenance', 'setMaintenance',
-    'content', 'getContent', 'createContent', 'updateContentBlock', 'deleteContent',
-    'getCategories', 'createCategory', 'updateCategory', 'deleteCategory',
-    'getCategoryTranslations', 'upsertCategoryTranslation', 'deleteCategoryTranslation',
-    'createProduct', 'updateProduct', 'getProduct', 'deleteProduct', 'duplicateProduct',
-    'uploadProductImage', 'deleteProductImage', 'transferOwner', 'revokeSessions',
-    'userAliases', 'updateUserRole', 'updateOrderStatus', 'createCoupon', 'updateCoupon',
-    'invalidateCouponStripeMappings', 'listContentVersions', 'getContentVersion',
-    'rollbackContentVersion', 'uploadContentImage', 'updateContentImageFocalPoint',
-    'listContentPages', 'renameContentPage', 'updateContentTranslationStatus',
-    'getSitemapPreview', 'validateStructuredData', 'deleteContentRedirect',
-    'exportContentRedirects', 'importContentRedirects', 'upsertContentRedirect',
-    'previewFindReplaceContent', 'applyFindReplaceContent', 'linkCheckContent',
-    'fetchSocialThumbnail', 'sendScheduledReport', 'createPagePreviewToken',
-    'createHomePreviewToken', 'listFeaturedCollections', 'createFeaturedCollection',
-    'updateFeaturedCollection', 'reorderCategories', 'listContentRedirects',
+    'products',
+    'coupons',
+    'lowStock',
+    'audit',
+    'getMaintenance',
+    'setMaintenance',
+    'content',
+    'getContent',
+    'createContent',
+    'updateContentBlock',
+    'deleteContent',
+    'getCategories',
+    'createCategory',
+    'updateCategory',
+    'deleteCategory',
+    'getCategoryTranslations',
+    'upsertCategoryTranslation',
+    'deleteCategoryTranslation',
+    'createProduct',
+    'updateProduct',
+    'getProduct',
+    'deleteProduct',
+    'duplicateProduct',
+    'uploadProductImage',
+    'deleteProductImage',
+    'transferOwner',
+    'revokeSessions',
+    'userAliases',
+    'updateUserRole',
+    'updateOrderStatus',
+    'createCoupon',
+    'updateCoupon',
+    'invalidateCouponStripeMappings',
+    'listContentVersions',
+    'getContentVersion',
+    'rollbackContentVersion',
+    'uploadContentImage',
+    'updateContentImageFocalPoint',
+    'listContentPages',
+    'renameContentPage',
+    'updateContentTranslationStatus',
+    'getSitemapPreview',
+    'validateStructuredData',
+    'deleteContentRedirect',
+    'exportContentRedirects',
+    'importContentRedirects',
+    'upsertContentRedirect',
+    'previewFindReplaceContent',
+    'applyFindReplaceContent',
+    'linkCheckContent',
+    'fetchSocialThumbnail',
+    'sendScheduledReport',
+    'createPagePreviewToken',
+    'createHomePreviewToken',
+    'listFeaturedCollections',
+    'createFeaturedCollection',
+    'updateFeaturedCollection',
+    'reorderCategories',
+    'listContentRedirects',
     'linkCheckContentPreview',
   ];
   const spy: any = jasmine.createSpyObj('AdminService', methods);
@@ -100,21 +143,37 @@ function createComponent(route: RouteStub = createRouteStub()): Harness {
   const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
   adminProducts.search.and.returnValue(of({ items: [], total: 0 }));
   const blog = jasmine.createSpyObj('BlogService', [
-    'listFlaggedComments', 'resolveCommentFlagsAdmin', 'hideCommentAdmin',
-    'unhideCommentAdmin', 'deleteComment', 'createPreviewToken',
+    'listFlaggedComments',
+    'resolveCommentFlagsAdmin',
+    'hideCommentAdmin',
+    'unhideCommentAdmin',
+    'deleteComment',
+    'createPreviewToken',
   ]);
   blog.listFlaggedComments.and.returnValue(of([]));
   blog.createPreviewToken.and.returnValue(of({ token: 't', expires_at: '' }));
   const fxAdmin = jasmine.createSpyObj('FxAdminService', [
-    'getStatus', 'listOverrideAudit', 'restoreOverrideFromAudit', 'clearOverride', 'setOverride',
+    'getStatus',
+    'listOverrideAudit',
+    'restoreOverrideFromAudit',
+    'clearOverride',
+    'setOverride',
   ]);
   fxAdmin.getStatus.and.returnValue(of({ override: null }));
   fxAdmin.listOverrideAudit.and.returnValue(of([]));
   const taxesAdmin = jasmine.createSpyObj('TaxesAdminService', [
-    'listGroups', 'createGroup', 'updateGroup', 'deleteGroup', 'upsertRate', 'deleteRate',
+    'listGroups',
+    'createGroup',
+    'updateGroup',
+    'deleteGroup',
+    'upsertRate',
+    'deleteRate',
   ]);
   taxesAdmin.listGroups.and.returnValue(of([]));
-  const auth = { role: jasmine.createSpy('role').and.returnValue('admin'), loadCurrentUser: jasmine.createSpy('loadCurrentUser').and.returnValue(of(null)) };
+  const auth = {
+    role: jasmine.createSpy('role').and.returnValue('admin'),
+    loadCurrentUser: jasmine.createSpy('loadCurrentUser').and.returnValue(of(null)),
+  };
   const cmsPrefs = makeCmsPrefs();
   const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
   const translate = { instant: (k: string, p?: any) => (p ? `${k}:${JSON.stringify(p)}` : k) };
@@ -144,8 +203,19 @@ function createComponent(route: RouteStub = createRouteStub()): Harness {
   );
 
   return {
-    component, admin, adminProducts, blog, fxAdmin, taxesAdmin, auth,
-    cmsPrefs, toast, translate, markdown, sanitizer, route,
+    component,
+    admin,
+    adminProducts,
+    blog,
+    fxAdmin,
+    taxesAdmin,
+    auth,
+    cmsPrefs,
+    toast,
+    translate,
+    markdown,
+    sanitizer,
+    route,
   };
 }
 
@@ -233,7 +303,11 @@ describe('AdminComponent — CmsDraftManager (via home draft)', () => {
     const key = (mgr as any).storageKey;
     localStorage.setItem(
       key,
-      JSON.stringify({ v: 1, ts: '2030-01-01T00:00:00Z', state_json: JSON.stringify([{ id: 'restored' }]) }),
+      JSON.stringify({
+        v: 1,
+        ts: '2030-01-01T00:00:00Z',
+        state_json: JSON.stringify([{ id: 'restored' }]),
+      }),
     );
     mgr.initFromServer([{ id: 'a' }]);
     expect(mgr.hasRestorableAutosave).toBe(true);
@@ -260,7 +334,10 @@ describe('AdminComponent — CmsDraftManager (via home draft)', () => {
 
   it('discardAutosave removes the stored envelope and candidate', () => {
     const key = (mgr as any).storageKey;
-    localStorage.setItem(key, JSON.stringify({ v: 1, ts: 't', state_json: JSON.stringify([{ id: 'x' }]) }));
+    localStorage.setItem(
+      key,
+      JSON.stringify({ v: 1, ts: 't', state_json: JSON.stringify([{ id: 'x' }]) }),
+    );
     mgr.initFromServer([{ id: 'a' }]);
     mgr.discardAutosave();
     expect(localStorage.getItem(key)).toBeNull();
@@ -280,8 +357,20 @@ describe('AdminComponent — CmsDraftManager (via home draft)', () => {
 
   it('debounced commit timer eventually commits pending state', (done) => {
     const fast = (h.component as any).ensurePageDraft('page.timer');
-    fast.initFromServer({ blocks: [], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false });
-    fast.observe({ blocks: [{ id: 'p' }], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false });
+    fast.initFromServer({
+      blocks: [],
+      status: 'draft',
+      publishedAt: '',
+      publishedUntil: '',
+      requiresAuth: false,
+    });
+    fast.observe({
+      blocks: [{ id: 'p' }],
+      status: 'draft',
+      publishedAt: '',
+      publishedUntil: '',
+      requiresAuth: false,
+    });
     expect(fast.autosavePending).toBe(true);
     setTimeout(() => {
       expect(fast.autosavePending).toBe(false);
@@ -360,8 +449,12 @@ describe('AdminComponent — pure helpers and getters', () => {
     c.settingsRevisionKey = 'seo.home';
     expect(c.settingsRevisionTitleKey()).toContain('seo');
     for (const [key, frag] of [
-      ['site.assets', 'assets'], ['site.social', 'social'], ['site.company', 'company'],
-      ['site.navigation', 'navigation'], ['site.checkout', 'checkout'], ['site.reports', 'reports'],
+      ['site.assets', 'assets'],
+      ['site.social', 'social'],
+      ['site.company', 'company'],
+      ['site.navigation', 'navigation'],
+      ['site.checkout', 'checkout'],
+      ['site.reports', 'reports'],
     ] as const) {
       c.settingsRevisionKey = key;
       expect(c.settingsRevisionTitleKey()).toContain(frag);
@@ -472,10 +565,20 @@ describe('AdminComponent — value normalisation helpers', () => {
   it('toCmsBlockLayout normalises each axis and defaults', () => {
     expect(c.toCmsBlockLayout(null)).toEqual(c.defaultCmsBlockLayout());
     expect(
-      c.toCmsBlockLayout({ spacing: 'lg', background: 'accent', align: 'center', maxWidth: 'wide' }),
+      c.toCmsBlockLayout({
+        spacing: 'lg',
+        background: 'accent',
+        align: 'center',
+        maxWidth: 'wide',
+      }),
     ).toEqual({ spacing: 'lg', background: 'accent', align: 'center', max_width: 'wide' });
     expect(
-      c.toCmsBlockLayout({ spacing: 'xxl', background: 'rainbow', align: 'top', max_width: 'huge' }),
+      c.toCmsBlockLayout({
+        spacing: 'xxl',
+        background: 'rainbow',
+        align: 'top',
+        max_width: 'huge',
+      }),
     ).toEqual({ spacing: 'none', background: 'none', align: 'left', max_width: 'full' });
     expect(c.toCmsBlockLayout({ max_width: 'narrow' }).max_width).toBe('narrow');
     expect(c.toCmsBlockLayout({ max_width: 'prose' }).max_width).toBe('prose');
@@ -514,7 +617,13 @@ describe('AdminComponent — value normalisation helpers', () => {
   });
 
   it('serializeSlideDraft trims urls and clamps focal points', () => {
-    const slide = { ...c.emptySlideDraft(), image_url: ' /x ', cta_url: ' /y ', focal_x: 200, focal_y: -5 };
+    const slide = {
+      ...c.emptySlideDraft(),
+      image_url: ' /x ',
+      cta_url: ' /y ',
+      focal_x: 200,
+      focal_y: -5,
+    };
     const out = c.serializeSlideDraft(slide);
     expect(out['image_url']).toBe('/x');
     expect(out['cta_url']).toBe('/y');
@@ -546,7 +655,9 @@ describe('AdminComponent — value normalisation helpers', () => {
 
 describe('AdminComponent — parsePageBlocksDraft', () => {
   let c: any;
-  beforeEach(() => { c = createComponent().component as any; });
+  beforeEach(() => {
+    c = createComponent().component as any;
+  });
 
   it('returns an empty list for missing or empty block arrays', () => {
     expect(c.parsePageBlocksDraft(null)).toEqual([]);
@@ -571,7 +682,9 @@ describe('AdminComponent — parsePageBlocksDraft', () => {
   });
 
   it('auto-generates keys and honours the enabled flag', () => {
-    const out = c.parsePageBlocksDraft({ blocks: [{ type: 'text' }, { type: 'cta', enabled: false }] });
+    const out = c.parsePageBlocksDraft({
+      blocks: [{ type: 'text' }, { type: 'cta', enabled: false }],
+    });
     expect(out[0].key).toBe('text_1');
     expect(out[0].enabled).toBe(true);
     expect(out[1].key).toBe('cta_2');
@@ -580,11 +693,21 @@ describe('AdminComponent — parsePageBlocksDraft', () => {
 
   it('parses every supported block type with rich content', () => {
     const blocks = [
-      { type: 'columns', columns: [{ title: 'c1' }, { title: 'c2' }, { title: 'c3' }, { title: 'c4' }], columns_breakpoint: 'lg' },
+      {
+        type: 'columns',
+        columns: [{ title: 'c1' }, { title: 'c2' }, { title: 'c3' }, { title: 'c4' }],
+        columns_breakpoint: 'lg',
+      },
       { type: 'cta', cta_label: 'Go', cta_url: ' /go ', cta_new_tab: 'yes' },
       { type: 'faq', items: [{ question: 'q1' }, null, { question: 'q2' }] },
       { type: 'testimonials', items: [{ author: 'a1' }, 'bad'] },
-      { type: 'product_grid', source: 'COLLECTION', collection_slug: ' col ', product_slugs: ['x', 'x', 'y'], limit: '99' },
+      {
+        type: 'product_grid',
+        source: 'COLLECTION',
+        collection_slug: ' col ',
+        product_slugs: ['x', 'x', 'y'],
+        limit: '99',
+      },
       { type: 'form', form_type: 'NEWSLETTER', topic: 'support' },
       { type: 'image', url: ' /img ', link_url: ' /l ', focal_x: 12, focal_y: 88 },
       { type: 'gallery', images: [{ url: ' /g ' }, { url: '' }, null] },
@@ -617,7 +740,9 @@ describe('AdminComponent — parsePageBlocksDraft', () => {
 
   it('handles product_grid with comma/newline string slugs and defaults', () => {
     const out = c.parsePageBlocksDraft({
-      blocks: [{ type: 'product_grid', source: 'products', product_slugs: 'a, b\nc', limit: 'bad' }],
+      blocks: [
+        { type: 'product_grid', source: 'products', product_slugs: 'a, b\nc', limit: 'bad' },
+      ],
     });
     expect(out[0].product_grid_source).toBe('products');
     expect(out[0].product_grid_product_slugs).toBe('a\nb\nc');
@@ -625,7 +750,9 @@ describe('AdminComponent — parsePageBlocksDraft', () => {
   });
 
   it('falls back to defaults for columns under two and unknown breakpoint', () => {
-    const out = c.parsePageBlocksDraft({ blocks: [{ type: 'columns', columns: [{ title: 'only' }], columns_breakpoint: 'xl' }] });
+    const out = c.parsePageBlocksDraft({
+      blocks: [{ type: 'columns', columns: [{ title: 'only' }], columns_breakpoint: 'xl' }],
+    });
     expect(out[0].columns.length).toBe(2); // default kept
     expect(out[0].columns_breakpoint).toBe('md');
   });
@@ -634,7 +761,10 @@ describe('AdminComponent — parsePageBlocksDraft', () => {
 describe('AdminComponent — contentTitleForKey and page block mutators', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('contentTitleForKey prefers known content page titles then defaults', () => {
     c.contentPages = [{ key: 'page.about', title: 'About Us' }];
@@ -705,7 +835,10 @@ function checkboxEvent(checked: boolean): any {
 describe('AdminComponent — home section helpers and slides', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('toPreviewSlide prefers the active language and falls back to the other', () => {
     const slide = {
@@ -734,7 +867,15 @@ describe('AdminComponent — home section helpers and slides', () => {
   });
 
   it('isHomeSectionId recognises every canonical id', () => {
-    for (const id of ['featured_products', 'sale_products', 'new_arrivals', 'featured_collections', 'story', 'recently_viewed', 'why']) {
+    for (const id of [
+      'featured_products',
+      'sale_products',
+      'new_arrivals',
+      'featured_collections',
+      'story',
+      'recently_viewed',
+      'why',
+    ]) {
       expect(c.isHomeSectionId(id)).toBe(true);
     }
     expect(c.isHomeSectionId('nope')).toBe(false);
@@ -777,7 +918,10 @@ describe('AdminComponent — home section helpers and slides', () => {
   });
 
   it('toggleHomeBlockEnabled flips the enabled flag for the matching block', () => {
-    c.homeBlocks = [{ key: 'a', enabled: true }, { key: 'b', enabled: true }];
+    c.homeBlocks = [
+      { key: 'a', enabled: true },
+      { key: 'b', enabled: true },
+    ];
     c.toggleHomeBlockEnabled({ key: 'a' }, checkboxEvent(false));
     expect(c.homeBlocks[0].enabled).toBe(false);
     expect(c.homeBlocks[1].enabled).toBe(true);
@@ -819,7 +963,10 @@ describe('AdminComponent — home section helpers and slides', () => {
   });
 
   it('onHomeBlockDropZone reorders an internal drag and inserts a library payload', () => {
-    c.homeBlocks = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }];
+    c.homeBlocks = [
+      { key: 'a', type: 'text' },
+      { key: 'b', type: 'text' },
+    ];
     c.draggingHomeBlockKey = 'a';
     c.onHomeBlockDropZone(dragEvent(), 2);
     expect(c.homeBlocks.map((b: any) => b.key)).toEqual(['b', 'a']);
@@ -829,7 +976,10 @@ describe('AdminComponent — home section helpers and slides', () => {
     expect(c.draggingHomeBlockKey).toBeNull();
 
     const before = c.homeBlocks.length;
-    c.onHomeBlockDropZone(dragEvent({ kind: 'cms-block', scope: 'home', type: 'cta', template: 'blank' }), 0);
+    c.onHomeBlockDropZone(
+      dragEvent({ kind: 'cms-block', scope: 'home', type: 'cta', template: 'blank' }),
+      0,
+    );
     expect(c.homeBlocks.length).toBe(before + 1);
 
     const after = c.homeBlocks.length;
@@ -838,13 +988,20 @@ describe('AdminComponent — home section helpers and slides', () => {
   });
 
   it('onHomeBlockDrop reorders onto a target and inserts a home payload', () => {
-    c.homeBlocks = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }, { key: 'c', type: 'text' }];
+    c.homeBlocks = [
+      { key: 'a', type: 'text' },
+      { key: 'b', type: 'text' },
+      { key: 'c', type: 'text' },
+    ];
     c.draggingHomeBlockKey = 'a';
     c.onHomeBlockDrop(dragEvent(), 'c');
     expect(c.homeBlocks.map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
 
     const cnt = c.homeBlocks.length;
-    c.onHomeBlockDrop(dragEvent({ kind: 'cms-block', scope: 'home', type: 'cta', template: 'blank' }), 'b');
+    c.onHomeBlockDrop(
+      dragEvent({ kind: 'cms-block', scope: 'home', type: 'cta', template: 'blank' }),
+      'b',
+    );
     expect(c.homeBlocks.length).toBe(cnt + 1);
 
     // dropping a block onto itself is a no-op
@@ -858,18 +1015,30 @@ describe('AdminComponent — home section helpers and slides', () => {
     expect(c.readCmsBlockPayload(dragEvent())).toBeNull();
     expect(c.readCmsBlockPayload(dragEvent('not-json'))).toBeNull();
     expect(c.readCmsBlockPayload(dragEvent({ kind: 'other' }))).toBeNull();
-    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'bad', type: 'text' }))).toBeNull();
-    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'home', type: 'nope' }))).toBeNull();
-    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'home', type: 'text', template: 'starter' })))
-      .toEqual({ scope: 'home', type: 'text', template: 'starter' });
-    expect(c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'page', type: 'cta' })).template).toBe('blank');
+    expect(
+      c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'bad', type: 'text' })),
+    ).toBeNull();
+    expect(
+      c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'home', type: 'nope' })),
+    ).toBeNull();
+    expect(
+      c.readCmsBlockPayload(
+        dragEvent({ kind: 'cms-block', scope: 'home', type: 'text', template: 'starter' }),
+      ),
+    ).toEqual({ scope: 'home', type: 'text', template: 'starter' });
+    expect(
+      c.readCmsBlockPayload(dragEvent({ kind: 'cms-block', scope: 'page', type: 'cta' })).template,
+    ).toBe('blank');
   });
 });
 
 describe('AdminComponent — page block mutators', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('addPageBlock and removePageBlock manage the page block list', () => {
     c.newPageBlockType = 'text';
@@ -895,14 +1064,20 @@ describe('AdminComponent — page block mutators', () => {
 describe('AdminComponent — orders, users, categories, coupons', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('selectOrder clones the order and filteredOrders honours the status filter', () => {
     const order = { id: 'o1', status: 'paid' } as any;
     c.selectOrder(order);
     expect(c.activeOrder).toEqual(order);
     expect(c.activeOrder).not.toBe(order);
-    c.orders = [{ id: 'o1', status: 'paid' }, { id: 'o2', status: 'shipped' }] as any;
+    c.orders = [
+      { id: 'o1', status: 'paid' },
+      { id: 'o2', status: 'shipped' },
+    ] as any;
     c.orderFilter = '';
     expect(c.filteredOrders().length).toBe(2);
     c.orderFilter = 'shipped';
@@ -1012,7 +1187,12 @@ describe('AdminComponent — orders, users, categories, coupons', () => {
       { slug: 'a', sort_order: 0 },
       { slug: 'b', sort_order: 1 },
     ];
-    h.admin.reorderCategories.and.returnValue(of([{ slug: 'b', sort_order: 0 }, { slug: 'a', sort_order: 1 }]));
+    h.admin.reorderCategories.and.returnValue(
+      of([
+        { slug: 'b', sort_order: 0 },
+        { slug: 'a', sort_order: 1 },
+      ]),
+    );
     c.moveCategory({ slug: 'a' } as any, 1);
     expect(h.admin.reorderCategories).toHaveBeenCalled();
     expect(h.toast.success).toHaveBeenCalled();
@@ -1023,13 +1203,20 @@ describe('AdminComponent — orders, users, categories, coupons', () => {
     expect(h.admin.reorderCategories).not.toHaveBeenCalled();
 
     h.admin.reorderCategories.and.returnValue(throwError(() => new Error('x')));
-    c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }];
+    c.categories = [
+      { slug: 'a', sort_order: 0 },
+      { slug: 'b', sort_order: 1 },
+    ];
     c.moveCategory({ slug: 'a' } as any, 1);
     expect(h.toast.error).toHaveBeenCalled();
   });
 
   it('category drag-drop reorders and guards self/missing drops', () => {
-    c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }, { slug: 'c', sort_order: 2 }];
+    c.categories = [
+      { slug: 'a', sort_order: 0 },
+      { slug: 'b', sort_order: 1 },
+      { slug: 'c', sort_order: 2 },
+    ];
     c.onCategoryDragStart('a');
     expect(c.draggingSlug).toBe('a');
     const ev = dragEvent();
@@ -1086,7 +1273,9 @@ describe('AdminComponent — orders, users, categories, coupons', () => {
 
 describe('AdminComponent — blog pinning helpers', () => {
   let c: any;
-  beforeEach(() => { c = createComponent().component as any; });
+  beforeEach(() => {
+    c = createComponent().component as any;
+  });
 
   it('blogPosts filters content blocks by blog prefix', () => {
     c.contentBlocks = [{ key: 'blog.a' }, { key: 'page.x' }, { key: 'blog.b' }];
@@ -1107,8 +1296,18 @@ describe('AdminComponent — blog pinning helpers', () => {
 
   it('blogPinnedSlot/blogPinnedPosts/nextBlogPinOrder rank pinned posts', () => {
     c.contentBlocks = [
-      { key: 'blog.a', meta: { pinned: true, pin_order: 2 }, published_at: '2020-01-01', updated_at: 'a' },
-      { key: 'blog.b', meta: { pinned: true, pin_order: 1 }, published_at: '2021-01-01', updated_at: 'b' },
+      {
+        key: 'blog.a',
+        meta: { pinned: true, pin_order: 2 },
+        published_at: '2020-01-01',
+        updated_at: 'a',
+      },
+      {
+        key: 'blog.b',
+        meta: { pinned: true, pin_order: 1 },
+        published_at: '2021-01-01',
+        updated_at: 'b',
+      },
       { key: 'blog.c', meta: { pinned: false } },
       { key: 'page.x', meta: { pinned: true, pin_order: 9 } },
     ];
@@ -1137,7 +1336,10 @@ describe('AdminComponent — blog pinning helpers', () => {
 describe('AdminComponent — FX override controls', () => {
   let h: Harness;
   let c: any;
-  const status = { override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '2020-01-01' } };
+  const status = {
+    override: null,
+    effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '2020-01-01' },
+  };
   beforeEach(() => {
     h = createComponent();
     c = h.component as any;
@@ -1234,7 +1436,10 @@ describe('AdminComponent — FX override controls', () => {
 describe('AdminComponent — products and stock', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('startNewProduct resets the form using the first category', () => {
     c.categories = [{ id: 'cat1' }];
@@ -1245,10 +1450,21 @@ describe('AdminComponent — products and stock', () => {
   });
 
   it('loadProduct hydrates the form and reports load errors', () => {
-    h.admin.getProduct.and.returnValue(of({
-      slug: 's1', name: 'P', category_id: 'c', price: 10, stock_quantity: 5, status: 'live',
-      sku: 'SKU', long_description: 'desc', publish_at: '2030-01-01T00:00:00Z', tags: ['bestseller'], images: [{ id: 'i' }],
-    }));
+    h.admin.getProduct.and.returnValue(
+      of({
+        slug: 's1',
+        name: 'P',
+        category_id: 'c',
+        price: 10,
+        stock_quantity: 5,
+        status: 'live',
+        sku: 'SKU',
+        long_description: 'desc',
+        publish_at: '2030-01-01T00:00:00Z',
+        tags: ['bestseller'],
+        images: [{ id: 'i' }],
+      }),
+    );
     c.loadProduct('s1');
     expect(c.editingId).toBe('s1');
     expect(c.form.is_bestseller).toBe(true);
@@ -1261,7 +1477,18 @@ describe('AdminComponent — products and stock', () => {
 
   it('saveProduct creates when new and updates when editing', () => {
     spyOn(c, 'loadAll'); // avoid cascading section reloads
-    c.form = { name: 'n', slug: 's', category_id: 'c', price: 1, stock: 2, status: 'draft', sku: '', description: '', publish_at: '', is_bestseller: false };
+    c.form = {
+      name: 'n',
+      slug: 's',
+      category_id: 'c',
+      price: 1,
+      stock: 2,
+      status: 'draft',
+      sku: '',
+      description: '',
+      publish_at: '',
+      is_bestseller: false,
+    };
     c.editingId = null;
     h.admin.createProduct.and.returnValue(of({}));
     c.saveProduct();
@@ -1363,7 +1590,10 @@ describe('AdminComponent — products and stock', () => {
 describe('AdminComponent — category wizard', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('start/exit toggle the wizard state', () => {
     c.startCategoryWizard();
@@ -1441,7 +1671,10 @@ describe('AdminComponent — category wizard', () => {
 describe('AdminComponent — tax groups and rates', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('loadTaxGroups stores groups and surfaces error details', () => {
     h.taxesAdmin.listGroups.and.returnValue(of([{ id: 'g1' }]));
@@ -1463,7 +1696,9 @@ describe('AdminComponent — tax groups and rates', () => {
     c.taxGroupCreate = { code: ' VAT ', name: ' Std ', description: ' d ', is_default: true };
     h.taxesAdmin.createGroup.and.returnValue(of({}));
     c.createTaxGroup();
-    expect(h.taxesAdmin.createGroup).toHaveBeenCalledWith(jasmine.objectContaining({ code: 'VAT', name: 'Std', is_default: true }));
+    expect(h.taxesAdmin.createGroup).toHaveBeenCalledWith(
+      jasmine.objectContaining({ code: 'VAT', name: 'Std', is_default: true }),
+    );
 
     c.taxGroupCreate = { code: 'A', name: 'B' };
     h.taxesAdmin.createGroup.and.returnValue(throwError(() => ({ error: { detail: 'dup' } })));
@@ -1505,7 +1740,8 @@ describe('AdminComponent — tax groups and rates', () => {
   });
 
   it('upsertTaxRate validates country and rate, then clears inputs', () => {
-    c.taxRateCountry = {}; c.taxRatePercent = {};
+    c.taxRateCountry = {};
+    c.taxRatePercent = {};
     c.upsertTaxRate({ id: 'g1' } as any); // missing country
     expect(h.taxesAdmin.upsertRate).not.toHaveBeenCalled();
 
@@ -1514,7 +1750,10 @@ describe('AdminComponent — tax groups and rates', () => {
     h.taxesAdmin.upsertRate.and.returnValue(of({}));
     c.upsertTaxRate({ id: 'g1' } as any);
     expect(c.taxRateCountry['g1']).toBe('');
-    expect(h.taxesAdmin.upsertRate).toHaveBeenCalledWith('g1', { country_code: 'RO', vat_rate_percent: 19 });
+    expect(h.taxesAdmin.upsertRate).toHaveBeenCalledWith('g1', {
+      country_code: 'RO',
+      vat_rate_percent: 19,
+    });
 
     c.taxRateCountry = { g1: 'RO' };
     c.taxRatePercent = { g1: '5' };
@@ -1538,10 +1777,16 @@ describe('AdminComponent — tax groups and rates', () => {
 describe('AdminComponent — category hierarchy and translations', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('categoryParentLabel resolves names or the none label', () => {
-    c.categories = [{ id: 'p', name: 'Parent' }, { id: 'c', name: 'Child', parent_id: 'p' }];
+    c.categories = [
+      { id: 'p', name: 'Parent' },
+      { id: 'c', name: 'Child', parent_id: 'p' },
+    ];
     expect(c.categoryParentLabel({ parent_id: 'p' })).toBe('Parent');
     expect(c.categoryParentLabel({ parent_id: '' })).toContain('parentNone');
     expect(c.categoryParentLabel({ parent_id: 'missing' })).toContain('parentNone');
@@ -1559,11 +1804,7 @@ describe('AdminComponent — category hierarchy and translations', () => {
   });
 
   it('categoryDescendantIds walks the tree', () => {
-    c.categories = [
-      { id: 'b', parent_id: 'a' },
-      { id: 'cc', parent_id: 'b' },
-      { id: 'orphan' },
-    ];
+    c.categories = [{ id: 'b', parent_id: 'a' }, { id: 'cc', parent_id: 'b' }, { id: 'orphan' }];
     const set = c.categoryDescendantIds('a');
     expect(Array.from(set).sort()).toEqual(['b', 'cc']);
   });
@@ -1649,7 +1890,9 @@ describe('AdminComponent — category hierarchy and translations', () => {
   });
 
   it('toggleCategoryTranslations opens and closes by slug', () => {
-    h.admin.getCategoryTranslations.and.returnValue(of([{ lang: 'en', name: 'EN', description: 'd' }, { lang: 'fr' }]));
+    h.admin.getCategoryTranslations.and.returnValue(
+      of([{ lang: 'en', name: 'EN', description: 'd' }, { lang: 'fr' }]),
+    );
     c.toggleCategoryTranslations('s1');
     expect(c.categoryTranslationsSlug).toBe('s1');
     expect(c.categoryTranslationExists.en).toBe(true);
@@ -1669,7 +1912,10 @@ describe('AdminComponent — category hierarchy and translations', () => {
     expect(h.admin.upsertCategoryTranslation).not.toHaveBeenCalled();
 
     c.categoryTranslationsSlug = 's1';
-    c.categoryTranslations = { en: { name: '', description: '' }, ro: { name: '', description: '' } };
+    c.categoryTranslations = {
+      en: { name: '', description: '' },
+      ro: { name: '', description: '' },
+    };
     c.saveCategoryTranslation('en'); // empty name
     expect(h.toast.error).toHaveBeenCalled();
 
@@ -1864,7 +2110,9 @@ describe('AdminComponent — blog selection and bulk actions', () => {
     expect(c.buildBlogBulkPayload({ meta: {} })).toBeNull();
     expect(c.blogBulkError).toContain('invalidSchedule');
     c.blogBulkUnpublishAt = '';
-    expect(c.buildBlogBulkPayload({ meta: {} })).toEqual(jasmine.objectContaining({ status: 'published' }));
+    expect(c.buildBlogBulkPayload({ meta: {} })).toEqual(
+      jasmine.objectContaining({ status: 'published' }),
+    );
   });
 });
 
@@ -1916,7 +2164,9 @@ describe('AdminComponent — preview links', () => {
     c.generatePagePreviewLink('   '); // empty → no call
     expect(h.admin.createPagePreviewToken).not.toHaveBeenCalled();
 
-    h.admin.createPagePreviewToken.and.returnValue(of({ token: 'pt', expires_at: 'soon', url: 'https://ex.com/about' }));
+    h.admin.createPagePreviewToken.and.returnValue(
+      of({ token: 'pt', expires_at: 'soon', url: 'https://ex.com/about' }),
+    );
     c.generatePagePreviewLink('about');
     expect(c.pagePreviewToken).toBe('pt');
     expect(copy).toHaveBeenCalled();
@@ -1944,7 +2194,9 @@ describe('AdminComponent — preview links', () => {
     expect(String(c.homePreviewIframeSrc())).toContain('__ts=');
 
     c.homePreviewToken = null;
-    h.admin.createHomePreviewToken.and.returnValue(of({ token: 'ht2', expires_at: 's', url: 'https://ex.com/' }));
+    h.admin.createHomePreviewToken.and.returnValue(
+      of({ token: 'ht2', expires_at: 's', url: 'https://ex.com/' }),
+    );
     c.generateHomePreviewLink();
     expect(c.homePreviewToken).toBe('ht2');
     expect(copy).toHaveBeenCalled();
@@ -1977,7 +2229,9 @@ describe('AdminComponent — preview links', () => {
     expect(h.blog.createPreviewToken).not.toHaveBeenCalled();
 
     c.selectedBlogKey = 'blog.hello';
-    h.blog.createPreviewToken.and.returnValue(of({ url: 'https://ex.com/blog/hello', token: 'bt', expires_at: 's' }));
+    h.blog.createPreviewToken.and.returnValue(
+      of({ url: 'https://ex.com/blog/hello', token: 'bt', expires_at: 's' }),
+    );
     c.generateBlogPreviewLink();
     expect(c.blogPreviewUrl).toBe('https://ex.com/blog/hello');
 
@@ -1996,7 +2250,10 @@ describe('AdminComponent — preview links', () => {
 describe('AdminComponent — blog versions and comment moderation', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('loadBlogVersions requires a key and stores versions', () => {
     c.selectedBlogKey = null;
@@ -2157,7 +2414,8 @@ describe('AdminComponent — markdown editor helpers', () => {
 
   it('wrapBlogSelection wraps a selection or inserts a placeholder', () => {
     ta.value = 'bold me';
-    ta.selectionStart = 0; ta.selectionEnd = 4;
+    ta.selectionStart = 0;
+    ta.selectionEnd = 4;
     c.wrapBlogSelection(ta, '**', '**', 'text');
     expect(c.blogForm.body_markdown).toBe('**bold** me');
 
@@ -2169,12 +2427,14 @@ describe('AdminComponent — markdown editor helpers', () => {
 
   it('insertBlogLink and insertBlogCodeBlock insert markdown snippets', () => {
     ta.value = 'click';
-    ta.selectionStart = 0; ta.selectionEnd = 5;
+    ta.selectionStart = 0;
+    ta.selectionEnd = 5;
     c.insertBlogLink(ta);
     expect(c.blogForm.body_markdown).toContain('[click](https://)');
 
     ta.value = 'x = 1';
-    ta.selectionStart = 0; ta.selectionEnd = 5;
+    ta.selectionStart = 0;
+    ta.selectionEnd = 5;
     c.insertBlogCodeBlock(ta);
     expect(c.blogForm.body_markdown).toContain('```');
   });
@@ -2201,7 +2461,11 @@ describe('AdminComponent — markdown editor helpers', () => {
 describe('AdminComponent — blog image markdown, a11y and writing aids', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; c.blogForm = { body_markdown: '', reading_time_minutes: '' }; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.blogForm = { body_markdown: '', reading_time_minutes: '' };
+  });
 
   it('insertBlogImageMarkdown appends an image snippet', () => {
     c.blogForm.body_markdown = 'Intro';
@@ -2256,10 +2520,16 @@ describe('AdminComponent — blog image markdown, a11y and writing aids', () => 
   });
 
   it('onBlogImageDragOver only reacts to file drags', () => {
-    const noFiles = { dataTransfer: { types: ['text/plain'] }, preventDefault: jasmine.createSpy('pd') } as any;
+    const noFiles = {
+      dataTransfer: { types: ['text/plain'] },
+      preventDefault: jasmine.createSpy('pd'),
+    } as any;
     c.onBlogImageDragOver(noFiles);
     expect(noFiles.preventDefault).not.toHaveBeenCalled();
-    const withFiles = { dataTransfer: { types: ['Files'], dropEffect: '' }, preventDefault: jasmine.createSpy('pd') } as any;
+    const withFiles = {
+      dataTransfer: { types: ['Files'], dropEffect: '' },
+      preventDefault: jasmine.createSpy('pd'),
+    } as any;
     c.onBlogImageDragOver(withFiles);
     expect(withFiles.preventDefault).toHaveBeenCalled();
     expect(withFiles.dataTransfer.dropEffect).toBe('copy');
@@ -2276,7 +2546,9 @@ describe('AdminComponent — blog image markdown, a11y and writing aids', () => 
       preventDefault: jasmine.createSpy('pd'),
       stopPropagation: jasmine.createSpy('sp'),
     } as any;
-    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', sort_order: 0 }] }));
+    h.admin.uploadContentImage.and.returnValue(
+      of({ images: [{ id: 'i', url: '/u.png', sort_order: 0 }] }),
+    );
     await c.onBlogImageDrop(ta, ev);
     expect(c.blogImages.length).toBe(1);
     expect(h.toast.success).toHaveBeenCalled();
@@ -2284,13 +2556,21 @@ describe('AdminComponent — blog image markdown, a11y and writing aids', () => 
 
   it('onBlogImageDrop ignores non-image drops and missing keys', async () => {
     const ta = document.createElement('textarea');
-    const noImg = { dataTransfer: { files: [], types: [] }, preventDefault: jasmine.createSpy('pd'), stopPropagation: jasmine.createSpy('sp') } as any;
+    const noImg = {
+      dataTransfer: { files: [], types: [] },
+      preventDefault: jasmine.createSpy('pd'),
+      stopPropagation: jasmine.createSpy('sp'),
+    } as any;
     await c.onBlogImageDrop(ta, noImg);
     expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
 
     c.selectedBlogKey = null;
     const file = new File(['x'], 'pic.png', { type: 'image/png' });
-    const ev = { dataTransfer: { files: [file], types: ['Files'] }, preventDefault: jasmine.createSpy('pd'), stopPropagation: jasmine.createSpy('sp') } as any;
+    const ev = {
+      dataTransfer: { files: [file], types: ['Files'] },
+      preventDefault: jasmine.createSpy('pd'),
+      stopPropagation: jasmine.createSpy('sp'),
+    } as any;
     await c.onBlogImageDrop(ta, ev);
     expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
   });
@@ -2299,7 +2579,11 @@ describe('AdminComponent — blog image markdown, a11y and writing aids', () => 
     const ta = document.createElement('textarea');
     c.selectedBlogKey = 'blog.a';
     const file = new File(['x'], 'pic.png', { type: 'image/png' });
-    const ev = { dataTransfer: { files: [file], types: ['Files'] }, preventDefault: jasmine.createSpy('pd'), stopPropagation: jasmine.createSpy('sp') } as any;
+    const ev = {
+      dataTransfer: { files: [file], types: ['Files'] },
+      preventDefault: jasmine.createSpy('pd'),
+      stopPropagation: jasmine.createSpy('sp'),
+    } as any;
     h.admin.uploadContentImage.and.returnValue(throwError(() => new Error('x')));
     await c.onBlogImageDrop(ta, ev);
     expect(h.toast.error).toHaveBeenCalled();
@@ -2317,8 +2601,13 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
 
   it('saveCheckoutSettings normalises values and persists', () => {
     c.checkoutSettingsForm = {
-      shipping_fee_ron: '15.5', free_shipping_threshold_ron: '-1', fee_type: 'percent',
-      fee_value: '5', vat_enabled: true, vat_rate_percent: '200', money_rounding: 'down',
+      shipping_fee_ron: '15.5',
+      free_shipping_threshold_ron: '-1',
+      fee_type: 'percent',
+      fee_value: '5',
+      vat_enabled: true,
+      vat_rate_percent: '200',
+      money_rounding: 'down',
       receipt_share_days: '5000',
     };
     h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
@@ -2353,15 +2642,22 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
   });
 
   it('loadReportsSettings parses meta and resets on error', () => {
-    h.admin.getContent.and.returnValue(of({
-      version: 3,
-      meta: {
-        reports_weekly_enabled: 'yes', reports_weekly_weekday: 9, reports_weekly_hour_utc: 30,
-        reports_monthly_enabled: 1, reports_monthly_day: 40, reports_monthly_hour_utc: '5',
-        reports_recipients: 'a@b.com, bad, c@d.com',
-        reports_weekly_last_sent_period_end: '2030', reports_weekly_last_error: 'err',
-      },
-    }));
+    h.admin.getContent.and.returnValue(
+      of({
+        version: 3,
+        meta: {
+          reports_weekly_enabled: 'yes',
+          reports_weekly_weekday: 9,
+          reports_weekly_hour_utc: 30,
+          reports_monthly_enabled: 1,
+          reports_monthly_day: 40,
+          reports_monthly_hour_utc: '5',
+          reports_recipients: 'a@b.com, bad, c@d.com',
+          reports_weekly_last_sent_period_end: '2030',
+          reports_weekly_last_error: 'err',
+        },
+      }),
+    );
     c.loadReportsSettings();
     expect(c.reportsSettingsForm.weekly_enabled).toBe(true);
     expect(c.reportsSettingsForm.weekly_weekday).toBe(6); // clamped
@@ -2382,11 +2678,17 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
   it('saveReportsSettings filters recipients and persists', () => {
     c.reportsSettingsMeta = {};
     c.reportsSettingsForm = {
-      weekly_enabled: true, weekly_weekday: 2, weekly_hour_utc: 9,
-      monthly_enabled: false, monthly_day: '15', monthly_hour_utc: 8,
+      weekly_enabled: true,
+      weekly_weekday: 2,
+      weekly_hour_utc: 9,
+      monthly_enabled: false,
+      monthly_day: '15',
+      monthly_hour_utc: 8,
       recipients: 'a@b.com, a@b.com, invalid, c@d.com',
     };
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { reports_recipients: ['a@b.com', 'c@d.com'] } }));
+    h.admin.updateContentBlock.and.returnValue(
+      of({ version: 2, meta: { reports_recipients: ['a@b.com', 'c@d.com'] } }),
+    );
     c.saveReportsSettings();
     const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
     expect(payload.meta.reports_recipients).toEqual(['a@b.com', 'c@d.com']);
@@ -2459,7 +2761,9 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('loadAssets maps meta and resets on error', () => {
-    h.admin.getContent.and.returnValue(of({ version: 2, meta: { logo_url: '/l', favicon_url: '/f', social_image_url: '/s' } }));
+    h.admin.getContent.and.returnValue(
+      of({ version: 2, meta: { logo_url: '/l', favicon_url: '/f', social_image_url: '/s' } }),
+    );
     c.loadAssets();
     expect(c.assetsForm.logo_url).toBe('/l');
     h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
@@ -2468,10 +2772,20 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('loadCheckoutSettings parses meta and resets on error', () => {
-    h.admin.getContent.and.returnValue(of({
-      version: 2,
-      meta: { shipping_fee_ron: 12, fee_type: 'percent', fee_value: 3, vat_rate_percent: 19, money_rounding: 'up', receipt_share_days: 30, phone_required_home: 'no' },
-    }));
+    h.admin.getContent.and.returnValue(
+      of({
+        version: 2,
+        meta: {
+          shipping_fee_ron: 12,
+          fee_type: 'percent',
+          fee_value: 3,
+          vat_rate_percent: 19,
+          money_rounding: 'up',
+          receipt_share_days: 30,
+          phone_required_home: 'no',
+        },
+      }),
+    );
     c.loadCheckoutSettings();
     expect(c.checkoutSettingsForm.shipping_fee_ron).toBe(12);
     expect(c.checkoutSettingsForm.fee_type).toBe('percent');
@@ -2484,7 +2798,9 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('loadCompany maps nested company meta and resets on error', () => {
-    h.admin.getContent.and.returnValue(of({ version: 2, meta: { company: { name: ' Acme ', cui: 'RO1' } } }));
+    h.admin.getContent.and.returnValue(
+      of({ version: 2, meta: { company: { name: ' Acme ', cui: 'RO1' } } }),
+    );
     c.loadCompany();
     expect(c.companyForm.name).toBe('Acme');
     expect(c.companyForm.cui).toBe('RO1');
@@ -2494,19 +2810,47 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('companyMissingFields lists empty required fields', () => {
-    c.companyForm = { name: '', registration_number: '', cui: '', address: '', phone: '', email: '' };
+    c.companyForm = {
+      name: '',
+      registration_number: '',
+      cui: '',
+      address: '',
+      phone: '',
+      email: '',
+    };
     expect(c.companyMissingFields().length).toBe(6);
-    c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+    c.companyForm = {
+      name: 'A',
+      registration_number: 'B',
+      cui: 'C',
+      address: 'D',
+      phone: 'E',
+      email: 'F',
+    };
     expect(c.companyMissingFields().length).toBe(0);
   });
 
   it('saveCompany blocks on missing fields then persists with fallbacks', () => {
-    c.companyForm = { name: '', registration_number: '', cui: '', address: '', phone: '', email: '' };
+    c.companyForm = {
+      name: '',
+      registration_number: '',
+      cui: '',
+      address: '',
+      phone: '',
+      email: '',
+    };
     c.saveCompany();
     expect(c.companyError).toBeTruthy();
     expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
 
-    c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+    c.companyForm = {
+      name: 'A',
+      registration_number: 'B',
+      cui: 'C',
+      address: 'D',
+      phone: 'E',
+      email: 'F',
+    };
     h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
     c.saveCompany();
     expect(c.companyMessage).toBeTruthy();
@@ -2516,7 +2860,14 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
     expect(c.companyError).toBeTruthy();
 
     // the conflict reload above blanks companyForm — re-populate before the create fallback
-    c.companyForm = { name: 'A', registration_number: 'B', cui: 'C', address: 'D', phone: 'E', email: 'F' };
+    c.companyForm = {
+      name: 'A',
+      registration_number: 'B',
+      cui: 'C',
+      address: 'D',
+      phone: 'E',
+      email: 'F',
+    };
     h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
     h.admin.createContent.and.returnValue(of({ version: 1 }));
     c.saveCompany();
@@ -2527,7 +2878,15 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('loadSocial maps contact + pages and keeps defaults on error', () => {
-    h.admin.getContent.and.returnValue(of({ version: 2, meta: { contact: { phone: '123', email: 'a@b.c' }, instagram_pages: [{ label: 'IG', url: 'u' }] } }));
+    h.admin.getContent.and.returnValue(
+      of({
+        version: 2,
+        meta: {
+          contact: { phone: '123', email: 'a@b.c' },
+          instagram_pages: [{ label: 'IG', url: 'u' }],
+        },
+      }),
+    );
     c.loadSocial();
     expect(c.socialForm.phone).toBe('123');
     expect(c.socialForm.instagram_pages.length).toBe(1);
@@ -2546,8 +2905,11 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('loadSeo maps title/description and resets on error', () => {
-    c.seoPage = 'home'; c.seoLang = 'en';
-    h.admin.getContent.and.returnValue(of({ version: 2, title: 'SEO', meta: { description: 'desc' } }));
+    c.seoPage = 'home';
+    c.seoLang = 'en';
+    h.admin.getContent.and.returnValue(
+      of({ version: 2, title: 'SEO', meta: { description: 'desc' } }),
+    );
     c.loadSeo();
     expect(c.seoForm.title).toBe('SEO');
     expect(c.seoForm.description).toBe('desc');
@@ -2557,7 +2919,8 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('saveSeo persists with conflict and create fallback', () => {
-    c.seoPage = 'home'; c.seoLang = 'en';
+    c.seoPage = 'home';
+    c.seoLang = 'en';
     c.seoForm = { title: 'T', description: 'D' };
     h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
     c.saveSeo();
@@ -2584,10 +2947,18 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
   });
 
   it('structuredDataIssueUrl builds entity URLs', () => {
-    expect(c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'p1' })).toBe('/products/p1');
-    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe('/about');
-    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' })).toBe('/contact');
-    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe('/pages/faq');
+    expect(c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'p1' })).toBe(
+      '/products/p1',
+    );
+    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe(
+      '/about',
+    );
+    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' })).toBe(
+      '/contact',
+    );
+    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe(
+      '/pages/faq',
+    );
     expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.' })).toBe('/pages');
     expect(c.structuredDataIssueUrl({ entity_type: 'other', entity_key: 'x' })).toBe('/');
   });
@@ -2596,7 +2967,9 @@ describe('AdminComponent — site settings load/save (assets, company, social, s
     h.admin.validateStructuredData.and.returnValue(of({ issues: [] }));
     c.runStructuredDataValidation();
     expect(c.structuredDataResult).toEqual({ issues: [] } as any);
-    h.admin.validateStructuredData.and.returnValue(throwError(() => ({ error: { detail: 'bad' } })));
+    h.admin.validateStructuredData.and.returnValue(
+      throwError(() => ({ error: { detail: 'bad' } })),
+    );
     c.runStructuredDataValidation();
     expect(c.structuredDataError).toBe('bad');
   });
@@ -2631,7 +3004,12 @@ describe('AdminComponent — navigation editor', () => {
   });
 
   it('loadNavigation maps meta and falls back to defaults on error', () => {
-    h.admin.getContent.and.returnValue(of({ version: 2, meta: { header_links: [{ id: 'h', url: '/', label: { en: 'Home', ro: 'Acasa' } }] } }));
+    h.admin.getContent.and.returnValue(
+      of({
+        version: 2,
+        meta: { header_links: [{ id: 'h', url: '/', label: { en: 'Home', ro: 'Acasa' } }] },
+      }),
+    );
     c.loadNavigation();
     expect(c.navigationForm.header_links.length).toBe(1);
     h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
@@ -2714,12 +3092,20 @@ describe('AdminComponent — navigation editor', () => {
     expect(c.navigationMessage).toBeTruthy();
 
     h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
-    c.navigationForm = { header_links: [link('a')], footer_handcrafted_links: [], footer_legal_links: [] };
+    c.navigationForm = {
+      header_links: [link('a')],
+      footer_handcrafted_links: [],
+      footer_legal_links: [],
+    };
     h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
     c.saveNavigation();
     expect(c.navigationError).toBeTruthy();
 
-    c.navigationForm = { header_links: [link('a')], footer_handcrafted_links: [], footer_legal_links: [] };
+    c.navigationForm = {
+      header_links: [link('a')],
+      footer_handcrafted_links: [],
+      footer_legal_links: [],
+    };
     h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
     h.admin.createContent.and.returnValue(of({ version: 1 }));
     c.saveNavigation();
@@ -2728,8 +3114,12 @@ describe('AdminComponent — navigation editor', () => {
 
   it('saveSocial sanitises pages and persists with fallbacks', () => {
     c.socialForm = {
-      phone: ' 123 ', email: ' a@b.c ',
-      instagram_pages: [{ label: 'IG', url: '/ig', thumbnail_url: '' }, { label: '', url: '/x', thumbnail_url: '' }],
+      phone: ' 123 ',
+      email: ' a@b.c ',
+      instagram_pages: [
+        { label: 'IG', url: '/ig', thumbnail_url: '' },
+        { label: '', url: '/x', thumbnail_url: '' },
+      ],
       facebook_pages: [],
     };
     h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
@@ -2770,7 +3160,10 @@ describe('AdminComponent — reusable blocks and content pages', () => {
   });
 
   it('visibleContentPages respects the hidden toggle', () => {
-    c.contentPages = [{ key: 'a', hidden: false }, { key: 'b', hidden: true }];
+    c.contentPages = [
+      { key: 'a', hidden: false },
+      { key: 'b', hidden: true },
+    ];
     c.showHiddenPages = false;
     expect(c.visibleContentPages().map((p: any) => p.key)).toEqual(['a']);
     c.showHiddenPages = true;
@@ -2779,10 +3172,12 @@ describe('AdminComponent — reusable blocks and content pages', () => {
 
   it('loadContentPages sorts and maps translation flags then errors', () => {
     spyOn(c, 'loadPageBlocks'); // ensureSelectedPageIsVisible may trigger a reload
-    h.admin.listContentPages.and.returnValue(of([
-      { key: 'page.b', slug: 'b', needs_translation_en: true },
-      { key: 'page.a', slug: 'a' },
-    ]));
+    h.admin.listContentPages.and.returnValue(
+      of([
+        { key: 'page.b', slug: 'b', needs_translation_en: true },
+        { key: 'page.a', slug: 'a' },
+      ]),
+    );
     c.loadContentPages();
     expect(c.contentPages[0].slug).toBe('a');
     expect(c.pageBlocksNeedsTranslationEn['page.b']).toBe(true);
@@ -2792,13 +3187,15 @@ describe('AdminComponent — reusable blocks and content pages', () => {
   });
 
   it('parseReusableBlocks keeps valid snippets and de-dupes', () => {
-    const parsed = c.parseReusableBlocks({ snippets: [
-      { id: 'a', title: 'A', block: { type: 'text' } },
-      { id: 'a', title: 'dup', block: { type: 'text' } },
-      { id: '', title: 'no id', block: {} },
-      { id: 'b', title: 'B', block: null },
-      null,
-    ] });
+    const parsed = c.parseReusableBlocks({
+      snippets: [
+        { id: 'a', title: 'A', block: { type: 'text' } },
+        { id: 'a', title: 'dup', block: { type: 'text' } },
+        { id: '', title: 'no id', block: {} },
+        { id: 'b', title: 'B', block: null },
+        null,
+      ],
+    });
     expect(parsed.map((b: any) => b.id)).toEqual(['a']);
     expect(c.parseReusableBlocks({})).toEqual([]);
   });
@@ -2813,12 +3210,16 @@ describe('AdminComponent — reusable blocks and content pages', () => {
     const clone = c.deepCloneJson(obj);
     expect(clone).toEqual(obj);
     expect(clone).not.toBe(obj);
-    const cyclic: any = {}; cyclic.self = cyclic;
+    const cyclic: any = {};
+    cyclic.self = cyclic;
     expect(c.deepCloneJson(cyclic)).toBe(cyclic); // returns original on failure
   });
 
   it('filteredReusableBlocks sorts and filters by query', () => {
-    c.reusableBlocks = [{ id: 'z', title: 'Zeta' }, { id: 'a', title: 'Alpha' }];
+    c.reusableBlocks = [
+      { id: 'z', title: 'Zeta' },
+      { id: 'a', title: 'Alpha' },
+    ];
     c.reusableBlocksQuery = '';
     expect(c.filteredReusableBlocks().map((b: any) => b.id)).toEqual(['a', 'z']);
     c.reusableBlocksQuery = 'alph';
@@ -2827,8 +3228,15 @@ describe('AdminComponent — reusable blocks and content pages', () => {
 
   it('savePageBlockAsReusable prompts for a title and persists', () => {
     const promptSpy = spyOn(window, 'prompt').and.returnValue('My Block');
-    c.pageBlocks['page.about'] = [{ key: 'b1', type: 'text', title: { en: 'Hello', ro: '' }, layout: {} }];
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { snippets: [{ id: 'my-block', title: 'My Block', block: { type: 'text' } }] } }));
+    c.pageBlocks['page.about'] = [
+      { key: 'b1', type: 'text', title: { en: 'Hello', ro: '' }, layout: {} },
+    ];
+    h.admin.updateContentBlock.and.returnValue(
+      of({
+        version: 2,
+        meta: { snippets: [{ id: 'my-block', title: 'My Block', block: { type: 'text' } }] },
+      }),
+    );
     c.savePageBlockAsReusable('page.about', 'b1');
     expect(c.reusableBlocks.length).toBe(1);
     expect(h.toast.success).toHaveBeenCalled();
@@ -2861,7 +3269,9 @@ describe('AdminComponent — reusable blocks and content pages', () => {
   it('persistReusableBlocks creates when block does not yet exist and handles conflict', () => {
     c.reusableBlocksExists = false;
     h.admin.createContent.and.returnValue(of({ version: 1, meta: { snippets: [] } }));
-    c.persistReusableBlocks([{ id: 'a', title: 'A', block: { type: 'text' } }], { successKey: 'k' });
+    c.persistReusableBlocks([{ id: 'a', title: 'A', block: { type: 'text' } }], {
+      successKey: 'k',
+    });
     expect(h.admin.createContent).toHaveBeenCalled();
     expect(c.reusableBlocksExists).toBe(true);
 
@@ -2898,7 +3308,9 @@ describe('AdminComponent — reusable blocks and content pages', () => {
   });
 
   it('loadReusableBlocks maps snippets and handles 404 vs error', () => {
-    h.admin.getContent.and.returnValue(of({ version: 2, meta: { snippets: [{ id: 'a', title: 'A', block: { type: 'text' } }] } }));
+    h.admin.getContent.and.returnValue(
+      of({ version: 2, meta: { snippets: [{ id: 'a', title: 'A', block: { type: 'text' } }] } }),
+    );
     c.loadReusableBlocks();
     expect(c.reusableBlocks.length).toBe(1);
     expect(c.reusableBlocksExists).toBe(true);
@@ -2931,11 +3343,15 @@ describe('AdminComponent — content redirects, find/replace, link check', () =>
     h = createComponent();
     c = h.component as any;
     c.redirectsMeta = { page: 1, limit: 20, total_pages: 1, total_items: 0 };
-    h.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
+    h.admin.listContentRedirects.and.returnValue(
+      of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }),
+    );
   });
 
   it('loadContentRedirects resets page, stores results and handles errors', () => {
-    h.admin.listContentRedirects.and.returnValue(of({ items: [{ id: 'r1' }], meta: { page: 2, total_pages: 3, total_items: 5, limit: 20 } }));
+    h.admin.listContentRedirects.and.returnValue(
+      of({ items: [{ id: 'r1' }], meta: { page: 2, total_pages: 3, total_items: 5, limit: 20 } }),
+    );
     c.loadContentRedirects(true);
     expect(c.redirects.length).toBe(1);
     expect(c.redirectsMeta.total_pages).toBe(3);
@@ -2973,17 +3389,20 @@ describe('AdminComponent — content redirects, find/replace, link check', () =>
   it('createContentRedirect validates fields and reports outcomes', () => {
     spyOn(c, 'loadContentRedirects');
     c.redirectCreateSaving = false;
-    c.redirectCreateFrom = ''; c.redirectCreateTo = 'x';
+    c.redirectCreateFrom = '';
+    c.redirectCreateTo = 'x';
     c.createContentRedirect();
     expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
 
-    c.redirectCreateFrom = 'a'; c.redirectCreateTo = 'b';
+    c.redirectCreateFrom = 'a';
+    c.redirectCreateTo = 'b';
     h.admin.upsertContentRedirect.and.returnValue(of({}));
     c.createContentRedirect();
     expect(c.redirectCreateFrom).toBe('');
     expect(h.toast.success).toHaveBeenCalled();
 
-    c.redirectCreateFrom = 'a'; c.redirectCreateTo = 'b';
+    c.redirectCreateFrom = 'a';
+    c.redirectCreateTo = 'b';
     h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({ error: { detail: 'dup' } })));
     c.createContentRedirect();
     expect(h.toast.error).toHaveBeenCalledWith('dup');
@@ -3002,17 +3421,24 @@ describe('AdminComponent — content redirects, find/replace, link check', () =>
     c.importContentRedirects({ target: { files: [file], value: 'x' } } as any);
     expect(c.redirectsImportResult).toEqual({ created: 1 } as any);
 
-    h.admin.importContentRedirects.and.returnValue(throwError(() => ({ error: { detail: 'bad' } })));
+    h.admin.importContentRedirects.and.returnValue(
+      throwError(() => ({ error: { detail: 'bad' } })),
+    );
     c.importContentRedirects({ target: { files: [file], value: 'x' } } as any);
     expect(h.toast.error).toHaveBeenCalledWith('bad');
   });
 
   it('findReplaceKeyPrefix maps each scope', () => {
-    c.findReplaceScope = 'blog'; expect(c.findReplaceKeyPrefix()).toBe('blog.');
-    c.findReplaceScope = 'home'; expect(c.findReplaceKeyPrefix()).toBe('home.');
-    c.findReplaceScope = 'site'; expect(c.findReplaceKeyPrefix()).toBe('site.');
-    c.findReplaceScope = 'pages'; expect(c.findReplaceKeyPrefix()).toBe('page.');
-    c.findReplaceScope = 'all'; expect(c.findReplaceKeyPrefix()).toBeUndefined();
+    c.findReplaceScope = 'blog';
+    expect(c.findReplaceKeyPrefix()).toBe('blog.');
+    c.findReplaceScope = 'home';
+    expect(c.findReplaceKeyPrefix()).toBe('home.');
+    c.findReplaceScope = 'site';
+    expect(c.findReplaceKeyPrefix()).toBe('site.');
+    c.findReplaceScope = 'pages';
+    expect(c.findReplaceKeyPrefix()).toBe('page.');
+    c.findReplaceScope = 'all';
+    expect(c.findReplaceKeyPrefix()).toBeUndefined();
   });
 
   it('previewFindReplace validates input and stores preview', () => {
@@ -3028,7 +3454,9 @@ describe('AdminComponent — content redirects, find/replace, link check', () =>
     expect(c.findReplacePreview.total_matches).toBe(5);
     expect(c.findReplacePreviewKey).toBeTruthy();
 
-    h.admin.previewFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'e' } })));
+    h.admin.previewFindReplaceContent.and.returnValue(
+      throwError(() => ({ error: { detail: 'e' } })),
+    );
     c.previewFindReplace();
     expect(c.findReplaceError).toBe('e');
   });
@@ -3052,14 +3480,18 @@ describe('AdminComponent — content redirects, find/replace, link check', () =>
     expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
 
     confirmSpy.and.returnValue(true);
-    h.admin.applyFindReplaceContent.and.returnValue(throwError(() => ({ error: { detail: 'oops' } })));
+    h.admin.applyFindReplaceContent.and.returnValue(
+      throwError(() => ({ error: { detail: 'oops' } })),
+    );
     c.applyFindReplace();
     expect(h.toast.error).toHaveBeenCalledWith('oops'); // error handler toasts the detail
     expect(c.findReplaceApplying).toBe(false);
 
     // success path with a fresh preview
     c.previewFindReplace();
-    h.admin.applyFindReplaceContent.and.returnValue(of({ updated_blocks: 1, total_replacements: 2 }));
+    h.admin.applyFindReplaceContent.and.returnValue(
+      of({ updated_blocks: 1, total_replacements: 2 }),
+    );
     c.applyFindReplace();
     expect(c.findReplaceApplyResult).toBeTruthy();
   });
@@ -3080,7 +3512,19 @@ describe('AdminComponent — content redirects, find/replace, link check', () =>
     expect(c.redirectKeyToUrl('blog.x')).toBe('blog.x');
     expect(c.pageKeySupportsRequiresAuth('page.x')).toBe(true);
     expect(c.pageKeySupportsRequiresAuth('home.x')).toBe(false);
-    for (const t of ['image', 'columns', 'cta', 'faq', 'testimonials', 'product_grid', 'form', 'gallery', 'banner', 'carousel', 'text']) {
+    for (const t of [
+      'image',
+      'columns',
+      'cta',
+      'faq',
+      'testimonials',
+      'product_grid',
+      'form',
+      'gallery',
+      'banner',
+      'carousel',
+      'text',
+    ]) {
       expect(c.pageBlockTypeLabelKey(t)).toContain(t === 'text' ? 'text' : t);
     }
     expect(c.allowedPageBlockTypesForKey('page.about').length).toBeGreaterThan(0);
@@ -3094,10 +3538,26 @@ describe('AdminComponent — page builder block editing', () => {
   let h: Harness;
   let c: any;
   const KEY = 'page.about';
-  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.pageBlocks = {};
+  });
 
   it('addPageBlockFromLibrary inserts a block and applies starter templates', () => {
-    for (const type of ['text', 'columns', 'cta', 'faq', 'testimonials', 'product_grid', 'form', 'image', 'gallery', 'banner', 'carousel']) {
+    for (const type of [
+      'text',
+      'columns',
+      'cta',
+      'faq',
+      'testimonials',
+      'product_grid',
+      'form',
+      'image',
+      'gallery',
+      'banner',
+      'carousel',
+    ]) {
       c.addPageBlockFromLibrary(KEY, type, 'starter');
     }
     expect(c.pageBlocks[KEY].length).toBe(11);
@@ -3115,7 +3575,11 @@ describe('AdminComponent — page builder block editing', () => {
   });
 
   it('movePageBlock reorders within bounds and announces', () => {
-    c.pageBlocks[KEY] = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }, { key: 'c', type: 'text' }];
+    c.pageBlocks[KEY] = [
+      { key: 'a', type: 'text' },
+      { key: 'b', type: 'text' },
+      { key: 'c', type: 'text' },
+    ];
     c.movePageBlock(KEY, 'a', 1);
     expect(c.pageBlocks[KEY].map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
     c.movePageBlock(KEY, 'missing', 1);
@@ -3124,7 +3588,10 @@ describe('AdminComponent — page builder block editing', () => {
   });
 
   it('page block drag lifecycle and drop zone reorders', () => {
-    c.pageBlocks[KEY] = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }];
+    c.pageBlocks[KEY] = [
+      { key: 'a', type: 'text' },
+      { key: 'b', type: 'text' },
+    ];
     c.onPageBlockDragStart(KEY, 'a');
     expect(c.draggingPageBlockKey).toBe('a');
     const ev = dragEvent();
@@ -3137,7 +3604,11 @@ describe('AdminComponent — page builder block editing', () => {
     expect(c.pageBlocks[KEY].map((b: any) => b.key)).toEqual(['b', 'a']);
 
     // library payload insert
-    c.onPageBlockDropZone(dragEvent({ kind: 'cms-block', scope: 'page', type: 'text', template: 'blank' }), KEY, 0);
+    c.onPageBlockDropZone(
+      dragEvent({ kind: 'cms-block', scope: 'page', type: 'text', template: 'blank' }),
+      KEY,
+      0,
+    );
     expect(c.pageBlocks[KEY].length).toBe(3);
 
     // wrong scope
@@ -3150,14 +3621,22 @@ describe('AdminComponent — page builder block editing', () => {
   });
 
   it('onPageBlockDrop reorders onto a target and inserts library payloads', () => {
-    c.pageBlocks[KEY] = [{ key: 'a', type: 'text' }, { key: 'b', type: 'text' }, { key: 'c', type: 'text' }];
+    c.pageBlocks[KEY] = [
+      { key: 'a', type: 'text' },
+      { key: 'b', type: 'text' },
+      { key: 'c', type: 'text' },
+    ];
     c.draggingPageBlocksKey = KEY;
     c.draggingPageBlockKey = 'a';
     c.onPageBlockDrop(dragEvent(), KEY, 'c');
     expect(c.pageBlocks[KEY].map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
 
     const cnt = c.pageBlocks[KEY].length;
-    c.onPageBlockDrop(dragEvent({ kind: 'cms-block', scope: 'page', type: 'text', template: 'blank' }), KEY, 'b');
+    c.onPageBlockDrop(
+      dragEvent({ kind: 'cms-block', scope: 'page', type: 'text', template: 'blank' }),
+      KEY,
+      'b',
+    );
     expect(c.pageBlocks[KEY].length).toBe(cnt + 1);
   });
 
@@ -3245,27 +3724,44 @@ describe('AdminComponent — page builder block editing', () => {
 describe('AdminComponent — home sections load/save and collections', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('loadSections parses built-in and custom blocks', () => {
-    h.admin.getContent.and.returnValue(of({
-      version: 2,
-      meta: { blocks: [
-        { type: 'featured_products', enabled: false },
-        { type: 'featured_products' }, // dup built-in skipped
-        { type: 'text', key: 't1', title: 'Hi', body_markdown: 'Body' },
-        { type: 'columns', key: 'c1', columns: [{ title: 'a' }, { title: 'b' }], columns_breakpoint: 'lg' },
-        { type: 'cta', key: 'cta1', cta_url: '/go', cta_new_tab: true },
-        { type: 'faq', key: 'f1', items: [{ question: 'q' }] },
-        { type: 'testimonials', key: 'te1', items: [{ author: 'a' }] },
-        { type: 'image', key: 'i1', url: '/img' },
-        { type: 'gallery', key: 'g1', images: [{ url: '/g' }, { url: '' }] },
-        { type: 'banner', key: 'b1', slide: { image: '/b' } },
-        { type: 'carousel', key: 'car1', slides: [{ image: '/s' }], settings: { autoplay: true } },
-        { type: 'unknown' }, // skipped
-        null,
-      ] },
-    }));
+    h.admin.getContent.and.returnValue(
+      of({
+        version: 2,
+        meta: {
+          blocks: [
+            { type: 'featured_products', enabled: false },
+            { type: 'featured_products' }, // dup built-in skipped
+            { type: 'text', key: 't1', title: 'Hi', body_markdown: 'Body' },
+            {
+              type: 'columns',
+              key: 'c1',
+              columns: [{ title: 'a' }, { title: 'b' }],
+              columns_breakpoint: 'lg',
+            },
+            { type: 'cta', key: 'cta1', cta_url: '/go', cta_new_tab: true },
+            { type: 'faq', key: 'f1', items: [{ question: 'q' }] },
+            { type: 'testimonials', key: 'te1', items: [{ author: 'a' }] },
+            { type: 'image', key: 'i1', url: '/img' },
+            { type: 'gallery', key: 'g1', images: [{ url: '/g' }, { url: '' }] },
+            { type: 'banner', key: 'b1', slide: { image: '/b' } },
+            {
+              type: 'carousel',
+              key: 'car1',
+              slides: [{ image: '/s' }],
+              settings: { autoplay: true },
+            },
+            { type: 'unknown' }, // skipped
+            null,
+          ],
+        },
+      }),
+    );
     c.loadSections();
     const types = c.homeBlocks.map((b: any) => b.type);
     expect(types).toContain('featured_products');
@@ -3309,7 +3805,12 @@ describe('AdminComponent — home sections load/save and collections', () => {
   });
 
   it('loadCategories sorts and resets on error', () => {
-    h.admin.getCategories.and.returnValue(of([{ slug: 'b', sort_order: 2 }, { slug: 'a', sort_order: 1 }]));
+    h.admin.getCategories.and.returnValue(
+      of([
+        { slug: 'b', sort_order: 2 },
+        { slug: 'a', sort_order: 1 },
+      ]),
+    );
     c.loadCategories();
     expect(c.categories[0].slug).toBe('a');
     h.admin.getCategories.and.returnValue(throwError(() => new Error('x')));
@@ -3338,7 +3839,10 @@ describe('AdminComponent — home sections load/save and collections', () => {
 describe('AdminComponent — home block content editing', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('removeHomeBlock only removes custom blocks', () => {
     c.homeBlocks = [
@@ -3475,7 +3979,9 @@ describe('AdminComponent — blog editor create/select/delete/lang', () => {
     let calls = 0;
     h.admin.createContent.and.callFake(() => {
       calls += 1;
-      return calls === 1 ? throwError(() => ({ error: { detail: 'Content key exists' } })) : of({ version: 1 });
+      return calls === 1
+        ? throwError(() => ({ error: { detail: 'Content key exists' } }))
+        : of({ version: 1 });
     });
     await c.createBlogPost();
     expect(calls).toBe(2);
@@ -3524,10 +4030,16 @@ describe('AdminComponent — blog editor create/select/delete/lang', () => {
 
     c.selectedBlogKey = 'blog.a';
     c.blogBaseLang = 'en';
-    h.admin.getContent.and.returnValue(of({
-      title: 'T', body_markdown: 'B', status: 'published',
-      published_at: '2030-01-01T00:00:00Z', published_until: '', meta: {},
-    }));
+    h.admin.getContent.and.returnValue(
+      of({
+        title: 'T',
+        body_markdown: 'B',
+        status: 'published',
+        published_at: '2030-01-01T00:00:00Z',
+        published_until: '',
+        meta: {},
+      }),
+    );
     c.setBlogEditLang('ro'); // translation lang
     expect(c.blogForm.title).toBe('T');
     c.setBlogEditLang('en'); // base lang sets status
@@ -3554,14 +4066,22 @@ describe('AdminComponent — page blocks load/save', () => {
   let h: Harness;
   let c: any;
   const KEY = 'page.about';
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('loadPageBlocks parses content, defaults on 404 and errors otherwise', () => {
-    h.admin.getContent.and.returnValue(of({
-      version: 2, status: 'published', needs_translation_en: true,
-      published_at: '2030-01-01T00:00:00Z', published_until: '',
-      meta: { requires_auth: true, blocks: [{ type: 'text', key: 't', body_markdown: 'b' }] },
-    }));
+    h.admin.getContent.and.returnValue(
+      of({
+        version: 2,
+        status: 'published',
+        needs_translation_en: true,
+        published_at: '2030-01-01T00:00:00Z',
+        published_until: '',
+        meta: { requires_auth: true, blocks: [{ type: 'text', key: 't', body_markdown: 'b' }] },
+      }),
+    );
     c.loadPageBlocks(KEY);
     expect(c.pageBlocks[KEY].length).toBe(1);
     expect(c.pageBlocksStatus[KEY]).toBe('published');
@@ -3620,7 +4140,9 @@ describe('AdminComponent — page blocks load/save', () => {
     c.pageBlocksMeta[KEY] = {};
     c.pageBlocksPublishedAt[KEY] = '2030-01-01T10:00';
     c.ensurePageDraft(KEY).initFromServer(c.currentPageDraftState(KEY));
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2, status: 'published', published_at: '2030-01-01T00:00:00Z', meta: {} }));
+    h.admin.updateContentBlock.and.returnValue(
+      of({ version: 2, status: 'published', published_at: '2030-01-01T00:00:00Z', meta: {} }),
+    );
     c.savePageBlocks(KEY, { bypassChecklist: true });
     expect(c.pageBlocksStatus[KEY]).toBe('published');
     expect(c.pageBlocksMessage[KEY]).toBeTruthy();
@@ -3635,7 +4157,10 @@ describe('AdminComponent — page blocks load/save', () => {
 describe('AdminComponent — info pages, legal pages, visibility', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('pagePublicUrlForKey maps slugs', () => {
     expect(c.pagePublicUrlForKey('page.about')).toBe('/about');
@@ -3645,7 +4170,10 @@ describe('AdminComponent — info pages, legal pages, visibility', () => {
   });
 
   it('isPageHidden / canTogglePageHidden reflect content pages and protections', () => {
-    c.contentPages = [{ key: 'page.custom', hidden: true }, { key: 'page.about', hidden: false }];
+    c.contentPages = [
+      { key: 'page.custom', hidden: true },
+      { key: 'page.about', hidden: false },
+    ];
     expect(c.isPageHidden('page.custom')).toBe(true);
     expect(c.isPageHidden('page.about')).toBe(false);
     expect(c.isPageHidden('')).toBe(false);
@@ -3757,16 +4285,32 @@ describe('AdminComponent — info pages, legal pages, visibility', () => {
 describe('AdminComponent — blog editor loading and meta sync', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('loadBlogEditor hydrates the form and handles errors', () => {
     h.admin.listContentVersions.and.returnValue(of([]));
-    h.admin.getContent.and.returnValue(of({
-      lang: 'ro', title: 'Titlu', body_markdown: 'Corp', status: 'published',
-      published_at: '2030-01-01T00:00:00Z', published_until: '',
-      meta: { tags: ['a', 'b'], series: 'S', cover_image_url: '/c.png', reading_time_minutes: 5, pinned: true, pin_order: 3 },
-      images: [{ id: 'i', url: '/u', sort_order: 0 }],
-    }));
+    h.admin.getContent.and.returnValue(
+      of({
+        lang: 'ro',
+        title: 'Titlu',
+        body_markdown: 'Corp',
+        status: 'published',
+        published_at: '2030-01-01T00:00:00Z',
+        published_until: '',
+        meta: {
+          tags: ['a', 'b'],
+          series: 'S',
+          cover_image_url: '/c.png',
+          reading_time_minutes: 5,
+          pinned: true,
+          pin_order: 3,
+        },
+        images: [{ id: 'i', url: '/u', sort_order: 0 }],
+      }),
+    );
     (c as any).loadBlogEditor('blog.a');
     expect(c.selectedBlogKey).toBe('blog.a');
     expect(c.blogBaseLang).toBe('ro');
@@ -3801,7 +4345,15 @@ describe('AdminComponent — blog editor loading and meta sync', () => {
 
   it('syncBlogMetaToForm maps meta variants', () => {
     c.blogForm = {};
-    c.blogMeta = { tags: 'x,y', series: 'Ser', cover_image: '/c', cover_fit: 'CONTAIN', reading_time: 7, pinned: 'yes', pin_order: '4' };
+    c.blogMeta = {
+      tags: 'x,y',
+      series: 'Ser',
+      cover_image: '/c',
+      cover_fit: 'CONTAIN',
+      reading_time: 7,
+      pinned: 'yes',
+      pin_order: '4',
+    };
     (c as any).syncBlogMetaToForm('en');
     expect(c.blogForm.tags).toBe('x,y');
     expect(c.blogForm.cover_image_url).toBe('/c');
@@ -3833,7 +4385,11 @@ describe('AdminComponent — page publish checklist', () => {
   let h: Harness;
   let c: any;
   const KEY = 'page.about';
-  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.pageBlocks = {};
+  });
 
   it('computePagePublishChecklistLocal flags empty enabled blocks of every type', () => {
     c.pageBlocksNeedsTranslationEn[KEY] = true;
@@ -3841,12 +4397,38 @@ describe('AdminComponent — page publish checklist', () => {
     c.pageBlocks[KEY] = [
       { key: '1', type: 'text', enabled: true, body_markdown: {} },
       { key: '2', type: 'columns', enabled: true, columns: [{}] },
-      { key: '3', type: 'cta', enabled: true, title: {}, body_markdown: {}, cta_label: {}, cta_url: '' },
+      {
+        key: '3',
+        type: 'cta',
+        enabled: true,
+        title: {},
+        body_markdown: {},
+        cta_label: {},
+        cta_url: '',
+      },
       { key: '4', type: 'faq', enabled: true, faq_items: [{}] },
       { key: '5', type: 'testimonials', enabled: true, testimonials: [{}] },
-      { key: '6', type: 'product_grid', enabled: true, product_grid_source: 'category', product_grid_category_slug: '' },
-      { key: '7', type: 'product_grid', enabled: true, product_grid_source: 'collection', product_grid_collection_slug: '' },
-      { key: '8', type: 'product_grid', enabled: true, product_grid_source: 'products', product_grid_product_slugs: '' },
+      {
+        key: '6',
+        type: 'product_grid',
+        enabled: true,
+        product_grid_source: 'category',
+        product_grid_category_slug: '',
+      },
+      {
+        key: '7',
+        type: 'product_grid',
+        enabled: true,
+        product_grid_source: 'collection',
+        product_grid_collection_slug: '',
+      },
+      {
+        key: '8',
+        type: 'product_grid',
+        enabled: true,
+        product_grid_source: 'products',
+        product_grid_product_slugs: '',
+      },
       { key: '9', type: 'form', enabled: true },
       { key: '10', type: 'image', enabled: true, url: '', alt: {} },
       { key: '11', type: 'gallery', enabled: true, images: [] },
@@ -3861,9 +4443,24 @@ describe('AdminComponent — page publish checklist', () => {
   it('computePagePublishChecklistLocal flags missing alt text for filled media', () => {
     c.pageBlocks[KEY] = [
       { key: 'i', type: 'image', enabled: true, url: '/u', alt: { en: '', ro: '' } },
-      { key: 'g', type: 'gallery', enabled: true, images: [{ url: '/g', alt: { en: '', ro: '' } }] },
-      { key: 'b', type: 'banner', enabled: true, slide: { image_url: '/b', alt: { en: '', ro: '' } } },
-      { key: 'c', type: 'carousel', enabled: true, slides: [{ image_url: '/s', alt: { en: '', ro: '' } }] },
+      {
+        key: 'g',
+        type: 'gallery',
+        enabled: true,
+        images: [{ url: '/g', alt: { en: '', ro: '' } }],
+      },
+      {
+        key: 'b',
+        type: 'banner',
+        enabled: true,
+        slide: { image_url: '/b', alt: { en: '', ro: '' } },
+      },
+      {
+        key: 'c',
+        type: 'carousel',
+        enabled: true,
+        slides: [{ image_url: '/s', alt: { en: '', ro: '' } }],
+      },
     ];
     const r = (c as any).computePagePublishChecklistLocal(KEY);
     expect(r.missingAlt.length).toBeGreaterThanOrEqual(8);
@@ -3884,14 +4481,21 @@ describe('AdminComponent — page publish checklist', () => {
     expect(c.pagePublishChecklistOpen).toBe(true);
     expect(c.pagePublishChecklistResult.linkIssues.length).toBe(1);
 
-    h.admin.linkCheckContentPreview.and.returnValue(throwError(() => ({ error: { detail: 'le' } })));
+    h.admin.linkCheckContentPreview.and.returnValue(
+      throwError(() => ({ error: { detail: 'le' } })),
+    );
     c.openPagePublishChecklist(KEY);
     expect(c.pagePublishChecklistError).toBe('le');
   });
 
   it('pagePublishChecklistHasIssues and close/confirm flows', () => {
     expect(c.pagePublishChecklistHasIssues()).toBe(false);
-    c.pagePublishChecklistResult = { missingTranslations: ['en'], missingAlt: [], emptySections: [], linkIssues: [] };
+    c.pagePublishChecklistResult = {
+      missingTranslations: ['en'],
+      missingAlt: [],
+      emptySections: [],
+      linkIssues: [],
+    };
     expect(c.pagePublishChecklistHasIssues()).toBe(true);
 
     c.closePagePublishChecklist();
@@ -3910,7 +4514,10 @@ describe('AdminComponent — page publish checklist', () => {
 describe('AdminComponent — collections, maintenance, custom pages', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('editCollection populates the form', () => {
     c.editCollection({ slug: 's1', name: 'N', description: 'D', product_ids: ['p1'] });
@@ -3996,10 +4603,16 @@ describe('AdminComponent — lifecycle and section orchestration', () => {
   function safeHarness(section: string): Harness {
     const h = createComponent(createRouteStub(section));
     // Every getContent-backed loader is safe with an empty meta block.
-    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft' }));
+    h.admin.getContent.and.returnValue(
+      of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft' }),
+    );
     h.admin.listContentPages.and.returnValue(of([]));
-    h.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
-    h.fxAdmin.getStatus.and.returnValue(of({ override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '' } }));
+    h.admin.listContentRedirects.and.returnValue(
+      of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }),
+    );
+    h.fxAdmin.getStatus.and.returnValue(
+      of({ override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '' } }),
+    );
     return h;
   }
 
@@ -4022,9 +4635,13 @@ describe('AdminComponent — lifecycle and section orchestration', () => {
 
   it('ngOnInit loads the pages section and applies an edit query', () => {
     const h = createComponent(createRouteStub('pages', { edit: 'about' }));
-    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft' }));
+    h.admin.getContent.and.returnValue(
+      of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft' }),
+    );
     h.admin.listContentPages.and.returnValue(of([]));
-    h.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
+    h.admin.listContentRedirects.and.returnValue(
+      of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }),
+    );
     h.component.ngOnInit();
     expect(h.component.section()).toBe('pages');
     h.component.ngOnDestroy();
@@ -4033,7 +4650,9 @@ describe('AdminComponent — lifecycle and section orchestration', () => {
   it('ngOnInit loads the blog section and applies a blog edit query', () => {
     const h = createComponent(createRouteStub('blog', { edit: 'welcome' }));
     h.admin.content.and.returnValue(of([]));
-    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft', lang: 'en' }));
+    h.admin.getContent.and.returnValue(
+      of({ meta: {}, version: 1, title: '', body_markdown: '', status: 'draft', lang: 'en' }),
+    );
     h.admin.listContentVersions.and.returnValue(of([]));
     h.blog.listFlaggedComments.and.returnValue(of({ items: [] }));
     h.component.ngOnInit();
@@ -4050,14 +4669,19 @@ describe('AdminComponent — lifecycle and section orchestration', () => {
     const h2 = createComponent(route2);
     h2.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '' }));
     h2.admin.listContentPages.and.returnValue(of([]));
-    h2.admin.listContentRedirects.and.returnValue(of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }));
-    h2.fxAdmin.getStatus.and.returnValue(of({ override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '' } }));
+    h2.admin.listContentRedirects.and.returnValue(
+      of({ items: [], meta: { page: 1, total_pages: 1, total_items: 0, limit: 20 } }),
+    );
+    h2.fxAdmin.getStatus.and.returnValue(
+      of({ override: null, effective: { eur_per_ron: 5, usd_per_ron: 4, as_of: '' } }),
+    );
     h2.component.ngOnInit();
     route2.data.next({ section: 'home' });
     route2.queryParams.next({});
     expect(h2.component.section()).toBe('home');
     h2.component.ngOnDestroy();
-    void route; void h;
+    void route;
+    void h;
   });
 
   it('loadAll/retryLoadAll re-run the current section loaders', () => {
@@ -4119,7 +4743,10 @@ describe('AdminComponent — lifecycle and section orchestration', () => {
 describe('AdminComponent — blog meta, info save, social thumbnails, content', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('getBlogSummary reads localized or base-language summaries', () => {
     c.blogBaseLang = 'en';
@@ -4133,8 +4760,14 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
     c.blogBaseLang = 'en';
     c.blogMeta = { summary: { en: 'old' } };
     c.blogForm = {
-      tags: 'a, b', series: 'S', cover_image_url: '/c', cover_fit: 'contain',
-      reading_time_minutes: '5', summary: 'New summary', pinned: true, pin_order: '3',
+      tags: 'a, b',
+      series: 'S',
+      cover_image_url: '/c',
+      cover_fit: 'contain',
+      reading_time_minutes: '5',
+      summary: 'New summary',
+      pinned: true,
+      pin_order: '3',
     };
     const meta = c.buildBlogMeta('ro');
     expect(meta.tags).toEqual(['a', 'b']);
@@ -4145,7 +4778,16 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
     expect(meta.pinned).toBe(true);
     expect(meta.pin_order).toBe(3);
 
-    c.blogForm = { tags: '', series: '', cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', summary: '', pinned: false, pin_order: '1' };
+    c.blogForm = {
+      tags: '',
+      series: '',
+      cover_image_url: '',
+      cover_fit: 'cover',
+      reading_time_minutes: '',
+      summary: '',
+      pinned: false,
+      pin_order: '1',
+    };
     const meta2 = c.buildBlogMeta('en');
     expect('tags' in meta2).toBe(false);
     expect('pinned' in meta2).toBe(false);
@@ -4169,18 +4811,25 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
 
   it('togglePageNeedsTranslation updates and reports', () => {
     spyOn(c, 'loadContentPages');
-    h.admin.updateContentTranslationStatus.and.returnValue(of({ needs_translation_en: true, needs_translation_ro: false }));
+    h.admin.updateContentTranslationStatus.and.returnValue(
+      of({ needs_translation_en: true, needs_translation_ro: false }),
+    );
     c.togglePageNeedsTranslation('page.about', 'en', checkboxEvent(true));
     expect(c.pageBlocksNeedsTranslationEn['page.about']).toBe(true);
     expect(h.toast.success).toHaveBeenCalled();
 
-    h.admin.updateContentTranslationStatus.and.returnValue(throwError(() => ({ error: { detail: 'd' } })));
+    h.admin.updateContentTranslationStatus.and.returnValue(
+      throwError(() => ({ error: { detail: 'd' } })),
+    );
     c.togglePageNeedsTranslation('page.about', 'ro', checkboxEvent(false));
     expect(h.toast.error).toHaveBeenCalledWith('d');
   });
 
   it('fetchSocialThumbnail validates url and updates the page', () => {
-    c.socialForm = { instagram_pages: [{ url: '', label: '', thumbnail_url: '' }], facebook_pages: [] };
+    c.socialForm = {
+      instagram_pages: [{ url: '', label: '', thumbnail_url: '' }],
+      facebook_pages: [],
+    };
     c.fetchSocialThumbnail('instagram', 0); // no url
     expect(h.admin.fetchSocialThumbnail).not.toHaveBeenCalled();
 
@@ -4200,7 +4849,9 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
   });
 
   it('selectContent loads a content block and saveContent persists it', () => {
-    h.admin.getContent.and.returnValue(of({ key: 'site.x', title: 'T', body_markdown: 'B', status: 'draft', version: 1 }));
+    h.admin.getContent.and.returnValue(
+      of({ key: 'site.x', title: 'T', body_markdown: 'B', status: 'draft', version: 1 }),
+    );
     c.selectContent({ key: 'site.x', title: 'T' });
     expect(c.contentForm.body_markdown).toBe('B');
 
@@ -4235,7 +4886,10 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
   });
 
   it('syncContentVersions remembers each block version', () => {
-    (c as any).syncContentVersions([{ key: 'k1', version: 3 }, { key: 'k2', version: 0 }]);
+    (c as any).syncContentVersions([
+      { key: 'k1', version: 3 },
+      { key: 'k2', version: 0 },
+    ]);
     expect((c as any).contentVersions['k1']).toBe(3);
     expect((c as any).contentVersions['k2']).toBeUndefined();
   });
@@ -4244,7 +4898,11 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
 describe('AdminComponent — draft delegate accessors', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { localStorage.clear(); h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    localStorage.clear();
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('home draft delegates reflect the underlying manager', () => {
     expect(c.homeDraftReady()).toBe(false);
@@ -4303,7 +4961,13 @@ describe('AdminComponent — draft delegate accessors', () => {
   it('blog draft delegates reflect a manager once selected', () => {
     c.selectedBlogKey = 'blog.a';
     c.blogEditLang = 'en';
-    c.blogForm = { title: 'T', body_markdown: 'B', status: 'draft', published_at: '', published_until: '' };
+    c.blogForm = {
+      title: 'T',
+      body_markdown: 'B',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+    };
     c.blogMeta = {};
     const mgr = c.ensureBlogDraft('blog.a', 'en');
     mgr.initFromServer(c.currentBlogDraftState());
@@ -4328,7 +4992,11 @@ describe('AdminComponent — blog SEO helpers', () => {
     c.selectedBlogKey = 'blog.hello';
     c.blogEditLang = 'en';
     c.blogBaseLang = 'en';
-    c.blogForm = { title: 'My Post Title', body_markdown: 'Some body content here.', status: 'draft' };
+    c.blogForm = {
+      title: 'My Post Title',
+      body_markdown: 'Some body content here.',
+      status: 'draft',
+    };
     c.blogMeta = {};
     c.blogSeoSnapshots = { en: null, ro: null };
   });
@@ -4376,7 +5044,9 @@ describe('AdminComponent — blog SEO helpers', () => {
     expect((c as any).truncateForPreview('', 10)).toBe('');
     expect((c as any).truncateForPreview('short', 10)).toBe('short');
     expect((c as any).truncateForPreview('a'.repeat(20), 10)).toContain('…');
-    expect((c as any).toSeoDescription('# Title\n```code```\n[link](u) **bold**')).not.toContain('#');
+    expect((c as any).toSeoDescription('# Title\n```code```\n[link](u) **bold**')).not.toContain(
+      '#',
+    );
   });
 
   it('blog public and og image urls build correctly', () => {
@@ -4399,15 +5069,39 @@ describe('AdminComponent — blog SEO helpers', () => {
 describe('AdminComponent — full block serialization and remaining flows', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   function allHomeTypes(): any[] {
-    return ['text', 'columns', 'cta', 'faq', 'testimonials', 'image', 'gallery', 'banner', 'carousel', 'featured_products']
-      .map((t) => c.makeHomeBlockDraft(`${t}_k`, t, true));
+    return [
+      'text',
+      'columns',
+      'cta',
+      'faq',
+      'testimonials',
+      'image',
+      'gallery',
+      'banner',
+      'carousel',
+      'featured_products',
+    ].map((t) => c.makeHomeBlockDraft(`${t}_k`, t, true));
   }
   function allPageTypes(): any[] {
-    return ['text', 'columns', 'cta', 'faq', 'testimonials', 'product_grid', 'form', 'image', 'gallery', 'banner', 'carousel']
-      .map((t) => ({ ...c.makeHomeBlockDraft(`${t}_k`, t, true), type: t }));
+    return [
+      'text',
+      'columns',
+      'cta',
+      'faq',
+      'testimonials',
+      'product_grid',
+      'form',
+      'image',
+      'gallery',
+      'banner',
+      'carousel',
+    ].map((t) => ({ ...c.makeHomeBlockDraft(`${t}_k`, t, true), type: t }));
   }
 
   it('saveSections serialises every home block type', () => {
@@ -4482,7 +5176,8 @@ describe('AdminComponent — full block serialization and remaining flows', () =
     expect(c.legalPageMessage).toBeTruthy();
 
     h.cmsPrefs.translationLayout.and.returnValue('sideBySide');
-    c.legalPageLastUpdated = ''; c.legalPageLastUpdatedOriginal = '';
+    c.legalPageLastUpdated = '';
+    c.legalPageLastUpdatedOriginal = '';
     c.saveLegalPageUi();
     expect(c.legalPageMessage).toBeTruthy();
   });
@@ -4539,9 +5234,19 @@ describe('AdminComponent — saveBlogPost paths and cover image', () => {
     c.blogEditLang = 'en';
     c.blogBaseLang = 'en';
     c.blogForm = {
-      title: 'Title here long enough', body_markdown: 'Body text', status: 'draft',
-      published_at: '', published_until: '', summary: '', tags: '', series: '',
-      cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', pinned: false, pin_order: '1',
+      title: 'Title here long enough',
+      body_markdown: 'Body text',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+      summary: '',
+      tags: '',
+      series: '',
+      cover_image_url: '',
+      cover_fit: 'cover',
+      reading_time_minutes: '',
+      pinned: false,
+      pin_order: '1',
     };
     c.blogMeta = {};
     c.ensureBlogDraft('blog.a', 'en').initFromServer(c.currentBlogDraftState());
@@ -4565,7 +5270,12 @@ describe('AdminComponent — saveBlogPost paths and cover image', () => {
   });
 
   it('respects the a11y publish gate', () => {
-    c.blogForm = { ...c.blogForm, title: 'A title that is plenty long', body_markdown: '![](a.png)', status: 'published' };
+    c.blogForm = {
+      ...c.blogForm,
+      title: 'A title that is plenty long',
+      body_markdown: '![](a.png)',
+      status: 'published',
+    };
     const confirmSpy = spyOn(window, 'confirm').and.returnValue(false);
     c.saveBlogPost(); // declined → no save
     expect(h.admin.updateContentBlock).not.toHaveBeenCalled();
@@ -4583,9 +5293,18 @@ describe('AdminComponent — saveBlogPost paths and cover image', () => {
     c.saveBlogPost(); // metaChanged false (buildBlogMeta == {})
     expect(h.toast.success).toHaveBeenCalled();
 
-    c.blogForm = { ...c.blogForm, title: 'Titlu', body_markdown: 'Corp', status: 'draft', tags: 'x' };
+    c.blogForm = {
+      ...c.blogForm,
+      title: 'Titlu',
+      body_markdown: 'Corp',
+      status: 'draft',
+      tags: 'x',
+    };
     let calls = 0;
-    h.admin.updateContentBlock.and.callFake(() => { calls += 1; return of({ version: calls + 1 }); });
+    h.admin.updateContentBlock.and.callFake(() => {
+      calls += 1;
+      return of({ version: calls + 1 });
+    });
     c.saveBlogPost(); // metaChanged true → two updates
     expect(calls).toBeGreaterThanOrEqual(2);
 
@@ -4596,12 +5315,15 @@ describe('AdminComponent — saveBlogPost paths and cover image', () => {
   });
 
   it('uploadBlogCoverImage sets the cover and clears it', () => {
-    c.blogEditLang = 'en'; c.blogBaseLang = 'en';
+    c.blogEditLang = 'en';
+    c.blogBaseLang = 'en';
     c.uploadBlogCoverImage({ target: { files: [], value: '' } } as any); // no file
     expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
 
     const file = new File(['x'], 'cover.png', { type: 'image/png' });
-    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/cover.png', sort_order: 0 }] }));
+    h.admin.uploadContentImage.and.returnValue(
+      of({ images: [{ id: 'i', url: '/cover.png', sort_order: 0 }] }),
+    );
     c.uploadBlogCoverImage({ target: { files: [file], value: 'v' } } as any);
     expect(c.blogForm.cover_image_url).toBe('/cover.png');
 
@@ -4618,7 +5340,8 @@ describe('AdminComponent — saveBlogPost paths and cover image', () => {
   });
 
   it('selectBlogCoverAsset sets cover and tracks the image', () => {
-    c.blogEditLang = 'en'; c.blogBaseLang = 'en';
+    c.blogEditLang = 'en';
+    c.blogBaseLang = 'en';
     c.blogImages = [];
     c.selectBlogCoverAsset({ url: '', id: 'a' }); // empty url
     expect(c.blogForm.cover_image_url).toBeFalsy();
@@ -4634,10 +5357,17 @@ describe('AdminComponent — CMS media upload', () => {
   let h: Harness;
   let c: any;
   const imgFile = () => new File(['x'], 'My_Cool-Pic.png', { type: 'image/png' });
-  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; c.homeBlocks = []; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.pageBlocks = {};
+    c.homeBlocks = [];
+  });
 
   it('normalizeCmsImageFiles filters by type/size and caps at 12', () => {
-    expect((c as any).normalizeCmsImageFiles([new File(['x'], 'a.txt', { type: 'text/plain' })])).toEqual([]);
+    expect(
+      (c as any).normalizeCmsImageFiles([new File(['x'], 'a.txt', { type: 'text/plain' })]),
+    ).toEqual([]);
     const ok = (c as any).normalizeCmsImageFiles([imgFile()]);
     expect(ok.length).toBe(1);
   });
@@ -4649,43 +5379,74 @@ describe('AdminComponent — CMS media upload', () => {
 
   it('lastUploadedContentImage extracts the last image', () => {
     expect((c as any).lastUploadedContentImage({ images: [] })).toBeNull();
-    expect((c as any).lastUploadedContentImage({ images: [{ url: '/a', focal_x: 10, focal_y: 20 }] })).toEqual({ url: '/a', focal_x: 10, focal_y: 20 });
+    expect(
+      (c as any).lastUploadedContentImage({ images: [{ url: '/a', focal_x: 10, focal_y: 20 }] }),
+    ).toEqual({ url: '/a', focal_x: 10, focal_y: 20 });
     expect((c as any).lastUploadedContentImage({ images: [{ url: '' }] })).toBeNull();
   });
 
   it('onCmsMediaDragOver reacts only to file drags', () => {
-    const noFiles = { dataTransfer: { types: ['text/plain'], files: [] }, preventDefault: jasmine.createSpy('pd') } as any;
+    const noFiles = {
+      dataTransfer: { types: ['text/plain'], files: [] },
+      preventDefault: jasmine.createSpy('pd'),
+    } as any;
     c.onCmsMediaDragOver(noFiles);
     expect(noFiles.preventDefault).not.toHaveBeenCalled();
-    const withFiles = { dataTransfer: { types: ['Files'], files: [], dropEffect: '' }, preventDefault: jasmine.createSpy('pd') } as any;
+    const withFiles = {
+      dataTransfer: { types: ['Files'], files: [], dropEffect: '' },
+      preventDefault: jasmine.createSpy('pd'),
+    } as any;
     c.onCmsMediaDragOver(withFiles);
     expect(withFiles.preventDefault).toHaveBeenCalled();
   });
 
   it('onPageMediaDropOnContainer ignores non-self drops and inserts files', async () => {
     const el = document.createElement('div');
-    const notSelf = { target: document.createElement('span'), currentTarget: el, dataTransfer: { files: [imgFile()] }, preventDefault: jasmine.createSpy('pd') } as any;
+    const notSelf = {
+      target: document.createElement('span'),
+      currentTarget: el,
+      dataTransfer: { files: [imgFile()] },
+      preventDefault: jasmine.createSpy('pd'),
+    } as any;
     c.onPageMediaDropOnContainer(notSelf, 'page.about');
     expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
 
-    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', sort_order: 0, focal_x: 50, focal_y: 50 }] }));
-    const ev = { target: el, currentTarget: el, dataTransfer: { files: [imgFile()] }, preventDefault: jasmine.createSpy('pd') } as any;
+    h.admin.uploadContentImage.and.returnValue(
+      of({ images: [{ id: 'i', url: '/u.png', sort_order: 0, focal_x: 50, focal_y: 50 }] }),
+    );
+    const ev = {
+      target: el,
+      currentTarget: el,
+      dataTransfer: { files: [imgFile()] },
+      preventDefault: jasmine.createSpy('pd'),
+    } as any;
     c.onPageMediaDropOnContainer(ev, 'page.about');
-    await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(h.admin.uploadContentImage).toHaveBeenCalled();
   });
 
   it('onHomeMediaDropOnContainer inserts dropped files', async () => {
     const el = document.createElement('div');
-    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', sort_order: 0, focal_x: 50, focal_y: 50 }] }));
-    const ev = { target: el, currentTarget: el, dataTransfer: { files: [imgFile()] }, preventDefault: jasmine.createSpy('pd') } as any;
+    h.admin.uploadContentImage.and.returnValue(
+      of({ images: [{ id: 'i', url: '/u.png', sort_order: 0, focal_x: 50, focal_y: 50 }] }),
+    );
+    const ev = {
+      target: el,
+      currentTarget: el,
+      dataTransfer: { files: [imgFile()] },
+      preventDefault: jasmine.createSpy('pd'),
+    } as any;
     c.onHomeMediaDropOnContainer(ev);
-    await Promise.resolve(); await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(h.admin.uploadContentImage).toHaveBeenCalled();
   });
 
   it('insertHomeMediaFiles inserts a single image then a gallery', async () => {
-    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/u.png', focal_x: 50, focal_y: 50 }] }));
+    h.admin.uploadContentImage.and.returnValue(
+      of({ images: [{ id: 'i', url: '/u.png', focal_x: 50, focal_y: 50 }] }),
+    );
     c.homeBlocks = [];
     await (c as any).insertHomeMediaFiles(0, [imgFile()]);
     expect(c.homeBlocks.some((b: any) => b.type === 'image')).toBe(true);
@@ -4720,7 +5481,9 @@ describe('AdminComponent — CMS media upload', () => {
   });
 
   it('insertPageMediaFiles inserts an image then a gallery', async () => {
-    h.admin.uploadContentImage.and.returnValue(of({ images: [{ url: '/u.png', focal_x: 50, focal_y: 50 }] }));
+    h.admin.uploadContentImage.and.returnValue(
+      of({ images: [{ url: '/u.png', focal_x: 50, focal_y: 50 }] }),
+    );
     c.pageBlocks['page.about'] = [];
     await (c as any).insertPageMediaFiles('page.about', 0, [imgFile()]);
     expect(c.pageBlocks['page.about'].some((b: any) => b.type === 'image')).toBe(true);
@@ -4735,11 +5498,17 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
   let h: Harness;
   let c: any;
   const KEY = 'page.about';
-  beforeEach(() => { h = createComponent(); c = h.component as any; c.pageBlocks = {}; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+    c.pageBlocks = {};
+  });
 
   it('uploadAndInsertBlogImage inserts markdown for textarea and editor', () => {
     c.selectedBlogKey = null;
-    c.uploadAndInsertBlogImage(document.createElement('textarea'), { target: { files: [] } } as any);
+    c.uploadAndInsertBlogImage(document.createElement('textarea'), {
+      target: { files: [] },
+    } as any);
     expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
 
     c.selectedBlogKey = 'blog.a';
@@ -4747,7 +5516,9 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
     c.blogImageLayout = 'wide';
     const ta = document.createElement('textarea');
     const file = new File(['x'], 'pic.png', { type: 'image/png' });
-    h.admin.uploadContentImage.and.returnValue(of({ images: [{ id: 'i', url: '/p.png', sort_order: 0 }] }));
+    h.admin.uploadContentImage.and.returnValue(
+      of({ images: [{ id: 'i', url: '/p.png', sort_order: 0 }] }),
+    );
     c.uploadAndInsertBlogImage(ta, { target: { files: [file], value: 'v' } } as any);
     expect(c.blogForm.body_markdown).toContain('/p.png');
 
@@ -4762,7 +5533,9 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
   });
 
   it('page carousel slide methods reorder, remove and set image', () => {
-    c.pageBlocks[KEY] = [{ key: 'car', type: 'carousel', slides: [c.emptySlideDraft(), c.emptySlideDraft()] }];
+    c.pageBlocks[KEY] = [
+      { key: 'car', type: 'carousel', slides: [c.emptySlideDraft(), c.emptySlideDraft()] },
+    ];
     c.movePageCarouselSlide(KEY, 'car', 0, 1);
     c.movePageCarouselSlide(KEY, 'car', 0, 99); // out of range
     c.setPageCarouselSlideImage(KEY, 'car', 0, { url: '/s.jpg', focal_x: 1, focal_y: 2 });
@@ -4821,7 +5594,8 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
   });
 
   it('editBlogCoverFocalPoint validates input', () => {
-    c.blogEditLang = 'en'; c.blogBaseLang = 'en';
+    c.blogEditLang = 'en';
+    c.blogBaseLang = 'en';
     c.blogImages = [{ id: 'i', url: '/c.png', focal_x: 50, focal_y: 50 }];
     c.blogForm = { cover_image_url: '/c.png' };
     const promptSpy = spyOn(window, 'prompt').and.returnValue(null);
@@ -4854,9 +5628,25 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
   it('savePageBlocks serialises product_grid collection/products and form', () => {
     c.pageBlocksStatus[KEY] = 'draft';
     c.pageBlocks[KEY] = [
-      { ...c.makeHomeBlockDraft('pg1', 'product_grid', true), type: 'product_grid', product_grid_source: 'collection', product_grid_collection_slug: 'col', product_grid_limit: 100 },
-      { ...c.makeHomeBlockDraft('pg2', 'product_grid', true), type: 'product_grid', product_grid_source: 'products', product_grid_product_slugs: 'a, a, b' },
-      { ...c.makeHomeBlockDraft('fm', 'form', true), type: 'form', form_type: 'contact', form_topic: 'support' },
+      {
+        ...c.makeHomeBlockDraft('pg1', 'product_grid', true),
+        type: 'product_grid',
+        product_grid_source: 'collection',
+        product_grid_collection_slug: 'col',
+        product_grid_limit: 100,
+      },
+      {
+        ...c.makeHomeBlockDraft('pg2', 'product_grid', true),
+        type: 'product_grid',
+        product_grid_source: 'products',
+        product_grid_product_slugs: 'a, a, b',
+      },
+      {
+        ...c.makeHomeBlockDraft('fm', 'form', true),
+        type: 'form',
+        form_type: 'contact',
+        form_topic: 'support',
+      },
     ];
     c.pageBlocksMeta[KEY] = {};
     c.ensurePageDraft(KEY).initFromServer(c.currentPageDraftState(KEY));
@@ -4907,16 +5697,27 @@ describe('AdminComponent — image insert, page carousel, exports, misc', () => 
 describe('AdminComponent — loadSections fallbacks and draft restore', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { localStorage.clear(); h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    localStorage.clear();
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('loadSections derives from sections metadata', () => {
-    h.admin.getContent.and.returnValue(of({ version: 1, meta: { sections: [{ id: 'story', enabled: false }, { id: 'bad' }, null] } }));
+    h.admin.getContent.and.returnValue(
+      of({
+        version: 1,
+        meta: { sections: [{ id: 'story', enabled: false }, { id: 'bad' }, null] },
+      }),
+    );
     c.loadSections();
     expect(c.homeBlocks.some((b: any) => b.type === 'story')).toBe(true);
   });
 
   it('loadSections derives from legacy order metadata', () => {
-    h.admin.getContent.and.returnValue(of({ version: 1, meta: { order: ['featured_products', 'story'] } }));
+    h.admin.getContent.and.returnValue(
+      of({ version: 1, meta: { order: ['featured_products', 'story'] } }),
+    );
     c.loadSections();
     expect(c.homeBlocks.length).toBeGreaterThan(0);
   });
@@ -4932,7 +5733,14 @@ describe('AdminComponent — loadSections fallbacks and draft restore', () => {
 
   it('restoreHomeDraftAutosave applies a stored draft', () => {
     const mgr = c.cmsHomeDraft;
-    localStorage.setItem((mgr as any).storageKey, JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify([{ key: 'restored', type: 'text' }]) }));
+    localStorage.setItem(
+      (mgr as any).storageKey,
+      JSON.stringify({
+        v: 1,
+        ts: '2999-01-01T00:00:00Z',
+        state_json: JSON.stringify([{ key: 'restored', type: 'text' }]),
+      }),
+    );
     mgr.initFromServer([{ key: 'orig', type: 'text' }]);
     c.homeBlocks = [{ key: 'orig', type: 'text' }];
     c.restoreHomeDraftAutosave();
@@ -4943,8 +5751,17 @@ describe('AdminComponent — loadSections fallbacks and draft restore', () => {
     const KEY = 'page.about';
     c.pageBlocks[KEY] = [];
     const mgr = c.ensurePageDraft(KEY);
-    const state = { blocks: [{ key: 'b', type: 'text', layout: {} }], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false };
-    localStorage.setItem((mgr as any).storageKey, JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify(state) }));
+    const state = {
+      blocks: [{ key: 'b', type: 'text', layout: {} }],
+      status: 'draft',
+      publishedAt: '',
+      publishedUntil: '',
+      requiresAuth: false,
+    };
+    localStorage.setItem(
+      (mgr as any).storageKey,
+      JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify(state) }),
+    );
     mgr.initFromServer(c.currentPageDraftState(KEY));
     c.restorePageDraftAutosave(KEY);
     expect(c.pageBlocks[KEY].length).toBe(1);
@@ -4953,12 +5770,29 @@ describe('AdminComponent — loadSections fallbacks and draft restore', () => {
   it('restoreBlogDraftAutosave applies a stored blog draft', () => {
     c.selectedBlogKey = 'blog.a';
     c.blogEditLang = 'en';
-    c.blogForm = { title: 'orig', body_markdown: '', status: 'draft', published_at: '', published_until: '', summary: '', tags: '', series: '', cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', pinned: false, pin_order: '1' };
+    c.blogForm = {
+      title: 'orig',
+      body_markdown: '',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+      summary: '',
+      tags: '',
+      series: '',
+      cover_image_url: '',
+      cover_fit: 'cover',
+      reading_time_minutes: '',
+      pinned: false,
+      pin_order: '1',
+    };
     c.blogMeta = {};
     const mgr = c.ensureBlogDraft('blog.a', 'en');
     const state = c.currentBlogDraftState();
     const restored = { ...state, title: 'restored title' };
-    localStorage.setItem((mgr as any).storageKey, JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify(restored) }));
+    localStorage.setItem(
+      (mgr as any).storageKey,
+      JSON.stringify({ v: 1, ts: '2999-01-01T00:00:00Z', state_json: JSON.stringify(restored) }),
+    );
     mgr.initFromServer(state);
     c.restoreBlogDraftAutosave();
     expect(c.blogForm.title).toBe('restored title');
@@ -4975,7 +5809,11 @@ describe('AdminComponent — loadSections fallbacks and draft restore', () => {
 describe('AdminComponent — remaining edge branches', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { localStorage.clear(); h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    localStorage.clear();
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('submitOwnerTransfer surfaces server error detail', () => {
     h.auth.role.and.returnValue('owner');
@@ -4992,30 +5830,73 @@ describe('AdminComponent — remaining edge branches', () => {
 
   it('hasUnsavedChanges detects dirty page and blog drafts', () => {
     const pm = c.ensurePageDraft('page.about');
-    pm.initFromServer({ blocks: [], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false });
-    pm.observe({ blocks: [{ key: 'x', type: 'text' }], status: 'draft', publishedAt: '', publishedUntil: '', requiresAuth: false });
+    pm.initFromServer({
+      blocks: [],
+      status: 'draft',
+      publishedAt: '',
+      publishedUntil: '',
+      requiresAuth: false,
+    });
+    pm.observe({
+      blocks: [{ key: 'x', type: 'text' }],
+      status: 'draft',
+      publishedAt: '',
+      publishedUntil: '',
+      requiresAuth: false,
+    });
     expect(c.hasUnsavedChanges()).toBe(true);
 
     const h2 = createComponent();
     const c2 = h2.component as any;
     const bm = c2.ensureBlogDraft('blog.a', 'en');
-    bm.initFromServer({ title: 'a', body_markdown: '', status: 'draft', published_at: '', published_until: '', meta: {} });
-    bm.observe({ title: 'b', body_markdown: '', status: 'draft', published_at: '', published_until: '', meta: {} });
+    bm.initFromServer({
+      title: 'a',
+      body_markdown: '',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+      meta: {},
+    });
+    bm.observe({
+      title: 'b',
+      body_markdown: '',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+      meta: {},
+    });
     expect(c2.hasUnsavedChanges()).toBe(true);
   });
 
   it('blogPinnedPosts applies tie-breakers by published_at then updated_at', () => {
     c.contentBlocks = [
-      { key: 'blog.a', meta: { pinned: true, pin_order: 1 }, published_at: '2020-01-01', updated_at: 'a' },
-      { key: 'blog.b', meta: { pinned: true, pin_order: 1 }, published_at: '2021-01-01', updated_at: 'b' },
-      { key: 'blog.c', meta: { pinned: true, pin_order: 1 }, published_at: '2021-01-01', updated_at: 'z' },
+      {
+        key: 'blog.a',
+        meta: { pinned: true, pin_order: 1 },
+        published_at: '2020-01-01',
+        updated_at: 'a',
+      },
+      {
+        key: 'blog.b',
+        meta: { pinned: true, pin_order: 1 },
+        published_at: '2021-01-01',
+        updated_at: 'b',
+      },
+      {
+        key: 'blog.c',
+        meta: { pinned: true, pin_order: 1 },
+        published_at: '2021-01-01',
+        updated_at: 'z',
+      },
     ];
     const ranked = c.blogPinnedPosts().map((p: any) => p.key);
     expect(ranked[0]).toBe('blog.c'); // newer published_at, then updated_at desc
   });
 
   it('saveContent handles a version conflict via reload', () => {
-    h.admin.getContent.and.returnValue(of({ key: 'site.x', title: 'T', body_markdown: 'B', status: 'draft', version: 1 }));
+    h.admin.getContent.and.returnValue(
+      of({ key: 'site.x', title: 'T', body_markdown: 'B', status: 'draft', version: 1 }),
+    );
     c.selectedContent = { key: 'site.x' };
     c.contentForm = { title: 'T', body_markdown: 'B', status: 'draft' };
     h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
@@ -5024,7 +5905,10 @@ describe('AdminComponent — remaining edge branches', () => {
   });
 
   it('onCategoryDrop reports a reorder failure', () => {
-    c.categories = [{ slug: 'a', sort_order: 0 }, { slug: 'b', sort_order: 1 }];
+    c.categories = [
+      { slug: 'a', sort_order: 0 },
+      { slug: 'b', sort_order: 1 },
+    ];
     c.draggingSlug = 'a';
     h.admin.reorderCategories.and.returnValue(throwError(() => new Error('x')));
     c.onCategoryDrop('b');
@@ -5035,12 +5919,28 @@ describe('AdminComponent — remaining edge branches', () => {
     c.selectedBlogKey = 'blog.a';
     c.blogEditLang = 'ro';
     c.blogBaseLang = 'en';
-    c.blogForm = { title: 'Titlu', body_markdown: 'Corp', status: 'draft', published_at: '', published_until: '', summary: '', tags: 'x', series: '', cover_image_url: '', cover_fit: 'cover', reading_time_minutes: '', pinned: false, pin_order: '1' };
+    c.blogForm = {
+      title: 'Titlu',
+      body_markdown: 'Corp',
+      status: 'draft',
+      published_at: '',
+      published_until: '',
+      summary: '',
+      tags: 'x',
+      series: '',
+      cover_image_url: '',
+      cover_fit: 'cover',
+      reading_time_minutes: '',
+      pinned: false,
+      pin_order: '1',
+    };
     c.blogMeta = {};
     c.ensureBlogDraft('blog.a', 'ro').initFromServer(c.currentBlogDraftState());
     spyOn(c, 'reloadContentBlocks');
     spyOn(c, 'setBlogEditLang');
-    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, lang: 'ro', title: 'Titlu', body_markdown: 'Corp' }));
+    h.admin.getContent.and.returnValue(
+      of({ meta: {}, version: 1, lang: 'ro', title: 'Titlu', body_markdown: 'Corp' }),
+    );
     let calls = 0;
     h.admin.updateContentBlock.and.callFake(() => {
       calls += 1;
@@ -5054,21 +5954,30 @@ describe('AdminComponent — remaining edge branches', () => {
 describe('AdminComponent — legal save, media drop, split scroll', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('saveLegalPage syncs meta then saves markdown (success and create fallback)', () => {
     spyOn(c, 'loadContentPages');
     c.legalPageMeta = {};
     c.legalPageLastUpdated = '2030-01-01';
     c.legalPageLastUpdatedOriginal = '';
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { last_updated: '2030-01-01' } }));
+    h.admin.updateContentBlock.and.returnValue(
+      of({ version: 2, meta: { last_updated: '2030-01-01' } }),
+    );
     (c as any).saveLegalPage('page.terms', 'Body', 'en');
     expect(c.legalPageMessage).toBeTruthy();
 
     // markdown save 404 → create fallback
-    c.legalPageLastUpdated = ''; c.legalPageLastUpdatedOriginal = '';
+    c.legalPageLastUpdated = '';
+    c.legalPageLastUpdatedOriginal = '';
     let calls = 0;
-    h.admin.updateContentBlock.and.callFake(() => { calls += 1; return throwError(() => ({ status: 404 })); });
+    h.admin.updateContentBlock.and.callFake(() => {
+      calls += 1;
+      return throwError(() => ({ status: 404 }));
+    });
     h.admin.createContent.and.returnValue(of({ version: 1 }));
     (c as any).saveLegalPage('page.terms', 'Body', 'en');
     expect(c.legalPageMessage).toBeTruthy();
@@ -5089,11 +5998,23 @@ describe('AdminComponent — legal save, media drop, split scroll', () => {
     spyOn(c, 'insertHomeMediaFiles');
     const file = new File(['x'], 'a.png', { type: 'image/png' });
     c.homeBlocks = [{ key: 'a', type: 'text' }];
-    c.onHomeBlockDrop({ preventDefault: jasmine.createSpy('pd'), dataTransfer: { files: [file], types: ['Files'] } } as any, 'a');
+    c.onHomeBlockDrop(
+      {
+        preventDefault: jasmine.createSpy('pd'),
+        dataTransfer: { files: [file], types: ['Files'] },
+      } as any,
+      'a',
+    );
     expect(c.insertHomeMediaFiles).toHaveBeenCalled();
 
     c.draggingHomeBlockKey = 'ghost';
-    c.onHomeBlockDrop({ preventDefault: jasmine.createSpy('pd'), dataTransfer: { files: [], getData: () => '' } } as any, 'a');
+    c.onHomeBlockDrop(
+      {
+        preventDefault: jasmine.createSpy('pd'),
+        dataTransfer: { files: [], getData: () => '' },
+      } as any,
+      'a',
+    );
     expect(c.draggingHomeBlockKey).toBeNull();
   });
 
@@ -5101,7 +6022,14 @@ describe('AdminComponent — legal save, media drop, split scroll', () => {
     spyOn(c, 'insertPageMediaFiles');
     const file = new File(['x'], 'a.png', { type: 'image/png' });
     c.pageBlocks['page.about'] = [{ key: 'b', type: 'text' }];
-    c.onPageBlockDrop({ preventDefault: jasmine.createSpy('pd'), dataTransfer: { files: [file], types: ['Files'] } } as any, 'page.about', 'b');
+    c.onPageBlockDrop(
+      {
+        preventDefault: jasmine.createSpy('pd'),
+        dataTransfer: { files: [file], types: ['Files'] },
+      } as any,
+      'page.about',
+      'b',
+    );
     expect(c.insertPageMediaFiles).toHaveBeenCalled();
   });
 
@@ -5117,7 +6045,10 @@ describe('AdminComponent — legal save, media drop, split scroll', () => {
     const source = mk(200, 100, 50);
     const target = mk(400, 100, 0);
     let rafCb: any = null;
-    spyOn(window, 'requestAnimationFrame').and.callFake((cb: any) => { rafCb = cb; return 0; });
+    spyOn(window, 'requestAnimationFrame').and.callFake((cb: any) => {
+      rafCb = cb;
+      return 0;
+    });
     c.syncSplitScroll(source, target);
     expect((c as any).previewScrollSyncActive).toBe(true); // set during sync, reset on rAF
     rafCb(); // run the queued frame
@@ -5131,7 +6062,10 @@ describe('AdminComponent — legal save, media drop, split scroll', () => {
 describe('AdminComponent — clipboard failure branches', () => {
   let h: Harness;
   let c: any;
-  beforeEach(() => { h = createComponent(); c = h.component as any; });
+  beforeEach(() => {
+    h = createComponent();
+    c = h.component as any;
+  });
 
   it('copyBlogPreviewLink toasts an error when the copy fails', async () => {
     spyOn(c, 'copyToClipboard').and.returnValue(Promise.resolve(false));

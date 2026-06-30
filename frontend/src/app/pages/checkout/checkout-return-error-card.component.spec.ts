@@ -66,10 +66,9 @@ describe('CheckoutReturnErrorCardComponent', () => {
   });
 
   it('creates with default input values', () => {
-    TestBed.configureTestingModule({ imports: [CheckoutReturnErrorCardComponent] }).overrideComponent(
-      CheckoutReturnErrorCardComponent,
-      { set: { template: '', imports: [] } },
-    );
+    TestBed.configureTestingModule({
+      imports: [CheckoutReturnErrorCardComponent],
+    }).overrideComponent(CheckoutReturnErrorCardComponent, { set: { template: '', imports: [] } });
     const fixture = TestBed.createComponent(CheckoutReturnErrorCardComponent);
     const cmp = fixture.componentInstance;
 

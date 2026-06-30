@@ -73,7 +73,9 @@ describe('AdminGdprComponent', () => {
       }),
     );
     usersApi.retryGdprExportJob.and.returnValue(of(exportJob()));
-    usersApi.downloadGdprExportJob.and.returnValue(of(new Blob(['{}'], { type: 'application/json' })));
+    usersApi.downloadGdprExportJob.and.returnValue(
+      of(new Blob(['{}'], { type: 'application/json' })),
+    );
     usersApi.executeGdprDeletion.and.returnValue(of(void 0));
     usersApi.cancelGdprDeletion.and.returnValue(of(void 0));
 
@@ -354,7 +356,9 @@ describe('AdminGdprComponent', () => {
 
   it('executes the deletion, toasts and closes the modal on success', () => {
     const cmp = create();
-    cmp.executeDeletionTarget.set(deletionItem({ user: { id: 'u42', email: 'a@b.c', username: 'a', role: 'user' } }));
+    cmp.executeDeletionTarget.set(
+      deletionItem({ user: { id: 'u42', email: 'a@b.c', username: 'a', role: 'user' } }),
+    );
     cmp.executeDeletionModalOpen.set(true);
     cmp.executeDeletionPassword = 'secret';
     cmp.confirmExecuteDeletion();
@@ -365,7 +369,9 @@ describe('AdminGdprComponent', () => {
   });
 
   it('surfaces a server detail string when executing the deletion fails', () => {
-    usersApi.executeGdprDeletion.and.returnValue(throwError(() => ({ error: { detail: 'wrong password' } })));
+    usersApi.executeGdprDeletion.and.returnValue(
+      throwError(() => ({ error: { detail: 'wrong password' } })),
+    );
     const cmp = create();
     cmp.executeDeletionTarget.set(deletionItem());
     cmp.executeDeletionPassword = 'secret';
@@ -403,7 +409,9 @@ describe('AdminGdprComponent', () => {
   it('cancels a deletion and toasts on success', () => {
     spyOn(window, 'confirm').and.returnValue(true);
     const cmp = create();
-    cmp.cancelDeletion(deletionItem({ user: { id: 'u55', email: 'c@d.e', username: 'c', role: 'user' } }));
+    cmp.cancelDeletion(
+      deletionItem({ user: { id: 'u55', email: 'c@d.e', username: 'c', role: 'user' } }),
+    );
     expect(usersApi.cancelGdprDeletion).toHaveBeenCalledWith('u55');
     expect(toast.success).toHaveBeenCalled();
     expect(cmp.deletionBusyUserId()).toBeNull();
@@ -413,7 +421,9 @@ describe('AdminGdprComponent', () => {
     spyOn(window, 'confirm').and.returnValue(true);
     usersApi.cancelGdprDeletion.and.returnValue(throwError(() => new Error('x')));
     const cmp = create();
-    cmp.cancelDeletion(deletionItem({ user: { id: 'u55', email: 'c@d.e', username: 'c', role: 'user' } }));
+    cmp.cancelDeletion(
+      deletionItem({ user: { id: 'u55', email: 'c@d.e', username: 'c', role: 'user' } }),
+    );
     expect(toast.error).toHaveBeenCalled();
     expect(cmp.deletionBusyUserId()).toBeNull();
   });
@@ -421,7 +431,12 @@ describe('AdminGdprComponent', () => {
   it('exposes stable trackBy identities for both tables', () => {
     const cmp = create();
     expect(cmp.trackExportJob(0, exportJob({ id: 'jx' }))).toBe('jx');
-    expect(cmp.trackDeletion(0, deletionItem({ user: { id: 'ux', email: 'e', username: 'u', role: 'user' } }))).toBe('ux');
+    expect(
+      cmp.trackDeletion(
+        0,
+        deletionItem({ user: { id: 'ux', email: 'e', username: 'u', role: 'user' } }),
+      ),
+    ).toBe('ux');
   });
 
   it('sends trimmed search and concrete status filters when loading exports', () => {
@@ -532,7 +547,13 @@ describe('AdminGdprComponent', () => {
     usersApi.listGdprExportJobs.and.returnValue(
       of({
         items: [
-          exportJob({ id: 'b1', status: 'failed', sla_breached: true, expires_at: null, has_file: false }),
+          exportJob({
+            id: 'b1',
+            status: 'failed',
+            sla_breached: true,
+            expires_at: null,
+            has_file: false,
+          }),
         ],
         meta: { page: 2, limit: 25, total: 30, total_pages: 2 } as any,
       }),

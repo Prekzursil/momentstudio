@@ -207,7 +207,9 @@ describe('GoogleCallbackComponent', () => {
     const fixture = build();
     translate.setTranslation('en', { auth: { googleFinishing: 'Finishing sign-in' } }, true);
     // Non-emitting observable: ngOnInit subscribes without navigating or resetting signals.
-    auth.completeGoogleLogin.and.returnValue(new Observable<GoogleCallbackResponse>(() => undefined));
+    auth.completeGoogleLogin.and.returnValue(
+      new Observable<GoogleCallbackResponse>(() => undefined),
+    );
     fixture.detectChanges();
     fixture.componentInstance.message.set('Working on it');
     fixture.componentInstance.error.set('Something failed');

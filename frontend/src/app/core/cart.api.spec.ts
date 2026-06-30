@@ -55,24 +55,31 @@ describe('CartApi', () => {
 
   it('generates a new session id with crypto.randomUUID when none exists', () => {
     localStorage.removeItem('cart_session_id');
-    spyOn(crypto, 'randomUUID').and.returnValue(
-      'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' as `${string}-${string}-${string}-${string}-${string}`,
-    );
-    const id = api.getSessionId();
-    expect(id).toBe('guest-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
-    expect(localStorage.getItem('cart_session_id')).toBe(id);
+    // crypto.randomUUID is inherited and non-writable in modern Chromium, so
+    // shadow it with a configurable own property instead of spyOn/assignment.
+    const stub = jasmine
+      .createSpy('randomUUID')
+      .and.returnValue('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+    Object.defineProperty(crypto, 'randomUUID', { value: stub, configurable: true });
+    try {
+      const id = api.getSessionId();
+      expect(id).toBe('guest-aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
+      expect(localStorage.getItem('cart_session_id')).toBe(id);
+      expect(stub).toHaveBeenCalled();
+    } finally {
+      delete (crypto as { randomUUID?: unknown }).randomUUID;
+    }
   });
 
   it('falls back to Date.now when randomUUID is unavailable', () => {
     localStorage.removeItem('cart_session_id');
-    const original = crypto.randomUUID;
-    (crypto as { randomUUID?: unknown }).randomUUID = undefined;
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
     try {
       const id = api.getSessionId();
       expect(id.startsWith('guest-')).toBeTrue();
       expect(id).not.toContain('undefined');
     } finally {
-      crypto.randomUUID = original;
+      delete (crypto as { randomUUID?: unknown }).randomUUID;
     }
   });
 

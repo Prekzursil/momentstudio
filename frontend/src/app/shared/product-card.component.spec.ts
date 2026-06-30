@@ -832,6 +832,19 @@ describe('ProductCardComponent', () => {
       spyOn(sessionStorage, 'setItem').and.throwError('quota');
       expect(() => component.rememberShopReturnContext()).not.toThrow();
     });
+
+    it('records a non-zero scroll position when the window is scrolled', () => {
+      const component = create();
+      component.rememberShopReturn = true;
+      window.history.replaceState(null, '', '/shop');
+      Object.defineProperty(window, 'scrollY', { value: 321, configurable: true });
+      try {
+        component.rememberShopReturnContext(mouseEvent());
+      } finally {
+        delete (window as { scrollY?: number }).scrollY;
+      }
+      expect(sessionStorage.getItem('shop_return_scroll_y')).toBe('321');
+    });
   });
 
   describe('branch coverage top-offs', () => {

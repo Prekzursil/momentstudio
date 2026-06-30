@@ -113,11 +113,11 @@ describe('app routes', () => {
         'checkout/success',
       ]) {
         const route = findByPath(routes, path);
-        expect(route)
-          .withContext(path)
-          .toBeDefined();
+        expect(route).withContext(path).toBeDefined();
         expect(route?.data?.['robots']).withContext(path).toBe(NOINDEX_ROBOTS);
-        expect(typeof route?.loadComponent).withContext(path).toBe('function');
+        expect(typeof route?.loadComponent)
+          .withContext(path)
+          .toBe('function');
       }
     });
   });
@@ -197,13 +197,9 @@ describe('app routes', () => {
       // Guard against a silent regression where the table loses its lazy pages.
       expect(lazy.length).toBeGreaterThan(20);
 
-      const resolved = await Promise.all(
-        lazy.map((r) => Promise.resolve(r.loadComponent())),
-      );
+      const resolved = await Promise.all(lazy.map((r) => Promise.resolve(r.loadComponent())));
       for (let i = 0; i < resolved.length; i++) {
-        expect(resolved[i])
-          .withContext(String(lazy[i].path))
-          .toEqual(jasmine.any(Function));
+        expect(resolved[i]).withContext(String(lazy[i].path)).toEqual(jasmine.any(Function));
       }
     });
   });

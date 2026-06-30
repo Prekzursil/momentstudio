@@ -34,9 +34,7 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       previewDevice: jasmine.createSpy('previewDevice').and.returnValue('desktop'),
       previewLayout: jasmine.createSpy('previewLayout').and.returnValue('stacked'),
     };
-    const translateInstant = jasmine
-      .createSpy('instant')
-      .and.callFake((key: string) => key);
+    const translateInstant = jasmine.createSpy('instant').and.callFake((key: string) => key);
     const component = new AdminComponent(
       {
         snapshot: routeStub.snapshot,
@@ -97,7 +95,11 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       const storageKey = 'adrianaart.cms.autosave.cms-draft-test';
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ v: 1, ts: '2024-01-01T00:00:00.000Z', state_json: JSON.stringify({ a: 99 }) }),
+        JSON.stringify({
+          v: 1,
+          ts: '2024-01-01T00:00:00.000Z',
+          state_json: JSON.stringify({ a: 99 }),
+        }),
       );
       mgr.initFromServer({ a: 1 });
       expect(mgr.hasRestorableAutosave).toBe(true);
@@ -110,7 +112,11 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       const storageKey = 'adrianaart.cms.autosave.cms-draft-test';
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ v: 1, ts: '2024-01-01T00:00:00.000Z', state_json: JSON.stringify({ a: 1 }) }),
+        JSON.stringify({
+          v: 1,
+          ts: '2024-01-01T00:00:00.000Z',
+          state_json: JSON.stringify({ a: 1 }),
+        }),
       );
       mgr.initFromServer({ a: 1 });
       expect(mgr.hasRestorableAutosave).toBe(false);
@@ -309,7 +315,11 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       const mgr = freshManager(component);
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ v: 1, ts: '2024-02-02T00:00:00.000Z', state_json: JSON.stringify({ a: 42 }) }),
+        JSON.stringify({
+          v: 1,
+          ts: '2024-02-02T00:00:00.000Z',
+          state_json: JSON.stringify({ a: 42 }),
+        }),
       );
       mgr.initFromServer({ a: 1 });
       const restored = mgr.restoreAutosave({ a: 1 });
@@ -323,7 +333,11 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       const mgr = freshManager(component);
       localStorage.setItem(
         storageKey,
-        JSON.stringify({ v: 1, ts: '2024-02-02T00:00:00.000Z', state_json: JSON.stringify({ a: 7 }) }),
+        JSON.stringify({
+          v: 1,
+          ts: '2024-02-02T00:00:00.000Z',
+          state_json: JSON.stringify({ a: 7 }),
+        }),
       );
       mgr.initFromServer({ a: 1 });
       expect(mgr.restoreAutosave({ a: 7 })).toBeNull();

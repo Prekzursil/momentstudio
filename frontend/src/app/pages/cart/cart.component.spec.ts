@@ -104,10 +104,20 @@ describe('CartComponent', () => {
 
     coupons = jasmine.createSpyObj('CouponsService', ['validate']);
     coupons.validate.and.returnValue(
-      of({ coupon: { code: 'SAVE10' }, eligible: true, reasons: [], estimated_shipping_discount_ron: '0' }),
+      of({
+        coupon: { code: 'SAVE10' },
+        eligible: true,
+        reasons: [],
+        estimated_shipping_discount_ron: '0',
+      }),
     );
 
-    wishlist = jasmine.createSpyObj('WishlistService', ['ensureLoaded', 'isWishlisted', 'add', 'addLocal']);
+    wishlist = jasmine.createSpyObj('WishlistService', [
+      'ensureLoaded',
+      'isWishlisted',
+      'add',
+      'addLocal',
+    ]);
     wishlist.isWishlisted.and.returnValue(false);
     wishlist.add.and.returnValue(of(makeProduct()));
 
@@ -116,7 +126,10 @@ describe('CartComponent', () => {
     catalog = jasmine.createSpyObj('CatalogService', ['listProducts']);
     catalog.listProducts.and.returnValue(of({ items: [] }));
 
-    checkoutPrefs = jasmine.createSpyObj('CheckoutPrefsService', ['loadDeliveryPrefs', 'saveDeliveryPrefs']);
+    checkoutPrefs = jasmine.createSpyObj('CheckoutPrefsService', [
+      'loadDeliveryPrefs',
+      'saveDeliveryPrefs',
+    ]);
     checkoutPrefs.loadDeliveryPrefs.and.returnValue({ courier: 'sameday', deliveryType: 'home' });
 
     enabledSig = signal<boolean>(false);
@@ -210,10 +223,16 @@ describe('CartComponent', () => {
   it('tracks view_cart once when analytics enabled and items present', fakeAsync(() => {
     enabledSig.set(true);
     // Include an item with falsy quantity to exercise the (quantity || 0) fallback
-    itemsSig.set([makeItem({ id: 'l0', quantity: 0 }), makeItem({ id: 'l1', product_id: 'p1', quantity: 2 })]);
+    itemsSig.set([
+      makeItem({ id: 'l0', quantity: 0 }),
+      makeItem({ id: 'l1', product_id: 'p1', quantity: 2 }),
+    ]);
     const { fixture } = create();
     tick();
-    expect(analytics.track).toHaveBeenCalledWith('view_cart', jasmine.objectContaining({ units: 2 }));
+    expect(analytics.track).toHaveBeenCalledWith(
+      'view_cart',
+      jasmine.objectContaining({ units: 2 }),
+    );
     analytics.track.calls.reset();
     // second flush should not track again (cartViewTracked)
     itemsSig.set([makeItem(), makeItem({ id: 'line2', product_id: 'p2' })]);
@@ -291,7 +310,9 @@ describe('CartComponent', () => {
 
     it('quoteFee/Tax/Shipping default to 0', () => {
       const { cmp } = create();
-      quoteSig.set(makeQuote({ fee: undefined as any, tax: undefined as any, shipping: undefined as any }));
+      quoteSig.set(
+        makeQuote({ fee: undefined as any, tax: undefined as any, shipping: undefined as any }),
+      );
       expect(cmp.quoteFee()).toBe(0);
       expect(cmp.quoteTax()).toBe(0);
       expect(cmp.quoteShipping()).toBe(0);
@@ -337,28 +358,48 @@ describe('CartComponent', () => {
 
     it('returns 0 when offer not eligible', () => {
       const { cmp } = create();
-      cmp.appliedCouponOffer = { coupon: { code: 'X' }, eligible: false, reasons: [], estimated_shipping_discount_ron: '5' } as any;
+      cmp.appliedCouponOffer = {
+        coupon: { code: 'X' },
+        eligible: false,
+        reasons: [],
+        estimated_shipping_discount_ron: '5',
+      } as any;
       cmp.promo = 'X';
       expect(cmp.freeShippingAppliedByCoupon()).toBeFalse();
     });
 
     it('returns 0 when no current code', () => {
       const { cmp } = create();
-      cmp.appliedCouponOffer = { coupon: { code: 'X' }, eligible: true, reasons: [], estimated_shipping_discount_ron: '5' } as any;
+      cmp.appliedCouponOffer = {
+        coupon: { code: 'X' },
+        eligible: true,
+        reasons: [],
+        estimated_shipping_discount_ron: '5',
+      } as any;
       cmp.promo = '' as any;
       expect(cmp.freeShippingAppliedByCoupon()).toBeFalse();
     });
 
     it('returns 0 when code does not match coupon', () => {
       const { cmp } = create();
-      cmp.appliedCouponOffer = { coupon: { code: 'OTHER' }, eligible: true, reasons: [], estimated_shipping_discount_ron: '5' } as any;
+      cmp.appliedCouponOffer = {
+        coupon: { code: 'OTHER' },
+        eligible: true,
+        reasons: [],
+        estimated_shipping_discount_ron: '5',
+      } as any;
       cmp.promo = 'X';
       expect(cmp.freeShippingAppliedByCoupon()).toBeFalse();
     });
 
     it('returns shipping discount when eligible and matching', () => {
       const { cmp } = create();
-      cmp.appliedCouponOffer = { coupon: { code: 'SAVE' }, eligible: true, reasons: [], estimated_shipping_discount_ron: '7' } as any;
+      cmp.appliedCouponOffer = {
+        coupon: { code: 'SAVE' },
+        eligible: true,
+        reasons: [],
+        estimated_shipping_discount_ron: '7',
+      } as any;
       cmp.promo = 'save';
       expect(cmp.freeShippingAppliedByCoupon()).toBeTrue();
       quoteSig.set(makeQuote({ subtotal: 100, total: 100 }));
@@ -453,7 +494,10 @@ describe('CartComponent', () => {
 
     it('falls back to cheapest sorted when none under remaining', () => {
       const { cmp } = create();
-      cmp.recommendations = [makeProduct({ id: 'a', base_price: 1000 }), makeProduct({ id: 'b', base_price: 900 })];
+      cmp.recommendations = [
+        makeProduct({ id: 'a', base_price: 1000 }),
+        makeProduct({ id: 'b', base_price: 900 }),
+      ];
       quoteSig.set(makeQuote({ subtotal: 199, total: 199, freeShippingThresholdRon: 200 }));
       const result = cmp.suggestedAddOns();
       expect(result.length).toBe(2);
@@ -466,14 +510,20 @@ describe('CartComponent', () => {
       const { cmp } = create();
       cmp.setDeliveryType('locker');
       expect(cmp.deliveryType).toBe('locker');
-      expect(checkoutPrefs.saveDeliveryPrefs).toHaveBeenCalledWith({ courier: 'sameday', deliveryType: 'locker' });
+      expect(checkoutPrefs.saveDeliveryPrefs).toHaveBeenCalledWith({
+        courier: 'sameday',
+        deliveryType: 'locker',
+      });
     });
 
     it('onCourierChanged saves prefs', () => {
       const { cmp } = create();
       cmp.courier = 'fan_courier';
       cmp.onCourierChanged();
-      expect(checkoutPrefs.saveDeliveryPrefs).toHaveBeenCalledWith({ courier: 'fan_courier', deliveryType: 'home' });
+      expect(checkoutPrefs.saveDeliveryPrefs).toHaveBeenCalledWith({
+        courier: 'fan_courier',
+        deliveryType: 'home',
+      });
     });
 
     it('deliveryEstimate returns range and key/params for non-equal min/max', () => {
@@ -516,7 +566,9 @@ describe('CartComponent', () => {
 
     it('returns 0 when base price missing', () => {
       const { cmp } = create();
-      expect(cmp.displayProductPrice(makeProduct({ base_price: undefined as any, sale_price: null }))).toBe(0);
+      expect(
+        cmp.displayProductPrice(makeProduct({ base_price: undefined as any, sale_price: null })),
+      ).toBe(0);
     });
   });
 
@@ -652,10 +704,14 @@ describe('CartComponent', () => {
       (cmp as any).addSavedForLater(item);
       expect(cmp.savedForLater.length).toBe(1);
       expect(cmp.savedForLater[0].quantity).toBe(2);
-      (cmp as any).addSavedForLater(makeItem({ id: 'line1', product_id: 'p1', variant_id: null, quantity: 3 }));
+      (cmp as any).addSavedForLater(
+        makeItem({ id: 'line1', product_id: 'p1', variant_id: null, quantity: 3 }),
+      );
       expect(cmp.savedForLater.length).toBe(1);
       expect(cmp.savedForLater[0].quantity).toBe(5);
-      (cmp as any).addSavedForLater(makeItem({ id: 'line2', product_id: 'p2', variant_id: 'v', quantity: 1 }));
+      (cmp as any).addSavedForLater(
+        makeItem({ id: 'line2', product_id: 'p2', variant_id: 'v', quantity: 1 }),
+      );
       expect(cmp.savedForLater.length).toBe(2);
       expect(cmp.savedForLater[0].product_id).toBe('p2');
     });
@@ -757,8 +813,28 @@ describe('CartComponent', () => {
       localStorage.setItem(
         SAVED_FOR_LATER_KEY,
         JSON.stringify([
-          { product_id: 'p1', variant_id: 'v', quantity: 2, name: 'Ok', slug: 'ok', price: 10, currency: 'RON', image: 'i.png', saved_at: 't' },
-          { product_id: '', variant_id: null, quantity: 0, name: '', slug: '', price: 'x', currency: '', image: null, saved_at: null },
+          {
+            product_id: 'p1',
+            variant_id: 'v',
+            quantity: 2,
+            name: 'Ok',
+            slug: 'ok',
+            price: 10,
+            currency: 'RON',
+            image: 'i.png',
+            saved_at: 't',
+          },
+          {
+            product_id: '',
+            variant_id: null,
+            quantity: 0,
+            name: '',
+            slug: '',
+            price: 'x',
+            currency: '',
+            image: null,
+            saved_at: null,
+          },
         ]),
       );
       const { cmp } = create();
@@ -772,7 +848,15 @@ describe('CartComponent', () => {
       localStorage.setItem(
         SAVED_FOR_LATER_KEY,
         JSON.stringify([
-          { product_id: 'p2', quantity: 1, name: 'Nm', slug: 'sl', price: 5, currency: 'RON', saved_at: '' },
+          {
+            product_id: 'p2',
+            quantity: 1,
+            name: 'Nm',
+            slug: 'sl',
+            price: 5,
+            currency: 'RON',
+            saved_at: '',
+          },
         ]),
       );
       const { cmp } = create();
@@ -784,7 +868,17 @@ describe('CartComponent', () => {
       localStorage.setItem(
         SAVED_FOR_LATER_KEY,
         JSON.stringify([
-          { product_id: 'p3', variant_id: null, quantity: 1, name: 'Free', slug: 'free', price: 0, currency: 'RON', image: '', saved_at: '' },
+          {
+            product_id: 'p3',
+            variant_id: null,
+            quantity: 1,
+            name: 'Free',
+            slug: 'free',
+            price: 0,
+            currency: 'RON',
+            image: '',
+            saved_at: '',
+          },
         ]),
       );
       const { cmp } = create();
@@ -929,7 +1023,12 @@ describe('CartComponent', () => {
     it('applies eligible coupon and refreshes quote', fakeAsync(() => {
       const { cmp } = create();
       coupons.validate.and.returnValue(
-        of({ coupon: { code: 'SAVE10' }, eligible: true, reasons: [], estimated_shipping_discount_ron: '0' }),
+        of({
+          coupon: { code: 'SAVE10' },
+          eligible: true,
+          reasons: [],
+          estimated_shipping_discount_ron: '0',
+        }),
       );
       cartApi.get.and.returnValue(of({ items: [], totals: {} }));
       cmp.promo = 'save10';
@@ -943,7 +1042,12 @@ describe('CartComponent', () => {
     it('warns for ineligible coupon with reasons (untranslated keys)', fakeAsync(() => {
       const { cmp } = create();
       coupons.validate.and.returnValue(
-        of({ coupon: { code: 'SAVE10' }, eligible: false, reasons: ['min_order', 'unknown_reason'], estimated_shipping_discount_ron: '0' }),
+        of({
+          coupon: { code: 'SAVE10' },
+          eligible: false,
+          reasons: ['min_order', 'unknown_reason'],
+          estimated_shipping_discount_ron: '0',
+        }),
       );
       cmp.promo = 'save10';
       cmp.applyPromo();
@@ -957,7 +1061,11 @@ describe('CartComponent', () => {
 
     it('describeCouponReasons uses translated label when available', () => {
       const ts = TestBed.inject(TranslateService);
-      ts.setTranslation('en', { checkout: { couponReasons: { min_order: 'Minimum order' } } }, true);
+      ts.setTranslation(
+        'en',
+        { checkout: { couponReasons: { min_order: 'Minimum order' } } },
+        true,
+      );
       ts.use('en');
       // Skip change detection so the localized-currency pipe never triggers an fx fetch
       const { cmp } = create(false);
@@ -980,7 +1088,9 @@ describe('CartComponent', () => {
 
     it('warns on validate error with server detail', fakeAsync(() => {
       const { cmp } = create();
-      coupons.validate.and.returnValue(throwError(() => ({ status: 500, error: { detail: 'bad coupon' } })));
+      coupons.validate.and.returnValue(
+        throwError(() => ({ status: 500, error: { detail: 'bad coupon' } })),
+      );
       cmp.promo = 'save10';
       cmp.applyPromo();
       tick();
@@ -1002,7 +1112,12 @@ describe('CartComponent', () => {
     it('describes reasons with empty list fallback', fakeAsync(() => {
       const { cmp } = create();
       coupons.validate.and.returnValue(
-        of({ coupon: { code: 'SAVE10' }, eligible: false, reasons: [], estimated_shipping_discount_ron: '0' }),
+        of({
+          coupon: { code: 'SAVE10' },
+          eligible: false,
+          reasons: [],
+          estimated_shipping_discount_ron: '0',
+        }),
       );
       cmp.promo = 'save10';
       cmp.applyPromo();
@@ -1013,7 +1128,11 @@ describe('CartComponent', () => {
     it('describes reasons when reasons is undefined', fakeAsync(() => {
       const { cmp } = create();
       coupons.validate.and.returnValue(
-        of({ coupon: { code: 'SAVE10' }, eligible: false, estimated_shipping_discount_ron: '0' } as any),
+        of({
+          coupon: { code: 'SAVE10' },
+          eligible: false,
+          estimated_shipping_discount_ron: '0',
+        } as any),
       );
       cmp.promo = 'save10';
       cmp.applyPromo();

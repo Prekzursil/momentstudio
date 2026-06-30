@@ -61,11 +61,9 @@ describe('AdminSupportService', () => {
   });
 
   it('lists submissions and defaults include_pii to true', () => {
-    service
-      .list({ q: 'jane', status_filter: 'new', page: 2, limit: 10 })
-      .subscribe((res) => {
-        expect(res.meta.page).toBe(2);
-      });
+    service.list({ q: 'jane', status_filter: 'new', page: 2, limit: 10 }).subscribe((res) => {
+      expect(res.meta.page).toBe(2);
+    });
 
     const req = httpMock.expectOne((r) => r.url === '/api/v1/support/admin/submissions');
     expect(req.request.method).toBe('GET');

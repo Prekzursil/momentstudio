@@ -30,26 +30,19 @@ describe('PayPalReturnComponent', () => {
     analytics: jasmine.SpyObj<AnalyticsService>;
   }
 
-  function setup(
-    queryParams: Record<string, string>,
-    opts: SetupOptions = {},
-  ): Harness {
+  function setup(queryParams: Record<string, string>, opts: SetupOptions = {}): Harness {
     const route = {
       snapshot: { queryParamMap: convertToParamMap(queryParams) },
     };
 
     const api = jasmine.createSpyObj<ApiService>('ApiService', ['post']);
-    api.post.and.returnValue(
-      opts.post ?? (of({ order_id: 'order-1', status: 'paid' }) as never),
-    );
+    api.post.and.returnValue(opts.post ?? (of({ order_id: 'order-1', status: 'paid' }) as never));
 
     const router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.returnValue(Promise.resolve(true));
 
     const cart = jasmine.createSpyObj<CartStore>('CartStore', ['clear']);
-    const analytics = jasmine.createSpyObj<AnalyticsService>('AnalyticsService', [
-      'track',
-    ]);
+    const analytics = jasmine.createSpyObj<AnalyticsService>('AnalyticsService', ['track']);
 
     // Use the real TranslateModule so the component template's `| translate`
     // pipes (and those of the imported child components) render without error
@@ -274,21 +267,19 @@ describe('PayPalReturnComponent', () => {
     });
 
     it('falls back to the error message when the detail is blank', () => {
-      expect(
-        resolve({ error: { detail: '   ' }, message: 'Network unreachable' }),
-      ).toBe('Network unreachable');
-    });
-
-    it('ignores a non-string detail and uses the message instead', () => {
-      expect(resolve({ error: { detail: 42 }, message: 'Plain error' })).toBe(
-        'Plain error',
+      expect(resolve({ error: { detail: '   ' }, message: 'Network unreachable' })).toBe(
+        'Network unreachable',
       );
     });
 
+    it('ignores a non-string detail and uses the message instead', () => {
+      expect(resolve({ error: { detail: 42 }, message: 'Plain error' })).toBe('Plain error');
+    });
+
     it('discards a generic HTTP failure message in favor of the fallback key', () => {
-      expect(
-        resolve({ message: 'Http failure response for /x: 500 Server Error' }),
-      ).toBe('T:checkout.paypalCaptureFailed');
+      expect(resolve({ message: 'Http failure response for /x: 500 Server Error' })).toBe(
+        'T:checkout.paypalCaptureFailed',
+      );
     });
 
     it('uses the fallback key when the message is blank', () => {

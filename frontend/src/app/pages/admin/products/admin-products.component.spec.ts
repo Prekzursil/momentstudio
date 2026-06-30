@@ -151,9 +151,7 @@ function makeSpies(): Spies {
     of({ type: HttpEventType.Response, body: { images: [] } } as any),
   );
   admin.listStockAdjustments.and.returnValue(of([]));
-  admin.applyStockAdjustment.and.returnValue(
-    of({ after_quantity: 7, variant_id: null } as any),
-  );
+  admin.applyStockAdjustment.and.returnValue(of({ after_quantity: 7, variant_id: null } as any));
   admin.exportStockAdjustmentsCsv.and.returnValue(of(new Blob(['a'])));
   admin.updateProductVariants.and.returnValue(of([]));
   admin.getProductAudit.and.returnValue(of([]));
@@ -247,7 +245,9 @@ describe('AdminProductsComponent', () => {
 
   describe('lifecycle', () => {
     it('ngOnInit loads data and applies pending edit slug from history state', () => {
-      spyOnProperty(window.history, 'state', 'get').and.returnValue({ editProductSlug: '  slug-x ' });
+      spyOnProperty(window.history, 'state', 'get').and.returnValue({
+        editProductSlug: '  slug-x ',
+      });
       component.ngOnInit();
       expect(spies.favorites.init).toHaveBeenCalled();
       expect(spies.catalog.listCategories).toHaveBeenCalled();
@@ -514,7 +514,10 @@ describe('AdminProductsComponent', () => {
     it('maybeApplyFiltersFromState ignores non-product scopes and bad filters', () => {
       (component as any).maybeApplyFiltersFromState({ adminFilterScope: 'orders' });
       expect(component.q).toBe('');
-      (component as any).maybeApplyFiltersFromState({ adminFilterScope: 'products', adminFilters: 1 });
+      (component as any).maybeApplyFiltersFromState({
+        adminFilterScope: 'products',
+        adminFilters: 1,
+      });
       expect(component.q).toBe('');
     });
 
@@ -903,7 +906,10 @@ describe('AdminProductsComponent bulk status and categories', () => {
     (component as any).createCategoryContext = 'product_form';
     component.confirmCreateCategory();
     expect(component.form.category_id).toBe('c1');
-    expect(spies.admin.createCategory).toHaveBeenCalledWith({ name: 'New Cat', parent_id: 'parent' });
+    expect(spies.admin.createCategory).toHaveBeenCalledWith({
+      name: 'New Cat',
+      parent_id: 'parent',
+    });
   });
 
   it('confirmCreateCategory for filters sets category slug', () => {
@@ -924,9 +930,7 @@ describe('AdminProductsComponent bulk status and categories', () => {
 
   it('confirmCreateCategory shows server error detail', () => {
     component.createCategoryName = 'New Cat';
-    spies.admin.createCategory.and.returnValue(
-      throwError(() => ({ error: { detail: 'taken' } })),
-    );
+    spies.admin.createCategory.and.returnValue(throwError(() => ({ error: { detail: 'taken' } })));
     component.confirmCreateCategory();
     expect(component.createCategoryError()).toBe('taken');
   });
@@ -966,9 +970,7 @@ describe('AdminProductsComponent bulk status and categories', () => {
   });
 
   it('onCategoryManagerSelect resolves the selected category parent', () => {
-    component.categories.set([
-      { id: 'c1', slug: 'cat-1', name: 'Cat', parent_id: 'root' } as any,
-    ]);
+    component.categories.set([{ id: 'c1', slug: 'cat-1', name: 'Cat', parent_id: 'root' } as any]);
     component.onCategoryManagerSelect('cat-1');
     expect(component.categoryManagerParentId).toBe('root');
     expect(component.categoryManagerSelectedCategory()?.id).toBe('c1');
@@ -1032,9 +1034,12 @@ describe('AdminProductsComponent bulk status and categories', () => {
       { id: 'child', slug: 'child', name: 'Child', parent_id: 'root' } as any,
       { id: 'other', slug: 'other', name: 'Other', parent_id: null } as any,
     ]);
-    const opts = component.categoryParentOptions(
-      { id: 'root', slug: 'root', name: 'Root', parent_id: null } as any,
-    );
+    const opts = component.categoryParentOptions({
+      id: 'root',
+      slug: 'root',
+      name: 'Root',
+      parent_id: null,
+    } as any);
     expect(opts.map((c: any) => c.id)).toEqual(['other']);
   });
 
@@ -1044,9 +1049,12 @@ describe('AdminProductsComponent bulk status and categories', () => {
       { id: 'b', slug: 'b', name: 'B', parent_id: 'root' } as any,
       { id: 'c', slug: 'c', name: 'C', parent_id: 'x' } as any,
     ]);
-    const opts = component.mergeTargetOptions(
-      { id: 'a', slug: 'a', name: 'A', parent_id: 'root' } as any,
-    );
+    const opts = component.mergeTargetOptions({
+      id: 'a',
+      slug: 'a',
+      name: 'A',
+      parent_id: 'root',
+    } as any);
     expect(opts.map((c: any) => c.slug)).toEqual(['b']);
   });
 
@@ -1293,7 +1301,9 @@ describe('AdminProductsComponent bulk status and categories', () => {
 
   it('runCategoryImport surfaces a request error', () => {
     component.categoryImportFile = new File(['a'], 'c.csv');
-    spies.admin.importCategoriesCsv.and.returnValue(throwError(() => ({ error: { detail: 'oops' } })));
+    spies.admin.importCategoriesCsv.and.returnValue(
+      throwError(() => ({ error: { detail: 'oops' } })),
+    );
     component.runCategoryImport();
     expect(component.categoryImportError()).toBe('oops');
   });
@@ -1469,7 +1479,13 @@ describe('AdminProductsComponent bulk pricing, inline edit, csv', () => {
 
   it('startInlineEdit seeds inline fields from a product', () => {
     component.startInlineEdit(
-      listItem({ id: 'p1', base_price: 12.5, stock_quantity: 3, sale_type: 'amount', sale_value: 2 }),
+      listItem({
+        id: 'p1',
+        base_price: 12.5,
+        stock_quantity: 3,
+        sale_type: 'amount',
+        sale_value: 2,
+      }),
     );
     expect(component.inlineEditId).toBe('p1');
     expect(component.inlineBasePrice).toBe('12.50');
@@ -2321,7 +2337,14 @@ describe('AdminProductsComponent editor, save and wizard', () => {
     component.wizardStep.set(2);
     (component as any).wizardAdvanceAfterSave = true;
     spies.admin.createProduct.and.returnValue(
-      of({ id: 'np', slug: 'new-slug', status: 'published', is_active: true, images: [{ id: 'i', sort_order: 1 }], tags: [] } as any),
+      of({
+        id: 'np',
+        slug: 'new-slug',
+        status: 'published',
+        is_active: true,
+        images: [{ id: 'i', sort_order: 1 }],
+        tags: [],
+      } as any),
     );
     component.save({ skipStatusConfirm: true });
     expect(spies.admin.createProduct).toHaveBeenCalled();
@@ -2435,7 +2458,9 @@ describe('AdminProductsComponent variants, stock, relationships', () => {
   it('saveVariants surfaces detail and fallback errors', () => {
     component.editingSlug.set('s1');
     component.variants.set([{ name: 'A', additional_price_delta: '1', stock_quantity: 2 } as any]);
-    spies.admin.updateProductVariants.and.returnValue(throwError(() => ({ error: { detail: ' bad ' } })));
+    spies.admin.updateProductVariants.and.returnValue(
+      throwError(() => ({ error: { detail: ' bad ' } })),
+    );
     component.saveVariants();
     expect(component.variantsError()).toBe('bad');
     spies.admin.updateProductVariants.and.returnValue(throwError(() => ({})));
@@ -2482,7 +2507,9 @@ describe('AdminProductsComponent variants, stock, relationships', () => {
     component.applyStockAdjustment();
     expect(component.form.stock_quantity).toBe(7);
 
-    component.variants.set([{ id: 'v1', name: 'A', additional_price_delta: '0', stock_quantity: 1 } as any]);
+    component.variants.set([
+      { id: 'v1', name: 'A', additional_price_delta: '0', stock_quantity: 1 } as any,
+    ]);
     spies.admin.applyStockAdjustment.and.returnValue(
       of({ after_quantity: 9, variant_id: 'v1' } as any),
     );
@@ -2495,7 +2522,9 @@ describe('AdminProductsComponent variants, stock, relationships', () => {
   it('applyStockAdjustment surfaces detail and fallback errors', () => {
     component.editingProductId.set('pid');
     component.stockAdjustDelta = '5';
-    spies.admin.applyStockAdjustment.and.returnValue(throwError(() => ({ error: { detail: ' nope ' } })));
+    spies.admin.applyStockAdjustment.and.returnValue(
+      throwError(() => ({ error: { detail: ' nope ' } })),
+    );
     component.applyStockAdjustment();
     expect(component.stockAdjustmentsError()).toBe('nope');
     spies.admin.applyStockAdjustment.and.returnValue(throwError(() => ({})));
@@ -2683,7 +2712,11 @@ describe('AdminProductsComponent variants, stock, relationships', () => {
 
   it('translationDiffRows flags missing ro and different content', () => {
     component.translations.ro = { name: '', short_description: 'x', long_description: 'a' } as any;
-    component.translations.en = { name: 'EN', short_description: 'y', long_description: 'b' } as any;
+    component.translations.en = {
+      name: 'EN',
+      short_description: 'y',
+      long_description: 'b',
+    } as any;
     const rows = component.translationDiffRows();
     expect(rows.find((r: any) => r.field === 'name').statusKey).toContain('missingRo');
     expect(rows.find((r: any) => r.field === 'long_description').statusKey).toContain('different');
@@ -2753,7 +2786,14 @@ describe('AdminProductsComponent images, audit, load and helpers', () => {
     (component as any).imageUploadActiveId = 'u1';
     (component as any).imageUploadFiles.set('u1', new File(['a'], 'a.png'));
     component.imageUploads.set([
-      { id: 'u1', fileName: 'a.png', bytes: 1, status: 'uploading', progress: 0, error: null } as any,
+      {
+        id: 'u1',
+        fileName: 'a.png',
+        bytes: 1,
+        status: 'uploading',
+        progress: 0,
+        error: null,
+      } as any,
     ]);
     component.retryImageUpload('u1');
     expect(component.imageUploads()[0].status).toBe('uploading');
@@ -2769,7 +2809,14 @@ describe('AdminProductsComponent images, audit, load and helpers', () => {
     expect(component.imageUploads()).toEqual([]);
     (component as any).imageUploadActiveId = 'u2';
     component.imageUploads.set([
-      { id: 'u2', fileName: 'b.png', bytes: 1, status: 'uploading', progress: 0, error: null } as any,
+      {
+        id: 'u2',
+        fileName: 'b.png',
+        bytes: 1,
+        status: 'uploading',
+        progress: 0,
+        error: null,
+      } as any,
     ]);
     component.removeImageUpload('u2');
     expect(component.imageUploads().length).toBe(1);
@@ -2799,7 +2846,14 @@ describe('AdminProductsComponent images, audit, load and helpers', () => {
     component.editingSlug.set('s1');
     (component as any).imageUploadFiles.set('u1', new File(['a'], 'a.png'));
     component.imageUploads.set([
-      { id: 'u1', fileName: 'a.png', bytes: 200, status: 'queued', progress: 0, error: null } as any,
+      {
+        id: 'u1',
+        fileName: 'a.png',
+        bytes: 200,
+        status: 'queued',
+        progress: 0,
+        error: null,
+      } as any,
     ]);
     spies.admin.uploadProductImageWithProgress.and.returnValue(
       of(
@@ -2819,7 +2873,14 @@ describe('AdminProductsComponent images, audit, load and helpers', () => {
     component.editingSlug.set('s1');
     (component as any).imageUploadFiles.set('u1', new File(['a'], 'a.png'));
     component.imageUploads.set([
-      { id: 'u1', fileName: 'a.png', bytes: 100, status: 'queued', progress: 0, error: null } as any,
+      {
+        id: 'u1',
+        fileName: 'a.png',
+        bytes: 100,
+        status: 'queued',
+        progress: 0,
+        error: null,
+      } as any,
     ]);
     spies.admin.uploadProductImageWithProgress.and.returnValue(
       of({ type: HttpEventType.UploadProgress, loaded: 50, total: 0 } as any),
@@ -2947,7 +3008,9 @@ describe('AdminProductsComponent images, audit, load and helpers', () => {
     component.editingSlug.set('s1');
     component.editingImageId.set('i1');
     component.deletedImagesOpen.set(true);
-    spies.admin.deleteProductImage.and.returnValue(of({ images: [{ id: 'i2', sort_order: 1 }] } as any));
+    spies.admin.deleteProductImage.and.returnValue(
+      of({ images: [{ id: 'i2', sort_order: 1 }] } as any),
+    );
     component.deleteImage('i1');
     expect(component.editingImageId()).toBeNull();
     expect(spies.admin.listDeletedProductImages).toHaveBeenCalled();
@@ -3285,7 +3348,9 @@ describe('AdminProductsComponent branch coverage', () => {
   // guard */` directive in the component, matching admin-ops/analytics.
 
   it('newImageUploadId falls back when randomUUID throws', () => {
-    const orig = Object.getOwnPropertyDescriptor(crypto, 'randomUUID');
+    // randomUUID is inherited from Crypto.prototype, so getOwnPropertyDescriptor
+    // returns undefined; shadow it with a configurable own property and remove
+    // that own property afterwards to restore the native implementation.
     Object.defineProperty(crypto, 'randomUUID', {
       configurable: true,
       value: () => {
@@ -3295,7 +3360,7 @@ describe('AdminProductsComponent branch coverage', () => {
     try {
       expect((component as any).newImageUploadId()).toContain('-');
     } finally {
-      if (orig) Object.defineProperty(crypto, 'randomUUID', orig);
+      delete (crypto as { randomUUID?: unknown }).randomUUID;
     }
   });
 
@@ -3347,9 +3412,12 @@ describe('AdminProductsComponent branch coverage', () => {
       { id: 'b', slug: 'b', name: 'Bravo', parent_id: null } as any,
       { id: 'a', slug: 'a', name: 'Alpha', parent_id: null } as any,
     ]);
-    const opts = component.categoryParentOptions(
-      { id: 'self', slug: 'self', name: 'Self', parent_id: null } as any,
-    );
+    const opts = component.categoryParentOptions({
+      id: 'self',
+      slug: 'self',
+      name: 'Self',
+      parent_id: null,
+    } as any);
     expect(opts.map((c: any) => c.name)).toEqual(['Alpha', 'Bravo']);
   });
 
@@ -3382,9 +3450,12 @@ describe('AdminProductsComponent branch coverage', () => {
       { id: 'c', slug: 'c', name: 'Charlie', parent_id: 'root' } as any,
       { id: 'b', slug: 'b', name: 'Bravo', parent_id: 'root' } as any,
     ]);
-    const opts = component.mergeTargetOptions(
-      { id: 'a', slug: 'a', name: 'Alpha', parent_id: 'root' } as any,
-    );
+    const opts = component.mergeTargetOptions({
+      id: 'a',
+      slug: 'a',
+      name: 'Alpha',
+      parent_id: 'root',
+    } as any);
     expect(opts.map((c: any) => c.name)).toEqual(['Bravo', 'Charlie']);
   });
 
@@ -3501,7 +3572,12 @@ describe('AdminProductsComponent branch coverage', () => {
     spies.admin.uploadProductImageWithProgress.and.returnValue(
       of({
         type: HttpEventType.Response,
-        body: { images: [{ id: 'i2', sort_order: 2 }, { id: 'i1', sort_order: 1 }] },
+        body: {
+          images: [
+            { id: 'i2', sort_order: 2 },
+            { id: 'i1', sort_order: 1 },
+          ],
+        },
       } as any),
     );
     (component as any).maybeStartImageUpload();
@@ -3518,7 +3594,12 @@ describe('AdminProductsComponent branch coverage', () => {
   it('restoreDeletedImage sorts multiple images', () => {
     component.editingSlug.set('s1');
     spies.admin.restoreProductImage.and.returnValue(
-      of({ images: [{ id: 'i2', sort_order: 2 }, { id: 'i1', sort_order: 1 }] } as any),
+      of({
+        images: [
+          { id: 'i2', sort_order: 2 },
+          { id: 'i1', sort_order: 1 },
+        ],
+      } as any),
     );
     component.restoreDeletedImage('i1');
     expect(component.images()[0].id).toBe('i1');
@@ -3688,7 +3769,10 @@ describe('AdminProductsComponent fallback branch coverage', () => {
   });
 
   it('quickSetStatus success falls back to slug for the toast name', () => {
-    component.quickSetStatus(listItem({ id: 'p1', name: '', slug: 'slug-1', status: 'draft' }), 'published');
+    component.quickSetStatus(
+      listItem({ id: 'p1', name: '', slug: 'slug-1', status: 'draft' }),
+      'published',
+    );
     expect(spies.toast.action).toHaveBeenCalled();
   });
 
@@ -3750,7 +3834,10 @@ describe('AdminProductsComponent fallback branch coverage', () => {
   });
 
   it('updateBulkPricePreview handles decrease direction and non-numeric base', () => {
-    component.products.set([listItem({ id: 'p1', base_price: undefined }), listItem({ id: 'p2', base_price: 20 })]);
+    component.products.set([
+      listItem({ id: 'p1', base_price: undefined }),
+      listItem({ id: 'p2', base_price: 20 }),
+    ]);
     component.selected = new Set(['p1', 'p2']);
     component.bulkPriceDirection = 'decrease';
     component.bulkPriceMode = 'percent';
@@ -3892,7 +3979,14 @@ describe('AdminProductsComponent fallback branch coverage', () => {
   it('save sorts response images that lack sort_order', () => {
     component.form.base_price = '10';
     spies.admin.createProduct.and.returnValue(
-      of({ id: 'np', slug: 's', status: 'draft', is_active: true, images: [{ id: 'i2' }, { id: 'i1', sort_order: 1 }], tags: [] } as any),
+      of({
+        id: 'np',
+        slug: 's',
+        status: 'draft',
+        is_active: true,
+        images: [{ id: 'i2' }, { id: 'i1', sort_order: 1 }],
+        tags: [],
+      } as any),
     );
     component.save({ skipStatusConfirm: true });
     expect(component.images().length).toBe(2);
@@ -4082,7 +4176,12 @@ describe('AdminProductsComponent fallback branch coverage', () => {
   it('deleteImage sorts the returned images', () => {
     component.editingSlug.set('s1');
     spies.admin.deleteProductImage.and.returnValue(
-      of({ images: [{ id: 'i2', sort_order: 2 }, { id: 'i1', sort_order: 1 }] } as any),
+      of({
+        images: [
+          { id: 'i2', sort_order: 2 },
+          { id: 'i1', sort_order: 1 },
+        ],
+      } as any),
     );
     component.deleteImage('i9');
     expect(component.images()[0].id).toBe('i1');
@@ -4334,10 +4433,14 @@ describe('AdminProductsComponent residual branch coverage', () => {
 
   it('deleteImage and restoreDeletedImage sort images lacking sort order', () => {
     component.editingSlug.set('s1');
-    spies.admin.deleteProductImage.and.returnValue(of({ images: [{ id: 'i2' }, { id: 'i1' }] } as any));
+    spies.admin.deleteProductImage.and.returnValue(
+      of({ images: [{ id: 'i2' }, { id: 'i1' }] } as any),
+    );
     component.deleteImage('x');
     expect(component.images().length).toBe(2);
-    spies.admin.restoreProductImage.and.returnValue(of({ images: [{ id: 'i2' }, { id: 'i1' }] } as any));
+    spies.admin.restoreProductImage.and.returnValue(
+      of({ images: [{ id: 'i2' }, { id: 'i1' }] } as any),
+    );
     component.restoreDeletedImage('y');
     expect(component.images().length).toBe(2);
   });
@@ -4370,7 +4473,12 @@ describe('AdminProductsComponent residual branch coverage', () => {
       { id: 'a', slug: 'a', name: 'A', parent_id: null } as any,
       { id: 'b', slug: 'b', name: 'B', parent_id: null } as any,
     ]);
-    const opts = component.mergeTargetOptions({ id: 'a', slug: 'a', name: 'A', parent_id: null } as any);
+    const opts = component.mergeTargetOptions({
+      id: 'a',
+      slug: 'a',
+      name: 'A',
+      parent_id: null,
+    } as any);
     expect(opts.map((c: any) => c.slug)).toEqual(['b']);
   });
 });

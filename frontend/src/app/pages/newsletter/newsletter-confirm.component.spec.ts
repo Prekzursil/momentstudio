@@ -94,9 +94,7 @@ describe('NewsletterConfirmComponent', () => {
 
   it('uses the server-provided detail message on error', () => {
     configure('bad-token');
-    newsletter.confirm.and.returnValue(
-      throwError(() => ({ error: { detail: 'Token expired' } })),
-    );
+    newsletter.confirm.and.returnValue(throwError(() => ({ error: { detail: 'Token expired' } })));
     const fixture = create();
     const component = fixture.componentInstance;
 

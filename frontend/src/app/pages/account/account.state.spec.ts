@@ -179,6 +179,7 @@ describe('AccountState', () => {
 
   beforeEach(() => {
     savedEnv.pkc = (window as any).PublicKeyCredential;
+    savedEnv.secureDesc = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
     savedEnv.credsDesc = Object.getOwnPropertyDescriptor(navigator, 'credentials');
     // window.isSecureContext is a native read-only accessor on Chrome 149.
     // setWebAuthnSupport() shadows it with an own data property, which strips the
@@ -412,6 +413,13 @@ describe('AccountState', () => {
 
   afterEach(() => {
     (window as any).PublicKeyCredential = savedEnv.pkc;
+    // Restore window.isSecureContext to its original (inherited accessor) form so
+    // later specs can spyOnProperty it; a leaked data property breaks that.
+    if (savedEnv.secureDesc) {
+      Object.defineProperty(window, 'isSecureContext', savedEnv.secureDesc);
+    } else {
+      delete (window as any).isSecureContext;
+    }
     if (savedEnv.credsDesc) {
       Object.defineProperty(navigator, 'credentials', savedEnv.credsDesc);
     }

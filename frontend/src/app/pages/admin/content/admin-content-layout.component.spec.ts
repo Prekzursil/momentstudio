@@ -105,11 +105,9 @@ describe('AdminContentLayoutComponent', () => {
   });
 
   function buttonByText(label: string): HTMLButtonElement {
-    const button = Array.from(
-      fixture.nativeElement.querySelectorAll('button'),
-    ).find((el) => ((el as HTMLElement).textContent || '').trim() === label) as
-      | HTMLButtonElement
-      | undefined;
+    const button = Array.from(fixture.nativeElement.querySelectorAll('button')).find(
+      (el) => ((el as HTMLElement).textContent || '').trim() === label,
+    ) as HTMLButtonElement | undefined;
     if (!button) {
       throw new Error(`Button with label "${label}" not found`);
     }

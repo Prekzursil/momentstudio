@@ -1890,9 +1890,7 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       await this.loadRetryPolicyPresets(jobType);
       // loadRetryPolicyPresets always assigns an array (items on success, [] on
       // failure), so the entry is guaranteed defined here — no fallback needed.
-      preset = this.retryPolicyPresetsByType[jobType].find(
-        (item) => item.preset_key === presetKey,
-      );
+      preset = this.retryPolicyPresetsByType[jobType].find((item) => item.preset_key === presetKey);
     }
     if (!preset) {
       this.retryPolicyRowErrors[jobType] = 'Preset is not available.';

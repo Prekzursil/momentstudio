@@ -255,16 +255,16 @@ describe('AccountWishlistComponent', () => {
 
     it('is false when out of stock but backorder is allowed', () => {
       const cmp = create();
-      expect(
-        cmp.isOutOfStock(makeProduct({ stock_quantity: 0, allow_backorder: true })),
-      ).toBe(false);
+      expect(cmp.isOutOfStock(makeProduct({ stock_quantity: 0, allow_backorder: true }))).toBe(
+        false,
+      );
     });
 
     it('is true when out of stock and no backorder (null stock treated as zero)', () => {
       const cmp = create();
-      expect(
-        cmp.isOutOfStock(makeProduct({ stock_quantity: null, allow_backorder: false })),
-      ).toBe(true);
+      expect(cmp.isOutOfStock(makeProduct({ stock_quantity: null, allow_backorder: false }))).toBe(
+        true,
+      );
     });
   });
 
@@ -476,9 +476,9 @@ describe('AccountWishlistComponent', () => {
     it('reports "out" when an item that used to be stocked is now unavailable', () => {
       wishlist.getBaseline.and.returnValue({ saved_at: 's', price: 10, stock_quantity: 5 });
       const cmp = create();
-      expect(
-        cmp.stockChange(makeProduct({ stock_quantity: 0, allow_backorder: false })),
-      ).toBe('out');
+      expect(cmp.stockChange(makeProduct({ stock_quantity: 0, allow_backorder: false }))).toBe(
+        'out',
+      );
     });
 
     it('reports "back" when a previously empty item is stocked again', () => {
@@ -490,9 +490,9 @@ describe('AccountWishlistComponent', () => {
     it('reports "back" via backorder availability when stock is missing', () => {
       wishlist.getBaseline.and.returnValue({ saved_at: 's', price: 10, stock_quantity: 0 });
       const cmp = create();
-      expect(
-        cmp.stockChange(makeProduct({ stock_quantity: null, allow_backorder: true })),
-      ).toBe('back');
+      expect(cmp.stockChange(makeProduct({ stock_quantity: null, allow_backorder: true }))).toBe(
+        'back',
+      );
     });
 
     it('returns null when availability is unchanged', () => {

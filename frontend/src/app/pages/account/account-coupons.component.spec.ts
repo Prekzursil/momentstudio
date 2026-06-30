@@ -4,11 +4,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { NEVER, of, throwError } from 'rxjs';
 
 import { AccountCouponsComponent } from './account-coupons.component';
-import {
-  CouponsService,
-  type CouponRead,
-  type PromotionRead,
-} from '../../core/coupons.service';
+import { CouponsService, type CouponRead, type PromotionRead } from '../../core/coupons.service';
 import { ToastService } from '../../core/toast.service';
 
 function makePromotion(overrides: Partial<PromotionRead> = {}): PromotionRead {
@@ -271,9 +267,7 @@ describe('AccountCouponsComponent', () => {
     });
 
     it('shows the error message when loading failed', () => {
-      couponsService.myCoupons.and.returnValue(
-        throwError(() => ({ error: { detail: 'Oops' } })),
-      );
+      couponsService.myCoupons.and.returnValue(throwError(() => ({ error: { detail: 'Oops' } })));
       const { fixture } = createComponent();
       fixture.detectChanges();
 

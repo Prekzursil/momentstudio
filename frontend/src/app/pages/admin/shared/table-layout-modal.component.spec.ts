@@ -48,9 +48,7 @@ describe('TableLayoutModalComponent', () => {
 
     it('marks required columns as checked and disabled', () => {
       const root = fixture.nativeElement as HTMLElement;
-      const firstCheckbox = root.querySelector(
-        'input[type="checkbox"]',
-      ) as HTMLInputElement;
+      const firstCheckbox = root.querySelector('input[type="checkbox"]') as HTMLInputElement;
       // 'name' is required: visible (checked) and not toggleable (disabled).
       expect(firstCheckbox.checked).toBeTrue();
       expect(firstCheckbox.disabled).toBeTrue();
@@ -96,7 +94,12 @@ describe('TableLayoutModalComponent', () => {
 
     it('reacts to a layout-only change', () => {
       component.open = true;
-      component.layout = { version: 1, order: ['email', 'name', 'role'], hidden: ['email'], density: 'compact' };
+      component.layout = {
+        version: 1,
+        order: ['email', 'name', 'role'],
+        hidden: ['email'],
+        density: 'compact',
+      };
       component.ngOnChanges({ layout: change(null, component.layout) } as SimpleChanges);
       expect(component.draftOrder).toEqual(['email', 'name', 'role']);
       expect(component.draftDensity).toBe('compact');
@@ -105,7 +108,12 @@ describe('TableLayoutModalComponent', () => {
 
     it('reacts to a defaults-only change', () => {
       component.open = true;
-      component.defaults = { version: 1, order: ['role', 'email', 'name'], hidden: [], density: 'comfortable' };
+      component.defaults = {
+        version: 1,
+        order: ['role', 'email', 'name'],
+        hidden: [],
+        density: 'comfortable',
+      };
       component.ngOnChanges({ defaults: change(null, component.defaults) } as SimpleChanges);
       expect(component.draftOrder).toEqual(['role', 'email', 'name']);
     });
@@ -267,8 +275,18 @@ describe('TableLayoutModalComponent', () => {
     });
 
     it('prefers layout when a layout is set', () => {
-      component.layout = { version: 1, order: ['role', 'name', 'email'], hidden: [], density: 'compact' };
-      component.defaults = { version: 1, order: ['name', 'email', 'role'], hidden: [], density: 'comfortable' };
+      component.layout = {
+        version: 1,
+        order: ['role', 'name', 'email'],
+        hidden: [],
+        density: 'compact',
+      };
+      component.defaults = {
+        version: 1,
+        order: ['name', 'email', 'role'],
+        hidden: [],
+        density: 'comfortable',
+      };
       component.ngOnChanges({ open: change(false, true) } as SimpleChanges);
       expect(component.draftOrder).toEqual(['role', 'name', 'email']);
       expect(component.draftDensity).toBe('compact');
@@ -276,7 +294,12 @@ describe('TableLayoutModalComponent', () => {
 
     it('uses defaults when layout is null but defaults is set', () => {
       component.layout = null;
-      component.defaults = { version: 1, order: ['email', 'role', 'name'], hidden: ['role'], density: 'comfortable' };
+      component.defaults = {
+        version: 1,
+        order: ['email', 'role', 'name'],
+        hidden: ['role'],
+        density: 'comfortable',
+      };
       component.ngOnChanges({ open: change(false, true) } as SimpleChanges);
       expect(component.draftOrder).toEqual(['email', 'role', 'name']);
       expect(component.draftHidden.has('role')).toBeTrue();
