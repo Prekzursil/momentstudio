@@ -2708,7 +2708,7 @@ describe('AdminComponent', () => {
         focal_x: 1,
         focal_y: 2,
       } as any);
-      let cur = env.c.pageBlocks['page.about'].find((b) => b.type === 'gallery')!;
+      const cur = env.c.pageBlocks['page.about'].find((b) => b.type === 'gallery')!;
       expect(cur.images.length).toBeGreaterThanOrEqual(3);
       env.c.removePageGalleryImage('page.about', gallery.key, 0);
       env.c.setPageImageBlockUrl(

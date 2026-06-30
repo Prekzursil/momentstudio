@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -5980,6 +5980,7 @@ describe('AdminComponent — legal save, media drop, split scroll', () => {
     });
     h.admin.createContent.and.returnValue(of({ version: 1 }));
     (c as any).saveLegalPage('page.terms', 'Body', 'en');
+    expect(calls).toBe(1);
     expect(c.legalPageMessage).toBeTruthy();
   });
 
@@ -5994,7 +5995,7 @@ describe('AdminComponent — legal save, media drop, split scroll', () => {
     expect(onErr).toHaveBeenCalled();
   });
 
-  it('onHomeBlockDrop handles media files and missing keys', async () => {
+  it('onHomeBlockDrop handles media files and missing keys', () => {
     spyOn(c, 'insertHomeMediaFiles');
     const file = new File(['x'], 'a.png', { type: 'image/png' });
     c.homeBlocks = [{ key: 'a', type: 'text' }];
