@@ -7,6 +7,17 @@ import { ApiService } from './api.service';
 describe('AnalyticsService', () => {
   let post: jasmine.Spy;
 
+  // Chrome 149 exposes crypto.randomUUID on Crypto.prototype (inherited), not as
+  // an own property of the crypto instance. A sibling spec captures
+  // Object.getOwnPropertyDescriptor(crypto, 'randomUUID') (which is therefore
+  // undefined), defines a throwing OWN property to test its fallback, and then
+  // skips its `if (orig)` restore -- leaking a read-only, throwing
+  // crypto.randomUUID into every later spec. Snapshot the genuine implementation
+  // once (captured at registration time, before any spec mutates it) and
+  // re-install a clean, writable, configurable own property before each test so
+  // these specs are isolated from that cross-spec contamination.
+  const realRandomUUID = crypto.randomUUID.bind(crypto);
+
   function configure(): AnalyticsService {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -16,6 +27,11 @@ describe('AnalyticsService', () => {
   }
 
   beforeEach(() => {
+    Object.defineProperty(crypto, 'randomUUID', {
+      configurable: true,
+      writable: true,
+      value: realRandomUUID,
+    });
     localStorage.clear();
     sessionStorage.clear();
     delete (window as { dataLayer?: unknown[] }).dataLayer;
@@ -28,6 +44,9 @@ describe('AnalyticsService', () => {
   afterEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    // Drop our own override so the pristine inherited crypto.randomUUID is
+    // restored and this suite never leaks state into later specs.
+    delete (crypto as { randomUUID?: unknown }).randomUUID;
   });
 
   it('reads the persisted opt-in state on construction', () => {
@@ -236,14 +255,15 @@ describe('AnalyticsService', () => {
   });
 
   it('falls back to a timestamp id when crypto.randomUUID is unavailable', () => {
-    const original = crypto.randomUUID;
-    (crypto as unknown as { randomUUID?: unknown }).randomUUID = undefined;
+    // crypto.randomUUID is inherited and non-writable in modern Chromium; shadow
+    // it with a configurable own property and delete it afterwards to restore.
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
     try {
       const service = configure();
       service.setEnabled(true);
       expect(sessionStorage.getItem('analytics.session_id.v1')).toBeTruthy();
     } finally {
-      (crypto as unknown as { randomUUID?: unknown }).randomUUID = original;
+      delete (crypto as unknown as { randomUUID?: unknown }).randomUUID;
     }
   });
 

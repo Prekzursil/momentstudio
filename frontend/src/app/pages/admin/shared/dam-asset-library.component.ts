@@ -1732,8 +1732,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
       this.retryPolicyHistoryOpen.set(new Set<string>());
       this.toast.success('All retry policies were reset to defaults.');
     } catch (err) {
-      this.retryPoliciesError.set((err as any)?.error?.detail || 'Failed to reset retry policies.');
-      this.toast.error(this.retryPoliciesError() || 'Failed to reset retry policies.');
+      const message = (err as any)?.error?.detail || 'Failed to reset retry policies.';
+      this.retryPoliciesError.set(message);
+      this.toast.error(message);
     }
   }
 
@@ -1887,9 +1888,9 @@ export class DamAssetLibraryComponent implements OnInit, OnDestroy {
     let preset = presets.find((item) => item.preset_key === presetKey);
     if (!preset) {
       await this.loadRetryPolicyPresets(jobType);
-      preset = (this.retryPolicyPresetsByType[jobType] || []).find(
-        (item) => item.preset_key === presetKey,
-      );
+      // loadRetryPolicyPresets always assigns an array (items on success, [] on
+      // failure), so the entry is guaranteed defined here — no fallback needed.
+      preset = this.retryPolicyPresetsByType[jobType].find((item) => item.preset_key === presetKey);
     }
     if (!preset) {
       this.retryPolicyRowErrors[jobType] = 'Preset is not available.';
