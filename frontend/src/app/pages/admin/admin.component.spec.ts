@@ -334,7 +334,6 @@ describe('AdminComponent', () => {
       [
         'loadCategories',
         'loadTaxGroups',
-        'loadSocial',
         'loadNavigation',
         'loadReportsSettings',
         'loadSeo',
@@ -359,7 +358,6 @@ describe('AdminComponent', () => {
       [
         'loadCategories',
         'loadTaxGroups',
-        'loadSocial',
         'loadNavigation',
         'loadReportsSettings',
         'loadSeo',
@@ -2161,63 +2159,6 @@ describe('AdminComponent', () => {
       env.admin.sendScheduledReport.and.returnValue(throwError(() => new Error('x')));
       env.c.sendReportNow('weekly');
       expect(env.c.reportsSettingsError).toBe('adminUi.reports.errors.send');
-    });
-
-    it('loadSocial parses pages + survives errors', () => {
-      const env = build('settings');
-      env.admin.getContent.and.returnValue(
-        of({
-          version: 1,
-          meta: {
-            contact: { phone: '123', email: 'a@b.com' },
-            instagram_pages: [{ label: 'IG', url: 'https://ig', thumbnail_url: '' }],
-          },
-        }),
-      );
-      env.c.loadSocial();
-      expect(env.c.socialForm.phone).toBe('123');
-      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-      expect(() => env.c.loadSocial()).not.toThrow();
-    });
-
-    it('addSocialLink + removeSocialLink mutate the page lists', () => {
-      const env = build('settings');
-      const igBefore = env.c.socialForm.instagram_pages.length;
-      env.c.addSocialLink('instagram');
-      expect(env.c.socialForm.instagram_pages.length).toBe(igBefore + 1);
-      env.c.addSocialLink('facebook');
-      env.c.removeSocialLink('instagram', env.c.socialForm.instagram_pages.length - 1);
-      expect(env.c.socialForm.instagram_pages.length).toBe(igBefore);
-      const fbLen = env.c.socialForm.facebook_pages.length;
-      env.c.removeSocialLink('facebook', fbLen - 1);
-      expect(env.c.socialForm.facebook_pages.length).toBe(fbLen - 1);
-      expect(env.c.socialThumbKey('instagram', 2)).toBe('instagram-2');
-    });
-
-    it('fetchSocialThumbnail validates url + applies result', () => {
-      const env = build('settings');
-      env.c.socialForm.instagram_pages = [{ label: 'IG', url: '', thumbnail_url: '' }];
-      env.c.fetchSocialThumbnail('instagram', 0);
-      expect(env.c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.urlRequired');
-      env.c.socialForm.instagram_pages = [{ label: 'IG', url: 'https://ig', thumbnail_url: '' }];
-      env.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: 'thumb.png' }));
-      env.c.fetchSocialThumbnail('instagram', 0);
-      expect(env.c.socialForm.instagram_pages[0].thumbnail_url).toBe('thumb.png');
-      env.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '' }));
-      env.c.fetchSocialThumbnail('instagram', 0);
-      expect(env.c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.noThumbnail');
-      env.admin.fetchSocialThumbnail.and.returnValue(
-        throwError(() => ({ error: { detail: 'bad-url' } })),
-      );
-      env.c.fetchSocialThumbnail('instagram', 0);
-      expect(env.c.socialThumbErrors['instagram-0']).toBe('bad-url');
-    });
-
-    it('saveSocial persists sanitized pages', () => {
-      const env = build('settings');
-      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-      env.c.saveSocial();
-      expect(env.c.socialMessage).toBe('adminUi.site.social.success.save');
     });
   });
 

@@ -2915,62 +2915,6 @@ describe('AdminComponent — branch fill', () => {
     });
   });
 
-  describe('social', () => {
-    it('parseSocialPages falls back for non-arrays and skips invalid entries', () => {
-      const fb = [{ label: 'd', url: 'u', thumbnail_url: '' }];
-      expect(c.parseSocialPages('not-array', fb)).toBe(fb);
-      const parsed = c.parseSocialPages([null, 5, { label: 1, url: 2, thumbnail_url: 3 }], fb);
-      expect(parsed.length).toBe(1);
-      expect(parsed[0]).toEqual({ label: '1', url: '2', thumbnail_url: '3' });
-    });
-
-    it('loadSocial merges contact info and parses page lists; ignores errors', () => {
-      c.socialForm = { phone: 'old', email: '', instagram_pages: [], facebook_pages: [] };
-      h.admin.getContent.and.returnValue(
-        of({ meta: { contact: { email: 'm@e.co' }, instagram_pages: [{ url: 'ig' }] } }),
-      );
-      c.loadSocial();
-      expect(c.socialForm.phone).toBe('old');
-      expect(c.socialForm.email).toBe('m@e.co');
-      expect(c.socialForm.instagram_pages.length).toBe(1);
-      c.contentVersions['site.social'] = { version: 1 };
-      h.admin.getContent.and.returnValue(throwError(() => ({})));
-      c.loadSocial();
-      expect(c.contentVersions['site.social']).toBeUndefined();
-    });
-
-    it('fetchSocialThumbnail validates the url and applies/falls-back/errors', () => {
-      c.socialForm = {
-        phone: '',
-        email: '',
-        instagram_pages: [{ label: '', url: '', thumbnail_url: '' }],
-        facebook_pages: [],
-      };
-      c.socialThumbErrors = {};
-      c.socialThumbLoading = {};
-      c.fetchSocialThumbnail('instagram', 0);
-      expect(c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.urlRequired');
-
-      c.socialForm.instagram_pages = [{ label: '', url: 'http://ig', thumbnail_url: '' }];
-      h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: ' /thumb ' }));
-      c.fetchSocialThumbnail('instagram', 0);
-      expect(c.socialForm.instagram_pages[0].thumbnail_url).toBe('/thumb');
-      expect(h.toast.success).toHaveBeenCalled();
-
-      h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '' }));
-      c.fetchSocialThumbnail('instagram', 0);
-      expect(c.socialThumbErrors['instagram-0']).toBe('adminUi.site.social.errors.noThumbnail');
-
-      c.socialForm.facebook_pages = [{ label: '', url: 'http://fb', thumbnail_url: '' }];
-      h.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({ error: { detail: 'fd' } })));
-      c.fetchSocialThumbnail('facebook', 0);
-      expect(c.socialThumbErrors['facebook-0']).toBe('fd');
-      h.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({})));
-      c.fetchSocialThumbnail('facebook', 0);
-      expect(c.socialThumbErrors['facebook-0']).toBe('adminUi.site.social.errors.fetchFailed');
-    });
-  });
-
   describe('onNavigationDrop', () => {
     function link(id: string): any {
       return { id, url: `/u/${id}`, label: { en: id, ro: id } };

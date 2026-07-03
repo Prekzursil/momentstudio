@@ -2703,33 +2703,6 @@ describe('AdminComponent — site settings load/save (assets, social, seo)', () 
     h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
   });
 
-  it('loadSocial maps contact + pages and keeps defaults on error', () => {
-    h.admin.getContent.and.returnValue(
-      of({
-        version: 2,
-        meta: {
-          contact: { phone: '123', email: 'a@b.c' },
-          instagram_pages: [{ label: 'IG', url: 'u' }],
-        },
-      }),
-    );
-    c.loadSocial();
-    expect(c.socialForm.phone).toBe('123');
-    expect(c.socialForm.instagram_pages.length).toBe(1);
-    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-    expect(() => c.loadSocial()).not.toThrow();
-  });
-
-  it('addSocialLink and removeSocialLink manage page lists', () => {
-    c.socialForm = { phone: '', email: '', instagram_pages: [], facebook_pages: [] };
-    c.addSocialLink('instagram');
-    c.addSocialLink('facebook');
-    expect(c.socialForm.instagram_pages.length).toBe(1);
-    expect(c.socialForm.facebook_pages.length).toBe(1);
-    c.removeSocialLink('instagram', 0);
-    expect(c.socialForm.instagram_pages.length).toBe(0);
-  });
-
   it('loadSeo maps title/description and resets on error', () => {
     c.seoPage = 'home';
     c.seoLang = 'en';
@@ -2936,33 +2909,6 @@ describe('AdminComponent — navigation editor', () => {
     h.admin.createContent.and.returnValue(of({ version: 1 }));
     c.saveNavigation();
     expect(c.navigationMessage).toBeTruthy();
-  });
-
-  it('saveSocial sanitises pages and persists with fallbacks', () => {
-    c.socialForm = {
-      phone: ' 123 ',
-      email: ' a@b.c ',
-      instagram_pages: [
-        { label: 'IG', url: '/ig', thumbnail_url: '' },
-        { label: '', url: '/x', thumbnail_url: '' },
-      ],
-      facebook_pages: [],
-    };
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-    c.saveSocial();
-    const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
-    expect(payload.meta.instagram_pages.length).toBe(1); // blank label dropped
-    expect(c.socialMessage).toBeTruthy();
-
-    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-    c.saveSocial();
-    expect(c.socialError).toBeTruthy();
-
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
-    h.admin.createContent.and.returnValue(of({ version: 1 }));
-    c.saveSocial();
-    expect(c.socialMessage).toBeTruthy();
   });
 
   it('selectSeoLang switches language and reloads', () => {
@@ -4649,29 +4595,6 @@ describe('AdminComponent — blog meta, info save, social thumbnails, content', 
     );
     c.togglePageNeedsTranslation('page.about', 'ro', checkboxEvent(false));
     expect(h.toast.error).toHaveBeenCalledWith('d');
-  });
-
-  it('fetchSocialThumbnail validates url and updates the page', () => {
-    c.socialForm = {
-      instagram_pages: [{ url: '', label: '', thumbnail_url: '' }],
-      facebook_pages: [],
-    };
-    c.fetchSocialThumbnail('instagram', 0); // no url
-    expect(h.admin.fetchSocialThumbnail).not.toHaveBeenCalled();
-
-    c.socialForm.instagram_pages = [{ url: '/ig', label: 'IG', thumbnail_url: '' }];
-    h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '/thumb.jpg' }));
-    c.fetchSocialThumbnail('instagram', 0);
-    expect(c.socialForm.instagram_pages[0].thumbnail_url).toBe('/thumb.jpg');
-
-    h.admin.fetchSocialThumbnail.and.returnValue(of({ thumbnail_url: '' }));
-    c.fetchSocialThumbnail('instagram', 0);
-    const key = (c as any).socialThumbKey('instagram', 0);
-    expect(c.socialThumbErrors[key]).toBeTruthy();
-
-    h.admin.fetchSocialThumbnail.and.returnValue(throwError(() => ({ error: { detail: 'fail' } })));
-    c.fetchSocialThumbnail('instagram', 0);
-    expect(c.socialThumbErrors[key]).toBe('fail');
   });
 
   it('selectContent loads a content block and saveContent persists it', () => {
