@@ -64,6 +64,7 @@ import {
 import { LocalizedTextEditorComponent } from './shared/localized-text-editor.component';
 import { AdminCompanyInfoComponent } from './settings/admin-company-info.component';
 import { AdminCheckoutSettingsComponent } from './settings/admin-checkout-settings.component';
+import { AdminSiteAssetsComponent } from './settings/admin-site-assets.component';
 import {
   CMS_GLOBAL_SECTIONS,
   CmsGlobalSectionKey,
@@ -519,6 +520,7 @@ class CmsDraftManager<T> {
     LocalizedTextEditorComponent,
     AdminCompanyInfoComponent,
     AdminCheckoutSettingsComponent,
+    AdminSiteAssetsComponent,
     TranslateModule,
   ],
   template: `
@@ -533,65 +535,13 @@ class CmsDraftManager<T> {
         (retry)="retryLoadAll()"
       ></app-error-state>
       <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
-        <section
+        <app-admin-site-assets
           *ngIf="section() === 'settings'"
-          class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.site.assets.title' | translate }}
-            </h2>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.actions.refresh' | translate"
-              (action)="loadAssets()"
-            ></app-button>
-          </div>
-          <div class="grid md:grid-cols-3 gap-3 text-sm">
-            <app-input
-              [label]="'adminUi.site.assets.logoUrl' | translate"
-              [(value)]="assetsForm.logo_url"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.assets.faviconUrl' | translate"
-              [(value)]="assetsForm.favicon_url"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.assets.socialImageUrl' | translate"
-              [(value)]="assetsForm.social_image_url"
-            ></app-input>
-          </div>
-          <div class="flex items-center gap-2 text-sm">
-            <app-button
-              size="sm"
-              [label]="'adminUi.site.assets.save' | translate"
-              (action)="saveAssets()"
-            ></app-button>
-            <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="assetsMessage">{{
-              assetsMessage
-            }}</span>
-            <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="assetsError">{{
-              assetsError
-            }}</span>
-          </div>
-
-          <details
-            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
-          >
-            <summary
-              class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-            >
-              {{ 'adminUi.site.assets.library.title' | translate }}
-            </summary>
-            <div class="mt-3">
-              <app-asset-library
-                [initialKey]="'site.assets'"
-                [allowSelect]="false"
-              ></app-asset-library>
-            </div>
-          </details>
-        </section>
+          [rememberContentVersion]="boundRememberContentVersion"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+          [forgetContentVersion]="boundForgetContentVersion"
+        ></app-admin-site-assets>
 
         <section
           *ngIf="section() === 'settings'"
@@ -10054,9 +10004,6 @@ export class AdminComponent implements OnInit, OnDestroy {
   flaggedCommentsLoading = signal<boolean>(false);
   flaggedCommentsError: string | null = null;
 
-  assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
-  assetsMessage: string | null = null;
-  assetsError: string | null = null;
   socialForm: {
     phone: string;
     email: string;
@@ -10948,7 +10895,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
     this.loadCategories();
     this.loadTaxGroups();
-    this.loadAssets();
     this.loadSocial();
     this.loadNavigation();
     this.loadReportsSettings();
@@ -13890,26 +13836,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     return meta;
   }
 
-  loadAssets(): void {
-    this.assetsError = null;
-    this.assetsMessage = null;
-    this.admin.getContent('site.assets').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('site.assets', block);
-        this.assetsForm = {
-          logo_url: block.meta?.['logo_url'] || '',
-          favicon_url: block.meta?.['favicon_url'] || '',
-          social_image_url: block.meta?.['social_image_url'] || '',
-        };
-        this.assetsMessage = null;
-      },
-      error: () => {
-        delete this.contentVersions['site.assets'];
-        this.assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
-      },
-    });
-  }
-
   loadReportsSettings(): void {
     this.reportsSettingsError = null;
     this.reportsSettingsMessage = null;
@@ -14091,38 +14017,6 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.reportsSettingsError = this.t('adminUi.reports.errors.send');
       },
     });
-  }
-
-  saveAssets(): void {
-    const payload = {
-      title: 'Site assets',
-      status: 'published',
-      meta: { ...this.assetsForm },
-    };
-    const onSuccess = (block?: { version?: number } | null) => {
-      this.rememberContentVersion('site.assets', block);
-      this.assetsMessage = this.t('adminUi.site.assets.success.save');
-      this.assetsError = null;
-    };
-    this.admin
-      .updateContentBlock('site.assets', this.withExpectedVersion('site.assets', payload))
-      .subscribe({
-        next: (block) => onSuccess(block),
-        error: (err) => {
-          if (this.handleContentConflict(err, 'site.assets', () => this.loadAssets())) {
-            this.assetsError = this.t('adminUi.site.assets.errors.save');
-            this.assetsMessage = null;
-            return;
-          }
-          this.admin.createContent('site.assets', payload).subscribe({
-            next: (created) => onSuccess(created),
-            error: () => {
-              this.assetsError = this.t('adminUi.site.assets.errors.save');
-              this.assetsMessage = null;
-            },
-          });
-        },
-      });
   }
 
   loadSocial(): void {

@@ -2692,21 +2692,6 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
     expect(c.reportsSettingsError).toBeTruthy();
   });
 
-  it('saveAssets persists with conflict and create fallback', () => {
-    c.assetsForm = { logo: '/l.png' };
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-    c.saveAssets();
-    expect(c.assetsMessage).toBeTruthy();
-
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-    c.saveAssets();
-    expect(c.assetsError).toBeTruthy();
-
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
-    h.admin.createContent.and.returnValue(of({ version: 1 }));
-    c.saveAssets();
-    expect(c.assetsMessage).toBeTruthy();
-  });
 });
 
 describe('AdminComponent — site settings load/save (assets, social, seo)', () => {
@@ -2716,17 +2701,6 @@ describe('AdminComponent — site settings load/save (assets, social, seo)', () 
     h = createComponent();
     c = h.component as any;
     h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
-  });
-
-  it('loadAssets maps meta and resets on error', () => {
-    h.admin.getContent.and.returnValue(
-      of({ version: 2, meta: { logo_url: '/l', favicon_url: '/f', social_image_url: '/s' } }),
-    );
-    c.loadAssets();
-    expect(c.assetsForm.logo_url).toBe('/l');
-    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-    c.loadAssets();
-    expect(c.assetsForm.logo_url).toBe('');
   });
 
   it('loadSocial maps contact + pages and keeps defaults on error', () => {

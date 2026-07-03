@@ -334,7 +334,6 @@ describe('AdminComponent', () => {
       [
         'loadCategories',
         'loadTaxGroups',
-        'loadAssets',
         'loadSocial',
         'loadNavigation',
         'loadReportsSettings',
@@ -360,7 +359,6 @@ describe('AdminComponent', () => {
       [
         'loadCategories',
         'loadTaxGroups',
-        'loadAssets',
         'loadSocial',
         'loadNavigation',
         'loadReportsSettings',
@@ -2112,50 +2110,6 @@ describe('AdminComponent', () => {
   });
 
   describe('site settings load/save', () => {
-    it('loadAssets hydrates + clears form on error', () => {
-      const env = build('settings');
-      env.admin.getContent.and.returnValue(
-        of({ meta: { logo_url: 'L', favicon_url: 'F', social_image_url: 'S' }, version: 1 }),
-      );
-      env.c.loadAssets();
-      expect(env.c.assetsForm.logo_url).toBe('L');
-      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-      env.c.loadAssets();
-      expect(env.c.assetsForm.logo_url).toBe('');
-    });
-
-    it('saveAssets updates then reports success', () => {
-      const env = build('settings');
-      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-      env.c.saveAssets();
-      expect(env.c.assetsMessage).toBe('adminUi.site.assets.success.save');
-    });
-
-    it('saveAssets falls back to createContent when update fails', () => {
-      const env = build('settings');
-      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
-      env.admin.createContent.and.returnValue(of({ version: 1 }));
-      env.c.saveAssets();
-      expect(env.admin.createContent).toHaveBeenCalled();
-      expect(env.c.assetsMessage).toBe('adminUi.site.assets.success.save');
-    });
-
-    it('saveAssets reports error on a 409 conflict', () => {
-      const env = build('settings');
-      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-      env.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
-      env.c.saveAssets();
-      expect(env.c.assetsError).toBe('adminUi.site.assets.errors.save');
-    });
-
-    it('saveAssets reports error when create also fails', () => {
-      const env = build('settings');
-      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
-      env.admin.createContent.and.returnValue(throwError(() => new Error('x')));
-      env.c.saveAssets();
-      expect(env.c.assetsError).toBe('adminUi.site.assets.errors.save');
-    });
-
     it('loadReportsSettings parses recipients + falls back', () => {
       const env = build('settings');
       env.admin.getContent.and.returnValue(
