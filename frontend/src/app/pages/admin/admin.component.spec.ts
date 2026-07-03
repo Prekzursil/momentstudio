@@ -246,23 +246,6 @@ describe('AdminComponent', () => {
   });
 
   describe('applyContentEditQuery', () => {
-    it('ignores blank edit values', () => {
-      const env = build('blog');
-      const loadBlogEditor = spyOn<any>(env.c, 'loadBlogEditor').and.stub();
-      (env.c as any).applyContentEditQuery('blog', { edit: '   ' });
-      expect(loadBlogEditor).not.toHaveBeenCalled();
-    });
-
-    it('prefixes a bare blog key and loads it once', () => {
-      const env = build('blog');
-      const loadBlogEditor = spyOn<any>(env.c, 'loadBlogEditor').and.stub();
-      (env.c as any).applyContentEditQuery('blog', { edit: 'welcome' });
-      expect(loadBlogEditor).toHaveBeenCalledWith('blog.welcome');
-      env.c.selectedBlogKey = 'blog.welcome';
-      (env.c as any).applyContentEditQuery('blog', { edit: 'blog.welcome' });
-      expect(loadBlogEditor.calls.count()).toBe(1);
-    });
-
     it('prefixes a bare page key and routes to page-block change', () => {
       const env = build('pages');
       const onPageKey = spyOn<any>(env.c, 'onPageBlocksKeyChange').and.stub();
@@ -321,10 +304,10 @@ describe('AdminComponent', () => {
     it('loads blog data', () => {
       const env = build('blog');
       const reload = spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      const flagged = spyOn<any>(env.c, 'loadFlaggedComments').and.stub();
+      // Flagged-comment loading moved into <app-admin-blog-editor>; the parent
+      // section-load now only refreshes the shared content blocks.
       (env.c as any).loadForSection('blog');
       expect(reload).toHaveBeenCalled();
-      expect(flagged).toHaveBeenCalled();
     });
 
     it('loads the settings workspace and audit data', () => {
@@ -508,26 +491,6 @@ describe('AdminComponent', () => {
       env.c.redoPageDraft(key);
       expect(env.c.pageBlocks['page.about'].length).toBe(1);
       env.c.restorePageDraftAutosave(key);
-    });
-
-    it('blog draft helpers gate on a selected key', () => {
-      const env = build('blog');
-      expect(env.c.blogDraftReady()).toBeFalse();
-      expect(env.c.blogDraftDirty()).toBeFalse();
-      expect(env.c.blogDraftAutosaving()).toBeFalse();
-      expect(env.c.blogDraftLastAutosavedAt()).toBeNull();
-      expect(env.c.blogDraftHasRestore()).toBeFalse();
-      expect(env.c.blogDraftRestoreAt()).toBeNull();
-      env.c.restoreBlogDraftAutosave();
-      env.c.dismissBlogDraftAutosave();
-
-      env.c.selectedBlogKey = 'blog.x';
-      const mgr = (env.c as any).ensureBlogDraft('blog.x', 'en');
-      mgr.initFromServer((env.c as any).currentBlogDraftState());
-      expect(env.c.blogDraftReady()).toBeTrue();
-      expect(env.c.blogDraftHasRestore()).toBeFalse();
-      env.c.restoreBlogDraftAutosave();
-      env.c.dismissBlogDraftAutosave();
     });
   });
 
@@ -1247,10 +1210,9 @@ describe('AdminComponent', () => {
       expect(env.c.userAliases).toBeNull();
     });
 
-    it('userIdentity + commentAuthorLabel format identities', () => {
+    it('userIdentity formats identities', () => {
       const env = build('settings');
       expect(typeof env.c.userIdentity({ id: 'u', email: 'a@b.com' } as any)).toBe('string');
-      expect(typeof env.c.commentAuthorLabel({ id: 'c1' })).toBe('string');
     });
 
     it('updateRole prompts for a password before persisting', () => {
@@ -1393,179 +1355,6 @@ describe('AdminComponent', () => {
       (env.c as any).reloadContentBlocks();
       expect(env.c.contentBlocks).toEqual(source as any);
       expect(env.c.contentBlocks).not.toBe(source as any);
-    });
-  });
-
-  describe('blog posts + pins', () => {
-    it('blogPosts filters blog-prefixed content', () => {
-      const env = build('blog');
-      env.c.contentBlocks = [{ key: 'blog.a' }, { key: 'site.x' }] as any;
-      expect(env.c.blogPosts().map((p) => p.key)).toEqual(['blog.a']);
-    });
-
-    it('blogPinnedSlot reads pin metadata across types', () => {
-      const env = build('blog');
-      expect(env.c.blogPinnedSlot({ meta: null } as any)).toBeNull();
-      expect(env.c.blogPinnedSlot({ meta: { pinned: false } } as any)).toBeNull();
-      expect(env.c.blogPinnedSlot({ meta: { pinned: true, pin_order: 2 } } as any)).toBe(2);
-      expect(env.c.blogPinnedSlot({ meta: { pinned: 1, pin_order: '3' } } as any)).toBe(3);
-      expect(env.c.blogPinnedSlot({ meta: { pinned: 'yes' } } as any)).toBe(1);
-    });
-
-    it('blogPinnedPosts sorts by slot then recency', () => {
-      const env = build('blog');
-      env.c.contentBlocks = [
-        { key: 'blog.a', meta: { pinned: true, pin_order: 2 }, published_at: '2026-01-01' },
-        { key: 'blog.b', meta: { pinned: true, pin_order: 1 }, published_at: '2026-01-02' },
-        { key: 'blog.c', meta: { pinned: false } },
-      ] as any;
-      expect(env.c.blogPinnedPosts().map((p) => p.key)).toEqual(['blog.b', 'blog.a']);
-    });
-
-    it('blog pin drag start/over set state', () => {
-      const env = build('blog');
-      env.c.onBlogPinDragStart('  blog.a  ');
-      expect(env.c.draggingBlogPinKey).toBe('blog.a');
-      const evt = { preventDefault: jasmine.createSpy('pd') } as any;
-      env.c.onBlogPinDragOver(evt);
-      expect(evt.preventDefault).toHaveBeenCalled();
-    });
-
-    it('onBlogPinDrop reorders pinned posts and persists', async () => {
-      const env = build('blog');
-      env.c.contentBlocks = [
-        { key: 'blog.a', meta: { pinned: true, pin_order: 1 } },
-        { key: 'blog.b', meta: { pinned: true, pin_order: 2 } },
-      ] as any;
-      env.c.draggingBlogPinKey = 'blog.b';
-      spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      env.admin.updateContentBlock.and.returnValue(of({ key: 'blog.b', version: 2 }));
-      await env.c.onBlogPinDrop('blog.a');
-      expect(env.admin.updateContentBlock).toHaveBeenCalled();
-      expect(env.c.blogPinsSaving).toBeFalse();
-    });
-
-    it('onBlogPinDrop exits on identical/empty keys', async () => {
-      const env = build('blog');
-      env.c.draggingBlogPinKey = 'blog.a';
-      await env.c.onBlogPinDrop('blog.a');
-      expect(env.admin.updateContentBlock).not.toHaveBeenCalled();
-    });
-
-    it('onBlogPinDrop toasts on persistence failure', async () => {
-      const env = build('blog');
-      env.c.contentBlocks = [
-        { key: 'blog.a', meta: { pinned: true, pin_order: 1 } },
-        { key: 'blog.b', meta: { pinned: true, pin_order: 2 } },
-      ] as any;
-      env.c.draggingBlogPinKey = 'blog.b';
-      spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      env.admin.updateContentBlock.and.returnValue(throwError(() => new Error('x')));
-      await env.c.onBlogPinDrop('blog.a');
-      expect(env.toast.error).toHaveBeenCalled();
-    });
-  });
-
-  describe('blog bulk selection', () => {
-    it('toggles individual + all selection', () => {
-      const env = build('blog');
-      env.c.contentBlocks = [{ key: 'blog.a' }, { key: 'blog.b' }] as any;
-      expect(env.c.isBlogSelected('blog.a')).toBeFalse();
-      env.c.toggleBlogSelection('blog.a', { target: { checked: true } } as any);
-      expect(env.c.isBlogSelected('blog.a')).toBeTrue();
-      env.c.toggleBlogSelection('blog.a', { target: { checked: false } } as any);
-      expect(env.c.isBlogSelected('blog.a')).toBeFalse();
-      expect(env.c.areAllBlogSelected()).toBeFalse();
-      env.c.toggleSelectAllBlogs({ target: { checked: true } } as any);
-      expect(env.c.areAllBlogSelected()).toBeTrue();
-      env.c.toggleSelectAllBlogs({ target: { checked: false } } as any);
-      expect(env.c.blogBulkSelection.size).toBe(0);
-      env.c.toggleBlogSelection('blog.a', { target: { checked: true } } as any);
-      env.c.clearBlogBulkSelection();
-      expect(env.c.blogBulkSelection.size).toBe(0);
-    });
-
-    it('areAllBlogSelected is false with no posts', () => {
-      const env = build('blog');
-      env.c.contentBlocks = [];
-      expect(env.c.areAllBlogSelected()).toBeFalse();
-    });
-
-    it('canApplyBlogBulk validates per action', () => {
-      const env = build('blog');
-      env.c.blogBulkAction = 'publish';
-      expect(env.c.canApplyBlogBulk()).toBeFalse();
-      env.c.blogBulkSelection.add('blog.a');
-      expect(env.c.canApplyBlogBulk()).toBeTrue();
-      env.c.blogBulkAction = 'schedule';
-      env.c.blogBulkPublishAt = '';
-      expect(env.c.canApplyBlogBulk()).toBeFalse();
-      env.c.blogBulkPublishAt = '2026-01-01T10:00';
-      expect(env.c.canApplyBlogBulk()).toBeTrue();
-      env.c.blogBulkUnpublishAt = '2026-01-01T09:00';
-      expect(env.c.canApplyBlogBulk()).toBeFalse();
-      env.c.blogBulkUnpublishAt = '2026-01-02T10:00';
-      expect(env.c.canApplyBlogBulk()).toBeTrue();
-      env.c.blogBulkAction = 'tags_add';
-      env.c.blogBulkTags = '';
-      expect(env.c.canApplyBlogBulk()).toBeFalse();
-      env.c.blogBulkTags = 'sale, new';
-      expect(env.c.canApplyBlogBulk()).toBeTrue();
-    });
-
-    it('blogBulkPreview renders per action', () => {
-      const env = build('blog');
-      expect(env.c.blogBulkPreview()).toBe('adminUi.blog.bulk.previewEmpty');
-      env.c.blogBulkSelection.add('blog.a');
-      env.c.blogBulkAction = 'publish';
-      expect(env.c.blogBulkPreview()).toBe('adminUi.blog.bulk.previewPublish');
-      env.c.blogBulkAction = 'unpublish';
-      expect(env.c.blogBulkPreview()).toBe('adminUi.blog.bulk.previewUnpublish');
-      env.c.blogBulkAction = 'schedule';
-      env.c.blogBulkPublishAt = '2026-01-01T10:00';
-      expect(env.c.blogBulkPreview()).toBe('adminUi.blog.bulk.previewSchedule');
-      env.c.blogBulkAction = 'tags_add';
-      env.c.blogBulkTags = 'a';
-      expect(env.c.blogBulkPreview()).toBe('adminUi.blog.bulk.previewTagsAdd');
-      env.c.blogBulkAction = 'tags_remove';
-      expect(env.c.blogBulkPreview()).toBe('adminUi.blog.bulk.previewTagsRemove');
-    });
-
-    it('applyBlogBulkAction publishes the selected posts', () => {
-      const env = build('blog');
-      env.c.blogBulkAction = 'publish';
-      env.c.blogBulkSelection.add('blog.a');
-      spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      env.admin.getContent.and.returnValue(of({ key: 'blog.a', meta: {}, version: 1 }));
-      env.admin.updateContentBlock.and.returnValue(of({ key: 'blog.a', version: 2 }));
-      env.c.applyBlogBulkAction();
-      expect(env.admin.updateContentBlock).toHaveBeenCalled();
-      expect(env.c.blogBulkSaving).toBeFalse();
-    });
-
-    it('applyBlogBulkAction reports no-change when payloads are empty', () => {
-      const env = build('blog');
-      env.c.blogBulkAction = 'tags_add';
-      env.c.blogBulkTags = 'x';
-      env.c.blogBulkSelection.add('blog.a');
-      env.admin.getContent.and.returnValue(of(null));
-      env.c.applyBlogBulkAction();
-      expect(env.c.blogBulkError).toBe('adminUi.blog.bulk.noChanges');
-    });
-
-    it('extractBlogSlug + currentBlogSlug strip the blog prefix', () => {
-      const env = build('blog');
-      expect(env.c.extractBlogSlug('blog.welcome')).toBe('welcome');
-      expect(env.c.extractBlogSlug('welcome')).toBe('welcome');
-      expect(env.c.currentBlogSlug()).toBe('');
-      env.c.selectedBlogKey = 'blog.welcome';
-      expect(env.c.currentBlogSlug()).toBe('welcome');
-    });
-
-    it('blogCreateSlug normalizes diacritics + whitespace', () => {
-      const env = build('blog');
-      env.c.blogCreate.title = '  Ănță Test Post!  ';
-      expect(env.c.blogCreateSlug()).toBe('anta-test-post');
     });
   });
 

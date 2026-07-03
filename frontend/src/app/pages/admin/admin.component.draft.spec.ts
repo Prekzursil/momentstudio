@@ -418,38 +418,10 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       expect(component.hasUnsavedChanges()).toBe(true);
     });
 
-    it('hasUnsavedChanges reflects a dirty blog draft', () => {
-      const { component } = createComponent();
-      const blog = (component as any).ensureBlogDraft('blog.post', 'en');
-      blog.initFromServer({ title: '' });
-      blog.observe({ title: 'changed' });
-      expect(component.hasUnsavedChanges()).toBe(true);
-    });
-
-    it('discardUnsavedChanges discards every ready draft', () => {
-      const { component } = createComponent();
-      const home = (component as any).cmsHomeDraft;
-      home.initFromServer([]);
-      home.observe([{ id: 'x' }]);
-      const page = (component as any).ensurePageDraft('home');
-      page.initFromServer({ blocks: [] });
-      const blog = (component as any).ensureBlogDraft('blog.post', 'en');
-      blog.initFromServer({ title: '' });
-      component.discardUnsavedChanges();
-      expect(localStorage.getItem(HOME_KEY)).toBeNull();
-    });
-
     it('ensurePageDraft is idempotent for a given key', () => {
       const { component } = createComponent();
       const first = (component as any).ensurePageDraft('about');
       const second = (component as any).ensurePageDraft('about');
-      expect(first).toBe(second);
-    });
-
-    it('ensureBlogDraft is idempotent for a given key + lang', () => {
-      const { component } = createComponent();
-      const first = (component as any).ensureBlogDraft('blog.post', 'ro');
-      const second = (component as any).ensureBlogDraft('blog.post', 'ro');
       expect(first).toBe(second);
     });
 
@@ -468,19 +440,6 @@ describe('AdminComponent CmsDraftManager + pure helpers', () => {
       expect(component.homeDraftReady()).toBe(true);
     });
 
-    it('blogDraftId composes key and language', () => {
-      const { component } = createComponent();
-      expect((component as any).blogDraftId('blog.post', 'en')).toBe('blog.post.en');
-    });
-
-    it('ngOnDestroy disposes drafts and clears version map without throwing', () => {
-      const { component } = createComponent();
-      (component as any).ensurePageDraft('home').initFromServer({ blocks: [] });
-      (component as any).ensureBlogDraft('blog.post', 'en').initFromServer({ title: '' });
-      (component as any).contentVersions = { 'home.hero': 3 };
-      expect(() => component.ngOnDestroy()).not.toThrow();
-      expect((component as any).contentVersions).toEqual({});
-    });
   });
 
   describe('pure helpers', () => {
