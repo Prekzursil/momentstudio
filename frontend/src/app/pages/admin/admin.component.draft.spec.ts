@@ -11,8 +11,6 @@ import { AdminComponent } from './admin.component';
  * localStorage side-effects, debounce timing), not mere invocation.
  */
 describe('AdminComponent CmsDraftManager + pure helpers', () => {
-  const HOME_KEY = 'adrianaart.cms.autosave.home.sections';
-
   type RouteStub = {
     snapshot: { data: Record<string, unknown>; queryParams: Record<string, unknown> };
     data: Subject<Record<string, unknown>>;

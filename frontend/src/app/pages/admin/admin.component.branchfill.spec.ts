@@ -1323,14 +1323,6 @@ describe('AdminComponent — branch fill', () => {
     });
   });
 
-  function blogPost(
-    key: string,
-    meta: Record<string, unknown> = {},
-    extra: Record<string, unknown> = {},
-  ): any {
-    return { key, title: key, status: 'published', meta, ...extra };
-  }
-
   describe('content redirects', () => {
     it('deleteContentRedirect ignores blanks and respects a cancelled confirm', () => {
       c.deleteContentRedirect('  ');

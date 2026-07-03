@@ -26,8 +26,6 @@ import {
   AdminProductDetail,
   FeaturedCollection,
   ContentImageAssetRead,
-  ContentBlockVersionListItem,
-  ContentBlockVersionRead,
   ContentPageListItem,
   ContentRedirectRead,
   ContentRedirectImportResult,
@@ -36,19 +34,16 @@ import {
   ContentFindReplaceApplyResponse,
   ContentPreviewTokenResponse,
 } from '../../core/admin.service';
-import { AdminBlogComment, BlogService } from '../../core/blog.service';
+import { BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
 import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { combineLatest, firstValueFrom, forkJoin, of, Subscription } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { combineLatest, firstValueFrom, Subscription } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
-import { appConfig } from '../../core/app-config';
 import { AdminProductListItem, AdminProductsService } from '../../core/admin-products.service';
-import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
 import { AssetLibraryComponent } from './shared/asset-library.component';
