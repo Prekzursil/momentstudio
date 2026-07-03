@@ -212,6 +212,7 @@ export type HomeBlockDraft = {
 };
 
 export type PageBuilderKey = `page.${string}` | CmsGlobalSectionKey;
+type BuilderContext = 'home' | 'page';
 type PageBlockType =
   | 'text'
   | 'columns'
@@ -10659,37 +10660,17 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   togglePageBlockEnabled(pageKey: PageBuilderKey, blockKey: string, event: Event): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
     const target = event.target as HTMLInputElement | null;
     const enabled = target?.checked !== false;
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) =>
-      b.key === blockKey ? { ...b, enabled } : b,
-    );
+    this.setBuilderBlockEnabled('page', pageKey, blockKey, enabled);
   }
 
   pageBlockLabel(block: PageBlockDraft): string {
-    const key = `adminUi.home.sections.blocks.${block.type}`;
-    const translated = this.t(key);
-    return translated !== key ? translated : String(block.type);
+    return this.builderBlockLabel(block);
   }
 
   movePageBlock(pageKey: PageBuilderKey, blockKey: string, delta: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const current = [...(this.pageBlocks[safePageKey] || [])];
-    const from = current.findIndex((b) => b.key === blockKey);
-    if (from === -1) return;
-    const to = from + delta;
-    if (to < 0 || to >= current.length) return;
-    const [moved] = current.splice(from, 1);
-    current.splice(to, 0, moved);
-    this.pageBlocks[safePageKey] = current;
-    this.announceCms(
-      this.t('adminUi.content.reorder.moved', {
-        label: this.pageBlockLabel(moved),
-        pos: to + 1,
-        count: current.length,
-      }),
-    );
+    this.moveBuilderBlock('page', pageKey, blockKey, delta);
   }
 
   onPageBlockDragStart(pageKey: PageBuilderKey, blockKey: string): void {
@@ -11041,15 +11022,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     blockKey: string,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) =>
-      b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b,
-    );
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderImageBlockUrl('page', pageKey, blockKey, asset);
   }
 
   setPageBannerSlideImage(
@@ -11057,34 +11030,15 @@ export class AdminComponent implements OnInit, OnDestroy {
     blockKey: string,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderBannerSlideImage('page', pageKey, blockKey, asset);
   }
 
   addPageCarouselSlide(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      return { ...b, slides: [...(b.slides || []), this.emptySlideDraft()] };
-    });
+    this.addBuilderCarouselSlide('page', pageKey, blockKey);
   }
 
   removePageCarouselSlide(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const next = [...(b.slides || [])];
-      next.splice(idx, 1);
-      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
-    });
+    this.removeBuilderCarouselSlide('page', pageKey, blockKey, idx);
   }
 
   movePageCarouselSlide(
@@ -11093,18 +11047,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     idx: number,
     delta: number,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const from = idx;
-      const to = idx + delta;
-      if (from < 0 || from >= slides.length) return b;
-      if (to < 0 || to >= slides.length) return b;
-      const [moved] = slides.splice(from, 1);
-      slides.splice(to, 0, moved);
-      return { ...b, slides };
-    });
+    this.moveBuilderCarouselSlide('page', pageKey, blockKey, idx, delta);
   }
 
   setPageCarouselSlideImage(
@@ -11113,40 +11056,11 @@ export class AdminComponent implements OnInit, OnDestroy {
     idx: number,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const target = slides[idx];
-      if (!target) return b;
-      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
-      return { ...b, slides };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderCarouselSlideImage('page', pageKey, blockKey, idx, asset);
   }
 
   addPageGalleryImage(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: '',
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: 50,
-            focal_y: 50,
-          },
-        ],
-      };
-    });
+    this.addBuilderGalleryImage('page', pageKey, blockKey);
   }
 
   addPageGalleryImageFromAsset(
@@ -11154,61 +11068,19 @@ export class AdminComponent implements OnInit, OnDestroy {
     blockKey: string,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: value,
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: focalX,
-            focal_y: focalY,
-          },
-        ],
-      };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.addBuilderGalleryImageFromAsset('page', pageKey, blockKey, asset);
   }
 
   removePageGalleryImage(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      const next = [...b.images];
-      next.splice(idx, 1);
-      return { ...b, images: next };
-    });
+    this.removeBuilderGalleryImage('page', pageKey, blockKey, idx);
   }
 
   addPageColumnsColumn(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length >= 3) return b;
-      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
-      return { ...b, columns: cols };
-    });
+    this.addBuilderColumnsColumn('page', pageKey, blockKey);
   }
 
   removePageColumnsColumn(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length <= 2) return b;
-      if (idx < 0 || idx >= cols.length) return b;
-      cols.splice(idx, 1);
-      return { ...b, columns: cols };
-    });
+    this.removeBuilderColumnsColumn('page', pageKey, blockKey, idx);
   }
 
   private parseProductGridSlugs(raw: string): string[] {
@@ -11295,56 +11167,19 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageFaqItem(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length >= 20) return b;
-      items.push({
-        question: this.emptyLocalizedText(),
-        answer_markdown: this.emptyLocalizedText(),
-      });
-      return { ...b, faq_items: items };
-    });
+    this.addBuilderFaqItem('page', pageKey, blockKey);
   }
 
   removePageFaqItem(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, faq_items: items };
-    });
+    this.removeBuilderFaqItem('page', pageKey, blockKey, idx);
   }
 
   addPageTestimonial(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length >= 12) return b;
-      items.push({
-        quote_markdown: this.emptyLocalizedText(),
-        author: this.emptyLocalizedText(),
-        role: this.emptyLocalizedText(),
-      });
-      return { ...b, testimonials: items };
-    });
+    this.addBuilderTestimonial('page', pageKey, blockKey);
   }
 
   removePageTestimonial(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, testimonials: items };
-    });
+    this.removeBuilderTestimonial('page', pageKey, blockKey, idx);
   }
 
   private buildPageBlocksMeta(pageKey: PageBuilderKey): Record<string, unknown> {
@@ -11799,6 +11634,333 @@ export class AdminComponent implements OnInit, OnDestroy {
     return value as PageBuilderKey;
   }
 
+  // --- Unified home/page builder block helpers ---------------------------------
+  // The home builder writes to `this.homeBlocks` (a single flat list) while the
+  // page builder writes to `this.pageBlocks[safeKey]` (a per-page record). These
+  // helpers expose the active block list for a `(context, pageKey)` pair so the
+  // block-body mutators can share one implementation behind the existing public
+  // method names. Observable behaviour is unchanged: the home path never touches
+  // `safePageRecordKey`, and the page path preserves the exact key normalization.
+  private builderBlockList(context: BuilderContext, pageKey?: PageBuilderKey): HomeBlockDraft[] {
+    if (context === 'home') return this.homeBlocks;
+    const safeKey = this.safePageRecordKey(pageKey as PageBuilderKey);
+    return this.pageBlocks[safeKey] || [];
+  }
+
+  private setBuilderBlockList(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blocks: HomeBlockDraft[],
+  ): void {
+    if (context === 'home') {
+      this.homeBlocks = blocks;
+      return;
+    }
+    const safeKey = this.safePageRecordKey(pageKey as PageBuilderKey);
+    this.pageBlocks[safeKey] = blocks as PageBlockDraft[];
+  }
+
+  private updateBuilderBlock(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    requiredType: HomeBlockType | null,
+    transform: (block: HomeBlockDraft) => HomeBlockDraft,
+  ): void {
+    const next = this.builderBlockList(context, pageKey).map((b) =>
+      b.key === blockKey && (requiredType === null || b.type === requiredType) ? transform(b) : b,
+    );
+    this.setBuilderBlockList(context, pageKey, next);
+  }
+
+  private setBuilderImageBlockUrl(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, null, (b) => ({
+      ...b,
+      url: value,
+      focal_x: focalX,
+      focal_y: focalY,
+    }));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private addBuilderGalleryImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'gallery', (b) => ({
+      ...b,
+      images: [
+        ...b.images,
+        {
+          url: '',
+          alt: this.emptyLocalizedText(),
+          caption: this.emptyLocalizedText(),
+          focal_x: 50,
+          focal_y: 50,
+        },
+      ],
+    }));
+  }
+
+  private addBuilderGalleryImageFromAsset(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, 'gallery', (b) => ({
+      ...b,
+      images: [
+        ...b.images,
+        {
+          url: value,
+          alt: this.emptyLocalizedText(),
+          caption: this.emptyLocalizedText(),
+          focal_x: focalX,
+          focal_y: focalY,
+        },
+      ],
+    }));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private removeBuilderGalleryImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'gallery', (b) => {
+      const next = [...b.images];
+      next.splice(idx, 1);
+      return { ...b, images: next };
+    });
+  }
+
+  private addBuilderColumnsColumn(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'columns', (b) => {
+      const cols = [...(b.columns || [])];
+      if (cols.length >= 3) return b;
+      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
+      return { ...b, columns: cols };
+    });
+  }
+
+  private removeBuilderColumnsColumn(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'columns', (b) => {
+      const cols = [...(b.columns || [])];
+      if (cols.length <= 2) return b;
+      if (idx < 0 || idx >= cols.length) return b;
+      cols.splice(idx, 1);
+      return { ...b, columns: cols };
+    });
+  }
+
+  private addBuilderFaqItem(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'faq', (b) => {
+      const items = [...(b.faq_items || [])];
+      if (items.length >= 20) return b;
+      items.push({
+        question: this.emptyLocalizedText(),
+        answer_markdown: this.emptyLocalizedText(),
+      });
+      return { ...b, faq_items: items };
+    });
+  }
+
+  private removeBuilderFaqItem(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'faq', (b) => {
+      const items = [...(b.faq_items || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, faq_items: items };
+    });
+  }
+
+  private addBuilderTestimonial(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'testimonials', (b) => {
+      const items = [...(b.testimonials || [])];
+      if (items.length >= 12) return b;
+      items.push({
+        quote_markdown: this.emptyLocalizedText(),
+        author: this.emptyLocalizedText(),
+        role: this.emptyLocalizedText(),
+      });
+      return { ...b, testimonials: items };
+    });
+  }
+
+  private removeBuilderTestimonial(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'testimonials', (b) => {
+      const items = [...(b.testimonials || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, testimonials: items };
+    });
+  }
+
+  private setBuilderBannerSlideImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, 'banner', (b) => ({
+      ...b,
+      slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY },
+    }));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private addBuilderCarouselSlide(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => ({
+      ...b,
+      slides: [...(b.slides || []), this.emptySlideDraft()],
+    }));
+  }
+
+  private removeBuilderCarouselSlide(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => {
+      const next = [...(b.slides || [])];
+      next.splice(idx, 1);
+      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
+    });
+  }
+
+  private moveBuilderCarouselSlide(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+    delta: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => {
+      const slides = [...(b.slides || [])];
+      const from = idx;
+      const to = idx + delta;
+      if (from < 0 || from >= slides.length) return b;
+      if (to < 0 || to >= slides.length) return b;
+      const [moved] = slides.splice(from, 1);
+      slides.splice(to, 0, moved);
+      return { ...b, slides };
+    });
+  }
+
+  private setBuilderCarouselSlideImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => {
+      const slides = [...(b.slides || [])];
+      const target = slides[idx];
+      if (!target) return b;
+      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
+      return { ...b, slides };
+    });
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private builderBlockLabel(block: HomeBlockDraft | PageBlockDraft): string {
+    const key = `adminUi.home.sections.blocks.${block.type}`;
+    const translated = this.t(key);
+    return translated !== key ? translated : String(block.type);
+  }
+
+  private moveBuilderBlock(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    delta: number,
+  ): void {
+    const current = [...this.builderBlockList(context, pageKey)];
+    const from = current.findIndex((b) => b.key === blockKey);
+    if (from === -1) return;
+    const to = from + delta;
+    if (to < 0 || to >= current.length) return;
+    const [moved] = current.splice(from, 1);
+    current.splice(to, 0, moved);
+    this.setBuilderBlockList(context, pageKey, current);
+    this.announceCms(
+      this.t('adminUi.content.reorder.moved', {
+        label: this.builderBlockLabel(moved),
+        pos: to + 1,
+        count: current.length,
+      }),
+    );
+  }
+
+  private setBuilderBlockEnabled(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    enabled: boolean,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, null, (b) => ({ ...b, enabled }));
+  }
+
   private safeRecordKey(key: string, fallback = 'unknown'): string {
     const value = String(key || '').trim();
     if (!/^[a-z0-9._:-]+$/i.test(value)) {
@@ -12152,33 +12314,17 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   homeBlockLabel(block: HomeBlockDraft): string {
-    const key = `adminUi.home.sections.blocks.${block.type}`;
-    const translated = this.t(key);
-    return translated !== key ? translated : String(block.type);
+    return this.builderBlockLabel(block);
   }
 
   toggleHomeBlockEnabled(block: HomeBlockDraft, event: Event): void {
     const target = event.target as HTMLInputElement | null;
     const enabled = target?.checked !== false;
-    this.homeBlocks = this.homeBlocks.map((b) => (b.key === block.key ? { ...b, enabled } : b));
+    this.setBuilderBlockEnabled('home', undefined, block.key, enabled);
   }
 
   moveHomeBlock(blockKey: string, delta: number): void {
-    const current = [...this.homeBlocks];
-    const from = current.findIndex((b) => b.key === blockKey);
-    if (from === -1) return;
-    const to = from + delta;
-    if (to < 0 || to >= current.length) return;
-    const [moved] = current.splice(from, 1);
-    current.splice(to, 0, moved);
-    this.homeBlocks = current;
-    this.announceCms(
-      this.t('adminUi.content.reorder.moved', {
-        label: this.homeBlockLabel(moved),
-        pos: to + 1,
-        count: current.length,
-      }),
-    );
+    this.moveBuilderBlock('home', undefined, blockKey, delta);
   }
 
   setHomeInsertDragActive(active: boolean): void {
@@ -12308,194 +12454,63 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   setImageBlockUrl(blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) =>
-      b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b,
-    );
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderImageBlockUrl('home', undefined, blockKey, asset);
   }
 
   addGalleryImage(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: '',
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: 50,
-            focal_y: 50,
-          },
-        ],
-      };
-    });
+    this.addBuilderGalleryImage('home', undefined, blockKey);
   }
 
   addGalleryImageFromAsset(blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: value,
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: focalX,
-            focal_y: focalY,
-          },
-        ],
-      };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.addBuilderGalleryImageFromAsset('home', undefined, blockKey, asset);
   }
 
   removeGalleryImage(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      const next = [...b.images];
-      next.splice(idx, 1);
-      return { ...b, images: next };
-    });
+    this.removeBuilderGalleryImage('home', undefined, blockKey, idx);
   }
 
   addHomeColumnsColumn(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length >= 3) return b;
-      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
-      return { ...b, columns: cols };
-    });
+    this.addBuilderColumnsColumn('home', undefined, blockKey);
   }
 
   removeHomeColumnsColumn(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length <= 2) return b;
-      if (idx < 0 || idx >= cols.length) return b;
-      cols.splice(idx, 1);
-      return { ...b, columns: cols };
-    });
+    this.removeBuilderColumnsColumn('home', undefined, blockKey, idx);
   }
 
   addHomeFaqItem(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length >= 20) return b;
-      items.push({
-        question: this.emptyLocalizedText(),
-        answer_markdown: this.emptyLocalizedText(),
-      });
-      return { ...b, faq_items: items };
-    });
+    this.addBuilderFaqItem('home', undefined, blockKey);
   }
 
   removeHomeFaqItem(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, faq_items: items };
-    });
+    this.removeBuilderFaqItem('home', undefined, blockKey, idx);
   }
 
   addHomeTestimonial(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length >= 12) return b;
-      items.push({
-        quote_markdown: this.emptyLocalizedText(),
-        author: this.emptyLocalizedText(),
-        role: this.emptyLocalizedText(),
-      });
-      return { ...b, testimonials: items };
-    });
+    this.addBuilderTestimonial('home', undefined, blockKey);
   }
 
   removeHomeTestimonial(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, testimonials: items };
-    });
+    this.removeBuilderTestimonial('home', undefined, blockKey, idx);
   }
 
   setBannerSlideImage(blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderBannerSlideImage('home', undefined, blockKey, asset);
   }
 
   addCarouselSlide(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      return { ...b, slides: [...(b.slides || []), this.emptySlideDraft()] };
-    });
+    this.addBuilderCarouselSlide('home', undefined, blockKey);
   }
 
   removeCarouselSlide(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const next = [...(b.slides || [])];
-      next.splice(idx, 1);
-      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
-    });
+    this.removeBuilderCarouselSlide('home', undefined, blockKey, idx);
   }
 
   moveCarouselSlide(blockKey: string, idx: number, delta: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const from = idx;
-      const to = idx + delta;
-      if (from < 0 || from >= slides.length) return b;
-      if (to < 0 || to >= slides.length) return b;
-      const [moved] = slides.splice(from, 1);
-      slides.splice(to, 0, moved);
-      return { ...b, slides };
-    });
+    this.moveBuilderCarouselSlide('home', undefined, blockKey, idx, delta);
   }
 
   setCarouselSlideImage(blockKey: string, idx: number, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const target = slides[idx];
-      if (!target) return b;
-      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
-      return { ...b, slides };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderCarouselSlideImage('home', undefined, blockKey, idx, asset);
   }
 
   loadSections(): void {
