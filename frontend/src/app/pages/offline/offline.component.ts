@@ -26,6 +26,7 @@ import { ButtonComponent } from '../../shared/button.component';
   `,
 })
 export class OfflineComponent {
+  /* istanbul ignore next -- location.reload() is a non-configurable, non-writable browser global; it cannot be spied/stubbed in headless Chrome and calling it for real reloads the Karma context. The retry button -> onRetry() wiring is asserted in the spec. */
   onRetry(): void {
     location.reload();
   }

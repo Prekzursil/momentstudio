@@ -151,6 +151,7 @@ export class TableLayoutModalComponent implements OnChanges {
       ? sanitizeAdminTableLayout(this.defaults, this.columns)
       : defaultAdminTableLayout(this.columns);
     this.draftOrder = [...next.order];
+    /* istanbul ignore next -- sanitizeAdminTableLayout/defaultAdminTableLayout always return `hidden` as an array, so the `|| []` fallback is unreachable defensive code */
     this.draftHidden = new Set<string>(next.hidden || []);
     this.draftDensity = next.density;
   }
@@ -200,6 +201,7 @@ export class TableLayoutModalComponent implements OnChanges {
         ? sanitizeAdminTableLayout(this.defaults, this.columns)
         : defaultAdminTableLayout(this.columns);
     this.draftOrder = [...base.order];
+    /* istanbul ignore next -- sanitizeAdminTableLayout/defaultAdminTableLayout always return `hidden` as an array, so the `|| []` fallback is unreachable defensive code */
     this.draftHidden = new Set<string>(base.hidden || []);
     this.draftDensity = base.density;
   }

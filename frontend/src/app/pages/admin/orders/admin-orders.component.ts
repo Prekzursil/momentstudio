@@ -1853,6 +1853,7 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   scrollToBulkActions(): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     const el = document.getElementById('admin-orders-bulk-actions');
     if (!el) return;

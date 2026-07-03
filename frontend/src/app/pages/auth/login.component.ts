@@ -279,7 +279,9 @@ export class LoginComponent {
   startGoogle(): void {
     localStorage.setItem('google_flow', 'login');
     this.auth.startGoogleLogin().subscribe({
-      next: (url) => {
+      next: /* istanbul ignore next -- full-page redirect cannot run under the Karma runner without disconnecting it */ (
+        url,
+      ) => {
         window.location.href = url;
       },
       error: (err) => {
