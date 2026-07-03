@@ -10380,7 +10380,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   setPageInsertDragActive(active: boolean): void {
-    this.pageInsertDragActive = active;
+    this.setBuilderInsertDragActive('page', active);
   }
 
   addPageBlockFromLibrary(
@@ -10674,15 +10674,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onPageBlockDragStart(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageInsertDragActive = true;
-    this.draggingPageBlocksKey = pageKey;
-    this.draggingPageBlockKey = blockKey;
+    this.onBuilderBlockDragStart('page', pageKey, blockKey);
   }
 
   onPageBlockDragEnd(): void {
-    this.draggingPageBlocksKey = null;
-    this.draggingPageBlockKey = null;
-    this.pageInsertDragActive = false;
+    this.onBuilderBlockDragEnd('page');
   }
 
   onPageBlockDragOver(event: DragEvent): void {
@@ -10698,92 +10694,19 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onPageMediaDropOnContainer(event: DragEvent, pageKey: PageBuilderKey): void {
-    if (event.target !== event.currentTarget) return;
-    const files = this.extractCmsImageFiles(event);
-    if (!files.length) return;
-    event.preventDefault();
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const index = (this.pageBlocks[safePageKey] || []).length;
-    void this.insertPageMediaFiles(safePageKey, index, files);
+    this.onBuilderMediaDropOnContainer('page', pageKey, event);
   }
 
   onHomeMediaDropOnContainer(event: DragEvent): void {
-    if (event.target !== event.currentTarget) return;
-    const files = this.extractCmsImageFiles(event);
-    if (!files.length) return;
-    event.preventDefault();
-    void this.insertHomeMediaFiles(this.homeBlocks.length, files);
+    this.onBuilderMediaDropOnContainer('home', undefined, event);
   }
 
   onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    event.preventDefault();
-    const current = [...(this.pageBlocks[safePageKey] || [])];
-
-    if (this.draggingPageBlocksKey === safePageKey && this.draggingPageBlockKey) {
-      const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
-      if (from === -1) {
-        this.onPageBlockDragEnd();
-        return;
-      }
-      const safeIndex = Math.max(0, Math.min(index, current.length));
-      const [moved] = current.splice(from, 1);
-      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
-      current.splice(nextIndex, 0, moved);
-      this.pageBlocks[safePageKey] = current;
-      this.onPageBlockDragEnd();
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (!payload || payload.scope !== 'page') {
-      this.onPageBlockDragEnd();
-      return;
-    }
-
-    this.insertPageBlockAt(safePageKey, payload.type, index, payload.template);
-    this.pageInsertDragActive = false;
+    this.onBuilderBlockDropZone('page', pageKey, event, index);
   }
 
   onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    event.preventDefault();
-
-    const mediaFiles = this.extractCmsImageFiles(event);
-    if (mediaFiles.length) {
-      const current = [...(this.pageBlocks[safePageKey] || [])];
-      const to = current.findIndex((b) => b.key === targetKey);
-      const safeIndex = to !== -1 ? to : current.length;
-      void this.insertPageMediaFiles(safePageKey, safeIndex, mediaFiles);
-      this.pageInsertDragActive = false;
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'page') {
-      const current = [...(this.pageBlocks[safePageKey] || [])];
-      const to = current.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
-        this.insertPageBlockAt(safePageKey, payload.type, to, payload.template);
-      }
-      this.pageInsertDragActive = false;
-      return;
-    }
-
-    if (!this.draggingPageBlocksKey || !this.draggingPageBlockKey) return;
-    if (this.draggingPageBlocksKey !== safePageKey) return;
-    if (this.draggingPageBlockKey === targetKey) return;
-
-    const current = [...(this.pageBlocks[safePageKey] || [])];
-    const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
-    const to = current.findIndex((b) => b.key === targetKey);
-    if (from === -1 || to === -1) return;
-
-    const [moved] = current.splice(from, 1);
-    const nextIndex = from < to ? to - 1 : to;
-    current.splice(nextIndex, 0, moved);
-    this.pageBlocks[safePageKey] = current;
-    this.onPageBlockDragEnd();
+    this.onBuilderBlockDrop('page', pageKey, event, targetKey);
   }
 
   private dragEventHasFiles(event: DragEvent): boolean {
@@ -11961,6 +11884,183 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.updateBuilderBlock(context, pageKey, blockKey, null, (b) => ({ ...b, enabled }));
   }
 
+  // --- Unified home/page builder drag & drop -----------------------------------
+  // R5: drag state stays scoped per-context — home tracks a single
+  // `draggingHomeBlockKey`, while the page builder additionally tracks
+  // `draggingPageBlocksKey` (which page owns the drag) so a drag started on one
+  // page cannot drop-reorder another. `builderDragActiveKey` returns the dragged
+  // block key only when the active drag belongs to this (context, pageKey),
+  // which encodes the page's cross-page guard while leaving home unscoped.
+  // `homeInsertDragActive` / `pageInsertDragActive` remain distinct fields so the
+  // two dropzones can be active simultaneously.
+  private builderDragActiveKey(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+  ): string | null {
+    if (context === 'home') return this.draggingHomeBlockKey;
+    const safeKey = this.safePageRecordKey(pageKey as PageBuilderKey);
+    if (this.draggingPageBlocksKey !== safeKey) return null;
+    return this.draggingPageBlockKey;
+  }
+
+  private setBuilderInsertDragActive(context: BuilderContext, active: boolean): void {
+    if (context === 'home') {
+      this.homeInsertDragActive = active;
+      return;
+    }
+    this.pageInsertDragActive = active;
+  }
+
+  private onBuilderBlockDragStart(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    if (context === 'home') {
+      this.homeInsertDragActive = true;
+      this.draggingHomeBlockKey = blockKey;
+      return;
+    }
+    this.pageInsertDragActive = true;
+    this.draggingPageBlocksKey = pageKey as PageBuilderKey;
+    this.draggingPageBlockKey = blockKey;
+  }
+
+  private onBuilderBlockDragEnd(context: BuilderContext): void {
+    if (context === 'home') {
+      this.draggingHomeBlockKey = null;
+      this.homeInsertDragActive = false;
+      return;
+    }
+    this.draggingPageBlocksKey = null;
+    this.draggingPageBlockKey = null;
+    this.pageInsertDragActive = false;
+  }
+
+  // Route drag-end through the public per-context wrappers so the original
+  // internal call graph (dropzone/drop -> onPageBlockDragEnd/onHomeBlockDragEnd)
+  // is preserved for callers and tests that observe those methods.
+  private dispatchBlockDragEnd(context: BuilderContext): void {
+    if (context === 'home') {
+      this.onHomeBlockDragEnd();
+      return;
+    }
+    this.onPageBlockDragEnd();
+  }
+
+  private insertBuilderBlockAt(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    type: CmsBlockLibraryBlockType,
+    index: number,
+    template: CmsBlockLibraryTemplate,
+  ): string | null {
+    if (context === 'home') return this.insertHomeBlockAt(type, index, template);
+    return this.insertPageBlockAt(this.safePageRecordKey(pageKey as PageBuilderKey), type, index, template);
+  }
+
+  private insertBuilderMediaFiles(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    index: number,
+    files: File[],
+  ): Promise<void> {
+    if (context === 'home') return this.insertHomeMediaFiles(index, files);
+    return this.insertPageMediaFiles(this.safePageRecordKey(pageKey as PageBuilderKey), index, files);
+  }
+
+  private onBuilderMediaDropOnContainer(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    event: DragEvent,
+  ): void {
+    if (event.target !== event.currentTarget) return;
+    const files = this.extractCmsImageFiles(event);
+    if (!files.length) return;
+    event.preventDefault();
+    const index = this.builderBlockList(context, pageKey).length;
+    void this.insertBuilderMediaFiles(context, pageKey, index, files);
+  }
+
+  private onBuilderBlockDropZone(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    event: DragEvent,
+    index: number,
+  ): void {
+    event.preventDefault();
+    const current = [...this.builderBlockList(context, pageKey)];
+
+    const dragKey = this.builderDragActiveKey(context, pageKey);
+    if (dragKey) {
+      const from = current.findIndex((b) => b.key === dragKey);
+      if (from === -1) {
+        this.dispatchBlockDragEnd(context);
+        return;
+      }
+      const safeIndex = Math.max(0, Math.min(index, current.length));
+      const [moved] = current.splice(from, 1);
+      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
+      current.splice(nextIndex, 0, moved);
+      this.setBuilderBlockList(context, pageKey, current);
+      this.dispatchBlockDragEnd(context);
+      return;
+    }
+
+    const payload = this.readCmsBlockPayload(event);
+    if (!payload || payload.scope !== context) {
+      this.dispatchBlockDragEnd(context);
+      return;
+    }
+
+    this.insertBuilderBlockAt(context, pageKey, payload.type, index, payload.template);
+    this.setBuilderInsertDragActive(context, false);
+  }
+
+  private onBuilderBlockDrop(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    event: DragEvent,
+    targetKey: string,
+  ): void {
+    event.preventDefault();
+    const list = this.builderBlockList(context, pageKey);
+
+    const mediaFiles = this.extractCmsImageFiles(event);
+    if (mediaFiles.length) {
+      const to = list.findIndex((b) => b.key === targetKey);
+      const safeIndex = to !== -1 ? to : list.length;
+      void this.insertBuilderMediaFiles(context, pageKey, safeIndex, mediaFiles);
+      this.setBuilderInsertDragActive(context, false);
+      return;
+    }
+
+    const payload = this.readCmsBlockPayload(event);
+    if (payload && payload.scope === context) {
+      const to = list.findIndex((b) => b.key === targetKey);
+      if (to !== -1) {
+        this.insertBuilderBlockAt(context, pageKey, payload.type, to, payload.template);
+      }
+      this.setBuilderInsertDragActive(context, false);
+      return;
+    }
+
+    const dragKey = this.builderDragActiveKey(context, pageKey);
+    if (!dragKey || dragKey === targetKey) return;
+    const current = [...list];
+    const from = current.findIndex((b) => b.key === dragKey);
+    const to = current.findIndex((b) => b.key === targetKey);
+    if (from === -1 || to === -1) {
+      if (context === 'home') this.dispatchBlockDragEnd(context);
+      return;
+    }
+    const [moved] = current.splice(from, 1);
+    const nextIndex = from < to ? to - 1 : to;
+    current.splice(nextIndex, 0, moved);
+    this.setBuilderBlockList(context, pageKey, current);
+    this.dispatchBlockDragEnd(context);
+  }
+
   private safeRecordKey(key: string, fallback = 'unknown'): string {
     const value = String(key || '').trim();
     if (!/^[a-z0-9._:-]+$/i.test(value)) {
@@ -12328,7 +12428,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   setHomeInsertDragActive(active: boolean): void {
-    this.homeInsertDragActive = active;
+    this.setBuilderInsertDragActive('home', active);
   }
 
   addHomeBlockFromLibrary(type: CmsBlockLibraryBlockType, template: CmsBlockLibraryTemplate): void {
@@ -12353,13 +12453,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onHomeBlockDragStart(key: string): void {
-    this.homeInsertDragActive = true;
-    this.draggingHomeBlockKey = key;
+    this.onBuilderBlockDragStart('home', undefined, key);
   }
 
   onHomeBlockDragEnd(): void {
-    this.draggingHomeBlockKey = null;
-    this.homeInsertDragActive = false;
+    this.onBuilderBlockDragEnd('home');
   }
 
   onHomeBlockDragOver(event: DragEvent): void {
@@ -12367,69 +12465,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onHomeBlockDropZone(event: DragEvent, index: number): void {
-    event.preventDefault();
-    const current = [...this.homeBlocks];
-
-    if (this.draggingHomeBlockKey) {
-      const from = current.findIndex((b) => b.key === this.draggingHomeBlockKey);
-      if (from === -1) {
-        this.onHomeBlockDragEnd();
-        return;
-      }
-      const safeIndex = Math.max(0, Math.min(index, current.length));
-      const [moved] = current.splice(from, 1);
-      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
-      current.splice(nextIndex, 0, moved);
-      this.homeBlocks = current;
-      this.onHomeBlockDragEnd();
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (!payload || payload.scope !== 'home') {
-      this.onHomeBlockDragEnd();
-      return;
-    }
-
-    this.insertHomeBlockAt(payload.type, index, payload.template);
-    this.homeInsertDragActive = false;
+    this.onBuilderBlockDropZone('home', undefined, event, index);
   }
 
   onHomeBlockDrop(event: DragEvent, targetKey: string): void {
-    event.preventDefault();
-
-    const mediaFiles = this.extractCmsImageFiles(event);
-    if (mediaFiles.length) {
-      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
-      const safeIndex = to !== -1 ? to : this.homeBlocks.length;
-      void this.insertHomeMediaFiles(safeIndex, mediaFiles);
-      this.homeInsertDragActive = false;
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'home') {
-      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
-        this.insertHomeBlockAt(payload.type, to, payload.template);
-      }
-      this.homeInsertDragActive = false;
-      return;
-    }
-
-    if (!this.draggingHomeBlockKey || this.draggingHomeBlockKey === targetKey) return;
-    const current = [...this.homeBlocks];
-    const from = current.findIndex((b) => b.key === this.draggingHomeBlockKey);
-    const to = current.findIndex((b) => b.key === targetKey);
-    if (from === -1 || to === -1) {
-      this.onHomeBlockDragEnd();
-      return;
-    }
-    const [moved] = current.splice(from, 1);
-    const nextIndex = from < to ? to - 1 : to;
-    current.splice(nextIndex, 0, moved);
-    this.homeBlocks = current;
-    this.onHomeBlockDragEnd();
+    this.onBuilderBlockDrop('home', undefined, event, targetKey);
   }
 
   private nextCustomBlockKey(type: string): string {
