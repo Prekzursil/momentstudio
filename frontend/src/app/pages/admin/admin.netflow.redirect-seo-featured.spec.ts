@@ -11,6 +11,7 @@ import { ButtonComponent } from '../../shared/button.component';
 import { InputComponent } from '../../shared/input.component';
 import { LocalizedCurrencyPipe } from '../../shared/localized-currency.pipe';
 import { CmsEditorPrefsService } from './shared/cms-editor-prefs.service';
+import { AdminSeoComponent } from './settings/admin-seo.component';
 import { AdminService } from '../../core/admin.service';
 import { AdminProductsService } from '../../core/admin-products.service';
 import { AuthService } from '../../core/auth.service';
@@ -229,6 +230,7 @@ async function setup(options: SetupOptions): Promise<SetupResult> {
           InputComponent,
           LocalizedCurrencyPipe,
           TranslateModule,
+          AdminSeoComponent,
         ],
         schemas: [NO_ERRORS_SCHEMA],
       },

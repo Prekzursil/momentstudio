@@ -2703,76 +2703,6 @@ describe('AdminComponent — site settings load/save (assets, social, seo)', () 
     h.admin.getContent.and.returnValue(of({ meta: {}, version: 1 }));
   });
 
-  it('loadSeo maps title/description and resets on error', () => {
-    c.seoPage = 'home';
-    c.seoLang = 'en';
-    h.admin.getContent.and.returnValue(
-      of({ version: 2, title: 'SEO', meta: { description: 'desc' } }),
-    );
-    c.loadSeo();
-    expect(c.seoForm.title).toBe('SEO');
-    expect(c.seoForm.description).toBe('desc');
-    h.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-    c.loadSeo();
-    expect(c.seoForm.title).toBe('');
-  });
-
-  it('saveSeo persists with conflict and create fallback', () => {
-    c.seoPage = 'home';
-    c.seoLang = 'en';
-    c.seoForm = { title: 'T', description: 'D' };
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-    c.saveSeo();
-    expect(c.seoMessage).toBeTruthy();
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-    c.saveSeo();
-    expect(c.seoError).toBeTruthy();
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
-    h.admin.createContent.and.returnValue(of({ version: 1 }));
-    c.saveSeo();
-    expect(c.seoMessage).toBeTruthy();
-    h.admin.createContent.and.returnValue(throwError(() => new Error('x')));
-    c.saveSeo();
-    expect(c.seoError).toBeTruthy();
-  });
-
-  it('loadSitemapPreview stores by-lang data and surfaces detail errors', () => {
-    h.admin.getSitemapPreview.and.returnValue(of({ by_lang: { en: ['/'] } }));
-    c.loadSitemapPreview();
-    expect(c.sitemapPreviewByLang).toEqual({ en: ['/'] });
-    h.admin.getSitemapPreview.and.returnValue(throwError(() => ({ error: { detail: 'boom' } })));
-    c.loadSitemapPreview();
-    expect(c.sitemapPreviewError).toBe('boom');
-  });
-
-  it('structuredDataIssueUrl builds entity URLs', () => {
-    expect(c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'p1' })).toBe(
-      '/products/p1',
-    );
-    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe(
-      '/about',
-    );
-    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' })).toBe(
-      '/contact',
-    );
-    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe(
-      '/pages/faq',
-    );
-    expect(c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.' })).toBe('/pages');
-    expect(c.structuredDataIssueUrl({ entity_type: 'other', entity_key: 'x' })).toBe('/');
-  });
-
-  it('runStructuredDataValidation stores results and surfaces errors', () => {
-    h.admin.validateStructuredData.and.returnValue(of({ issues: [] }));
-    c.runStructuredDataValidation();
-    expect(c.structuredDataResult).toEqual({ issues: [] } as any);
-    h.admin.validateStructuredData.and.returnValue(
-      throwError(() => ({ error: { detail: 'bad' } })),
-    );
-    c.runStructuredDataValidation();
-    expect(c.structuredDataError).toBe('bad');
-  });
-
   it('selectInfoLang sets the active info language', () => {
     c.selectInfoLang('ro');
     expect(c.infoLang).toBe('ro');
@@ -2909,13 +2839,6 @@ describe('AdminComponent — navigation editor', () => {
     h.admin.createContent.and.returnValue(of({ version: 1 }));
     c.saveNavigation();
     expect(c.navigationMessage).toBeTruthy();
-  });
-
-  it('selectSeoLang switches language and reloads', () => {
-    h.admin.getContent.and.returnValue(of({ meta: {}, version: 1, title: '' }));
-    c.selectSeoLang('ro');
-    expect(c.seoLang).toBe('ro');
-    expect(h.admin.getContent).toHaveBeenCalled();
   });
 });
 

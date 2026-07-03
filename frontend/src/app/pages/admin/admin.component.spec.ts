@@ -336,7 +336,6 @@ describe('AdminComponent', () => {
         'loadTaxGroups',
         'loadNavigation',
         'loadReportsSettings',
-        'loadSeo',
         'loadFxStatus',
       ].forEach((m) => spyOn<any>(env.c, m).and.stub());
       env.admin.coupons.and.returnValue(of([{ code: 'A' }]));
@@ -360,7 +359,6 @@ describe('AdminComponent', () => {
         'loadTaxGroups',
         'loadNavigation',
         'loadReportsSettings',
-        'loadSeo',
         'loadFxStatus',
       ].forEach((m) => spyOn<any>(env.c, m).and.stub());
       env.admin.coupons.and.returnValue(throwError(() => new Error('x')));
@@ -2274,77 +2272,6 @@ describe('AdminComponent', () => {
   });
 
   describe('seo + sitemap + structured data', () => {
-    it('selectSeoLang + loadSeo hydrate the form', () => {
-      const env = build('settings');
-      env.admin.getContent.and.returnValue(
-        of({ title: 'T', meta: { description: 'D' }, version: 1 }),
-      );
-      env.c.selectSeoLang('ro');
-      expect(env.c.seoLang).toBe('ro');
-      expect(env.c.seoForm.title).toBe('T');
-      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-      env.c.loadSeo();
-      expect(env.c.seoForm.title).toBe('');
-    });
-
-    it('saveSeo persists + create fallback', () => {
-      const env = build('settings');
-      env.admin.updateContentBlock.and.returnValue(of({ version: 2 }));
-      env.c.saveSeo();
-      expect(env.c.seoMessage).toBe('adminUi.site.seo.success.save');
-      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
-      env.admin.createContent.and.returnValue(of({ version: 1 }));
-      env.c.saveSeo();
-      expect(env.admin.createContent).toHaveBeenCalled();
-      env.admin.createContent.and.returnValue(throwError(() => new Error('x')));
-      env.c.saveSeo();
-      expect(env.c.seoError).toBe('adminUi.site.seo.errors.save');
-    });
-
-    it('loadSitemapPreview maps by_lang + handles errors', () => {
-      const env = build('settings');
-      env.admin.getSitemapPreview.and.returnValue(of({ by_lang: { en: ['/'] } }));
-      env.c.loadSitemapPreview();
-      expect(env.c.sitemapPreviewByLang).toEqual({ en: ['/'] });
-      env.admin.getSitemapPreview.and.returnValue(
-        throwError(() => ({ error: { detail: 'down' } })),
-      );
-      env.c.loadSitemapPreview();
-      expect(env.c.sitemapPreviewError).toBe('down');
-    });
-
-    it('structuredDataIssueUrl maps entity types', () => {
-      const env = build('settings');
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'product', entity_key: 'mug' })).toBe(
-        '/products/mug',
-      );
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.about' })).toBe(
-        '/about',
-      );
-      expect(
-        env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.contact' }),
-      ).toBe('/contact');
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.faq' })).toBe(
-        '/pages/faq',
-      );
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'page', entity_key: 'page.' })).toBe(
-        '/pages',
-      );
-      expect(env.c.structuredDataIssueUrl({ entity_type: 'other', entity_key: 'x' })).toBe('/');
-    });
-
-    it('runStructuredDataValidation stores results + errors', () => {
-      const env = build('settings');
-      env.admin.validateStructuredData.and.returnValue(of({ ok: true }));
-      env.c.runStructuredDataValidation();
-      expect(env.c.structuredDataResult).toEqual({ ok: true } as any);
-      env.admin.validateStructuredData.and.returnValue(
-        throwError(() => ({ error: { detail: 'invalid' } })),
-      );
-      env.c.runStructuredDataValidation();
-      expect(env.c.structuredDataError).toBe('invalid');
-    });
-
     it('selectInfoLang sets the active language', () => {
       const env = build('pages');
       env.c.selectInfoLang('ro');
