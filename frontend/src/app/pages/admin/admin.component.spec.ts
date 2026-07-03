@@ -330,13 +330,9 @@ describe('AdminComponent', () => {
     it('loads the settings workspace and audit data', () => {
       const env = build('settings');
       spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      [
-        'loadCategories',
-        'loadTaxGroups',
-        'loadNavigation',
-        'loadReportsSettings',
-        'loadFxStatus',
-      ].forEach((m) => spyOn<any>(env.c, m).and.stub());
+      ['loadCategories', 'loadTaxGroups', 'loadNavigation', 'loadFxStatus'].forEach((m) =>
+        spyOn<any>(env.c, m).and.stub(),
+      );
       env.admin.coupons.and.returnValue(of([{ code: 'A' }]));
       env.admin.lowStock.and.returnValue(of([{ id: 'l1' }]));
       env.admin.audit.and.returnValue(of({ products: [1], content: [2], security: [3] }));
@@ -353,13 +349,9 @@ describe('AdminComponent', () => {
     it('handles settings load failures defensively', () => {
       const env = build('settings');
       spyOn<any>(env.c, 'reloadContentBlocks').and.stub();
-      [
-        'loadCategories',
-        'loadTaxGroups',
-        'loadNavigation',
-        'loadReportsSettings',
-        'loadFxStatus',
-      ].forEach((m) => spyOn<any>(env.c, m).and.stub());
+      ['loadCategories', 'loadTaxGroups', 'loadNavigation', 'loadFxStatus'].forEach((m) =>
+        spyOn<any>(env.c, m).and.stub(),
+      );
       env.admin.coupons.and.returnValue(throwError(() => new Error('x')));
       env.admin.lowStock.and.returnValue(throwError(() => new Error('x')));
       env.admin.audit.and.returnValue(throwError(() => new Error('x')));
@@ -2101,61 +2093,6 @@ describe('AdminComponent', () => {
       expect(env.c.homeBlocks.map((b) => b.key)).toEqual(['b', 'a']);
       env.c.setHomeInsertDragActive(true);
       expect(env.c.homeInsertDragActive).toBeTrue();
-    });
-  });
-
-  describe('site settings load/save', () => {
-    it('loadReportsSettings parses recipients + falls back', () => {
-      const env = build('settings');
-      env.admin.getContent.and.returnValue(
-        of({
-          version: 1,
-          meta: {
-            reports_weekly_enabled: true,
-            reports_weekly_weekday: 9,
-            reports_monthly_day: 40,
-            reports_recipients: 'a@b.com, c@d.com',
-            reports_weekly_last_error: 'boom',
-          },
-        }),
-      );
-      env.c.loadReportsSettings();
-      expect(env.c.reportsSettingsForm.weekly_enabled).toBeTrue();
-      expect(env.c.reportsSettingsForm.weekly_weekday).toBe(6);
-      expect(env.c.reportsSettingsForm.recipients).toBe('a@b.com, c@d.com');
-      expect(env.c.reportsWeeklyLastError).toBe('boom');
-      env.admin.getContent.and.returnValue(throwError(() => new Error('x')));
-      env.c.loadReportsSettings();
-      expect(env.c.reportsSettingsForm.recipients).toBe('');
-    });
-
-    it('saveReportsSettings filters invalid emails + create fallback', () => {
-      const env = build('settings');
-      env.c.reportsSettingsForm.recipients = 'a@b.com, not-an-email, a@b.com';
-      env.admin.updateContentBlock.and.returnValue(
-        of({ version: 2, meta: { reports_recipients: ['a@b.com'] } }),
-      );
-      env.c.saveReportsSettings();
-      const payload = env.admin.updateContentBlock.calls.mostRecent().args[1];
-      expect(payload.meta.reports_recipients).toEqual(['a@b.com']);
-      env.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
-      env.admin.createContent.and.returnValue(of({ version: 1 }));
-      env.c.saveReportsSettings();
-      expect(env.admin.createContent).toHaveBeenCalled();
-    });
-
-    it('sendReportNow guards re-entry + reports skipped/sent', () => {
-      const env = build('settings');
-      env.admin.sendScheduledReport.and.returnValue(of({ skipped: true }));
-      spyOn(env.c, 'loadReportsSettings').and.stub();
-      env.c.sendReportNow('weekly');
-      expect(env.c.reportsSettingsMessage).toBe('adminUi.reports.success.skipped');
-      env.admin.sendScheduledReport.and.returnValue(of({ skipped: false }));
-      env.c.sendReportNow('monthly', true);
-      expect(env.c.reportsSettingsMessage).toBe('adminUi.reports.success.sent');
-      env.admin.sendScheduledReport.and.returnValue(throwError(() => new Error('x')));
-      env.c.sendReportNow('weekly');
-      expect(env.c.reportsSettingsError).toBe('adminUi.reports.errors.send');
     });
   });
 
