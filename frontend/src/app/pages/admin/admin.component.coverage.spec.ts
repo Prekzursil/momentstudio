@@ -1,4 +1,3 @@
- 
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
@@ -2691,7 +2690,6 @@ describe('AdminComponent — settings save/load (checkout, reports, assets)', ()
     c.sendReportNow('weekly');
     expect(c.reportsSettingsError).toBeTruthy();
   });
-
 });
 
 describe('AdminComponent — site settings load/save (assets, social, seo)', () => {
@@ -3864,6 +3862,22 @@ describe('AdminComponent — info pages, legal pages, visibility', () => {
     expect(c.pagePublicUrlForKey('page.')).toBe('/pages');
   });
 
+  it('boundApplyPageBlockSaved threads needs-translation flags then reloads pages', () => {
+    spyOn(c, 'loadContentPages');
+    c.boundApplyPageBlockSaved('page.terms', {
+      needs_translation_en: true,
+      needs_translation_ro: false,
+    });
+    expect(c.pageBlocksNeedsTranslationEn['page.terms']).toBe(true);
+    expect(c.pageBlocksNeedsTranslationRo['page.terms']).toBe(false);
+    expect(c.loadContentPages).toHaveBeenCalled();
+
+    // a null/absent block clears both flags
+    c.boundApplyPageBlockSaved('page.terms', null);
+    expect(c.pageBlocksNeedsTranslationEn['page.terms']).toBe(false);
+    expect(c.pageBlocksNeedsTranslationRo['page.terms']).toBe(false);
+  });
+
   it('isPageHidden / canTogglePageHidden reflect content pages and protections', () => {
     c.contentPages = [
       { key: 'page.custom', hidden: true },
@@ -3906,39 +3920,6 @@ describe('AdminComponent — info pages, legal pages, visibility', () => {
     expect(h.toast.error).toHaveBeenCalled();
   });
 
-  it('onLegalPageKeyChange switches and reloads', () => {
-    spyOn(c, 'loadLegalPage');
-    c.legalPageKey = 'page.terms';
-    c.onLegalPageKeyChange('page.terms'); // unchanged
-    expect(c.loadLegalPage).not.toHaveBeenCalled();
-    c.onLegalPageKeyChange('page.privacy-policy');
-    expect(c.legalPageKey).toBe('page.privacy-policy');
-    expect(c.loadLegalPage).toHaveBeenCalled();
-  });
-
-  it('loadLegalPage requires a key and merges en/ro content', () => {
-    c.loadLegalPage('' as any);
-    expect(c.legalPageError).toBeTruthy();
-
-    h.admin.getContent.and.callFake((key: string, lang: string) =>
-      of({ body_markdown: lang === 'en' ? 'EN body' : 'RO body', meta: { last_updated: '2030' } }),
-    );
-    c.loadLegalPage('page.terms');
-    expect(c.legalPageForm.en).toBe('EN body');
-    expect(c.legalPageForm.ro).toBe('RO body');
-    expect(c.legalPageLastUpdated).toBe('2030');
-
-    // 404 on both → empty form, no error
-    h.admin.getContent.and.returnValue(throwError(() => ({ status: 404 })));
-    c.loadLegalPage('page.terms');
-    expect(c.legalPageForm.en).toBe('');
-
-    // non-404 surfaces error
-    h.admin.getContent.and.returnValue(of({ status: 500 }));
-    c.loadLegalPage('page.terms');
-    expect(c.legalPageError).toBeTruthy();
-  });
-
   it('saveInfoUi routes by translation layout', () => {
     const single = spyOn<any>(c, 'saveInfo');
     const both = spyOn<any>(c, 'saveInfoBoth');
@@ -3949,23 +3930,6 @@ describe('AdminComponent — info pages, legal pages, visibility', () => {
     h.cmsPrefs.translationLayout.and.returnValue('sideBySide');
     c.saveInfoUi('page.about', { en: 'A', ro: 'B' });
     expect(both).toHaveBeenCalled();
-  });
-
-  it('saveLegalPageUi routes by translation layout and guards key', () => {
-    const single = spyOn<any>(c, 'saveLegalPage');
-    const both = spyOn<any>(c, 'saveLegalPageBoth');
-    c.legalPageKey = null;
-    c.saveLegalPageUi();
-    expect(single).not.toHaveBeenCalled();
-    c.legalPageKey = 'page.terms';
-    c.legalPageForm = { en: 'E', ro: 'R' };
-    h.cmsPrefs.translationLayout.and.returnValue('sideBySide');
-    c.saveLegalPageUi();
-    expect(both).toHaveBeenCalled();
-    h.cmsPrefs.translationLayout.and.returnValue('tabbed');
-    c.infoLang = 'ro';
-    c.saveLegalPageUi();
-    expect(single).toHaveBeenCalledWith('page.terms', 'R', 'ro');
   });
 
   it('loadInfo fetches each info page', async () => {
@@ -4834,26 +4798,6 @@ describe('AdminComponent — full block serialization and remaining flows', () =
     expect(h.toast.error).toHaveBeenCalled();
   });
 
-  it('saveLegalPage and saveLegalPageBoth persist with meta sync', () => {
-    spyOn(c, 'loadContentPages');
-    c.legalPageKey = 'page.terms';
-    c.legalPageForm = { en: 'E', ro: 'R' };
-    c.legalPageLastUpdated = '2030';
-    c.legalPageLastUpdatedOriginal = '';
-    c.legalPageMeta = {};
-    h.admin.updateContentBlock.and.returnValue(of({ version: 2, meta: { last_updated: '2030' } }));
-    h.cmsPrefs.translationLayout.and.returnValue('tabbed');
-    c.infoLang = 'en';
-    c.saveLegalPageUi();
-    expect(c.legalPageMessage).toBeTruthy();
-
-    h.cmsPrefs.translationLayout.and.returnValue('sideBySide');
-    c.legalPageLastUpdated = '';
-    c.legalPageLastUpdatedOriginal = '';
-    c.saveLegalPageUi();
-    expect(c.legalPageMessage).toBeTruthy();
-  });
-
   it('renameCustomPageUrl renames a custom page and optional redirect', () => {
     spyOn(c, 'loadContentPages');
     spyOn(c, 'loadPageBlocks');
@@ -5623,48 +5567,12 @@ describe('AdminComponent — remaining edge branches', () => {
   });
 });
 
-describe('AdminComponent — legal save, media drop, split scroll', () => {
+describe('AdminComponent — media drop, split scroll', () => {
   let h: Harness;
   let c: any;
   beforeEach(() => {
     h = createComponent();
     c = h.component as any;
-  });
-
-  it('saveLegalPage syncs meta then saves markdown (success and create fallback)', () => {
-    spyOn(c, 'loadContentPages');
-    c.legalPageMeta = {};
-    c.legalPageLastUpdated = '2030-01-01';
-    c.legalPageLastUpdatedOriginal = '';
-    h.admin.updateContentBlock.and.returnValue(
-      of({ version: 2, meta: { last_updated: '2030-01-01' } }),
-    );
-    (c as any).saveLegalPage('page.terms', 'Body', 'en');
-    expect(c.legalPageMessage).toBeTruthy();
-
-    // markdown save 404 → create fallback
-    c.legalPageLastUpdated = '';
-    c.legalPageLastUpdatedOriginal = '';
-    let calls = 0;
-    h.admin.updateContentBlock.and.callFake(() => {
-      calls += 1;
-      return throwError(() => ({ status: 404 }));
-    });
-    h.admin.createContent.and.returnValue(of({ version: 1 }));
-    (c as any).saveLegalPage('page.terms', 'Body', 'en');
-    expect(calls).toBe(1);
-    expect(c.legalPageMessage).toBeTruthy();
-  });
-
-  it('saveLegalMetaIfNeeded reports a conflict error', () => {
-    spyOn(c, 'loadLegalPage');
-    c.legalPageMeta = {};
-    c.legalPageLastUpdated = 'new';
-    c.legalPageLastUpdatedOriginal = 'old';
-    h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
-    const onErr = jasmine.createSpy('onErr');
-    (c as any).saveLegalMetaIfNeeded('page.terms', () => {}, onErr);
-    expect(onErr).toHaveBeenCalled();
   });
 
   it('onHomeBlockDrop handles media files and missing keys', () => {

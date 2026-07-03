@@ -34,6 +34,7 @@ import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
 import { MarkdownService } from '../../core/markdown.service';
 import { CmsEditorPrefsService } from './shared/cms-editor-prefs.service';
+import { AdminLegalPagesComponent } from './settings/admin-legal-pages.component';
 import { RichEditorComponent } from '../../shared/rich-editor.component';
 import { InputComponent } from '../../shared/input.component';
 import { ButtonComponent } from '../../shared/button.component';
@@ -90,22 +91,64 @@ interface Env {
 }
 
 const ADMIN_METHODS = [
-  'products', 'coupons', 'lowStock', 'audit', 'content', 'getMaintenance', 'setMaintenance',
-  'getCategories', 'createCategory', 'updateCategory', 'deleteCategory', 'reorderCategories',
-  'getCategoryTranslations', 'upsertCategoryTranslation', 'deleteCategoryTranslation',
-  'listFeaturedCollections', 'createFeaturedCollection', 'updateFeaturedCollection',
-  'getProduct', 'createProduct', 'updateProduct', 'deleteProduct', 'duplicateProduct',
-  'uploadProductImage', 'deleteProductImage', 'getContent', 'createContent', 'updateContentBlock',
-  'deleteContent', 'getContentVersion', 'listContentVersions', 'rollbackContentVersion',
-  'updateContentTranslationStatus', 'uploadContentImage', 'updateContentImageFocalPoint',
-  'listContentPages', 'renameContentPage', 'createPagePreviewToken', 'createHomePreviewToken',
-  'listContentRedirects', 'deleteContentRedirect', 'exportContentRedirects',
-  'importContentRedirects', 'upsertContentRedirect', 'previewFindReplaceContent',
-  'applyFindReplaceContent', 'linkCheckContent', 'linkCheckContentPreview', 'getSitemapPreview',
-  'validateStructuredData', 'sendScheduledReport',
+  'products',
+  'coupons',
+  'lowStock',
+  'audit',
+  'content',
+  'getMaintenance',
+  'setMaintenance',
+  'getCategories',
+  'createCategory',
+  'updateCategory',
+  'deleteCategory',
+  'reorderCategories',
+  'getCategoryTranslations',
+  'upsertCategoryTranslation',
+  'deleteCategoryTranslation',
+  'listFeaturedCollections',
+  'createFeaturedCollection',
+  'updateFeaturedCollection',
+  'getProduct',
+  'createProduct',
+  'updateProduct',
+  'deleteProduct',
+  'duplicateProduct',
+  'uploadProductImage',
+  'deleteProductImage',
+  'getContent',
+  'createContent',
+  'updateContentBlock',
+  'deleteContent',
+  'getContentVersion',
+  'listContentVersions',
+  'rollbackContentVersion',
+  'updateContentTranslationStatus',
+  'uploadContentImage',
+  'updateContentImageFocalPoint',
+  'listContentPages',
+  'renameContentPage',
+  'createPagePreviewToken',
+  'createHomePreviewToken',
+  'listContentRedirects',
+  'deleteContentRedirect',
+  'exportContentRedirects',
+  'importContentRedirects',
+  'upsertContentRedirect',
+  'previewFindReplaceContent',
+  'applyFindReplaceContent',
+  'linkCheckContent',
+  'linkCheckContentPreview',
+  'getSitemapPreview',
+  'validateStructuredData',
+  'sendScheduledReport',
   // used by child components rendered inside the admin shell (asset library)
-  'listContentImages', 'getContentImageUsage', 'updateContentImage', 'updateContentImageTags',
-  'editContentImage', 'deleteContentImage',
+  'listContentImages',
+  'getContentImageUsage',
+  'updateContentImage',
+  'updateContentImageTags',
+  'editContentImage',
+  'deleteContentImage',
 ];
 
 async function setup(section: 'settings' | 'pages'): Promise<Env> {
@@ -122,24 +165,39 @@ async function setup(section: 'settings' | 'pages'): Promise<Env> {
   admin.updateContentBlock.and.returnValue(of(block({ version: 4 })));
   admin.createContent.and.returnValue(of(block({ version: 4 })));
   admin.listContentPages.and.returnValue(of([]));
-  admin.listContentImages.and.returnValue(of({ items: [], meta: { total_pages: 1, total_items: 0, page: 1, limit: 20 } }));
+  admin.listContentImages.and.returnValue(
+    of({ items: [], meta: { total_pages: 1, total_items: 0, page: 1, limit: 20 } }),
+  );
 
   const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
   adminProducts.search.and.returnValue(of([]));
 
   const blog = jasmine.createSpyObj('BlogService', [
-    'createPreviewToken', 'deleteComment', 'hideCommentAdmin', 'listFlaggedComments',
-    'resolveCommentFlagsAdmin', 'unhideCommentAdmin',
+    'createPreviewToken',
+    'deleteComment',
+    'hideCommentAdmin',
+    'listFlaggedComments',
+    'resolveCommentFlagsAdmin',
+    'unhideCommentAdmin',
   ]);
   for (const k of Object.keys(blog)) (blog[k] as jasmine.Spy).and.returnValue(of([]));
 
   const fxAdmin = jasmine.createSpyObj('FxAdminService', [
-    'clearOverride', 'getStatus', 'listOverrideAudit', 'restoreOverrideFromAudit', 'setOverride',
+    'clearOverride',
+    'getStatus',
+    'listOverrideAudit',
+    'restoreOverrideFromAudit',
+    'setOverride',
   ]);
   for (const k of Object.keys(fxAdmin)) (fxAdmin[k] as jasmine.Spy).and.returnValue(of(undefined));
 
   const taxesAdmin = jasmine.createSpyObj('TaxesAdminService', [
-    'deleteGroup', 'deleteRate', 'listGroups', 'updateGroup', 'createGroup', 'upsertRate',
+    'deleteGroup',
+    'deleteRate',
+    'listGroups',
+    'updateGroup',
+    'createGroup',
+    'upsertRate',
   ]);
   for (const k of Object.keys(taxesAdmin)) (taxesAdmin[k] as jasmine.Spy).and.returnValue(of([]));
 
@@ -148,9 +206,19 @@ async function setup(section: 'settings' | 'pages'): Promise<Env> {
   auth.loadCurrentUser.and.returnValue(of(null));
 
   const cmsPrefs = jasmine.createSpyObj('CmsEditorPrefsService', [
-    'mode', 'previewDevice', 'previewLang', 'previewLayout', 'previewTheme', 'translationLayout',
-    'setMode', 'setPreviewDevice', 'setPreviewLayout', 'setPreviewLang', 'setPreviewTheme',
-    'setTranslationLayout', 'toggleMode',
+    'mode',
+    'previewDevice',
+    'previewLang',
+    'previewLayout',
+    'previewTheme',
+    'translationLayout',
+    'setMode',
+    'setPreviewDevice',
+    'setPreviewLayout',
+    'setPreviewLang',
+    'setPreviewTheme',
+    'setTranslationLayout',
+    'toggleMode',
   ]);
   cmsPrefs.mode.and.returnValue('basic');
   cmsPrefs.previewDevice.and.returnValue('desktop');
@@ -188,6 +256,13 @@ async function setup(section: 'settings' | 'pages'): Promise<Env> {
       remove: { imports: [RichEditorComponent] },
       add: { imports: [StubRichEditorComponent] },
     })
+    // The legal-page editor was extracted into its own standalone component, so
+    // its rich editor lives in the child's imports — stub it there too so the
+    // DOM-boundary legal flow keeps driving the stub, not the heavy editor.
+    .overrideComponent(AdminLegalPagesComponent, {
+      remove: { imports: [RichEditorComponent] },
+      add: { imports: [StubRichEditorComponent] },
+    })
     .compileComponents();
 
   const translate = TestBed.inject(TranslateService);
@@ -220,7 +295,9 @@ function findButton(scope: DebugElement, label: string): DebugElement | undefine
     (d) => (d.componentInstance as ButtonComponent).label === label,
   );
   if (!found) {
-    const labels = appButtons(scope).map((d) => JSON.stringify((d.componentInstance as ButtonComponent).label));
+    const labels = appButtons(scope).map((d) =>
+      JSON.stringify((d.componentInstance as ButtonComponent).label),
+    );
     throw new Error(`button "${label}" not found. available labels: [${labels.join(', ')}]`);
   }
   return found;
@@ -233,7 +310,11 @@ function clickAppButton(fixture: ComponentFixture<AdminComponent>, de: DebugElem
   fixture.detectChanges();
 }
 
-function setAppInput(fixture: ComponentFixture<AdminComponent>, label: string, value: string): void {
+function setAppInput(
+  fixture: ComponentFixture<AdminComponent>,
+  label: string,
+  value: string,
+): void {
   const input = fixture.debugElement
     .queryAll(By.directive(InputComponent))
     .find((d) => (d.componentInstance as InputComponent).label === label);
@@ -262,9 +343,7 @@ function contentEditorCard(fixture: ComponentFixture<AdminComponent>): DebugElem
 function legalDetails(fixture: ComponentFixture<AdminComponent>): DebugElement {
   return fixture.debugElement
     .queryAll(By.css('details'))
-    .find((d) =>
-      (d.nativeElement.textContent || '').includes('adminUi.site.pages.legal.title'),
-    )!;
+    .find((d) => (d.nativeElement.textContent || '').includes('adminUi.site.pages.legal.title'))!;
 }
 
 describe('NET admin cms-content-save :: content block save (settings)', () => {
@@ -319,7 +398,10 @@ describe('NET admin cms-content-save :: content block save (settings)', () => {
 
     setAppInput(env.fixture, 'adminUi.content.titleLabel', 'Conflicting edit');
     const getCountBefore = env.admin.getContent.calls.count();
-    clickAppButton(env.fixture, findButton(contentEditorCard(env.fixture)!, 'adminUi.content.save')!);
+    clickAppButton(
+      env.fixture,
+      findButton(contentEditorCard(env.fixture)!, 'adminUi.content.save')!,
+    );
 
     // Conflict feedback + reload (re-fetch), editor preserved.
     expect(env.toast.error).toHaveBeenCalledWith(
@@ -353,7 +435,10 @@ describe('NET admin cms-content-save :: content block save (settings)', () => {
 
     setAppInput(env.fixture, 'adminUi.content.titleLabel', 'Will fail');
     const getCountBefore = env.admin.getContent.calls.count();
-    clickAppButton(env.fixture, findButton(contentEditorCard(env.fixture)!, 'adminUi.content.save')!);
+    clickAppButton(
+      env.fixture,
+      findButton(contentEditorCard(env.fixture)!, 'adminUi.content.save')!,
+    );
 
     expect(env.toast.error).toHaveBeenCalledWith('adminUi.content.errors.update');
     expect(env.toast.success).not.toHaveBeenCalled();

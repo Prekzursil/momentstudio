@@ -306,7 +306,6 @@ describe('AdminComponent', () => {
       const env = build('pages');
       const spies = [
         'loadInfo',
-        'loadLegalPage',
         'loadCategories',
         'loadCollections',
         'loadContentPages',

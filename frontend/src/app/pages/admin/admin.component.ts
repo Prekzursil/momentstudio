@@ -66,6 +66,7 @@ import { AdminCheckoutSettingsComponent } from './settings/admin-checkout-settin
 import { AdminSiteAssetsComponent } from './settings/admin-site-assets.component';
 import { AdminSocialLinksComponent } from './settings/admin-social-links.component';
 import { AdminSeoComponent } from './settings/admin-seo.component';
+import { AdminLegalPagesComponent, LegalPageKey } from './settings/admin-legal-pages.component';
 import {
   CMS_GLOBAL_SECTIONS,
   CmsGlobalSectionKey,
@@ -77,11 +78,6 @@ import {
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
 type UiLang = 'en' | 'ro';
 type ContentStatusUi = 'draft' | 'review' | 'published';
-type LegalPageKey =
-  | 'page.terms'
-  | 'page.terms-and-conditions'
-  | 'page.privacy-policy'
-  | 'page.anpc';
 const CMS_DRAFT_POLL_INTERVAL_MS = 1200;
 
 type HomeSectionId =
@@ -524,6 +520,7 @@ class CmsDraftManager<T> {
     AdminSiteAssetsComponent,
     AdminSocialLinksComponent,
     AdminSeoComponent,
+    AdminLegalPagesComponent,
     TranslateModule,
   ],
   template: `
@@ -1300,132 +1297,14 @@ class CmsDraftManager<T> {
               </div>
             </div>
 
-            <details
-              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
-            >
-              <summary
-                class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-              >
-                {{ 'adminUi.site.pages.legal.title' | translate }}
-              </summary>
-              <div class="mt-3 grid gap-3">
-                <p class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.site.pages.legal.hint' | translate }}
-                </p>
-
-                <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.site.pages.legal.documentLabel' | translate }}
-                    <select
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      [(ngModel)]="legalPageKey"
-                      (ngModelChange)="onLegalPageKeyChange($event)"
-                    >
-                      <option [ngValue]="'page.terms'">
-                        {{ 'adminUi.site.pages.legal.documents.termsIndex' | translate }}
-                      </option>
-                      <option [ngValue]="'page.terms-and-conditions'">
-                        {{ 'adminUi.site.pages.legal.documents.terms' | translate }}
-                      </option>
-                      <option [ngValue]="'page.privacy-policy'">
-                        {{ 'adminUi.site.pages.legal.documents.privacy' | translate }}
-                      </option>
-                      <option [ngValue]="'page.anpc'">
-                        {{ 'adminUi.site.pages.legal.documents.anpc' | translate }}
-                      </option>
-                    </select>
-                  </label>
-                  <div class="flex flex-wrap items-center justify-end gap-2">
-                    <a
-                      class="inline-flex h-10 items-center justify-center rounded-full px-3 text-sm font-medium bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
-                      [attr.href]="pagePublicUrlForKey(legalPageKey)"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      {{ 'adminUi.site.pages.legal.open' | translate }}
-                    </a>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.refresh' | translate"
-                      (action)="loadLegalPage(legalPageKey)"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-[260px_1fr] items-end">
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.site.pages.legal.lastUpdatedLabel' | translate }}
-                    <input
-                      type="date"
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      [(ngModel)]="legalPageLastUpdated"
-                    />
-                    <span class="text-xs text-slate-500 dark:text-slate-400">{{
-                      'adminUi.site.pages.legal.lastUpdatedHint' | translate
-                    }}</span>
-                  </label>
-                </div>
-
-                <div
-                  *ngIf="legalPageError"
-                  class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-                >
-                  {{ legalPageError }}
-                </div>
-                <div *ngIf="legalPageLoading" class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'notifications.loading' | translate }}
-                </div>
-
-                <ng-container
-                  *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else legalPagesSingle"
-                >
-                  <div class="grid gap-3 md:grid-cols-2">
-                    <div class="grid gap-1">
-                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300"
-                        >RO</span
-                      >
-                      <app-rich-editor
-                        height="520px"
-                        [(value)]="legalPageForm.ro"
-                      ></app-rich-editor>
-                    </div>
-                    <div class="grid gap-1">
-                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300"
-                        >EN</span
-                      >
-                      <app-rich-editor
-                        height="520px"
-                        [(value)]="legalPageForm.en"
-                      ></app-rich-editor>
-                    </div>
-                  </div>
-                </ng-container>
-                <ng-template #legalPagesSingle>
-                  <app-rich-editor
-                    height="520px"
-                    [(value)]="legalPageForm[infoLang]"
-                  ></app-rich-editor>
-                </ng-template>
-
-                <div class="flex flex-wrap items-center gap-2">
-                  <app-button
-                    size="sm"
-                    [label]="'adminUi.actions.save' | translate"
-                    [disabled]="legalPageSaving"
-                    (action)="saveLegalPageUi()"
-                  ></app-button>
-                  <span
-                    class="text-xs text-emerald-700 dark:text-emerald-300"
-                    *ngIf="legalPageMessage"
-                    >{{ legalPageMessage }}</span
-                  >
-                  <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="legalPageError">{{
-                    legalPageError
-                  }}</span>
-                </div>
-              </div>
-            </details>
+            <app-admin-legal-pages
+              [(legalPageKey)]="legalPageKey"
+              [infoLang]="infoLang"
+              [rememberContentVersion]="boundRememberContentVersion"
+              [withExpectedVersion]="boundWithExpectedVersion"
+              [handleContentConflict]="boundHandleContentConflict"
+              [applyPageBlockSaved]="boundApplyPageBlockSaved"
+            ></app-admin-legal-pages>
 
             <details
               class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
@@ -9671,15 +9550,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   };
   infoMessage: string | null = null;
   infoError: string | null = null;
+  /**
+   * Selected legal document, retained here (not on the extracted
+   * <app-admin-legal-pages> child) so the choice survives leaving and
+   * re-entering the pages section, which destroys/recreates the child.
+   */
   legalPageKey: LegalPageKey = 'page.terms';
-  legalPageForm: LocalizedText = { en: '', ro: '' };
-  legalPageLastUpdated = '';
-  private legalPageLastUpdatedOriginal = '';
-  private legalPageMeta: Record<string, unknown> = {};
-  legalPageLoading = false;
-  legalPageSaving = false;
-  legalPageMessage: string | null = null;
-  legalPageError: string | null = null;
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
@@ -10155,12 +10031,32 @@ export class AdminComponent implements OnInit, OnDestroy {
     key: string,
     payload: T,
   ): T & { expected_version?: number } => this.withExpectedVersion(key, payload);
-  readonly boundHandleContentConflict = (
-    err: any,
-    key: string,
-    reload: () => void,
-  ): boolean => this.handleContentConflict(err, key, reload);
+  readonly boundHandleContentConflict = (err: any, key: string, reload: () => void): boolean =>
+    this.handleContentConflict(err, key, reload);
   readonly boundForgetContentVersion = (key: string): void => this.forgetContentVersion(key);
+
+  /**
+   * Applies the shared needs-translation + content-pages bookkeeping after the
+   * extracted legal-pages panel persists a markdown block. Kept on the parent
+   * because it mutates the shared page-builder state maps.
+   */
+  readonly boundApplyPageBlockSaved = (
+    key: string,
+    block: { needs_translation_en?: boolean; needs_translation_ro?: boolean } | null | undefined,
+  ): void => {
+    const safePageKey = this.safePageRecordKey(key as PageBuilderKey);
+    this.setPageRecordValue(
+      this.pageBlocksNeedsTranslationEn,
+      safePageKey,
+      Boolean(block?.needs_translation_en),
+    );
+    this.setPageRecordValue(
+      this.pageBlocksNeedsTranslationRo,
+      safePageKey,
+      Boolean(block?.needs_translation_ro),
+    );
+    this.loadContentPages();
+  };
 
   pagesRevisionTitleKey(): string | undefined {
     switch (String(this.pagesRevisionKey || '').trim()) {
@@ -10416,7 +10312,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'pages') {
       this.loadInfo();
-      this.loadLegalPage(this.legalPageKey);
       this.loadCategories();
       this.loadCollections();
       this.loadContentPages();
@@ -14071,228 +13966,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  onLegalPageKeyChange(next: LegalPageKey): void {
-    if (!next || next === this.legalPageKey) return;
-    this.legalPageKey = next;
-    this.loadLegalPage(next);
-  }
-
-  loadLegalPage(key: LegalPageKey): void {
-    this.legalPageLoading = true;
-    this.legalPageMessage = null;
-    this.legalPageError = null;
-    const target = (key || '').trim();
-    if (!target) {
-      this.legalPageLoading = false;
-      this.legalPageError = 'Missing page key.';
-      return;
-    }
-
-    forkJoin([
-      this.admin
-        .getContent(target, 'en')
-        .pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err)))),
-      this.admin
-        .getContent(target, 'ro')
-        .pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err)))),
-    ]).subscribe({
-      next: ([enRes, roRes]) => {
-        const enBlock =
-          enRes && typeof enRes === 'object' && 'body_markdown' in enRes ? enRes : null;
-        const roBlock =
-          roRes && typeof roRes === 'object' && 'body_markdown' in roRes ? roRes : null;
-
-        if (!enBlock && enRes?.status && enRes.status !== 404) {
-          this.legalPageError = this.t('adminUi.site.pages.errors.load');
-        }
-
-        if (enBlock) this.rememberContentVersion(target, enBlock);
-        if (!enBlock && roBlock) this.rememberContentVersion(target, roBlock);
-
-        this.legalPageForm = {
-          en: (enBlock?.body_markdown as string) || '',
-          ro: (roBlock?.body_markdown as string) || '',
-        };
-        const meta = ((enBlock?.meta as Record<string, unknown> | null | undefined) ??
-          (roBlock?.meta as Record<string, unknown> | null | undefined) ??
-          {}) as Record<string, unknown>;
-        this.legalPageMeta = { ...(meta && typeof meta === 'object' ? meta : {}) };
-        const lastUpdated =
-          typeof this.legalPageMeta['last_updated'] === 'string'
-            ? String(this.legalPageMeta['last_updated'])
-            : '';
-        this.legalPageLastUpdated = lastUpdated;
-        this.legalPageLastUpdatedOriginal = lastUpdated;
-
-        this.legalPageLoading = false;
-      },
-      error: () => {
-        this.legalPageLoading = false;
-        this.legalPageError = this.t('adminUi.site.pages.errors.load');
-      },
-    });
-  }
-
-  private saveLegalMetaIfNeeded(
-    key: LegalPageKey,
-    onSuccess: () => void,
-    onError: () => void,
-  ): void {
-    const next = String(this.legalPageLastUpdated || '').trim();
-    const prev = String(this.legalPageLastUpdatedOriginal || '').trim();
-    if (next === prev) {
-      onSuccess();
-      return;
-    }
-    const meta: Record<string, unknown> = { ...this.legalPageMeta };
-    if (next) meta['last_updated'] = next;
-    else delete meta['last_updated'];
-
-    this.admin.updateContentBlock(key, this.withExpectedVersion(key, { meta })).subscribe({
-      next: (updated) => {
-        this.rememberContentVersion(key, updated);
-        const updatedMeta = ((updated as { meta?: Record<string, unknown> | null }).meta ||
-          {}) as Record<string, unknown>;
-        this.legalPageMeta = {
-          ...(updatedMeta && typeof updatedMeta === 'object' ? updatedMeta : {}),
-        };
-        const lastUpdated =
-          typeof this.legalPageMeta['last_updated'] === 'string'
-            ? String(this.legalPageMeta['last_updated'])
-            : '';
-        this.legalPageLastUpdated = lastUpdated;
-        this.legalPageLastUpdatedOriginal = lastUpdated;
-        onSuccess();
-      },
-      error: (err) => {
-        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key))) {
-          onError();
-          return;
-        }
-        onError();
-      },
-    });
-  }
-
-  saveLegalPageUi(): void {
-    const key = this.legalPageKey;
-    if (!key) return;
-    if (this.cmsPrefs.translationLayout() === 'sideBySide') {
-      this.saveLegalPageBoth(key, this.legalPageForm);
-      return;
-    }
-    this.saveLegalPage(key, this.legalPageForm[this.infoLang] || '', this.infoLang);
-  }
-
-  private saveLegalPage(key: LegalPageKey, body: string, lang: UiLang): void {
-    this.legalPageMessage = null;
-    this.legalPageError = null;
-    this.legalPageSaving = true;
-    this.saveLegalMetaIfNeeded(
-      key,
-      () => {
-        this.savePageMarkdownInternal(
-          key,
-          body,
-          lang,
-          () => {
-            this.legalPageSaving = false;
-            this.legalPageMessage = this.t('adminUi.site.pages.success.save');
-          },
-          () => {
-            this.legalPageSaving = false;
-            this.legalPageError = this.t('adminUi.site.pages.errors.save');
-          },
-        );
-      },
-      () => {
-        this.legalPageSaving = false;
-        this.legalPageError = this.t('adminUi.site.pages.errors.save');
-      },
-    );
-  }
-
-  private saveLegalPageBoth(key: LegalPageKey, body: LocalizedText): void {
-    this.legalPageMessage = null;
-    this.legalPageError = null;
-    this.legalPageSaving = true;
-    this.saveLegalMetaIfNeeded(
-      key,
-      () => {
-        this.savePageMarkdownInternal(
-          key,
-          body.en || '',
-          'en',
-          () => {
-            this.savePageMarkdownInternal(
-              key,
-              body.ro || '',
-              'ro',
-              () => {
-                this.legalPageSaving = false;
-                this.legalPageMessage = this.t('adminUi.site.pages.success.save');
-              },
-              () => {
-                this.legalPageSaving = false;
-                this.legalPageError = this.t('adminUi.site.pages.errors.save');
-              },
-            );
-          },
-          () => {
-            this.legalPageSaving = false;
-            this.legalPageError = this.t('adminUi.site.pages.errors.save');
-          },
-        );
-      },
-      () => {
-        this.legalPageSaving = false;
-        this.legalPageError = this.t('adminUi.site.pages.errors.save');
-      },
-    );
-  }
-
-  private savePageMarkdownInternal(
-    key: string,
-    body: string,
-    lang: UiLang,
-    onSuccess: () => void,
-    onError: () => void,
-  ): void {
-    const payload = { body_markdown: body, status: 'published', lang };
-    const createPayload = { title: key, ...payload };
-
-    const onSuccessWithBlock = (block?: any | null) => {
-      this.rememberContentVersion(key, block);
-      const safePageKey = this.safePageRecordKey(key as PageBuilderKey);
-      this.setPageRecordValue(
-        this.pageBlocksNeedsTranslationEn,
-        safePageKey,
-        Boolean(block?.needs_translation_en),
-      );
-      this.setPageRecordValue(
-        this.pageBlocksNeedsTranslationRo,
-        safePageKey,
-        Boolean(block?.needs_translation_ro),
-      );
-      this.loadContentPages();
-      onSuccess();
-    };
-
-    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
-      next: (block) => onSuccessWithBlock(block),
-      error: (err) => {
-        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key as LegalPageKey))) {
-          onError();
-          return;
-        }
-        this.admin.createContent(key, createPayload).subscribe({
-          next: (created) => onSuccessWithBlock(created),
-          error: () => onError(),
-        });
-      },
-    });
-  }
-
   saveInfo(
     key: 'page.about' | 'page.faq' | 'page.shipping' | 'page.contact',
     body: string,
@@ -16764,9 +16437,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (!checklist) return false;
     return Boolean(
       checklist.missingTranslations.length ||
-        checklist.missingAlt.length ||
-        checklist.emptySections.length ||
-        checklist.linkIssues.length,
+      checklist.missingAlt.length ||
+      checklist.emptySections.length ||
+      checklist.linkIssues.length,
     );
   }
 
