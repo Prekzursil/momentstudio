@@ -16,6 +16,7 @@ theme through ``ensure_default_theme``.
 """
 
 import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 import pytest
@@ -30,7 +31,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.passkeys import UserPasskey
-from app.models.theme import Theme
+from app.models.theme import Theme, ThemeAuditLog, ThemeStatus, ThemeVersion
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services import theme_usage
@@ -351,6 +352,83 @@ def test_is_rollback_helper() -> None:
     assert theme_usage._is_rollback("publish") is False
     assert theme_usage._is_rollback("reset-to-default") is False
     assert theme_usage._is_rollback("draft-save") is False
+
+
+def test_last_change_orders_by_created_at_not_version(
+    seeded_app: Dict[str, object],
+) -> None:
+    """FIX 2: ``last_change_*`` reflects the most-recent-by-TIME live change, so
+    the aggregation orders by ``created_at`` first, NOT ``version``.
+
+    Force-publish anomaly (the exact case the ordering must survive): an EARLIER
+    change carries a HIGHER version than a LATER one. Ordering by version first
+    would name the older-but-higher-versioned publish as "last"; ordering by
+    ``created_at`` first correctly names the later reset. Seeded directly at the
+    audit layer so the anomaly is reproducible regardless of the version-assign
+    path.
+    """
+    factory = seeded_app["session_factory"]
+
+    async def _seed_anomaly() -> None:
+        async with factory() as session:
+            theme = (await session.execute(select(Theme).limit(1))).scalar_one()
+            base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+            # Higher version, but EARLIER in time.
+            hi = ThemeVersion(
+                theme_id=theme.id,
+                version=9,
+                schema_version=1,
+                tokens={},
+                status=ThemeStatus.published,
+                created_by_user_id=None,
+                published_at=base,
+            )
+            # Lower version, but LATER in time.
+            lo = ThemeVersion(
+                theme_id=theme.id,
+                version=5,
+                schema_version=1,
+                tokens={},
+                status=ThemeStatus.published,
+                created_by_user_id=None,
+                published_at=base + timedelta(hours=1),
+            )
+            session.add_all([hi, lo])
+            await session.flush()
+            session.add(
+                ThemeAuditLog(
+                    theme_version_id=hi.id,
+                    action="publish",
+                    version=9,
+                    user_id=None,
+                    created_at=base,
+                )
+            )
+            session.add(
+                ThemeAuditLog(
+                    theme_version_id=lo.id,
+                    action="reset-to-default",
+                    version=5,
+                    user_id=None,
+                    created_at=base + timedelta(hours=1),
+                )
+            )
+            await session.commit()
+
+    asyncio.run(_seed_anomaly())
+
+    async def _run() -> theme_usage.ThemeUsageMetrics:
+        async with factory() as session:
+            return await theme_usage.get_usage_metrics(session)
+
+    metrics = asyncio.run(_run())
+    # created_at-primary ordering picks the LATER row (reset, v5), NOT the
+    # higher-version-but-earlier publish (v9).
+    assert metrics.last_change_action == "reset-to-default"
+    assert metrics.last_changed_at is not None
+    # The chosen row is the later-in-time one (its hour component is 1, not 0),
+    # independent of how SQLite round-trips the timezone.
+    assert metrics.last_changed_at.hour == 1
 
 
 def test_usage_current_version_tracks_singleton(seeded_app: Dict[str, object]) -> None:

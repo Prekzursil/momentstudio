@@ -101,8 +101,13 @@ async def get_usage_metrics(session: AsyncSession) -> ThemeUsageMetrics:
     current_published_version = published.version if published is not None else None
 
     # The most recent event that CHANGED the live theme (publish / rollback /
-    # reset — draft-saves are excluded). Ordered by the monotonic snapshot
-    # version so the "latest" is unambiguous even when rows share a timestamp.
+    # reset — draft-saves are excluded). Ordered by APPEND TIME first
+    # (``created_at`` is monotonic with when the change actually happened), then
+    # by ``version`` as a same-timestamp tiebreak. Version is NOT ordered first:
+    # the snapshot version is not guaranteed monotonic with publish TIME (a stale
+    # draft published after a force-publish can carry a lower number than an
+    # earlier live change), so ordering by version could name an OLDER change as
+    # "last". ``created_at`` reflects the true most-recent change.
     last_event = (
         await session.execute(
             select(ThemeAuditLog)
@@ -113,7 +118,7 @@ async def get_usage_metrics(session: AsyncSession) -> ThemeUsageMetrics:
                     ThemeAuditLog.action.startswith(ROLLBACK_PREFIX),
                 )
             )
-            .order_by(ThemeAuditLog.version.desc(), ThemeAuditLog.created_at.desc())
+            .order_by(ThemeAuditLog.created_at.desc(), ThemeAuditLog.version.desc())
             .limit(1)
         )
     ).scalar_one_or_none()

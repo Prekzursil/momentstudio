@@ -182,6 +182,19 @@ def _audit_actions(session_factory: async_sessionmaker) -> list[str]:
     return asyncio.run(_run())
 
 
+def _audit_rows(session_factory: async_sessionmaker) -> list[dict]:
+    async def _run() -> list[dict]:
+        async with session_factory() as session:
+            rows = (
+                await session.execute(
+                    select(ThemeAuditLog).order_by(ThemeAuditLog.created_at)
+                )
+            ).scalars().all()
+            return [{"action": row.action, "version": row.version} for row in rows]
+
+    return asyncio.run(_run())
+
+
 def _versions(session_factory: async_sessionmaker) -> list[dict]:
     async def _run() -> list[dict]:
         async with session_factory() as session:
@@ -431,6 +444,59 @@ def test_publish_promotes_draft_atomically(seeded_app: Dict[str, object]) -> Non
     # The public read reflects the new published theme.
     assert client.get("/api/v1/theme").json()["tokens"]["--accent"] == "20 30 120"
     assert _audit_actions(factory) == ["draft-save", "publish"]
+
+
+def test_publish_after_reset_does_not_regress_version(
+    seeded_app: Dict[str, object],
+) -> None:
+    """Root-cause regression (WU4b / WU14 review): the published version must be
+    STRICTLY MONOTONIC even when a stale draft is published after a force-publish.
+
+    Exact repro: save a draft (v2) -> reset-to-default force-publishes a NEWER
+    version (v3) while the pending draft LINGERS -> publish {} (``expected_version``
+    absent, so the staleness 409 is bypassed) re-publishes the lingering draft.
+
+    Pre-fix ``publish`` reused the stale ``draft.version`` (2) as the published
+    version, so the live version REGRESSED 3 -> 2. The fix reassigns a fresh
+    monotonic number, so the publish yields a version strictly greater than the
+    reset's — no regression — and the audit row stays consistent with it.
+    """
+    client: TestClient = seeded_app["client"]  # type: ignore[assignment]
+    factory = seeded_app["session_factory"]
+    token = _create_admin_token(factory)
+    headers = _auth_headers(token)
+
+    # 1. Save a draft (v2) — never published yet.
+    save = client.put(
+        "/api/v1/theme/draft",
+        json={"tokens": {**_primaries(), "--accent": "20 30 120"}},
+        headers=headers,
+    )
+    assert save.status_code == 200, save.text
+    draft_version = save.json()["version"]
+    assert draft_version == 2
+
+    # 2. Reset-to-default force-publishes a NEWER version; the draft lingers.
+    reset = client.post("/api/v1/theme/reset-to-default", headers=headers)
+    assert reset.status_code == 200, reset.text
+    reset_version = reset.json()["version"]
+    assert reset_version > draft_version  # v3 > v2
+    assert _theme_row(factory)["version"] == reset_version
+
+    # 3. Publish the lingering draft with NO expected_version (bypasses the 409).
+    pub = client.post("/api/v1/theme/publish", json={}, headers=headers)
+    assert pub.status_code == 200, pub.text
+    pub_version = pub.json()["version"]
+
+    # STRICTLY MONOTONIC: the publish must not regress below the reset's version.
+    assert pub_version > reset_version
+    assert _theme_row(factory)["version"] == pub_version
+    # The lingering draft's tokens went live (its --accent, not the reset default).
+    assert _theme_row(factory)["tokens"]["--accent"] == "20 30 120"
+    # Audit/version stay consistent: the publish audit row records pub_version.
+    rows = _audit_rows(factory)
+    assert [r["action"] for r in rows] == ["draft-save", "reset-to-default", "publish"]
+    assert rows[-1]["version"] == pub_version
 
 
 def test_publish_staleness_conflict_409(seeded_app: Dict[str, object]) -> None:

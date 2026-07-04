@@ -451,6 +451,20 @@ async def publish(
     _reject_failing_contrast(dict(draft.tokens))
 
     now = datetime.now(timezone.utc)
+    # STRICT MONOTONICITY (root-cause fix for the version-regression class).
+    # ``draft.version`` was fixed at draft-CREATION and can be STALE: a
+    # force-publish (reset-to-default / rollback) may have bumped the live
+    # ``theme.version`` PAST this draft while it lingered unpublished. Reusing the
+    # stale ``draft.version`` here would REGRESS the published version (the WU14
+    # repro: save-draft v2 -> reset force-publishes v3 -> publish{} re-emits v2,
+    # so the live version went 3 -> 2). Reassign the snapshot to a FRESH monotonic
+    # number whenever it would not strictly exceed the current published version,
+    # so every publish yields a version strictly greater than the live one — no
+    # regression is possible even when a stale draft is published after a
+    # force-publish. When the draft is already ahead (the common path) its number
+    # is kept, preserving the version identity that rollback-by-version targets.
+    if draft.version <= theme.version:
+        draft.version = await next_version(session)
     draft.status = ThemeStatus.published
     draft.published_at = now
     _apply_published(theme, draft, draft.tokens, now)
