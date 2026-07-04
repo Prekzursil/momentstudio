@@ -20,7 +20,9 @@ describe('AdminThemeService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [AdminThemeService],
+      // Mirror the admin route's seam binding so `inject(ThemeResetService)`
+      // resolves to the AdminThemeService instance (WU9 panic-frame contract).
+      providers: [AdminThemeService, { provide: ThemeResetService, useExisting: AdminThemeService }],
     });
     service = TestBed.inject(AdminThemeService);
     httpMock = TestBed.inject(HttpTestingController);

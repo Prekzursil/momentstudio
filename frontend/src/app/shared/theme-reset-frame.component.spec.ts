@@ -190,10 +190,11 @@ describe('ThemeResetFrameComponent', () => {
 
     expect(resetSpy).toHaveBeenCalledTimes(1);
 
-    // Completing the in-flight request settles the state.
+    // Completing the in-flight request settles the state (status is a model
+    // property set synchronously by the subscriber; no DOM assertion follows,
+    // so no detectChanges — a settle-time CD trips NG0100 on the disabled attr).
     pending$.next();
     pending$.complete();
-    fixture.detectChanges();
     expect(cmp.status).toBe('done');
   });
 

@@ -77,6 +77,6 @@ describe('validateAdminEditable (strict draft-save / publish gate)', () => {
     const entry = resolveAdminEditable('--space-md');
     const result = validateAdminEditable('--space-md', '16'); // missing unit
     expect(result.ok).toBe(false);
-    expect(result.value).toBe(entry?.fallback);
+    expect(entry?.fallback).toBe(result.value);
   });
 });
