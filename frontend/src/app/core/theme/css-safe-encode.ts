@@ -18,7 +18,10 @@
 
 const HEX_ESCAPE = /\\([0-9a-fA-F]{1,6})[ \t\n\f\r]?/g;
 const LITERAL_ESCAPE = /\\([^0-9a-fA-F])/g;
-const URL_CALL = /url\(\s*(['"]?)([^'")]*)\1\s*\)/gi;
+// Excludes whitespace from the URL-target class so the surrounding `\s*` cannot
+// overlap it — prevents polynomial backtracking (ReDoS) on `url(` + many spaces.
+// Valid URLs carry no unescaped whitespace, so a spaced target correctly fails.
+const URL_CALL = /url\(\s*(['"]?)([^'")\s]*)\1\s*\)/gi;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
 /** True if the value contains a C0 control character or DEL (0x00-0x1f, 0x7f). */

@@ -62,7 +62,10 @@ _SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 _HEX_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})[ \t\n\f\r]?")
 _LITERAL_ESCAPE = re.compile(r"\\([^0-9a-fA-F])")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
-_URL_CALL = re.compile(r"url\(\s*(['\"]?)([^'\")]*)\1\s*\)", re.IGNORECASE)
+# ``\s``-excluded target class so the surrounding ``\s*`` cannot overlap it —
+# prevents polynomial backtracking (ReDoS) on ``url(`` + many spaces. Mirrors
+# the frontend css-safe-encode URL_CALL.
+_URL_CALL = re.compile(r"url\(\s*(['\"]?)([^'\")\s]*)\1\s*\)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
