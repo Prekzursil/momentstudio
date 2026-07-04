@@ -182,6 +182,7 @@ describe('ThemeResetFrameComponent', () => {
     const btn = resetButton(fixture);
 
     btn.click();
+    fixture.detectChanges();
     expect(cmp.status).toBe('pending');
     // The button disables while pending; drive a second call directly too.
     expect(btn.disabled).toBe(true);
@@ -198,10 +199,11 @@ describe('ThemeResetFrameComponent', () => {
 
   it('exposes overridable labels for the panic frame', () => {
     const { fixture } = mount('ok');
-    const cmp = fixture.componentInstance;
-    cmp.heading = 'Emergency';
-    cmp.buttonLabel = 'Restore defaults';
-    cmp.ariaLabel = 'Restore the safe default theme';
+    // setInput marks the view for check the way real input binding does; direct
+    // instance assignment does not, and tripped NG0100 under checkNoChanges.
+    fixture.componentRef.setInput('heading', 'Emergency');
+    fixture.componentRef.setInput('buttonLabel', 'Restore defaults');
+    fixture.componentRef.setInput('ariaLabel', 'Restore the safe default theme');
     fixture.detectChanges();
 
     const btn = resetButton(fixture);
