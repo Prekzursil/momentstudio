@@ -38,3 +38,25 @@ class ThemeVersionListResponse(BaseModel):
     """Wrapper for the version-history list (newest first)."""
 
     items: list[ThemeVersionListItem] = Field(default_factory=list)
+
+
+class ThemeDraftSaveRequest(BaseModel):
+    """Admin draft-save body: the editable token map to revalidate + snapshot (WU4b).
+
+    Only the NINE primary colour tokens (+ the curated fonts / sizes / spacing)
+    are editable; a derived shade / on-colour key is not in the WU2 registry and
+    is rejected server-side, so an admin can never set one here.
+    """
+
+    tokens: dict[str, str]
+
+
+class ThemePublishRequest(BaseModel):
+    """Atomic-publish body carrying the optimistic-concurrency guard (WU4b).
+
+    ``expected_version`` mirrors ``content.py``'s staleness guard: when supplied
+    and it no longer matches the live version, the publish is rejected 409 so a
+    stale editor cannot silently clobber a concurrent change.
+    """
+
+    expected_version: int | None = None

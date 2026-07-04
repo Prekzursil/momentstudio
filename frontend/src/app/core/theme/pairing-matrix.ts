@@ -17,6 +17,7 @@
  */
 
 import { AA_THRESHOLDS, contrastRatio, passesAa, type RgbTriplet, type TextSize } from './contrast';
+import { deriveColorTokens, PRIMARY_DEFAULTS } from './theme-derive';
 import { type Archetype, ARCHETYPES, getToken } from './token-taxonomy';
 
 /** A curated, pre-validated foreground-on-background pairing. */
@@ -125,4 +126,63 @@ export function pairingRatio(pair: Pairing): number {
 /** Whether a pairing meets its tagged AA threshold. */
 export function pairingPassesAa(pair: Pairing): boolean {
   return passesAa(colorFor(pair.foreground), colorFor(pair.background), pair.size);
+}
+
+/**
+ * An ON-COLOUR pairing: a contrast-DERIVED foreground on a PRIMARY background.
+ * `onColor` names a derived token (`theme-derive.DERIVED_COLOR_NAMES`).
+ */
+export interface OnColorPairing {
+  /** Stable identifier. */
+  readonly id: string;
+  /** The contrast-derived foreground token name (never admin-editable). */
+  readonly onColor: string;
+  /** The PRIMARY background token the on-colour is derived to contrast. */
+  readonly background: string;
+}
+
+/**
+ * The ON-COLOUR pairings — DELIBERATELY EXCLUDED from the gated `PAIRINGS` above
+ * and from the server gate (`theme_contrast.PRIMARY_PAIRINGS`). They are SAFE BY
+ * CONSTRUCTION, not gated: each `onColor` is derived (`theme-derive.bestOnColor`)
+ * as black-or-white for maximum WCAG contrast against its background, so
+ * `max(contrast(black), contrast(white)) >= 4.58:1` for ANY background — an admin
+ * has no editable key to force white-on-white. Kept here so the FE ↔ BE parity is
+ * explicit and machine-asserted (see `onColorPairingsAlwaysContrast`).
+ */
+export const ON_COLOR_PAIRINGS: readonly OnColorPairing[] = [
+  {
+    id: 'text-inverse-on-surface-inverse',
+    onColor: '--text-inverse',
+    background: '--surface-inverse',
+  },
+  { id: 'text-onmedia-on-accent', onColor: '--text-onmedia', background: '--accent' },
+];
+
+/** The black/white crossover minimum every on-colour clears by construction. */
+export const ON_COLOR_MIN_RATIO = 4.58;
+
+/** Resolve a primary token's triplet from `primaries`, else its compiled default. */
+function primaryTriplet(
+  primaries: Readonly<Record<string, string>>,
+  name: string,
+): RgbTriplet {
+  return parseTriplet(primaries[name] ?? PRIMARY_DEFAULTS[name]);
+}
+
+/**
+ * Assert every on-colour pairing clears AA body for `primaries` — TRUE by
+ * construction for any primary set (default: the compiled defaults). The
+ * derived on-colour is recomputed from the primaries, so this holds even when a
+ * background primary is set to white (the on-colour flips to black).
+ */
+export function onColorPairingsAlwaysContrast(
+  primaries: Readonly<Record<string, string>> = PRIMARY_DEFAULTS,
+): boolean {
+  const derived = deriveColorTokens(primaries);
+  return ON_COLOR_PAIRINGS.every((pair) => {
+    const onColor = parseTriplet(derived[pair.onColor]);
+    const background = primaryTriplet(primaries, pair.background);
+    return contrastRatio(onColor, background) >= AA_THRESHOLDS.body;
+  });
 }

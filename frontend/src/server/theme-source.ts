@@ -20,6 +20,16 @@
  *    fallback — flip it and every route renders the known-safe defaults with no
  *    redeploy.
  *
+ * DERIVE-AWARE contract: this module returns the RAW published document as
+ * fetched (the source-of-truth editable primaries + fonts + spacing). It does
+ * NOT derive the shade / on-colour set itself — the WU6 sink (`theme-head`)
+ * owns that: it re-validates every key through the WU2 registry (dropping any
+ * derived / tampered key the cached doc might carry) and only THEN computes the
+ * fourteen derived tokens via `deriveTokens`. Deriving here instead would emit
+ * the DERIVED full set from an UN-validated cached doc, re-opening the
+ * white-on-white bypass class — so derivation stays in the sink, after
+ * validation, never in the transport/cache layer.
+ *
  * This module is intentionally free of node-only imports (uses only `fetch` /
  * `AbortController` / `URL` — web-standard in both node 18+ and the browser) so
  * it is instrumented by the karma coverage gate. `server.ts` — which imports

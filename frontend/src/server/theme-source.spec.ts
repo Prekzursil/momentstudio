@@ -1,3 +1,6 @@
+import { contrastRatio } from '../app/core/theme/contrast';
+import { DERIVED_COLOR_NAMES, parseTriplet } from '../app/core/theme/theme-derive';
+import { resolveThemeTokens } from './theme-head';
 import {
   type ThemeFetchDeps,
   type ThemeSourceConfig,
@@ -187,5 +190,39 @@ describe('getThemeTokens', () => {
       })) as unknown as typeof fetch;
     const tokens = await getThemeTokens({ ...BASE_CONFIG, timeoutMs: 1 }, depsWith(impl));
     expect(tokens).toBeNull();
+  });
+});
+
+describe('theme-source -> WU6 sink (DERIVED full set emitted)', () => {
+  beforeEach(() => invalidateThemeCache());
+  afterEach(() => invalidateThemeCache());
+
+  it('the fetched doc, fed to the sink, yields every DERIVED token', async () => {
+    const fetcher = jsonFetch({ tokens: { '--accent': '20 30 120' } });
+    const doc = await getThemeTokens(BASE_CONFIG, depsWith(fetcher.impl));
+    const emitted = resolveThemeTokens(doc);
+    for (const name of DERIVED_COLOR_NAMES) {
+      expect(emitted[name]).withContext(`${name} must be emitted`).toBeTruthy();
+    }
+    // The submitted primary survives; the derived on-colours are computed.
+    expect(emitted['--accent']).toBe('20 30 120');
+  });
+
+  it('drops a hostile DERIVED/white-on-white key from the cached doc, re-derives', async () => {
+    // A tampered cached doc tries to force --surface-inverse=white AND a white
+    // --text-inverse on-colour. The sink keeps the (legal) primary but RECOMPUTES
+    // the on-colour to black — the transport never dictates a derived value.
+    const fetcher = jsonFetch({
+      tokens: { '--surface-inverse': '255 255 255', '--text-inverse': '255 255 255' },
+    });
+    const doc = await getThemeTokens(BASE_CONFIG, depsWith(fetcher.impl));
+    const emitted = resolveThemeTokens(doc);
+    expect(emitted['--surface-inverse']).toBe('255 255 255');
+    expect(emitted['--text-inverse']).toBe('0 0 0');
+    const ratio = contrastRatio(
+      parseTriplet(emitted['--text-inverse']),
+      parseTriplet(emitted['--surface-inverse']),
+    );
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 });

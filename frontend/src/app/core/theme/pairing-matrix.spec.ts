@@ -1,12 +1,16 @@
-import { AA_THRESHOLDS } from './contrast';
+import { AA_THRESHOLDS, contrastRatio } from './contrast';
 import {
   colorFor,
+  ON_COLOR_MIN_RATIO,
+  ON_COLOR_PAIRINGS,
+  onColorPairingsAlwaysContrast,
   PAIRINGS,
   pairingPassesAa,
   pairingRatio,
   parseTriplet,
   type Pairing,
 } from './pairing-matrix';
+import { deriveColorTokens, DERIVED_COLOR_NAMES, PRIMARY_DEFAULTS } from './theme-derive';
 import { ARCHETYPES, getToken } from './token-taxonomy';
 
 describe('PAIRINGS', () => {
@@ -66,6 +70,74 @@ describe('PAIRINGS', () => {
     const sizes = new Set(PAIRINGS.map((p) => p.size));
     expect(sizes.has('body')).toBe(true);
     expect(sizes.has('large')).toBe(true);
+  });
+});
+
+describe('ON_COLOR_PAIRINGS (safe by construction)', () => {
+  it('references only DERIVED on-colour tokens as the foreground', () => {
+    expect(ON_COLOR_PAIRINGS.length).toBeGreaterThan(0);
+    for (const pair of ON_COLOR_PAIRINGS) {
+      expect(DERIVED_COLOR_NAMES).toContain(pair.onColor);
+    }
+  });
+
+  it('is disjoint from the gated PAIRINGS (never double-gated)', () => {
+    const gatedFg = new Set(PAIRINGS.map((p) => p.foreground));
+    for (const pair of ON_COLOR_PAIRINGS) {
+      expect(gatedFg.has(pair.onColor)).toBe(false);
+    }
+  });
+
+  it('always contrasts at the compiled defaults', () => {
+    expect(onColorPairingsAlwaysContrast()).toBe(true);
+  });
+
+  it('every on-colour clears the black/white crossover minimum at defaults', () => {
+    const derived = deriveColorTokens(PRIMARY_DEFAULTS);
+    for (const pair of ON_COLOR_PAIRINGS) {
+      const ratio = contrastRatio(
+        parseTriplet(derived[pair.onColor]),
+        parseTriplet(PRIMARY_DEFAULTS[pair.background]),
+      );
+      expect(ratio).toBeGreaterThanOrEqual(ON_COLOR_MIN_RATIO);
+    }
+  });
+
+  it('stays AA even when a background primary is set to white (no white-on-white)', () => {
+    // Setting --surface-inverse and --accent to white flips the derived on-colour
+    // to black, so the pairing still clears AA — white-on-white is unreachable.
+    const white = '255 255 255';
+    const primaries = {
+      ...PRIMARY_DEFAULTS,
+      '--surface-inverse': white,
+      '--accent': white,
+    };
+    expect(onColorPairingsAlwaysContrast(primaries)).toBe(true);
+    const derived = deriveColorTokens(primaries);
+    expect(derived['--text-inverse']).toBe('0 0 0');
+    expect(derived['--text-onmedia']).toBe('0 0 0');
+  });
+
+  it('falls back to compiled defaults for absent background primaries', () => {
+    // An empty primary map exercises the compiled-default fallback on both the
+    // derivation and the background lookup — still AA by construction.
+    expect(onColorPairingsAlwaysContrast({})).toBe(true);
+  });
+
+  it('holds over many random primary sets (property check)', () => {
+    let seed = 20260704;
+    const rand = (): number => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed % 256;
+    };
+    const triplet = (): string => `${rand()} ${rand()} ${rand()}`;
+    for (let i = 0; i < 300; i += 1) {
+      const primaries: Record<string, string> = {};
+      for (const name of Object.keys(PRIMARY_DEFAULTS)) {
+        primaries[name] = triplet();
+      }
+      expect(onColorPairingsAlwaysContrast(primaries)).toBe(true);
+    }
   });
 });
 
