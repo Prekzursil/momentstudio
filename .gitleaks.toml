@@ -44,4 +44,10 @@ regexes = [
   '''sk_test_placeholder''',
   # Truncated fake PEM header used as a unit-test fixture (history only).
   '''-----BEGIN PRIVATE KEY-----\\nX''',
+  # generic-api-key FP: the prose phrase "empty/invalid" in a test comment
+  # (backend/tests/test_lr_newsletter_api.py) — a slash-separated English phrase
+  # describing a 400 path, matched by the slash-pair heuristic. Not a credential.
+  # Present in older history (git-mode scan) even though the current comment was
+  # reworded to "empty or invalid".
+  '''empty/invalid''',
 ]
