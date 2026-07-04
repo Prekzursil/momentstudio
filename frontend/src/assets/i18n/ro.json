@@ -57,6 +57,7 @@
       "help_center": "Ajutor | momentstudio",
       "admin_access": "Acces admin | momentstudio",
       "admin": "Admin | momentstudio",
+      "admin_theme": "Temă | Admin | momentstudio",
       "admin_content_home": "Conținut · Acasă | Admin | momentstudio",
       "admin_content_pages": "Conținut · Pagini | Admin | momentstudio",
       "admin_content_blog": "Conținut · Blog | Admin | momentstudio",
@@ -1748,7 +1749,8 @@
       "users": "Utilizatori",
       "support": "Suport",
       "ops": "Operațiuni",
-      "content": "Conținut"
+      "content": "Conținut",
+      "theme": "Temă"
     },
     "navGroup": {
       "overview": "Privire generală",
@@ -1758,6 +1760,98 @@
       "customersSupport": "Clienți & suport",
       "marketing": "Marketing",
       "operationsSecurity": "Operațiuni & securitate"
+    },
+    "theme": {
+      "eyebrow": "Aspect",
+      "title": "Tema magazinului",
+      "intro": "Schimbă culorile, tipografia și spațierea magazinului, apoi publică — fără cod sau reconstruire. Modificările se previzualizează live în dreapta înainte de salvare, iar publicarea este blocată până când orice contrast de culoare insuficient este remediat.",
+      "loading": "Se încarcă tema…",
+      "groups": { "color": "Culori", "type": "Tipografie", "spacing": "Spațiere" },
+      "tokens": {
+        "background": "Fundal pagină",
+        "surface": "Carduri și panouri",
+        "surfaceInverse": "Chipuri și butoane inverse",
+        "text": "Text de corp",
+        "textHeading": "Titluri",
+        "textMuted": "Estompat / subtitrări",
+        "border": "Borduri și separatoare",
+        "accent": "Accent și linkuri",
+        "overlay": "Strat de acoperire",
+        "fontBody": "Font text",
+        "fontHeading": "Font titluri",
+        "fontSizeBase": "Dimensiune text de bază",
+        "spaceXs": "Spațiere foarte mică",
+        "spaceSm": "Spațiere mică",
+        "spaceMd": "Spațiere medie",
+        "spaceLg": "Spațiere mare",
+        "spaceXl": "Spațiere foarte mare"
+      },
+      "fonts": {
+        "inter": "Inter (sans-serif)",
+        "cinzel": "Cinzel (serif)",
+        "systemSans": "Sans-serif de sistem",
+        "systemSerif": "Serif de sistem",
+        "mono": "Monospațiat",
+        "custom": "Personalizat"
+      },
+      "sizes": {
+        "compact": "Compact",
+        "default": "Implicit",
+        "comfortable": "Confortabil",
+        "large": "Mare"
+      },
+      "spaces": {
+        "4": "4px (0.25rem)",
+        "8": "8px (0.5rem)",
+        "12": "12px (0.75rem)",
+        "16": "16px (1rem)",
+        "20": "20px (1.25rem)",
+        "24": "24px (1.5rem)",
+        "32": "32px (2rem)",
+        "40": "40px (2.5rem)",
+        "48": "48px (3rem)"
+      },
+      "contrast": {
+        "fails": "Contrast AA insuficient",
+        "snapHint": "Fixează pe o culoare conformă:",
+        "noSnap": "Nicio culoare apropiată nu trece toate perechile — alege altă nuanță."
+      },
+      "preview": {
+        "title": "Previzualizare live",
+        "hint": "Se actualizează pe măsură ce editezi — înainte de salvare."
+      },
+      "history": {
+        "title": "Istoric versiuni",
+        "rollback": "Revenire",
+        "empty": "Încă nu există versiuni."
+      },
+      "status": { "draft": "Ciornă", "published": "Publicat" },
+      "actions": {
+        "save": "Salvează ciorna",
+        "publish": "Publică",
+        "reset": "Resetează la implicit",
+        "saveFirst": "Salvează ciorna înainte de publicare.",
+        "fixContrast": "Remediază avertismentele de contrast înainte de publicare."
+      },
+      "stale": {
+        "message": "Această temă s-a modificat în altă parte de când ai deschis-o. Reîncarcă înainte de salvare pentru a nu suprascrie modificări mai noi.",
+        "reload": "Reîncarcă"
+      },
+      "feedback": {
+        "saved": "Ciornă salvată.",
+        "published": "Temă publicată.",
+        "rolledBack": "Revenit la versiunea selectată.",
+        "reset": "Temă resetată la valorile implicite sigure."
+      },
+      "errors": {
+        "load": "Nu s-a putut încărca tema. Încearcă să reîncarci.",
+        "save": "Nu s-a putut salva ciorna. Încearcă din nou.",
+        "publish": "Nu s-a putut publica tema. Încearcă din nou.",
+        "stale": "Altcineva a publicat o temă mai nouă. Reîncarcă și reaplică modificările.",
+        "contrast": "Publicare blocată: o pereche de culori nu trece contrastul minim.",
+        "rollback": "Nu s-a putut reveni. Încearcă din nou.",
+        "reset": "Nu s-a putut reseta tema. Încearcă din nou."
+      }
     },
     "uiMode": {
       "title": "Mod administrare",
