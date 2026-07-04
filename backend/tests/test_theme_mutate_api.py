@@ -493,6 +493,77 @@ def test_publish_rejects_hostile_primary_failing_contrast(
     assert _theme_row(factory)["version"] == 1
 
 
+def test_publish_rejects_surface_inverse_crossover_gray(
+    seeded_app: Dict[str, object],
+) -> None:
+    """Regression (contrast bypass #6): a near-crossover grey --surface-inverse.
+
+    ``--surface-inverse = 117 117 117`` is a valid triplet and its BASE on-colour
+    pairing passes (white --text-inverse on 117 = 4.61 >= 4.5), so every legacy
+    gated pairing is green and it USED to publish (200). But the DERIVED
+    ``--surface-inverse-hover = mix(--surface-inverse, --background, 0.07) =
+    127 127 127`` renders the SAME white --text-inverse at 4.00:1 — below body AA
+    — on the primary-button / file-input hover. The render-complete gate now
+    catches the state-shade pair and rejects the publish (422).
+    """
+    client: TestClient = seeded_app["client"]  # type: ignore[assignment]
+    factory = seeded_app["session_factory"]
+    token = _create_admin_token(factory)
+    headers = _auth_headers(token)
+
+    hostile = {**_primaries(), "--surface-inverse": "117 117 117"}
+    save = client.put("/api/v1/theme/draft", json={"tokens": hostile}, headers=headers)
+    assert save.status_code == 200, save.text
+    resp = client.post("/api/v1/theme/publish", json={}, headers=headers)
+    assert resp.status_code == 422, resp.text
+    detail = resp.json()["detail"]
+    assert detail["error"] == "contrast"
+    failed = {f["pairing"] for f in detail["failures"]}
+    assert "text-inverse-on-surface-inverse-hover" in failed
+    hover = next(
+        f for f in detail["failures"]
+        if f["pairing"] == "text-inverse-on-surface-inverse-hover"
+    )
+    assert hover["ratio"] < hover["target"] == 4.5
+    # Atomic: the failing publish did not flip the live theme.
+    assert _theme_row(factory)["version"] == 1
+
+
+def test_publish_rejects_heading_below_body_aa(
+    seeded_app: Dict[str, object],
+) -> None:
+    """Regression (contrast bypass #7): a mid-grey --text-heading gated too leniently.
+
+    ``--text-heading = 137 137 137`` clears the OLD ``large`` (3.0) heading target
+    (3.50 on --background) and so USED to publish (200) — but --text-heading also
+    colours text-sm / text-xs BODY elements (header search, account menus, product
+    cards, ``select`` options via --field) that need 4.5. The gate now targets
+    --text-heading at BODY (4.5) on every neutral surface it renders on and rejects
+    the publish (422).
+    """
+    client: TestClient = seeded_app["client"]  # type: ignore[assignment]
+    factory = seeded_app["session_factory"]
+    token = _create_admin_token(factory)
+    headers = _auth_headers(token)
+
+    hostile = {**_primaries(), "--text-heading": "137 137 137"}
+    save = client.put("/api/v1/theme/draft", json={"tokens": hostile}, headers=headers)
+    assert save.status_code == 200, save.text
+    resp = client.post("/api/v1/theme/publish", json={}, headers=headers)
+    assert resp.status_code == 422, resp.text
+    detail = resp.json()["detail"]
+    assert detail["error"] == "contrast"
+    failed = {f["pairing"] for f in detail["failures"]}
+    assert "heading-on-background" in failed
+    assert "heading-on-field" in failed
+    for f in detail["failures"]:
+        if f["pairing"].startswith("heading-on-"):
+            assert f["size"] == "body"
+            assert f["target"] == 4.5
+            assert f["ratio"] < 4.5
+    assert _theme_row(factory)["version"] == 1
+
+
 def test_publish_requires_admin(seeded_app: Dict[str, object]) -> None:
     client: TestClient = seeded_app["client"]  # type: ignore[assignment]
     factory = seeded_app["session_factory"]

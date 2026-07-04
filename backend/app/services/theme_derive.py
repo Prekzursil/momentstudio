@@ -5,10 +5,14 @@ NINE primary colour tokens are admin-editable; the fourteen shade / state tokens
 are COMPUTED from those primaries here and can never be set by an admin — the fix
 that eliminates the white-on-white bypass class.
 
-The ON-COLOURS (``--text-inverse``, ``--text-onmedia``, ``--border-inverse``) are
-derived to CONTRAST their background, so a failing pairing on those surfaces is
-impossible by construction: ``max(contrast(black), contrast(white))`` against any
-colour is always >= 4.58:1.
+The TEXT ON-COLOURS (``--text-inverse``, ``--text-onmedia``) are derived to
+CONTRAST their BASE background — ``max(contrast(black), contrast(white))`` against
+any colour is always >= 4.58:1 — so the base pairing cannot fail. That guarantee
+covers the BASE surface only, NOT its derived STATE shades (e.g. the 7%-lighter
+``--surface-inverse-hover``); those are the render-complete gate's job
+(``theme_contrast.RENDER_PAIRINGS``). ``--border-inverse`` is NOT a contrast
+on-colour: it is a plain ``copy`` of ``--surface-inverse`` used as an edge/ring
+(never text), so it carries no AA text obligation.
 
 Colour maths runs in sRGB with per-channel linear interpolation and round-half-up
 (``floor(x + 0.5)``), byte-identical to the TS ``Math.round`` for the 0-255

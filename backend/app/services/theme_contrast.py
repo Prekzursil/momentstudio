@@ -6,13 +6,31 @@ guardrail and the server publish gate agree byte-for-byte.
 
 The publish gate (:func:`evaluate_contrast`) runs over the DERIVED effective
 token set — the primaries an admin submitted PLUS the shade/state tokens computed
-from them (:mod:`app.services.theme_derive`). It gates the pairings among the
-PRIMARY-editable surfaces (body/heading/muted/secondary text on background /
-surface, accent as link text on background / surface). The on-colour pairings
-(``--text-inverse`` on ``--surface-inverse``, ``--text-onmedia`` on ``--accent``)
-are SAFE BY CONSTRUCTION — the on-colour is derived as black-or-white for maximum
-contrast, always >= 4.58:1 — so they are asserted as always-pass rather than
-gated, and documented here as why they cannot fail.
+from them (:mod:`app.services.theme_derive`) — and iterates :data:`RENDER_PAIRINGS`:
+the RENDER-COMPLETE set of every ``(foreground-token, background-token)`` the
+storefront actually paints text for, INCLUDING derived STATE shades, each tagged
+with the STRICTEST size it renders at.
+
+This closes the contrast-bypass CLASS. The earlier gate checked only the
+primary-on-primary pairings and trusted the on-colours as "safe by construction",
+but the set that actually renders is WIDER than the set that was gated:
+
+* an on-colour is derived to contrast its BASE surface, yet also renders on that
+  surface's derived STATE shade (``--text-inverse`` on the 7%-lighter
+  ``--surface-inverse-hover``), which a near-crossover grey pushes below AA; and
+* ``--text-heading`` was gated at ``large`` (3.0) but also colours BODY-size
+  ``text-sm`` / ``text-xs`` elements (and the derived ``--field`` / ``--surface-muted``
+  surfaces) that need 4.5.
+
+The on-colours are STILL derived safe-by-construction (:func:`theme_derive.best_on_color`
+keeps a dark inverse surface bearing white text); the gate is the render-complete
+DEFENCE-IN-DEPTH boundary that rejects a surface too light to bear its intended
+on-colour across ALL its shades, rather than silently recolouring it. A grey band
+(``--surface-inverse`` n ~= 109-117) is exactly such a case and is now a 422.
+
+:data:`PRIMARY_PAIRINGS` is retained as the curated admin-guardrail matrix (the
+byte-for-byte mirror of ``pairing-matrix.ts`` ``PAIRINGS`` — primary-on-primary,
+body + large); the authoritative publish gate is :data:`RENDER_PAIRINGS`.
 
 Channels are integers 0-255 (the frozen ``R G B`` triplet wire format). Values
 are assumed pre-validated by the token validator (WU2); this module is
@@ -77,14 +95,11 @@ class Pairing:
     size: str
 
 
-# The gated pairings — a byte-for-byte mirror of ``pairing-matrix.ts`` PAIRINGS
-# (FE/BE parity). These place the PRIMARY-editable text colours on the
-# PRIMARY-editable neutral surfaces; a hostile primary edit that collapses one of
-# these (e.g. near-white --text on --background) is what the gate catches. The
-# on-colour pairings are NOT listed: they are safe by construction (see module
-# docstring). Derived text shades (--text-secondary / --text-strong) sit BETWEEN
-# gated primary endpoints (--text and --text-muted / --text-heading), so they are
-# bounded-safe once those endpoints pass — no separate gate row needed.
+# The CURATED admin-guardrail matrix — a byte-for-byte mirror of
+# ``pairing-matrix.ts`` PAIRINGS (FE/BE parity). Primary-on-primary only, tagged
+# body / large as the admin live guardrail (``pairing-validator.ts``) documents.
+# It is NOT the authoritative publish gate (that is RENDER_PAIRINGS below); it is
+# kept for the client guardrail mirror and its structural test.
 PRIMARY_PAIRINGS: tuple[Pairing, ...] = (
     Pairing("text-on-background", "--text", "--background", "body"),
     Pairing("heading-on-background", "--text-heading", "--background", "large"),
@@ -93,6 +108,65 @@ PRIMARY_PAIRINGS: tuple[Pairing, ...] = (
     Pairing("heading-on-surface", "--text-heading", "--surface", "large"),
     Pairing("accent-on-background", "--accent", "--background", "body"),
     Pairing("accent-on-surface", "--accent", "--surface", "body"),
+)
+
+
+# The RENDER-COMPLETE publish gate. Every row is a ``(foreground, background)``
+# pair the storefront actually renders TEXT for — resolved over the DERIVED
+# effective token set (so a DERIVED foreground such as ``--text-strong`` or a
+# DERIVED background such as ``--surface-inverse-hover`` is a first-class endpoint)
+# — tagged with the STRICTEST size it renders at. Mirrored byte-for-byte by
+# ``pairing-matrix.ts`` RENDER_PAIRINGS. The audited render map (frontend/src/**)
+# that grounds each row, with representative file:line:
+#
+#   --text            on --background (header:157) / --surface (product:278, hover
+#                     header:180) / --surface-muted (product-card:138)              body
+#   --text-muted      on --background (product-card:111)                            body
+#   --text-secondary  on --background (footer:53) / --surface (shop:212) /
+#                     --surface-muted (shop:280)                                    body
+#   --text-strong     on --background (shop:93) / --surface (header:133) /
+#                     --surface-muted (shop:706 hover)                              body
+#   --text-heading    on --background (header:252, shop:999 text-sm) / --surface
+#                     (header:180 hover) / --field (header:97, select styles.css:527)
+#                     / --surface-muted (shop:1026 hover) / --background-subtle
+#                     (app:40) — ALSO large (h1/h2 product:146); gated at BODY,
+#                     the strictest, which subsumes large                           body
+#   --accent          on --background (shop:75) / --surface                         body
+#   --accent-strong   on --background (shop:715 hover) / --accent-subtle
+#                     (header:696 maintenance banner)                               body
+#   --text-inverse    on --surface-inverse (header:140/445, shop:536..) — safe by
+#                     construction — AND on --surface-inverse-hover (shop:1019,
+#                     file-input hover shop:293/310) — the STATE-SHADE bypass       body
+#   --text-onmedia    on --accent (safe by construction; its gradient/scrim render
+#                     surfaces are media-composited, not single-token gateable)     body
+RENDER_PAIRINGS: tuple[Pairing, ...] = (
+    Pairing("text-on-background", "--text", "--background", "body"),
+    Pairing("text-on-surface", "--text", "--surface", "body"),
+    Pairing("text-on-surface-muted", "--text", "--surface-muted", "body"),
+    Pairing("muted-on-background", "--text-muted", "--background", "body"),
+    Pairing("secondary-on-background", "--text-secondary", "--background", "body"),
+    Pairing("secondary-on-surface", "--text-secondary", "--surface", "body"),
+    Pairing("secondary-on-surface-muted", "--text-secondary", "--surface-muted", "body"),
+    Pairing("strong-on-background", "--text-strong", "--background", "body"),
+    Pairing("strong-on-surface", "--text-strong", "--surface", "body"),
+    Pairing("strong-on-surface-muted", "--text-strong", "--surface-muted", "body"),
+    Pairing("heading-on-background", "--text-heading", "--background", "body"),
+    Pairing("heading-on-surface", "--text-heading", "--surface", "body"),
+    Pairing("heading-on-field", "--text-heading", "--field", "body"),
+    Pairing("heading-on-surface-muted", "--text-heading", "--surface-muted", "body"),
+    Pairing("heading-on-background-subtle", "--text-heading", "--background-subtle", "body"),
+    Pairing("accent-on-background", "--accent", "--background", "body"),
+    Pairing("accent-on-surface", "--accent", "--surface", "body"),
+    Pairing("accent-strong-on-background", "--accent-strong", "--background", "body"),
+    Pairing("accent-strong-on-accent-subtle", "--accent-strong", "--accent-subtle", "body"),
+    Pairing("text-inverse-on-surface-inverse", "--text-inverse", "--surface-inverse", "body"),
+    Pairing(
+        "text-inverse-on-surface-inverse-hover",
+        "--text-inverse",
+        "--surface-inverse-hover",
+        "body",
+    ),
+    Pairing("text-onmedia-on-accent", "--text-onmedia", "--accent", "body"),
 )
 
 
@@ -109,16 +183,17 @@ class ContrastFailure:
 
 
 def evaluate_contrast(tokens: dict[str, str]) -> list[ContrastFailure]:
-    """Return the primary pairings that FAIL AA under ``tokens`` (empty = pass).
+    """Return the render pairings that FAIL AA under ``tokens`` (empty = pass).
 
     ``tokens`` is the DERIVED effective set (primaries + computed shade/state
-    tokens). Every gated pairing references a token present in that set; a
-    failing pairing is returned actionably (measured ratio vs pinned target) so
-    the publish path can reject with a 422 rather than a bare block.
+    tokens). Iterates the RENDER-COMPLETE :data:`RENDER_PAIRINGS`; every pairing
+    references a token present in that set (primary OR derived); a failing pairing
+    is returned actionably (measured ratio vs pinned target) so the publish path
+    can reject with a 422 rather than a bare block.
     """
 
     failures: list[ContrastFailure] = []
-    for pair in PRIMARY_PAIRINGS:
+    for pair in RENDER_PAIRINGS:
         fg = _parse_triplet(tokens[pair.foreground])
         bg = _parse_triplet(tokens[pair.background])
         ratio = contrast_ratio(fg, bg)

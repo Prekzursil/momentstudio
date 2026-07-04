@@ -64,8 +64,11 @@ def default_theme_tokens() -> dict[str, str]:
         "--border": "226 232 240",  # slate-200
         "--accent": "79 70 229",  # indigo-600
         "--overlay": "0 0 0",  # black scrim
-        # Literal-type colors — consumed as raw var(--token, <literal>).
-        "--shadow-color": "rgb(15 23 42 / 8%)",  # .shadow-soft elevation
+        # NOTE: no `--shadow-color` token — `.shadow-soft` derives its elevation
+        # from `rgb(var(--text-heading) / 8%)` (styles.css), and the token is in
+        # NEITHER registry, so the SSR sink dropped it: seeding it produced a
+        # GET-/theme value the storefront never rendered (FE/BE divergence). Kept
+        # out to keep the stored doc == the emitted doc.
         # Fonts — curated-enum family strings (WU0 memo §1B).
         "--font-body": "Inter",
         "--font-heading": "Cinzel",
@@ -322,15 +325,19 @@ def _revalidate_tokens(tokens: dict[str, str]) -> dict[str, str]:
 
 
 def _reject_failing_contrast(editable_tokens: dict[str, str]) -> None:
-    """Raise 422 if any primary pairing fails WCAG AA over the DERIVED set (B9).
+    """Raise 422 if any RENDER pairing fails WCAG AA over the DERIVED set (B9).
 
     The gate runs over ``derive_tokens`` of :func:`compiled_defaults` MERGED-UNDER
     the submitted editable tokens (submitted overrides default). Deriving first
     yields the exact effective set the SSR sink renders — every shade / state
     token computed from the primaries and every absent primary falling back to
     its compiled default — so no pairing is skipped for an omitted endpoint. The
-    ON-COLOURS (``--text-inverse`` / ``--text-onmedia``) are contrast-derived and
-    therefore never gated: they cannot fail (white-on-white is unreachable).
+    gate is RENDER-COMPLETE (``theme_contrast.RENDER_PAIRINGS``): it covers the
+    on-colours on their BASE surface AND on their derived STATE shades (e.g.
+    ``--text-inverse`` on ``--surface-inverse-hover``), so a surface too light to
+    bear its intended on-colour across all shades is rejected here rather than
+    silently recoloured — the defence-in-depth behind the safe-by-construction
+    derivation.
     """
     effective = derive_tokens({**compiled_defaults(), **editable_tokens})
     failures = theme_contrast.evaluate_contrast(effective)

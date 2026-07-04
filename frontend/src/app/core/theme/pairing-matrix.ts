@@ -16,8 +16,15 @@
  * known-good set, not every possible combination.
  */
 
-import { AA_THRESHOLDS, contrastRatio, passesAa, type RgbTriplet, type TextSize } from './contrast';
-import { deriveColorTokens, PRIMARY_DEFAULTS } from './theme-derive';
+import {
+  AA_THRESHOLDS,
+  contrastRatio,
+  meetsAa,
+  passesAa,
+  type RgbTriplet,
+  type TextSize,
+} from './contrast';
+import { deriveColorTokens, deriveTokens, PRIMARY_DEFAULTS } from './theme-derive';
 import { type Archetype, ARCHETYPES, getToken } from './token-taxonomy';
 
 /** A curated, pre-validated foreground-on-background pairing. */
@@ -185,4 +192,148 @@ export function onColorPairingsAlwaysContrast(
     const background = primaryTriplet(primaries, pair.background);
     return contrastRatio(onColor, background) >= AA_THRESHOLDS.body;
   });
+}
+
+/**
+ * A row of the RENDER-COMPLETE publish gate: one `(foreground, background)` pair
+ * the storefront actually renders TEXT for, tagged with the STRICTEST size it
+ * renders at. Endpoints may be PRIMARY or DERIVED (state shade / on-colour); they
+ * are resolved against the DERIVED effective token set, so a derived foreground
+ * (`--text-strong`) or derived background (`--surface-inverse-hover`) is a
+ * first-class endpoint here — unlike `PAIRINGS`, whose endpoints must be taxonomy
+ * primaries (`colorFor`).
+ */
+export interface RenderPairing {
+  readonly id: string;
+  readonly foreground: string;
+  readonly background: string;
+  readonly size: TextSize;
+}
+
+/**
+ * The RENDER-COMPLETE gate — the byte-for-byte mirror of
+ * `theme_contrast.py` `RENDER_PAIRINGS`. Every row is grounded in the audited
+ * `frontend/src/**` render map (see the Python docstring for representative
+ * file:line). This is the browser twin of the server publish gate: if the two
+ * lists diverge, the server gates one thing and the browser renders another —
+ * exactly the bypass this closes — so `theme-contrast-fixture.json` locks them
+ * together and both suites assert against it.
+ *
+ * `--text-heading` renders at BOTH large (h1/h2) and body (text-sm meta); gated at
+ * BODY, the strictest, which subsumes large. `--text-inverse` is gated on its BASE
+ * `--surface-inverse` (safe by construction) AND on the derived
+ * `--surface-inverse-hover` STATE shade (the closed bypass).
+ */
+export const RENDER_PAIRINGS: readonly RenderPairing[] = [
+  { id: 'text-on-background', foreground: '--text', background: '--background', size: 'body' },
+  { id: 'text-on-surface', foreground: '--text', background: '--surface', size: 'body' },
+  { id: 'text-on-surface-muted', foreground: '--text', background: '--surface-muted', size: 'body' },
+  { id: 'muted-on-background', foreground: '--text-muted', background: '--background', size: 'body' },
+  {
+    id: 'secondary-on-background',
+    foreground: '--text-secondary',
+    background: '--background',
+    size: 'body',
+  },
+  { id: 'secondary-on-surface', foreground: '--text-secondary', background: '--surface', size: 'body' },
+  {
+    id: 'secondary-on-surface-muted',
+    foreground: '--text-secondary',
+    background: '--surface-muted',
+    size: 'body',
+  },
+  { id: 'strong-on-background', foreground: '--text-strong', background: '--background', size: 'body' },
+  { id: 'strong-on-surface', foreground: '--text-strong', background: '--surface', size: 'body' },
+  {
+    id: 'strong-on-surface-muted',
+    foreground: '--text-strong',
+    background: '--surface-muted',
+    size: 'body',
+  },
+  { id: 'heading-on-background', foreground: '--text-heading', background: '--background', size: 'body' },
+  { id: 'heading-on-surface', foreground: '--text-heading', background: '--surface', size: 'body' },
+  { id: 'heading-on-field', foreground: '--text-heading', background: '--field', size: 'body' },
+  {
+    id: 'heading-on-surface-muted',
+    foreground: '--text-heading',
+    background: '--surface-muted',
+    size: 'body',
+  },
+  {
+    id: 'heading-on-background-subtle',
+    foreground: '--text-heading',
+    background: '--background-subtle',
+    size: 'body',
+  },
+  { id: 'accent-on-background', foreground: '--accent', background: '--background', size: 'body' },
+  { id: 'accent-on-surface', foreground: '--accent', background: '--surface', size: 'body' },
+  {
+    id: 'accent-strong-on-background',
+    foreground: '--accent-strong',
+    background: '--background',
+    size: 'body',
+  },
+  {
+    id: 'accent-strong-on-accent-subtle',
+    foreground: '--accent-strong',
+    background: '--accent-subtle',
+    size: 'body',
+  },
+  {
+    id: 'text-inverse-on-surface-inverse',
+    foreground: '--text-inverse',
+    background: '--surface-inverse',
+    size: 'body',
+  },
+  {
+    id: 'text-inverse-on-surface-inverse-hover',
+    foreground: '--text-inverse',
+    background: '--surface-inverse-hover',
+    size: 'body',
+  },
+  { id: 'text-onmedia-on-accent', foreground: '--text-onmedia', background: '--accent', size: 'body' },
+];
+
+/** One render pairing that FAILS its AA target under the evaluated tokens. */
+export interface ThemeContrastFailure {
+  readonly id: string;
+  readonly foreground: string;
+  readonly background: string;
+  readonly size: TextSize;
+  /** The measured WCAG ratio (1..21). */
+  readonly ratio: number;
+  /** The pinned AA target for the pairing's size. */
+  readonly target: number;
+}
+
+/**
+ * The BROWSER twin of the server publish gate (`theme_service._reject_failing_contrast`
+ * → `theme_contrast.evaluate_contrast`). Merges the (possibly partial) editable
+ * `primaries` OVER the compiled defaults, derives the full effective token set,
+ * then returns every `RENDER_PAIRINGS` row that fails its AA target (empty = the
+ * theme would publish). Client and server therefore reject byte-for-byte the same
+ * themes — no "passes in the editor, 422 on publish" divergence.
+ */
+export function evaluateThemeContrast(
+  primaries: Readonly<Record<string, string>>,
+): ThemeContrastFailure[] {
+  const effective = deriveTokens({ ...PRIMARY_DEFAULTS, ...primaries });
+  const failures: ThemeContrastFailure[] = [];
+  for (const pair of RENDER_PAIRINGS) {
+    const ratio = contrastRatio(
+      parseTriplet(effective[pair.foreground]),
+      parseTriplet(effective[pair.background]),
+    );
+    if (!meetsAa(ratio, pair.size)) {
+      failures.push({
+        id: pair.id,
+        foreground: pair.foreground,
+        background: pair.background,
+        size: pair.size,
+        ratio,
+        target: AA_THRESHOLDS[pair.size],
+      });
+    }
+  }
+  return failures;
 }

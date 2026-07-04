@@ -12,13 +12,18 @@
  *     --accent-strong, --accent-subtle, --border-muted, --border-strong,
  *     --border-inverse, --text-inverse, --text-onmedia.
  *
- * Because the ON-COLOURS (`--text-inverse`, `--text-onmedia`, `--border-inverse`)
- * are derived to CONTRAST their background — `--text-inverse` is black-or-white
- * chosen for maximum WCAG contrast against `--surface-inverse`, `--text-onmedia`
- * likewise against `--accent` — a failing pairing on those surfaces is impossible
- * BY CONSTRUCTION: `max(contrast(black), contrast(white))` against any colour is
- * always >= 4.58:1 (the crossover minimum), so both always clear AA. An admin has
- * no key to force white-on-white.
+ * Because the TEXT ON-COLOURS (`--text-inverse`, `--text-onmedia`) are derived to
+ * CONTRAST their BASE background — `--text-inverse` is black-or-white chosen for
+ * maximum WCAG contrast against `--surface-inverse`, `--text-onmedia` likewise
+ * against `--accent` — a failing pairing on that BASE surface is impossible BY
+ * CONSTRUCTION: `max(contrast(black), contrast(white))` against any colour is
+ * always >= 4.58:1 (the crossover minimum). An admin has no key to force
+ * white-on-white. This covers the BASE surface only; the derived STATE shades
+ * (e.g. the 7%-lighter `--surface-inverse-hover`) an on-colour also renders on are
+ * gated render-complete by `pairing-matrix.ts` RENDER_PAIRINGS. Note
+ * `--border-inverse` is NOT a contrast on-colour — it is a `copy` of
+ * `--surface-inverse` used as an edge/ring (never text), so it bears no AA text
+ * obligation.
  *
  * Colour maths runs in sRGB with per-channel linear interpolation (`mix`), which
  * is documented as an acceptable derivation space (WU spec) and — critically for

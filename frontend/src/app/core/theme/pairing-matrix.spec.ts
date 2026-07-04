@@ -1,6 +1,8 @@
+import contrastFixture from '../../../../../test-fixtures/theme-contrast-fixture.json';
 import { AA_THRESHOLDS, contrastRatio } from './contrast';
 import {
   colorFor,
+  evaluateThemeContrast,
   ON_COLOR_MIN_RATIO,
   ON_COLOR_PAIRINGS,
   onColorPairingsAlwaysContrast,
@@ -8,6 +10,7 @@ import {
   pairingPassesAa,
   pairingRatio,
   parseTriplet,
+  RENDER_PAIRINGS,
   type Pairing,
 } from './pairing-matrix';
 import { deriveColorTokens, DERIVED_COLOR_NAMES, PRIMARY_DEFAULTS } from './theme-derive';
@@ -180,5 +183,72 @@ describe('pairingPassesAa (fail path)', () => {
     };
     expect(pairingPassesAa(bad)).toBe(false);
     expect(pairingRatio(bad)).toBeLessThan(AA_THRESHOLDS.body);
+  });
+});
+
+describe('RENDER_PAIRINGS (render-complete gate) + evaluateThemeContrast', () => {
+  const failingIds = (primaries: Record<string, string>): string[] =>
+    evaluateThemeContrast(primaries)
+      .map((f) => f.id)
+      .sort();
+
+  it('matches the shared TS<->Python parity fixture, in order', () => {
+    const got = RENDER_PAIRINGS.map((p) => ({
+      id: p.id,
+      foreground: p.foreground,
+      background: p.background,
+      size: p.size as string,
+    }));
+    expect(got).toEqual(contrastFixture.pairings);
+  });
+
+  it('passes on the compiled defaults (empty primaries)', () => {
+    expect(evaluateThemeContrast({})).toEqual([]);
+  });
+
+  it('reproduces every shared-fixture case (server/browser reject the same themes)', () => {
+    for (const testCase of contrastFixture.cases) {
+      expect(failingIds(testCase.primaries as Record<string, string>))
+        .withContext(testCase.name)
+        .toEqual([...testCase.failures]);
+    }
+  });
+
+  it('rejects a near-crossover grey --surface-inverse (bypass #6, state shade)', () => {
+    // BASE white --text-inverse on 117 = 4.61 (passes); the derived hover shade
+    // 127 renders it at 4.00 — the render-complete gate catches the state shade.
+    const failures = evaluateThemeContrast({ '--surface-inverse': '117 117 117' });
+    const hover = failures.find((f) => f.id === 'text-inverse-on-surface-inverse-hover');
+    expect(hover).withContext('hover state-shade pair must fail').toBeTruthy();
+    expect(hover?.ratio).toBeLessThan(4.5);
+    expect(hover?.target).toBe(4.5);
+    // The BASE pairing stays safe by construction.
+    expect(failures.some((f) => f.id === 'text-inverse-on-surface-inverse')).toBe(false);
+  });
+
+  it('rejects a mid-grey --text-heading at BODY size (bypass #7, size tier)', () => {
+    // 137 clears large (3.0) but colours text-sm body elements needing 4.5.
+    const failures = evaluateThemeContrast({ '--text-heading': '137 137 137' });
+    const headingFails = failures.filter((f) => f.id.startsWith('heading-on-'));
+    expect(headingFails.length).toBeGreaterThan(0);
+    for (const f of headingFails) {
+      expect(f.size).toBe('body');
+      expect(f.target).toBe(4.5);
+      expect(f.ratio).toBeLessThan(4.5);
+    }
+    expect(failures.some((f) => f.id === 'heading-on-field')).toBe(true);
+  });
+
+  it('gates every derived surface the storefront renders text on (bypass #8 backstop)', () => {
+    const gatedBackgrounds = new Set(RENDER_PAIRINGS.map((p) => p.background));
+    for (const surface of [
+      '--surface-muted',
+      '--field',
+      '--background-subtle',
+      '--surface-inverse-hover',
+      '--accent-subtle',
+    ]) {
+      expect(gatedBackgrounds.has(surface)).withContext(surface).toBe(true);
+    }
   });
 });
