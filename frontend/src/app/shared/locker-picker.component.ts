@@ -300,12 +300,23 @@ export class LockerPickerComponent implements AfterViewInit, OnChanges, OnDestro
     return `${item.lat},${item.lng},${item.display_name}`;
   }
 
+  /**
+   * Seam for the lazy Leaflet import. Isolated into an overridable method so
+   * tests can supply an eagerly-bundled Leaflet module instead of triggering a
+   * network-backed webpack lazy chunk, which times out intermittently under
+   * headless Chrome on a loaded CI runner and surfaced as a ChunkLoadError
+   * attributed to whichever spec happened to be draining the microtask queue.
+   */
+  protected loadLeaflet(): Promise<Leaflet> {
+    return import('leaflet');
+  }
+
   async initMap(): Promise<void> {
     if (this.initialized) return;
     if (!this.mapHost?.nativeElement) return;
 
     await this.styles.ensure('leaflet', 'assets/vendor/leaflet/leaflet.css');
-    const L = await import('leaflet');
+    const L = await this.loadLeaflet();
     this.leaflet = L;
 
     const map = L.map(this.mapHost.nativeElement, { zoomControl: true }).setView(

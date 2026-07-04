@@ -2608,6 +2608,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
       if (firstChild?.nodeType === w.Node.TEXT_NODE) {
         firstChild.textContent = (firstChild.textContent || '').replace(calloutMarker, '');
       } else {
+        // Operates on the element's OWN already-DOMPurify-sanitized innerHTML (from
+        // MarkdownService.render); only strips a literal callout marker, introducing no new data.
+        // nosemgrep: quality.opengrep.js-inner-html-assignment -- own-sanitized-content marker strip
         firstPara.innerHTML = firstPara.innerHTML.replace(calloutMarker, '');
       }
       if ((firstPara.textContent || '').trim().length === 0) {
@@ -2665,6 +2668,9 @@ export class BlogPostComponent implements OnInit, OnDestroy {
           lang && hljs.getLanguage(lang)
             ? hljs.highlight(raw, { language: lang }).value
             : hljs.highlightAuto(raw).value;
+        // `highlighted` is highlight.js output over plain text (codeEl.textContent); hljs
+        // HTML-escapes its input and emits only its own <span class="hljs-*"> markup.
+        // nosemgrep: quality.opengrep.js-inner-html-assignment -- hljs-escaped syntax highlight
         codeEl.innerHTML = highlighted;
         codeEl.classList.add('hljs');
       } catch {

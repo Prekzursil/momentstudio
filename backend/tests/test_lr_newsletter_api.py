@@ -418,7 +418,7 @@ def test_unsubscribe_post_json_body(newsletter_app, monkeypatch) -> None:
 
 
 def test_unsubscribe_post_no_body(newsletter_app, monkeypatch) -> None:
-    # No query token, empty/invalid body -> decode("") -> None -> 400.
+    # No query token, empty or invalid body -> decode("") -> None -> 400.
     monkeypatch.setattr(
         newsletter_tokens,
         "decode_newsletter_token",
