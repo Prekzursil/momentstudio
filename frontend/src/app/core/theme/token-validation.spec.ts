@@ -1,6 +1,6 @@
 import { resolveToken } from './token-registry';
 import { validateToken } from './token-validation';
-import corpus from '../../../../../test-fixtures/theme-token-corpus.json' with { type: 'json' };
+import corpus from '../../../../../test-fixtures/theme-token-corpus.json';
 
 interface CorpusCase {
   readonly name: string;
