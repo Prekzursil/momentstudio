@@ -11,6 +11,7 @@ under both the real-migration path and the test ``create_all`` path.
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -122,3 +123,100 @@ async def seed_default_theme_on_startup(
             )
             return False
     return True
+
+
+@dataclass(frozen=True)
+class ResolvedTheme:
+    """Read-only projection of a theme document for the resolve/read API.
+
+    Uniform shape for a resolved theme regardless of whether it originated from
+    the singleton :class:`Theme` row (published/live) or a :class:`ThemeVersion`
+    snapshot (draft), so the WU4a read endpoints serialize one consistent
+    schema.
+    """
+
+    tokens: dict[str, str]
+    version: int
+    schema_version: int
+    status: ThemeStatus
+    published_at: datetime | None
+    updated_at: datetime | None
+
+
+def _resolved_from_theme(theme: Theme) -> ResolvedTheme:
+    return ResolvedTheme(
+        tokens=dict(theme.tokens),
+        version=theme.version,
+        schema_version=theme.schema_version,
+        status=theme.status,
+        published_at=theme.published_at,
+        updated_at=theme.updated_at,
+    )
+
+
+def _resolved_from_version(snapshot: ThemeVersion) -> ResolvedTheme:
+    return ResolvedTheme(
+        tokens=dict(snapshot.tokens),
+        version=snapshot.version,
+        schema_version=snapshot.schema_version,
+        status=snapshot.status,
+        published_at=snapshot.published_at,
+        updated_at=snapshot.created_at,
+    )
+
+
+async def resolve_published_tokens(session: AsyncSession) -> ResolvedTheme | None:
+    """Return the current published (live/SSR) theme, or ``None`` if none exists.
+
+    The storefront is a single global theme (singleton :class:`Theme` row); the
+    published document is what ``server.ts`` reads at request time (WU6). Returns
+    ``None`` when no published theme is present so the SSR consumer can fall back
+    to compiled defaults (WU6) rather than fail.
+    """
+
+    theme = (
+        await session.execute(
+            select(Theme)
+            .where(Theme.status == ThemeStatus.published)
+            .order_by(Theme.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if theme is None:
+        return None
+    return _resolved_from_theme(theme)
+
+
+async def get_draft(session: AsyncSession) -> ResolvedTheme | None:
+    """Return the current editable draft for the admin theme editor.
+
+    The theme is a single global draft per store (plan §WU1/B7). Returns the
+    latest ``draft`` snapshot when one has been saved (WU4b ``PUT /theme/draft``);
+    before any draft exists, falls back to the published baseline so the editor
+    always opens on the live document. ``None`` only when neither exists.
+    """
+
+    draft = (
+        await session.execute(
+            select(ThemeVersion)
+            .where(ThemeVersion.status == ThemeStatus.draft)
+            .order_by(ThemeVersion.version.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if draft is not None:
+        return _resolved_from_version(draft)
+    return await resolve_published_tokens(session)
+
+
+async def list_versions(session: AsyncSession) -> list[ThemeVersion]:
+    """Return the theme version history, newest first.
+
+    The browsable list the WU12 preview-before-restore flow and the WU4b
+    rollback endpoint consume.
+    """
+
+    result = await session.execute(
+        select(ThemeVersion).order_by(ThemeVersion.version.desc())
+    )
+    return list(result.scalars().all())
