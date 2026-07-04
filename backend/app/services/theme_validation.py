@@ -184,17 +184,33 @@ def _numeric_entry(fallback: str) -> TokenEntry:
 
 # Closed base-token registry. Fallbacks are the compiled defaults derived from
 # today's styles.css (in the frozen R G B / curated-enum / numeric wire format).
+# Mirrors ``token-registry.ts`` BASE_TOKENS. Fallbacks pin the LIGHT compiled
+# default; the dark reassignment lives in styles.css :root.dark. The role+state
+# set keeps distinct core-surface shades distinct (P1a WU5 / WU0 memo §1A, §2);
+# a full numeric ramp stays deferred to P2.
 _BASE_TOKENS: dict[str, TokenEntry] = {
     "--background": _triplet_entry("255 255 255"),
+    "--background-subtle": _triplet_entry("248 250 252"),
     "--surface": _triplet_entry("241 245 249"),
+    "--surface-muted": _triplet_entry("248 250 252"),
+    "--surface-raised": _triplet_entry("226 232 240"),
     "--surface-inverse": _triplet_entry("15 23 42"),
+    "--surface-inverse-hover": _triplet_entry("30 41 59"),
+    "--field": _triplet_entry("255 255 255"),
     "--text": _triplet_entry("51 65 85"),
+    "--text-secondary": _triplet_entry("71 85 105"),
     "--text-inverse": _triplet_entry("255 255 255"),
+    "--text-onmedia": _triplet_entry("255 255 255"),
     "--text-heading": _triplet_entry("15 23 42"),
-    "--text-strong": _triplet_entry("15 23 42"),
+    "--text-strong": _triplet_entry("30 41 59"),
     "--text-muted": _triplet_entry("100 116 139"),
     "--border": _triplet_entry("226 232 240"),
+    "--border-muted": _triplet_entry("226 232 240"),
+    "--border-strong": _triplet_entry("203 213 225"),
+    "--border-inverse": _triplet_entry("15 23 42"),
     "--accent": _triplet_entry("79 70 229"),
+    "--accent-strong": _triplet_entry("55 48 163"),
+    "--accent-subtle": _triplet_entry("238 242 255"),
     "--overlay": _triplet_entry("0 0 0"),
     "--font-body": _font_entry("Inter, system-ui, -apple-system, sans-serif"),
     "--font-heading": _font_entry("Cinzel, ui-serif, Georgia, serif"),

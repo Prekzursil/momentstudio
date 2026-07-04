@@ -186,6 +186,61 @@ export const SEED_TOKENS: readonly TaxonomyToken[] = [
   space('--space-xl', '2rem'),
 ];
 
+/**
+ * Derived role + STATE shade tokens (P1a WU5). The `SEED_TOKENS` above are the curated,
+ * admin-facing normal-tier roles (the WU3 control set); the tokens below are the extra
+ * per-STATE shades WU5 needs so a flat one-token-per-role model does NOT collapse two
+ * core-surface shades that render differently (WU0 memo §1A/§2). The blocking regression
+ * this fixes: base `bg-white` (--background) and `hover:bg-slate-50` (--surface-muted)
+ * must resolve to DISTINCT values, or light-mode hover feedback vanishes. Each token
+ * carries its LIGHT default (styles.css :root) and DARK default (styles.css :root.dark);
+ * dark re-themes at runtime by reassigning these same custom properties. A full numeric
+ * 50->950 ramp stays DEFERRED to P2 — this role+state set covers the core surface
+ * actually used, an explicit reviewed re-scope of WU0 memo §2.
+ */
+export interface StateToken {
+  readonly name: string;
+  /** LIGHT compiled default — the `R G B` triplet on `:root`. */
+  readonly light: string;
+  /** DARK compiled default — the `R G B` triplet reassigned on `:root.dark`. */
+  readonly dark: string;
+  readonly role: string;
+}
+
+const s = (name: string, light: string, dark: string, role: string): StateToken => ({
+  name,
+  light,
+  dark,
+  role,
+});
+
+/** Every storefront color token, with its light + dark compiled default. */
+export const STATE_TOKENS: readonly StateToken[] = [
+  s('--background', '255 255 255', '15 23 42', 'page canvas / plain card'),
+  s('--background-subtle', '248 250 252', '2 6 23', 'page-canvas gradient top'),
+  s('--surface', '241 245 249', '30 41 59', 'card / panel / pill base fill'),
+  s('--surface-muted', '248 250 252', '30 41 59', 'sunken well / hover fill / drag-over'),
+  s('--surface-raised', '226 232 240', '51 65 85', 'stronger fill (skeleton / divider bar)'),
+  s('--surface-inverse', '15 23 42', '248 250 252', 'inverse chip / button / badge'),
+  s('--surface-inverse-hover', '30 41 59', '255 255 255', 'inverse control hover'),
+  s('--field', '255 255 255', '30 41 59', 'text input / select fill'),
+  s('--overlay', '0 0 0', '0 0 0', 'modal / drawer scrim'),
+  s('--text', '51 65 85', '226 232 240', 'body copy'),
+  s('--text-secondary', '71 85 105', '203 213 225', 'secondary copy / descriptions'),
+  s('--text-muted', '100 116 139', '148 163 184', 'captions / meta / placeholder'),
+  s('--text-strong', '30 41 59', '241 245 249', 'emphasis (labels / section headers)'),
+  s('--text-heading', '15 23 42', '248 250 252', 'headings / product title / hover target'),
+  s('--text-inverse', '255 255 255', '15 23 42', 'text on an inverse chip'),
+  s('--text-onmedia', '255 255 255', '255 255 255', 'text on colored/gradient media'),
+  s('--border', '226 232 240', '30 41 59', 'card edges / dividers'),
+  s('--border-muted', '226 232 240', '51 65 85', 'input / control / dropdown edges'),
+  s('--border-strong', '203 213 225', '71 85 105', 'radio edges / hover border'),
+  s('--border-inverse', '15 23 42', '248 250 252', 'active thumbnail edge'),
+  s('--accent', '79 70 229', '165 180 252', 'links / focus rings / form accent'),
+  s('--accent-strong', '55 48 163', '199 210 254', 'link hover / emphasis accent'),
+  s('--accent-subtle', '238 242 255', '30 27 75', 'accent-tinted banner surface'),
+];
+
 const SEED_BY_NAME: ReadonlyMap<string, TaxonomyToken> = new Map(
   SEED_TOKENS.map((token) => [token.name, token]),
 );

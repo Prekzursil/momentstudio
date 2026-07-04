@@ -1,11 +1,19 @@
-import { resolveToken } from './token-registry';
+import { isColorTriplet, resolveToken } from './token-registry';
 import {
   ARCHETYPES,
   colorTokens,
   getToken,
   SEED_TOKENS,
+  STATE_TOKENS,
   type TaxonomyToken,
 } from './token-taxonomy';
+
+const stateByName = new Map(STATE_TOKENS.map((t) => [t.name, t]));
+const light = (name: string): string => {
+  const token = stateByName.get(name);
+  if (!token) throw new Error(`missing state token ${name}`);
+  return token.light;
+};
 
 describe('SEED_TOKENS', () => {
   it('is non-empty and every name is unique', () => {
@@ -77,6 +85,73 @@ describe('SEED_TOKENS', () => {
         .map((t) => t.name)
         .sort(),
     ).toEqual([...expected].sort());
+  });
+});
+
+describe('STATE_TOKENS (P1a WU5 distinct role + state shades)', () => {
+  it('every token resolves in the registry with a valid triplet for both light + dark', () => {
+    for (const token of STATE_TOKENS) {
+      expect(resolveToken(token.name))
+        .withContext(`${token.name} must be a registry member`)
+        .toBeTruthy();
+      expect(isColorTriplet(token.light))
+        .withContext(`${token.name} light '${token.light}'`)
+        .toBe(true);
+      expect(isColorTriplet(token.dark))
+        .withContext(`${token.name} dark '${token.dark}'`)
+        .toBe(true);
+    }
+  });
+
+  it('pins each light default to the registry (light) fallback', () => {
+    for (const token of STATE_TOKENS) {
+      expect(resolveToken(token.name)?.fallback)
+        .withContext(`${token.name} light must equal the registry fallback`)
+        .toBe(token.light);
+    }
+  });
+
+  it('covers every seed colour role', () => {
+    const names = new Set(STATE_TOKENS.map((t) => t.name));
+    for (const token of colorTokens()) {
+      expect(names.has(token.name))
+        .withContext(`${token.name} must have a light/dark state entry`)
+        .toBe(true);
+    }
+  });
+
+  it('THE REGRESSION GUARD: base canvas, surface and hover-fill are all DISTINCT', () => {
+    // hover:bg-slate-50 (--surface-muted) once collapsed onto base bg-white
+    // (--background), erasing light-mode hover feedback. These must never be equal.
+    expect(light('--background')).not.toBe(light('--surface-muted'));
+    expect(light('--background')).not.toBe(light('--surface'));
+    expect(light('--surface')).not.toBe(light('--surface-muted'));
+    expect(light('--surface')).not.toBe(light('--surface-raised'));
+  });
+
+  it('keeps every text emphasis level distinct in light mode', () => {
+    const levels = [
+      '--text',
+      '--text-secondary',
+      '--text-muted',
+      '--text-strong',
+      '--text-heading',
+    ];
+    const values = levels.map(light);
+    expect(new Set(values).size).toBe(levels.length);
+  });
+
+  it('reassigns to a DIFFERENT dark value for every token except intentional constants', () => {
+    // --overlay (black scrim) and --text-onmedia (text on colored media) stay the same
+    // in both modes by design; everything else must actually re-theme under :root.dark.
+    const constant = new Set(['--overlay', '--text-onmedia']);
+    for (const token of STATE_TOKENS) {
+      if (constant.has(token.name)) {
+        expect(token.light).toBe(token.dark);
+      } else {
+        expect(token.light).withContext(`${token.name} must re-theme in dark`).not.toBe(token.dark);
+      }
+    }
   });
 });
 

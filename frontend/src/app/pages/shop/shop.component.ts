@@ -64,15 +64,15 @@ interface ShopFilterChip {
       <div class="grid gap-8 lg:grid-cols-[280px_1fr]">
         <aside
           id="shop-filters"
-          class="border border-slate-200 rounded-2xl p-4 bg-white h-fit space-y-6 scroll-mt-24 dark:border-slate-800 dark:bg-slate-900"
+          class="border border-border rounded-2xl p-4 bg-background h-fit space-y-6 scroll-mt-24"
         >
           <div class="space-y-3">
             <div class="flex items-center justify-between">
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+              <h2 class="text-lg font-semibold text-text-heading font-heading">
                 {{ 'shop.filters' | translate }}
               </h2>
               <button
-                class="text-sm text-indigo-600 font-medium dark:text-indigo-300"
+                class="text-sm text-accent font-medium"
                 type="button"
                 (click)="resetFilters()"
               >
@@ -90,13 +90,13 @@ interface ShopFilterChip {
 
           <div class="space-y-3">
             <div class="flex items-center justify-between gap-2">
-              <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              <p class="text-sm font-semibold text-text-strong">
                 {{ 'shop.categories' | translate }}
               </p>
               <button
                 *ngIf="canEditCategories()"
                 type="button"
-                class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                class="rounded-full border border-border-muted bg-background px-2 py-1 text-[11px] font-semibold text-text shadow-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                 [disabled]="reorderSaving() || renameSaving || renameLoading || createSaving"
                 (click)="toggleCreateRootCategory()"
               >
@@ -107,26 +107,26 @@ interface ShopFilterChip {
                 }}
               </button>
             </div>
-            <p *ngIf="canEditCategories()" class="text-xs text-slate-500 dark:text-slate-400">
+            <p *ngIf="canEditCategories()" class="text-xs text-text-muted">
               {{ 'adminUi.storefront.categories.dragHint' | translate }}
             </p>
             <div class="space-y-2 max-h-48 overflow-auto pr-1">
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <label class="flex items-center gap-2 text-sm text-text">
                 <input
                   type="radio"
                   name="category"
-                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                  class="h-4 w-4 rounded border-border-strong"
                   value=""
                   [(ngModel)]="categorySelection"
                   (change)="onCategorySelected()"
                 />
                 <span>{{ 'shop.allCategories' | translate }}</span>
               </label>
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <label class="flex items-center gap-2 text-sm text-text">
                 <input
                   type="radio"
                   name="category"
-                  class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                  class="h-4 w-4 rounded border-border-strong"
                   value="sale"
                   [(ngModel)]="categorySelection"
                   (change)="onCategorySelected()"
@@ -135,7 +135,7 @@ interface ShopFilterChip {
               </label>
               <div
                 *ngIf="isCreatingRootCategory()"
-                class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                class="grid gap-3 rounded-xl border border-border-muted bg-background p-3"
               >
                 <app-input
                   [label]="'adminUi.storefront.categories.nameRo' | translate"
@@ -176,9 +176,7 @@ interface ShopFilterChip {
                 *ngFor="let category of rootCategories"
                 class="grid gap-2"
                 [ngClass]="
-                  dragOverRootCategorySlug === category.slug
-                    ? 'rounded-lg bg-slate-50 dark:bg-slate-800/60'
-                    : ''
+                  dragOverRootCategorySlug === category.slug ? 'rounded-lg bg-surface-muted' : ''
                 "
                 [attr.draggable]="
                   canEditCategories() &&
@@ -192,10 +190,10 @@ interface ShopFilterChip {
                 (drop)="onRootCategoryDrop($event, category.slug)"
                 (dragend)="onRootCategoryDragEnd()"
               >
-                <span class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <span class="flex items-center gap-2 text-sm text-text">
                   <span
                     *ngIf="canEditCategories()"
-                    class="text-slate-400 dark:text-slate-500 select-none cursor-grab"
+                    class="text-text-muted select-none cursor-grab"
                     aria-hidden="true"
                   >
                     ⋮⋮
@@ -203,7 +201,7 @@ interface ShopFilterChip {
                   <input
                     type="radio"
                     name="category"
-                    class="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                    class="h-4 w-4 rounded border-border-strong"
                     [value]="category.slug"
                     [(ngModel)]="categorySelection"
                     (change)="onCategorySelected()"
@@ -211,14 +209,14 @@ interface ShopFilterChip {
                   <span class="truncate">{{ category.name }}</span>
                   <span
                     *ngIf="canEditCategories() && category.is_visible === false"
-                    class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-200"
+                    class="rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-text-secondary"
                   >
                     {{ 'adminUi.storefront.categories.hidden' | translate }}
                   </span>
                   <div *ngIf="canEditCategories()" class="ml-auto flex items-center gap-2">
                     <button
                       type="button"
-                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      class="rounded-full border border-border-muted bg-background px-2 py-1 text-[11px] font-semibold text-text shadow-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                       [disabled]="
                         reorderSaving() ||
                         renameSaving ||
@@ -238,7 +236,7 @@ interface ShopFilterChip {
                     </button>
                     <button
                       type="button"
-                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      class="rounded-full border border-border-muted bg-background px-2 py-1 text-[11px] font-semibold text-text shadow-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                       [disabled]="
                         reorderSaving() || createSaving || visibilitySavingSlug === category.slug
                       "
@@ -251,10 +249,10 @@ interface ShopFilterChip {
 
                 <div
                   *ngIf="editingCategorySlug === category.slug"
-                  class="ml-6 grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                  class="ml-6 grid gap-3 rounded-xl border border-border-muted bg-background p-3"
                   (click)="$event.stopPropagation()"
                 >
-                  <div *ngIf="renameLoading" class="text-xs text-slate-600 dark:text-slate-300">
+                  <div *ngIf="renameLoading" class="text-xs text-text-secondary">
                     {{ 'adminUi.common.loading' | translate }}
                   </div>
 
@@ -272,27 +270,27 @@ interface ShopFilterChip {
                       (valueChange)="renameNameEn = String($event ?? '')"
                     ></app-input>
                     <div
-                      class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40"
+                      class="grid gap-2 rounded-xl border border-border-muted bg-surface-muted p-3"
                     >
-                      <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      <p class="text-xs font-semibold text-text">
                         {{ 'adminUi.storefront.categories.images' | translate }}
                       </p>
                       <div class="grid gap-3">
                         <div class="grid gap-2">
-                          <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          <p class="text-xs font-semibold text-text-secondary">
                             {{ 'adminUi.storefront.categories.thumbnail' | translate }}
                           </p>
                           <div class="flex items-center gap-3">
                             <img
                               *ngIf="category.thumbnail_url"
                               [src]="category.thumbnail_url"
-                              class="h-12 w-12 rounded-lg border border-slate-200 object-cover dark:border-slate-700"
+                              class="h-12 w-12 rounded-lg border border-border-muted object-cover"
                               [alt]="category.name"
                             />
                             <input
                               type="file"
                               accept="image/*"
-                              class="block w-full text-xs text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-800 dark:text-slate-200 dark:file:bg-slate-50 dark:file:text-slate-900 dark:hover:file:bg-white"
+                              class="block w-full text-xs text-text file:mr-3 file:rounded-full file:border-0 file:bg-surface-inverse file:px-3 file:py-2 file:text-xs file:font-semibold file:text-inverse hover:file:bg-surface-inverse-hover"
                               [disabled]="
                                 renameSaving ||
                                 createSaving ||
@@ -303,13 +301,13 @@ interface ShopFilterChip {
                           </div>
                         </div>
                         <div class="grid gap-2">
-                          <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                          <p class="text-xs font-semibold text-text-secondary">
                             {{ 'adminUi.storefront.categories.banner' | translate }}
                           </p>
                           <input
                             type="file"
                             accept="image/*"
-                            class="block w-full text-xs text-slate-700 file:mr-3 file:rounded-full file:border-0 file:bg-slate-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-slate-800 dark:text-slate-200 dark:file:bg-slate-50 dark:file:text-slate-900 dark:hover:file:bg-white"
+                            class="block w-full text-xs text-text file:mr-3 file:rounded-full file:border-0 file:bg-surface-inverse file:px-3 file:py-2 file:text-xs file:font-semibold file:text-inverse hover:file:bg-surface-inverse-hover"
                             [disabled]="
                               renameSaving ||
                               createSaving ||
@@ -317,10 +315,7 @@ interface ShopFilterChip {
                             "
                             (change)="onCategoryImageSelected($event, category.slug, 'banner')"
                           />
-                          <p
-                            *ngIf="category.banner_url"
-                            class="text-xs text-slate-600 dark:text-slate-300"
-                          >
+                          <p *ngIf="category.banner_url" class="text-xs text-text-secondary">
                             {{ 'adminUi.storefront.categories.currentBanner' | translate }}
                           </p>
                         </div>
@@ -354,18 +349,16 @@ interface ShopFilterChip {
                         (action)="saveRenameCategory()"
                       ></app-button>
                     </div>
-                    <div
-                      class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-                    >
-                      <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                    <div class="grid gap-3 rounded-xl border border-border-muted bg-background p-3">
+                      <p class="text-xs font-semibold text-text-strong">
                         {{ 'adminUi.storefront.categories.mergeTitle' | translate }}
                       </p>
                       <label class="grid gap-1">
-                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        <span class="text-xs font-semibold text-text-secondary">
                           {{ 'adminUi.storefront.categories.mergeInto' | translate }}
                         </span>
                         <select
-                          class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                          class="h-10 rounded-xl border border-border-muted bg-field px-3 text-sm text-text-heading shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
                           [(ngModel)]="mergeTargetSlug"
                           (ngModelChange)="onMergeTargetChange()"
                           [disabled]="
@@ -387,7 +380,7 @@ interface ShopFilterChip {
                           </option>
                         </select>
                       </label>
-                      <p *ngIf="mergePreview" class="text-xs text-slate-600 dark:text-slate-300">
+                      <p *ngIf="mergePreview" class="text-xs text-text-secondary">
                         {{
                           'adminUi.storefront.categories.mergePreviewInfo'
                             | translate
@@ -477,13 +470,13 @@ interface ShopFilterChip {
                   class="ml-6 grid gap-2"
                 >
                   <div class="flex items-center justify-between gap-2">
-                    <p class="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <p class="text-xs font-semibold text-text-secondary">
                       {{ 'shop.subcategories' | translate }}
                     </p>
                     <button
                       *ngIf="canEditCategories()"
                       type="button"
-                      class="rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                      class="rounded-full border border-border-muted bg-background px-2 py-1 text-[11px] font-semibold text-text shadow-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                       [disabled]="reorderSaving() || renameSaving || renameLoading || createSaving"
                       (click)="toggleCreateSubcategory($event, category)"
                     >
@@ -496,7 +489,7 @@ interface ShopFilterChip {
                   </div>
                   <div
                     *ngIf="isCreatingSubcategory(category.slug)"
-                    class="grid gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
+                    class="grid gap-3 rounded-xl border border-border-muted bg-background p-3"
                     (click)="$event.stopPropagation()"
                   >
                     <app-input
@@ -540,8 +533,8 @@ interface ShopFilterChip {
                       class="rounded-full border px-3 py-1 text-xs font-medium transition"
                       [ngClass]="
                         !activeSubcategorySlug
-                          ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50'
-                          : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'
+                          ? 'bg-surface-inverse text-inverse border-border-inverse'
+                          : 'border-border-muted text-text hover:border-border-strong hover:text-text-heading'
                       "
                       (click)="setSubcategory('')"
                     >
@@ -553,8 +546,8 @@ interface ShopFilterChip {
                       class="rounded-full border px-3 py-1 text-xs font-medium transition"
                       [ngClass]="
                         activeSubcategorySlug === sub.slug
-                          ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50'
-                          : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'
+                          ? 'bg-surface-inverse text-inverse border-border-inverse'
+                          : 'border-border-muted text-text hover:border-border-strong hover:text-text-heading'
                       "
                       (click)="setSubcategory(sub.slug)"
                     >
@@ -567,7 +560,7 @@ interface ShopFilterChip {
           </div>
 
           <div class="space-y-3">
-            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            <p class="text-sm font-semibold text-text-strong">
               {{ 'shop.priceRange' | translate }}
             </p>
             <div class="grid gap-3">
@@ -583,7 +576,7 @@ interface ShopFilterChip {
                   [min]="priceMinBound"
                   [max]="priceMaxBound"
                   [step]="priceStep"
-                  class="block w-full max-w-full accent-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  class="block w-full max-w-full accent-accent focus:outline-none focus:ring-2 focus:ring-accent/40"
                   [(ngModel)]="filters.min_price"
                   (change)="onPriceCommit('min')"
                   [attr.aria-label]="'shop.ariaMinPrice' | translate"
@@ -595,7 +588,7 @@ interface ShopFilterChip {
                   [min]="priceMinBound"
                   [max]="priceMaxBound"
                   [step]="priceStep"
-                  class="block w-full max-w-full accent-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  class="block w-full max-w-full accent-accent focus:outline-none focus:ring-2 focus:ring-accent/40"
                   [(ngModel)]="filters.max_price"
                   (change)="onPriceCommit('max')"
                   [attr.aria-label]="'shop.ariaMaxPrice' | translate"
@@ -625,14 +618,14 @@ interface ShopFilterChip {
                   inputMode="numeric"
                 ></app-input>
               </div>
-              <p id="shop-price-hint" class="text-xs text-slate-500 dark:text-slate-400">
+              <p id="shop-price-hint" class="text-xs text-text-muted">
                 {{ 'shop.priceHint' | translate }}
               </p>
             </div>
           </div>
 
           <div class="space-y-3" *ngIf="allTags.length">
-            <p class="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            <p class="text-sm font-semibold text-text-strong">
               {{ 'shop.tags' | translate }}
             </p>
             <div class="flex flex-wrap gap-2">
@@ -641,8 +634,8 @@ interface ShopFilterChip {
                 class="rounded-full border px-3 py-1 text-xs font-medium transition"
                 [ngClass]="
                   filters.tags.has(tag.slug)
-                    ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-50 dark:text-slate-900 dark:border-slate-50'
-                    : 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:text-slate-50'
+                    ? 'bg-surface-inverse text-inverse border-border-inverse'
+                    : 'border-border-muted text-text hover:border-border-strong hover:text-text-heading'
                 "
                 *ngFor="let tag of allTags"
                 (click)="toggleTag(tag.slug)"
@@ -660,7 +653,7 @@ interface ShopFilterChip {
           >
             <div class="flex items-center gap-3">
               <input
-                class="w-64 max-w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                class="w-64 max-w-full rounded-lg border border-border-muted bg-field px-3 py-2 text-text-heading shadow-sm focus:border-border-strong focus:outline-none"
                 [placeholder]="'shop.searchPlaceholder' | translate"
                 [(ngModel)]="filters.search"
                 (keyup.enter)="onSearch()"
@@ -672,11 +665,11 @@ interface ShopFilterChip {
               ></app-button>
             </div>
             <div class="flex flex-wrap items-center justify-end gap-3">
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <label class="flex items-center gap-2 text-sm text-text">
                 <span>{{ 'shop.sort' | translate }}</span>
                 <select
                   id="shop-sort-select"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  class="rounded-lg border border-border-muted bg-field px-3 py-2 text-sm text-text-heading"
                   [(ngModel)]="filters.sort"
                   (change)="applyFilters()"
                 >
@@ -688,7 +681,7 @@ interface ShopFilterChip {
               <button
                 *ngIf="canEditProducts()"
                 type="button"
-                class="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                class="rounded-full border border-border-muted bg-background px-3 py-2 text-xs font-semibold text-text shadow-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                 [disabled]="bulkSaving()"
                 (click)="toggleBulkSelectMode()"
               >
@@ -704,24 +697,22 @@ interface ShopFilterChip {
           <div class="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <ng-container *ngIf="filterChips() as chips">
               <div *ngIf="chips.length" class="flex flex-wrap items-center gap-2">
-                <p
-                  class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                >
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">
                   {{ 'shop.activeFilters' | translate }}
                 </p>
                 <button
                   *ngFor="let chip of chips; trackBy: trackChip"
                   type="button"
-                  class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+                  class="inline-flex items-center gap-2 rounded-full border border-border-muted bg-background px-3 py-1 text-xs font-semibold text-text-strong hover:border-border-strong hover:bg-surface-muted"
                   (click)="removeChip(chip)"
                   [attr.aria-label]="'shop.removeFilter' | translate: { filter: chip.label }"
                 >
                   <span>{{ chip.label }}</span>
-                  <span aria-hidden="true" class="text-slate-500 dark:text-slate-400">×</span>
+                  <span aria-hidden="true" class="text-text-muted">×</span>
                 </button>
                 <button
                   type="button"
-                  class="ml-1 text-xs font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+                  class="ml-1 text-xs font-semibold text-accent hover:text-accent-strong"
                   (click)="resetFilters()"
                 >
                   {{ 'shop.clearAll' | translate }}
@@ -731,7 +722,7 @@ interface ShopFilterChip {
 
             <div
               *ngIf="!loading() && !hasError() && resultsMetaParams() as meta"
-              class="text-sm text-slate-600 dark:text-slate-300"
+              class="text-sm text-text-secondary"
             >
               {{ 'shop.resultsMeta' | translate: meta }}
             </div>
@@ -739,18 +730,16 @@ interface ShopFilterChip {
 
           <div
             *ngIf="canEditProducts() && bulkSelectMode()"
-            class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+            class="grid gap-4 rounded-2xl border border-border bg-background p-4"
           >
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div
-                class="flex flex-wrap items-center gap-2 text-sm text-slate-700 dark:text-slate-200"
-              >
+              <div class="flex flex-wrap items-center gap-2 text-sm text-text">
                 <span class="font-semibold">{{
                   'adminUi.products.bulk.selected' | translate: { count: bulkSelectedCount() }
                 }}</span>
                 <button
                   type="button"
-                  class="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  class="rounded-full border border-border-muted bg-background px-3 py-2 text-xs font-semibold text-text shadow-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                   [disabled]="bulkSaving() || products.length === 0"
                   (click)="selectAllProductsOnPage()"
                 >
@@ -758,7 +747,7 @@ interface ShopFilterChip {
                 </button>
                 <button
                   type="button"
-                  class="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                  class="rounded-full border border-border-muted bg-background px-3 py-2 text-xs font-semibold text-text shadow-sm transition hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
                   [disabled]="bulkSaving() || bulkSelectedCount() === 0"
                   (click)="clearBulkSelection()"
                 >
@@ -774,10 +763,10 @@ interface ShopFilterChip {
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <label class="grid gap-1 text-xs font-semibold text-text">
                 <span>{{ 'adminUi.storefront.products.bulkStatus' | translate }}</span>
                 <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  class="h-10 rounded-lg border border-border-muted bg-field px-3 text-sm font-normal text-text-heading shadow-sm focus:border-border-strong focus:outline-none disabled:opacity-60"
                   [disabled]="bulkSaving()"
                   [(ngModel)]="bulkStatus"
                 >
@@ -790,10 +779,10 @@ interface ShopFilterChip {
                 </select>
               </label>
 
-              <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <label class="grid gap-1 text-xs font-semibold text-text">
                 <span>{{ 'adminUi.storefront.products.bulkCategory' | translate }}</span>
                 <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  class="h-10 rounded-lg border border-border-muted bg-field px-3 text-sm font-normal text-text-heading shadow-sm focus:border-border-strong focus:outline-none disabled:opacity-60"
                   [disabled]="bulkSaving()"
                   [(ngModel)]="bulkCategoryId"
                 >
@@ -806,10 +795,10 @@ interface ShopFilterChip {
                 </select>
               </label>
 
-              <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+              <label class="grid gap-1 text-xs font-semibold text-text">
                 <span>{{ 'adminUi.storefront.products.bulkFeatured' | translate }}</span>
                 <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  class="h-10 rounded-lg border border-border-muted bg-field px-3 text-sm font-normal text-text-heading shadow-sm focus:border-border-strong focus:outline-none disabled:opacity-60"
                   [disabled]="bulkSaving()"
                   [(ngModel)]="bulkFeatured"
                 >
@@ -831,7 +820,7 @@ interface ShopFilterChip {
             </p>
           </div>
 
-          <p *ngIf="canReorderProducts()" class="text-xs text-slate-500 dark:text-slate-400">
+          <p *ngIf="canReorderProducts()" class="text-xs text-text-muted">
             {{ 'adminUi.storefront.products.reorderHint' | translate }}
           </p>
 
@@ -867,15 +856,13 @@ interface ShopFilterChip {
               (primaryAction)="resetFilters()"
             ></app-empty-state>
             <div *ngIf="rootCategories.length" class="mt-1 grid gap-2">
-              <p
-                class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-              >
+              <p class="text-xs font-semibold uppercase tracking-[0.2em] text-text-muted">
                 {{ 'shop.suggestedCategories' | translate }}
               </p>
               <div class="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+                  class="rounded-full border border-border-muted bg-background px-3 py-1 text-xs font-semibold text-text-strong hover:border-border-strong hover:bg-surface-muted"
                   (click)="quickSelectCategory('sale')"
                 >
                   {{ 'shop.sale' | translate }}
@@ -883,7 +870,7 @@ interface ShopFilterChip {
                 <button
                   *ngFor="let category of rootCategories"
                   type="button"
-                  class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:hover:bg-slate-800"
+                  class="rounded-full border border-border-muted bg-background px-3 py-1 text-xs font-semibold text-text-strong hover:border-border-strong hover:bg-surface-muted"
                   (click)="quickSelectCategory(category.slug)"
                 >
                   {{ category.name }}
@@ -901,7 +888,7 @@ interface ShopFilterChip {
               class="relative"
               [ngClass]="{
                 'cursor-move': canReorderProducts(),
-                'ring-2 ring-indigo-400 rounded-2xl': dragOverProductId === product.id,
+                'ring-2 ring-accent rounded-2xl': dragOverProductId === product.id,
               }"
               [attr.draggable]="canReorderProducts() ? 'true' : null"
               (dragstart)="onProductDragStart($event, product.id)"
@@ -912,7 +899,7 @@ interface ShopFilterChip {
               <input
                 *ngIf="bulkSelectMode()"
                 type="checkbox"
-                class="absolute left-3 top-3 z-20 h-5 w-5 rounded border-slate-300 bg-white/90 shadow-sm accent-indigo-600 dark:border-slate-600 dark:bg-slate-900/80"
+                class="absolute left-3 top-3 z-20 h-5 w-5 rounded border-border-strong bg-background/90 shadow-sm accent-accent"
                 [checked]="bulkIsSelected(product.id)"
                 [disabled]="bulkSaving()"
                 [attr.aria-label]="'adminUi.products.table.select' | translate"
@@ -934,19 +921,19 @@ interface ShopFilterChip {
 
           <div
             *ngIf="pageMeta"
-            class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-slate-700 dark:text-slate-300"
+            class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm text-text"
           >
             <div class="flex flex-wrap items-center gap-3">
               <div
-                class="inline-flex items-center overflow-hidden rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+                class="inline-flex items-center overflow-hidden rounded-full border border-border-muted bg-background"
               >
                 <button
                   type="button"
                   class="px-3 py-2 text-xs font-semibold transition"
                   [ngClass]="
                     paginationMode === 'pages'
-                      ? 'bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900'
-                      : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'
+                      ? 'bg-surface-inverse text-inverse'
+                      : 'text-text hover:bg-surface-muted'
                   "
                   (click)="setPaginationMode('pages')"
                   [attr.aria-pressed]="paginationMode === 'pages'"
@@ -958,8 +945,8 @@ interface ShopFilterChip {
                   class="px-3 py-2 text-xs font-semibold transition"
                   [ngClass]="
                     paginationMode === 'load_more'
-                      ? 'bg-slate-900 text-white dark:bg-slate-50 dark:text-slate-900'
-                      : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'
+                      ? 'bg-surface-inverse text-inverse'
+                      : 'text-text hover:bg-surface-muted'
                   "
                   (click)="setPaginationMode('load_more')"
                   [attr.aria-pressed]="paginationMode === 'load_more'"
@@ -1009,7 +996,7 @@ interface ShopFilterChip {
             <div *ngIf="paginationMode === 'load_more'" class="flex">
               <button
                 type="button"
-                class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"
+                class="rounded-full border border-border-muted bg-background px-4 py-2 text-sm font-semibold text-text-heading hover:bg-surface-muted disabled:opacity-60 disabled:cursor-not-allowed"
                 [disabled]="loadingMore() || pageMeta.page >= pageMeta.total_pages"
                 (click)="loadMore()"
               >
@@ -1024,19 +1011,19 @@ interface ShopFilterChip {
     </app-container>
 
     <div
-      class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/80 lg:hidden"
+      class="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 backdrop-blur lg:hidden"
     >
       <div class="mx-auto max-w-6xl px-4 sm:px-6 py-3 grid grid-cols-2 gap-3">
         <button
           type="button"
-          class="h-11 w-full rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white"
+          class="h-11 w-full rounded-full bg-surface-inverse text-inverse text-sm font-semibold hover:bg-surface-inverse-hover"
           (click)="scrollToFilters()"
         >
           {{ 'shop.filters' | translate }}
         </button>
         <button
           type="button"
-          class="h-11 w-full rounded-full border border-slate-200 bg-white text-slate-900 text-sm font-semibold hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-50 dark:hover:bg-slate-800"
+          class="h-11 w-full rounded-full border border-border-muted bg-background text-text-heading text-sm font-semibold hover:bg-surface-muted"
           (click)="scrollToSort()"
         >
           {{ 'shop.sort' | translate }}
@@ -1439,8 +1426,8 @@ export class ShopComponent implements OnInit, OnDestroy {
   bulkHasPendingEdits(): boolean {
     return Boolean(
       (this.bulkStatus || '').trim() ||
-        (this.bulkCategoryId || '').trim() ||
-        String(this.bulkFeatured || '').trim(),
+      (this.bulkCategoryId || '').trim() ||
+      String(this.bulkFeatured || '').trim(),
     );
   }
 

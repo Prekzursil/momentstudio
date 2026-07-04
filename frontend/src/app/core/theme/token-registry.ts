@@ -92,17 +92,38 @@ function numericEntry(fallback: string): TokenEntry {
 
 // Closed base-token registry. Fallbacks are the compiled defaults derived from
 // today's styles.css (in the frozen R G B / curated-enum / numeric wire format).
+// Compiled-default fallbacks are the LIGHT values (styles.css :root). The dark
+// reassignment (styles.css :root.dark) is a runtime concern of the token layer,
+// not the admin-value validator — so each registry fallback pins the light shade.
+//
+// P1a WU5 distinct-shade set: a flat one-token-per-role collapses shades that
+// render differently (e.g. base `bg-white` vs `hover:bg-slate-50`). The role +
+// state tokens below keep each core-surface shade distinct (WU0 §1A / §2). A full
+// numeric 50->950 ramp stays DEFERRED (P2); this role+state set covers the core
+// surface actually used — an explicit, reviewed P1a re-scope of WU0 memo §2.
 const BASE_TOKENS = new Map<string, TokenEntry>([
   ['--background', tripletEntry('255 255 255')],
+  ['--background-subtle', tripletEntry('248 250 252')],
   ['--surface', tripletEntry('241 245 249')],
+  ['--surface-muted', tripletEntry('248 250 252')],
+  ['--surface-raised', tripletEntry('226 232 240')],
   ['--surface-inverse', tripletEntry('15 23 42')],
+  ['--surface-inverse-hover', tripletEntry('30 41 59')],
+  ['--field', tripletEntry('255 255 255')],
   ['--text', tripletEntry('51 65 85')],
+  ['--text-secondary', tripletEntry('71 85 105')],
   ['--text-inverse', tripletEntry('255 255 255')],
+  ['--text-onmedia', tripletEntry('255 255 255')],
   ['--text-heading', tripletEntry('15 23 42')],
-  ['--text-strong', tripletEntry('15 23 42')],
+  ['--text-strong', tripletEntry('30 41 59')],
   ['--text-muted', tripletEntry('100 116 139')],
   ['--border', tripletEntry('226 232 240')],
+  ['--border-muted', tripletEntry('226 232 240')],
+  ['--border-strong', tripletEntry('203 213 225')],
+  ['--border-inverse', tripletEntry('15 23 42')],
   ['--accent', tripletEntry('79 70 229')],
+  ['--accent-strong', tripletEntry('55 48 163')],
+  ['--accent-subtle', tripletEntry('238 242 255')],
   ['--overlay', tripletEntry('0 0 0')],
   ['--font-body', fontEntry('Inter, system-ui, -apple-system, sans-serif')],
   ['--font-heading', fontEntry('Cinzel, ui-serif, Georgia, serif')],
