@@ -8,8 +8,9 @@
  * server-resolved theme — mirroring those values onto its OWN host element.
  *
  * `applyToken(name, value)` pushes an IN-PROGRESS edit: it routes the value
- * through the SAME WU2 validator the WU7 service uses (`validateToken`) and then
- * writes the accepted (or compiled-default) value to the SCOPED preview root —
+ * through the SAME strict admin-editable validator the WU7 service uses
+ * (`validateAdminEditable`) and then writes the accepted (or compiled-default)
+ * value to the SCOPED preview root —
  * this component's host element via `setProperty` — and NEVER to the global
  * `:root`. Scoping is deliberate: the storefront tokens cascade only to the
  * preview's own subtree, so the surrounding admin chrome is never repainted, and
@@ -24,7 +25,10 @@
 import { Component, ElementRef, inject } from '@angular/core';
 
 import { ThemeTokensService } from '../../../core/theme/theme-tokens.service';
-import { validateToken, type ValidationResult } from '../../../core/theme/token-validation';
+import {
+  validateAdminEditable,
+  type ValidationResult,
+} from '../../../core/theme/token-validation';
 
 @Component({
   selector: 'app-theme-live-preview',
@@ -153,14 +157,15 @@ export class ThemeLivePreviewComponent {
   }
 
   /**
-   * Push an in-progress token edit into the preview. Validates via the WU2 sink
-   * (identical semantics to WU7's `applyToken`) then applies the accepted value —
-   * or the compiled default for a known key with a bad value — to the SCOPED host
-   * only. An unknown/non-registry name never touches the DOM. Returns the
-   * {@link ValidationResult} so the editor can surface the outcome.
+   * Push an in-progress token edit into the preview. Validates via the strict
+   * admin-editable gate (identical semantics to WU7's `applyToken`) then applies
+   * the accepted value — or the compiled default for a known editable key with a
+   * bad value — to the SCOPED host only. A non-admin-editable / unknown name never
+   * touches the DOM. Returns the {@link ValidationResult} so the editor can
+   * surface the outcome.
    */
   applyToken(name: string, value: string): ValidationResult {
-    const result = validateToken(name, value);
+    const result = validateAdminEditable(name, value);
     if (result.ok || result.value !== '') {
       this.host.nativeElement.style.setProperty(name, result.value);
     }

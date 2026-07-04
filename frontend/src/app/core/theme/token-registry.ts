@@ -101,10 +101,14 @@ function numericEntry(fallback: string): TokenEntry {
 // (--background-subtle, --surface-muted/-raised, --surface-inverse-hover,
 // --field, --text-strong/-secondary/-inverse/-onmedia, --accent-strong/-subtle,
 // --border-muted/-strong/-inverse) are DERIVED from these primaries by
-// `theme-derive.ts` and are DELIBERATELY ABSENT — so `resolveToken` rejects them
-// as an unknown editable key and no admin-supplied draft can set a shade / on
-// -colour to a contrast-failing value. The derived on-colours always contrast
-// their background by construction; primary pairings are gated at publish.
+// `theme-derive.ts` and are DELIBERATELY ABSENT — so `resolveAdminEditable` (the
+// draft-save / publish gate) rejects them as an unknown editable key and no
+// admin-supplied draft can set a shade / on-colour to a contrast-failing value.
+// (`resolveToken`, the broad SSR sink resolver, still accepts the server-emitted
+// ramp for forward-compat; the admin gate is the strict `ADMIN_EDITABLE_NAMES`
+// subset, which additionally exposes the five `--space-*` anchors.) The derived
+// on-colours always contrast their background by construction; primary pairings
+// are gated at publish.
 const BASE_TOKENS = new Map<string, TokenEntry>([
   ['--background', tripletEntry('255 255 255')],
   ['--surface', tripletEntry('241 245 249')],
@@ -131,7 +135,45 @@ const RAMP_FALLBACK: Record<string, string> = {
   border: '226 232 240',
 };
 
-/** Resolve a token NAME to its registry entry, or `undefined` to hard-reject. */
+// The admin-controllable spacing anchors — the CLOSED subset of the `--space-*`
+// family that ships as a P1a admin control (mirrors the normal-tier `space(...)`
+// entries in `token-taxonomy.ts` SEED_TOKENS). The wider `SPACE_RAMP` (`2xs` /
+// `3xs` / `2xl` / `3xl`) is server-emitted only and NOT admin-settable.
+const SPACE_ANCHOR_DEFAULTS: Record<string, string> = {
+  '--space-xs': '0.5rem',
+  '--space-sm': '0.75rem',
+  '--space-md': '1rem',
+  '--space-lg': '1.5rem',
+  '--space-xl': '2rem',
+};
+
+// The CLOSED admin-editable registry — the ONLY names a draft-save / publish may
+// set (`resolveAdminEditable`). A STRICT SUBSET of `resolveToken`: the twelve
+// primary / font / size base tokens PLUS the five spacing anchors. It excludes the
+// numeric colour ramp, the wider `--space-*` ramp, and every derived shade / state
+// token — the guard that closes the white-on-white bypass class. Mirrors
+// `backend/app/services/theme_validation.py::_ADMIN_EDITABLE_TOKENS`.
+const ADMIN_EDITABLE_TOKENS = new Map<string, TokenEntry>([
+  ...BASE_TOKENS,
+  ...Object.entries(SPACE_ANCHOR_DEFAULTS).map(
+    ([name, fallback]): [string, TokenEntry] => [name, numericEntry(fallback)],
+  ),
+]);
+
+/**
+ * The exact admin-settable token-name set (the pinning-test contract). Adding or
+ * removing a key here changes the admin surface and MUST fail the pinning test.
+ */
+export const ADMIN_EDITABLE_NAMES: readonly string[] = [...ADMIN_EDITABLE_TOKENS.keys()];
+
+/**
+ * Resolve a token NAME to its registry entry, or `undefined` to hard-reject.
+ *
+ * The BROAD (sink-acceptable) resolver: accepts base tokens, the server-emitted
+ * numeric colour ramp and the full `--space-*` ramp for forward-compat with the
+ * WU5/WU6 SSR sink (`theme-head` re-validation). NOT the admin gate — use
+ * {@link resolveAdminEditable} for the draft-save / publish path.
+ */
 export function resolveToken(name: string): TokenEntry | undefined {
   if (!TOKEN_NAME_PATTERN.test(name)) {
     return undefined;
@@ -148,4 +190,18 @@ export function resolveToken(name: string): TokenEntry | undefined {
     return numericEntry('1rem');
   }
   return undefined;
+}
+
+/**
+ * Resolve an ADMIN-SETTABLE token NAME (draft-save / publish path), else
+ * `undefined`. STRICT subset of {@link resolveToken}: primaries + fonts + size +
+ * the five spacing anchors ONLY. A numeric colour-ramp step, a wider `--space-*`
+ * ramp step, or any derived shade / state token hard-rejects — an admin can never
+ * set a computed / server-emitted token (the white-on-white bypass fix).
+ */
+export function resolveAdminEditable(name: string): TokenEntry | undefined {
+  if (!TOKEN_NAME_PATTERN.test(name)) {
+    return undefined;
+  }
+  return ADMIN_EDITABLE_TOKENS.get(name);
 }

@@ -15,7 +15,7 @@
  */
 
 import { encodeCssSafe } from './css-safe-encode';
-import { resolveToken } from './token-registry';
+import { resolveAdminEditable, resolveToken, type TokenEntry } from './token-registry';
 
 /** Outcome of validating a token: accepted value, or a compiled default. */
 export interface ValidationResult {
@@ -23,13 +23,8 @@ export interface ValidationResult {
   readonly value: string;
 }
 
-/**
- * Validate a single token. Returns the accepted (CSS-safe) value on success, or
- * a compiled default on failure — a per-token fallback for a known key with a
- * bad value, or an empty string for an unknown/invalid name (never emitted).
- */
-export function validateToken(name: string, value: string): ValidationResult {
-  const entry = resolveToken(name);
+/** Shared decode-first CSS-safe encode + per-type validation over a resolved entry. */
+function validateEntry(entry: TokenEntry | undefined, value: string): ValidationResult {
   if (!entry) {
     return { ok: false, value: '' };
   }
@@ -41,4 +36,26 @@ export function validateToken(name: string, value: string): ValidationResult {
     return { ok: false, value: entry.fallback };
   }
   return { ok: true, value: encoded.value };
+}
+
+/**
+ * Validate a single token against the BROAD (sink) registry. Returns the accepted
+ * (CSS-safe) value on success, or a compiled default on failure — a per-token
+ * fallback for a known key with a bad value, or an empty string for an
+ * unknown/invalid name (never emitted). Accepts the server-emitted ramp names —
+ * this is the SSR-sink re-validation, NOT the admin gate.
+ */
+export function validateToken(name: string, value: string): ValidationResult {
+  return validateEntry(resolveToken(name), value);
+}
+
+/**
+ * Validate a single token against the STRICT admin-editable registry — the
+ * client mirror of the backend draft-save / publish gate. Accepts ONLY the
+ * primaries + fonts + size + spacing anchors; the numeric colour ramp, the wider
+ * `--space-*` ramp and every derived shade / state token hard-reject (`ok:false`,
+ * empty value), so an admin edit surface can never set a computed token.
+ */
+export function validateAdminEditable(name: string, value: string): ValidationResult {
+  return validateEntry(resolveAdminEditable(name), value);
 }

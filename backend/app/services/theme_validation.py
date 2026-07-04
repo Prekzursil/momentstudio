@@ -189,11 +189,14 @@ def _numeric_entry(fallback: str) -> TokenEntry:
 # COLOUR SPLIT (the fix for the white-on-white bypass class): ONLY the NINE
 # primary colour tokens are editable. The fourteen shade / state tokens are
 # DERIVED from these primaries by ``theme_derive.py`` and are DELIBERATELY ABSENT
-# here — so ``resolve_token`` rejects them as an unknown editable key and a
-# draft-save that tries to set a shade / on-colour hard-rejects to a compiled
-# default (the client-visible 422 path). Derived on-colours always contrast their
-# background by construction; primary pairings are gated at publish
-# (``theme_contrast.py``).
+# here — so ``resolve_admin_editable`` (the draft-save / publish gate) rejects them
+# as an unknown editable key and a draft-save that tries to set a shade / on-colour
+# hard-rejects (the client-visible 422 path). NB: ``resolve_token`` (the broad SSR
+# sink resolver) still accepts the server-emitted ramp for forward-compat — the
+# admin gate is the strict :data:`ADMIN_EDITABLE_NAMES` subset, NOT this base map
+# alone (the admin surface additionally exposes the five ``--space-*`` anchors).
+# Derived on-colours always contrast their background by construction; primary
+# pairings are gated at publish (``theme_contrast.py``).
 _BASE_TOKENS: dict[str, TokenEntry] = {
     "--background": _triplet_entry("255 255 255"),
     "--surface": _triplet_entry("241 245 249"),
@@ -222,9 +225,45 @@ _RAMP_FALLBACK: dict[str, str] = {
     "border": "226 232 240",
 }
 
+# The admin-controllable spacing anchors — the CLOSED subset of the ``--space-*``
+# family that ships as a P1a admin control (mirrors the normal-tier ``space(...)``
+# entries in ``token-taxonomy.ts`` SEED_TOKENS). The WIDER ``_SPACE_RAMP`` (the
+# ``2xs`` / ``3xs`` / ``2xl`` / ``3xl`` steps) is server-emitted only and is
+# DELIBERATELY not admin-settable. Fallbacks mirror the taxonomy compiled defaults.
+_SPACE_ANCHOR_DEFAULTS: dict[str, str] = {
+    "--space-xs": "0.5rem",
+    "--space-sm": "0.75rem",
+    "--space-md": "1rem",
+    "--space-lg": "1.5rem",
+    "--space-xl": "2rem",
+}
+
+# The CLOSED admin-editable registry — the ONLY names a draft-save / publish may
+# set (``resolve_admin_editable`` / ``validate_admin_editable``). It is a STRICT
+# SUBSET of ``resolve_token``: the twelve primary / font / size base tokens PLUS
+# the five spacing anchors. It DELIBERATELY excludes the numeric colour ramp
+# (``--background-50`` ...), the wider ``--space-*`` ramp, and every derived shade
+# / state token — those are computed (``theme_derive``) or server-emitted, so an
+# admin has no key to set them. THIS is the guard that closes the white-on-white
+# bypass class end-to-end (a numeric ramp step reaching the published ``:root``).
+_ADMIN_EDITABLE_TOKENS: dict[str, TokenEntry] = {
+    **_BASE_TOKENS,
+    **{name: _numeric_entry(default) for name, default in _SPACE_ANCHOR_DEFAULTS.items()},
+}
+
+#: The exact admin-settable token-name set (the pinning-test contract). Adding or
+#: removing a key here changes the admin surface and MUST fail the pinning test.
+ADMIN_EDITABLE_NAMES: frozenset[str] = frozenset(_ADMIN_EDITABLE_TOKENS)
+
 
 def resolve_token(name: str) -> TokenEntry | None:
-    """Resolve a token NAME to its registry entry, or None to hard-reject it."""
+    """Resolve a token NAME to its registry entry, or None to hard-reject it.
+
+    The BROAD (sink-acceptable) resolver: accepts base tokens, the server-emitted
+    numeric colour ramp and the full ``--space-*`` ramp for forward-compat with
+    the WU5/WU6 SSR sink (``theme-head`` re-validation). It is NOT the admin gate
+    — use :func:`resolve_admin_editable` for the draft-save / publish path.
+    """
     if not TOKEN_NAME_PATTERN.match(name):
         return None
     base = _BASE_TOKENS.get(name)
@@ -238,9 +277,21 @@ def resolve_token(name: str) -> TokenEntry | None:
     return None
 
 
-def validate_token(name: str, value: str) -> ValidationResult:
-    """Validate ``name``/``value`` -> accepted value, or a compiled default."""
-    entry = resolve_token(name)
+def resolve_admin_editable(name: str) -> TokenEntry | None:
+    """Resolve an ADMIN-SETTABLE token NAME (draft-save / publish path), else None.
+
+    STRICT subset of :func:`resolve_token`: primaries + fonts + size + the five
+    spacing anchors ONLY. A numeric colour-ramp step, a wider ``--space-*`` ramp
+    step, or any derived shade / state token resolves to ``None`` and hard-rejects
+    — the admin can never set a computed / server-emitted token (bypass-class fix).
+    """
+    if not TOKEN_NAME_PATTERN.match(name):
+        return None
+    return _ADMIN_EDITABLE_TOKENS.get(name)
+
+
+def _validate_entry(entry: TokenEntry | None, value: str) -> ValidationResult:
+    """Run the shared decode-first CSS-safe encode + per-type value validation."""
     if entry is None:
         return ValidationResult(False, "")
     encoded = encode_css_safe(value, entry.allow_url)
@@ -249,3 +300,22 @@ def validate_token(name: str, value: str) -> ValidationResult:
     if not entry.validate(encoded.value):
         return ValidationResult(False, entry.fallback)
     return ValidationResult(True, encoded.value)
+
+
+def validate_token(name: str, value: str) -> ValidationResult:
+    """Validate ``name``/``value`` against the BROAD (sink) registry.
+
+    Used by the SSR sink re-validation (``theme-head`` mirror) — accepts the
+    server-emitted ramp names. NOT the admin gate: see :func:`validate_admin_editable`.
+    """
+    return _validate_entry(resolve_token(name), value)
+
+
+def validate_admin_editable(name: str, value: str) -> ValidationResult:
+    """Validate ``name``/``value`` against the STRICT admin-editable registry.
+
+    The draft-save / publish gate: accepts ONLY the primaries + fonts + size +
+    spacing anchors; the numeric ramp, wider spacing ramp and every derived token
+    hard-reject (``ok=False``), so an admin can never persist a computed value.
+    """
+    return _validate_entry(resolve_admin_editable(name), value)

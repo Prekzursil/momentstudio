@@ -8,11 +8,13 @@
  * the server is the single source of truth and its already-rendered `:root` is
  * the hydration source, so SSR and client agree with no FOUC.
  *
- * `applyToken(name, value)` routes EVERY change through the WU2 validator
- * (`validateToken`) BEFORE it reaches `element.style.setProperty`, so a tainted
- * or corpus-invalid value can never be written to the DOM: a valid value is
- * applied verbatim, a known key with a bad value falls back to its compiled
- * default, and an unknown/non-registry name is dropped without touching the DOM.
+ * `applyToken(name, value)` routes EVERY change through the STRICT admin-editable
+ * validator (`validateAdminEditable`) BEFORE it reaches `element.style.setProperty`,
+ * so a tainted, corpus-invalid, or non-admin-settable value (a derived shade, a
+ * numeric ramp step, a wider `--space-*` step) can never be written to the DOM: a
+ * valid editable value is applied verbatim, a known editable key with a bad value
+ * falls back to its compiled default, and any non-admin-editable / unknown name is
+ * dropped without touching the DOM.
  *
  * Colours/typography/spacing live here; the light/dark class toggle stays in
  * `theme.service.ts`. SSR-safe throughout: every DOM access is guarded by
@@ -22,7 +24,7 @@
 import { Injectable, Signal, signal } from '@angular/core';
 import { deriveColorTokens, PRIMARY_COLOR_NAMES } from './theme-derive';
 import { SEED_TOKENS } from './token-taxonomy';
-import { validateToken, type ValidationResult } from './token-validation';
+import { validateAdminEditable, type ValidationResult } from './token-validation';
 
 @Injectable({ providedIn: 'root' })
 export class ThemeTokensService {
@@ -44,14 +46,15 @@ export class ThemeTokensService {
   }
 
   /**
-   * Validate `value` for `name` through the WU2 sink, then apply the result to
-   * `:root`. On success the accepted value is written; on a known key with an
-   * invalid value the compiled default is written instead; an unknown name never
-   * touches the DOM. The tainted input value is NEVER passed to `setProperty`.
-   * Returns the {@link ValidationResult} so callers can surface the outcome.
+   * Validate `value` for `name` through the STRICT admin-editable gate, then apply
+   * the result to `:root`. On success the accepted value is written; on a known
+   * editable key with an invalid value the compiled default is written instead; a
+   * non-admin-editable / unknown name never touches the DOM. The tainted input
+   * value is NEVER passed to `setProperty`. Returns the {@link ValidationResult}
+   * so callers can surface the outcome.
    */
   applyToken(name: string, value: string): ValidationResult {
-    const result = validateToken(name, value);
+    const result = validateAdminEditable(name, value);
     const committed = result.ok || result.value !== '';
     if (committed) {
       this.commit(name, result.value);

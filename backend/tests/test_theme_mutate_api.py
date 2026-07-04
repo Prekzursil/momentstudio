@@ -310,6 +310,48 @@ def test_save_draft_rejects_derived_token_key(
     assert derived_key in resp.json()["detail"]["invalid"]
 
 
+@pytest.mark.parametrize(
+    "ramp_key,value",
+    [
+        ("--background-50", "255 255 255"),  # numeric colour ramp step
+        ("--surface-800", "30 41 59"),  # numeric colour ramp step
+        ("--space-2xl", "3rem"),  # wider spacing ramp (not an admin anchor)
+    ],
+)
+def test_save_draft_rejects_server_emitted_ramp_key(
+    seeded_app: Dict[str, object], ramp_key: str, value: str
+) -> None:
+    client: TestClient = seeded_app["client"]  # type: ignore[assignment]
+    factory = seeded_app["session_factory"]
+    token = _create_admin_token(factory)
+    # A server-emitted ramp name is sink-acceptable (SSR forward-compat) but is
+    # NOT admin-settable: draft-save must 422 so a white-on-white numeric ramp
+    # step can never reach the published :root (the LATENT bypass vector).
+    resp = client.put(
+        "/api/v1/theme/draft",
+        json={"tokens": {**_primaries(), ramp_key: value}},
+        headers=_auth_headers(token),
+    )
+    assert resp.status_code == 422, resp.text
+    assert ramp_key in resp.json()["detail"]["invalid"]
+
+
+def test_save_draft_accepts_editable_spacing_anchor(
+    seeded_app: Dict[str, object],
+) -> None:
+    client: TestClient = seeded_app["client"]  # type: ignore[assignment]
+    factory = seeded_app["session_factory"]
+    token = _create_admin_token(factory)
+    # The five --space-* anchors ARE admin-controllable and must still save.
+    resp = client.put(
+        "/api/v1/theme/draft",
+        json={"tokens": {**_primaries(), "--space-md": "1.25rem"}},
+        headers=_auth_headers(token),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["tokens"]["--space-md"] == "1.25rem"
+
+
 def test_save_draft_rejects_unknown_and_malicious_keys(
     seeded_app: Dict[str, object],
 ) -> None:

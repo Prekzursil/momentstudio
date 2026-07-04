@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from app.services.theme_validation import (
+    ADMIN_EDITABLE_NAMES,
     decode_css_escapes,
     encode_css_safe,
     is_allowed_url,
@@ -25,7 +26,9 @@ from app.services.theme_validation import (
     is_color_triplet,
     is_font_family,
     is_numeric_length,
+    resolve_admin_editable,
     resolve_token,
+    validate_admin_editable,
     validate_token,
 )
 
@@ -68,13 +71,106 @@ def test_known_name_bad_value_falls_back_to_compiled_default() -> None:
 
 
 def test_resolve_token_paths() -> None:
+    # The BROAD (sink-acceptable) resolver still accepts the server-emitted ramp
+    # — the SSR sink re-validation keeps forward-compat with WU5/WU6.
     assert resolve_token("--bad name") is None  # name regex reject
     assert resolve_token("--background") is not None  # base token
-    ramp = resolve_token("--surface-300")  # color ramp
+    ramp = resolve_token("--surface-300")  # color ramp (sink-acceptable)
     assert ramp is not None and ramp.validate is is_color_triplet
-    space = resolve_token("--space-xl")  # spacing ramp
+    space = resolve_token("--space-xl")  # spacing ramp (sink-acceptable)
     assert space is not None and space.validate is is_numeric_length
     assert resolve_token("--text-42") is None  # ramp shade not in enum
+
+
+def test_resolve_admin_editable_split() -> None:
+    # The STRICT admin gate accepts ONLY primaries + fonts + size + the five
+    # spacing anchors; the numeric colour ramp, the wider --space-* ramp, and
+    # every derived shade / state token are sink-acceptable but NOT admin-settable.
+    assert resolve_admin_editable("--bad name") is None  # name regex reject
+    primary = resolve_admin_editable("--background")  # primary colour
+    assert primary is not None and primary.validate is is_color_triplet
+    font = resolve_admin_editable("--font-body")
+    assert font is not None and font.validate is is_font_family
+    anchor = resolve_admin_editable("--space-md")  # admin-controllable anchor
+    assert anchor is not None and anchor.validate is is_numeric_length
+    # Sink-acceptable but rejected by the admin gate:
+    assert resolve_token("--surface-300") is not None  # sink says yes
+    assert resolve_admin_editable("--surface-300") is None  # admin says no (ramp)
+    assert resolve_token("--space-2xl") is not None  # sink says yes
+    assert resolve_admin_editable("--space-2xl") is None  # admin says no (ramp)
+    assert resolve_admin_editable("--surface-muted") is None  # derived shade
+    assert resolve_admin_editable("--surface-inverse-hover") is None  # derived state
+
+
+def test_admin_editable_names_is_the_exact_pinned_set() -> None:
+    # PINNING guard: the admin-settable key set is EXACTLY this list. Adding or
+    # removing a control (widening the bypass surface, or dropping a real control)
+    # must fail here. It is the guard that would have caught the ramp bypass.
+    assert ADMIN_EDITABLE_NAMES == frozenset(
+        {
+            # 9 primary colours
+            "--background",
+            "--surface",
+            "--surface-inverse",
+            "--text",
+            "--text-heading",
+            "--text-muted",
+            "--border",
+            "--accent",
+            "--overlay",
+            # 3 font / size
+            "--font-body",
+            "--font-heading",
+            "--font-size-base",
+            # 5 spacing anchors (NOT the wider --space-* ramp)
+            "--space-xs",
+            "--space-sm",
+            "--space-md",
+            "--space-lg",
+            "--space-xl",
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("--background-50", "255 255 255"),  # numeric colour ramp step
+        ("--surface-800", "30 41 59"),  # numeric colour ramp step
+        ("--space-2xl", "3rem"),  # wider spacing ramp (not an anchor)
+        ("--surface-muted", "248 250 252"),  # derived shade
+        ("--surface-inverse-hover", "255 255 255"),  # derived state (bypass class)
+        ("--text-inverse", "255 255 255"),  # derived on-colour
+        ("--not-a-token", "1 2 3"),  # unknown
+    ],
+)
+def test_validate_admin_editable_rejects_non_admin_keys(name: str, value: str) -> None:
+    # The vector: each of these is accepted by the BROAD sink validator but MUST
+    # be rejected by the admin draft-save / publish gate.
+    assert validate_admin_editable(name, value).ok is False
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("--background", "255 255 255"),  # primary colour
+        ("--font-heading", "Cinzel, ui-serif, Georgia, serif"),  # font enum
+        ("--font-size-base", "1rem"),  # size
+        ("--space-lg", "1.5rem"),  # spacing anchor
+    ],
+)
+def test_validate_admin_editable_accepts_editable_keys(name: str, value: str) -> None:
+    result = validate_admin_editable(name, value)
+    assert result.ok is True
+    assert result.value == value
+
+
+def test_validate_admin_editable_known_key_bad_value_falls_back() -> None:
+    # A known editable key with an invalid value degrades to its compiled default
+    # (the fallback branch), never emitting the tainted input.
+    result = validate_admin_editable("--space-md", "16")  # missing unit
+    assert result.ok is False
+    assert result.value == resolve_admin_editable("--space-md").fallback
 
 
 def test_color_triplet_validator() -> None:

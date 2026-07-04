@@ -25,7 +25,7 @@ from app.models.theme import Theme, ThemeStatus, ThemeVersion
 from app.services import audit_chain as audit_chain_service
 from app.services import theme_contrast
 from app.services.theme_derive import derive_tokens
-from app.services.theme_validation import validate_token
+from app.services.theme_validation import validate_admin_editable
 
 logger = logging.getLogger("app.services.theme")
 
@@ -287,9 +287,13 @@ def _revalidate_tokens(tokens: dict[str, str]) -> dict[str, str]:
     """Server-side WU2 revalidation — never trust the client.
 
     Returns the accepted editable token map, or raises 413 (oversized) / 422 (any
-    token failing the closed name registry / per-type value allowlist / CSS-safe
-    encoder). A DERIVED key (shade / on-colour) is absent from the registry, so it
-    lands in ``invalid`` and forces a 422 — an admin can never persist one.
+    token failing the STRICT admin-editable name registry / per-type value
+    allowlist / CSS-safe encoder). The gate is ``validate_admin_editable`` — the
+    admin-settable subset (primaries + fonts + size + the five ``--space-*``
+    anchors) — NOT the broad sink resolver. So a DERIVED shade / on-colour, a
+    numeric colour-ramp step (``--background-50``) or a wider spacing-ramp step
+    (``--space-2xl``) is absent from the admin registry, lands in ``invalid`` and
+    forces a 422 — an admin can never persist one (the white-on-white bypass fix).
     """
     if len(tokens) > MAX_TOKEN_COUNT:
         raise HTTPException(
@@ -304,7 +308,7 @@ def _revalidate_tokens(tokens: dict[str, str]) -> dict[str, str]:
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail=f"Token value too long (max {MAX_TOKEN_VALUE_LENGTH})",
             )
-        result = validate_token(name, value)
+        result = validate_admin_editable(name, value)
         if not result.ok:
             invalid.append(name)
         else:
