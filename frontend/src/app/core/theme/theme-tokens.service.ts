@@ -74,9 +74,7 @@ export class ThemeTokensService {
    * (`document` undefined) it is a no-op and the map stays empty.
    */
   private hydrateFromRoot(): void {
-    if (typeof document === 'undefined') {
-      return;
-    }
+    if (typeof document === 'undefined') return;
     const computed = getComputedStyle(document.documentElement);
     const next = new Map<string, string>();
     for (const token of SEED_TOKENS) {
