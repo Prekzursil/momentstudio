@@ -4,6 +4,8 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import bootstrap from './main.server';
+import { applyThemeSsr } from './server/theme-head';
+import { defaultFetchDeps, getThemeTokens, readThemeConfig } from './server/theme-source';
 
 // The Express app is exported so that it can be reused by tests/other runtimes.
 export function app(): express.Express {
@@ -37,7 +39,16 @@ export function app(): express.Express {
         publicPath: distFolder,
         providers: [{ provide: APP_BASE_HREF, useValue: baseUrl }],
       })
-      .then((html) => res.send(html))
+      // WU6: resolve the published theme express-side (never via Angular
+      // HttpClient, so it never enters TransferState) and inject the hash-pinned
+      // head <style> + report-only CSP. A backend blip / kill-switch degrades to
+      // compiled defaults inside applyThemeSsr — never a 500, never unstyled.
+      .then(async (html) => {
+        const doc = await getThemeTokens(readThemeConfig(), defaultFetchDeps());
+        const themed = await applyThemeSsr(html, doc);
+        res.setHeader('Content-Security-Policy-Report-Only', themed.cspHeader);
+        res.send(themed.html);
+      })
       .catch((err) => next(err));
   });
 
