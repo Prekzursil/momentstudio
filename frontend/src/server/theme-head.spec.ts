@@ -1,3 +1,4 @@
+import { deriveTokens, DERIVED_COLOR_NAMES } from '../app/core/theme/theme-derive';
 import {
   COMPILED_DEFAULT_TOKENS,
   STYLE_ELEMENT_ID,
@@ -49,14 +50,48 @@ describe('COMPILED_DEFAULT_TOKENS', () => {
 });
 
 describe('resolveThemeTokens', () => {
-  it('returns the pure compiled defaults for a null doc (backend blip / kill-switch)', () => {
+  it('returns the DERIVED compiled defaults for a null doc (backend blip / kill-switch)', () => {
     const resolved = resolveThemeTokens(null);
-    expect(resolved).toEqual({ ...COMPILED_DEFAULT_TOKENS });
+    // The primaries are the compiled defaults, plus every derived shade / state
+    // token computed from them (never unstyled, never partial).
+    expect(resolved).toEqual(deriveTokens({ ...COMPILED_DEFAULT_TOKENS }));
+    for (const name of DERIVED_COLOR_NAMES) {
+      expect(resolved[name]).withContext(`${name} must be derived + emitted`).toBeDefined();
+    }
   });
 
   it('overlays a valid doc value over the default', () => {
     const resolved = resolveThemeTokens({ '--background': '10 20 30' });
     expect(resolved['--background']).toBe('10 20 30');
+  });
+
+  it('THE BYPASS IS DEAD: a doc that sets a DERIVED token is ignored + recomputed', () => {
+    // The old white-on-white bypass: publish a doc setting --surface-inverse-hover
+    // (or --background-subtle) to a contrast-failing value. It is no longer an
+    // editable key, so validateToken drops it and deriveTokens recomputes it from
+    // the primaries — the injected value can never reach the emitted :root.
+    const resolved = resolveThemeTokens({
+      '--surface-inverse-hover': '255 255 255',
+      '--background-subtle': '255 255 255',
+      '--text-inverse': '255 255 255',
+    });
+    const clean = deriveTokens({ ...COMPILED_DEFAULT_TOKENS });
+    expect(resolved['--surface-inverse-hover']).toBe(clean['--surface-inverse-hover']);
+    expect(resolved['--surface-inverse-hover']).not.toBe('255 255 255');
+    expect(resolved['--background-subtle']).toBe(clean['--background-subtle']);
+    expect(resolved['--text-inverse']).toBe(clean['--text-inverse']);
+  });
+
+  it('recomputes every derived token from an overridden primary', () => {
+    // Changing the --surface-inverse primary re-derives its on-colour + hover, so
+    // --text-inverse always contrasts the new inverse surface by construction.
+    const resolved = resolveThemeTokens({ '--surface-inverse': '250 250 250' });
+    const expected = deriveTokens({
+      ...COMPILED_DEFAULT_TOKENS,
+      '--surface-inverse': '250 250 250',
+    });
+    expect(resolved['--text-inverse']).toBe(expected['--text-inverse']);
+    expect(resolved['--text-inverse']).toBe('0 0 0'); // black on a near-white inverse
   });
 
   it('keeps the default when a known token carries an invalid value', () => {

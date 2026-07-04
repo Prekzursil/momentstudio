@@ -16,6 +16,7 @@
  * head-injection precedent (`index.html` head hooks).
  */
 
+import { deriveTokens } from '../app/core/theme/theme-derive';
 import { SEED_TOKENS } from '../app/core/theme/token-taxonomy';
 import { validateToken } from '../app/core/theme/token-validation';
 import type { ThemeTokenDoc } from './theme-source';
@@ -34,24 +35,27 @@ export const COMPILED_DEFAULT_TOKENS: Readonly<Record<string, string>> = Object.
 );
 
 /**
- * Resolve a raw doc into the safe token map to emit: start from the compiled
- * defaults, then overlay ONLY doc values that independently pass WU2 validation
- * (`validateToken`). A known token with a bad value keeps its default; an
- * unknown/rejected name is dropped; a valid server-emitted ramp name is added.
- * `null` (backend failure / kill-switch) -> the pure compiled-default map.
+ * Resolve a raw doc into the safe token map to emit. Start from the compiled
+ * defaults (primaries + fonts + spacing), overlay ONLY doc values that pass WU2
+ * validation — which now covers ONLY the editable PRIMARY keys, so a doc that
+ * carries a derived shade / on-colour has it DROPPED here — then recompute every
+ * derived token from the resolved primaries via `deriveTokens`. This is what
+ * kills the bypass class: the emitted `:root` always gets its shade / state
+ * tokens from the derivation, never from admin input, so a contrast-failing
+ * `--surface-inverse-hover` / `--background-subtle` / white on-colour cannot be
+ * injected. `null` (backend failure / kill-switch) -> derived compiled defaults.
  */
 export function resolveThemeTokens(doc: ThemeTokenDoc | null): Record<string, string> {
-  const out: Record<string, string> = { ...COMPILED_DEFAULT_TOKENS };
-  if (doc === null) {
-    return out;
-  }
-  for (const [name, value] of Object.entries(doc)) {
-    const result = validateToken(name, value);
-    if (result.ok) {
-      out[name] = result.value;
+  const editable: Record<string, string> = { ...COMPILED_DEFAULT_TOKENS };
+  if (doc !== null) {
+    for (const [name, value] of Object.entries(doc)) {
+      const result = validateToken(name, value);
+      if (result.ok) {
+        editable[name] = result.value;
+      }
     }
   }
-  return out;
+  return deriveTokens(editable);
 }
 
 /**

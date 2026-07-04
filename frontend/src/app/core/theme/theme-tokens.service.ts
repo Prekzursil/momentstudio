@@ -20,6 +20,7 @@
  */
 
 import { Injectable, Signal, signal } from '@angular/core';
+import { deriveColorTokens, PRIMARY_COLOR_NAMES } from './theme-derive';
 import { SEED_TOKENS } from './token-taxonomy';
 import { validateToken, type ValidationResult } from './token-validation';
 
@@ -51,10 +52,36 @@ export class ThemeTokensService {
    */
   applyToken(name: string, value: string): ValidationResult {
     const result = validateToken(name, value);
-    if (result.ok || result.value !== '') {
+    const committed = result.ok || result.value !== '';
+    if (committed) {
       this.commit(name, result.value);
     }
+    if (committed && PRIMARY_COLOR_NAMES.includes(name)) {
+      this.applyDerived();
+    }
     return result;
+  }
+
+  /**
+   * Recompute the fourteen derived shade / state tokens from the CURRENT primary
+   * values and apply them to `:root`, so the live preview repaints every derived
+   * surface (and every on-colour re-contrasts) the instant a primary changes.
+   * Derived tokens are never accepted from input — always computed here.
+   */
+  private applyDerived(): void {
+    const current = this.tokensSignal();
+    const primaries: Record<string, string> = {};
+    for (const name of PRIMARY_COLOR_NAMES) {
+      const value = current.get(name);
+      if (value !== undefined) primaries[name] = value;
+    }
+    const derived = deriveColorTokens(primaries);
+    const next = new Map(current);
+    for (const [name, value] of Object.entries(derived)) {
+      next.set(name, value);
+      if (typeof document !== 'undefined') document.documentElement.style.setProperty(name, value);
+    }
+    this.tokensSignal.set(next);
   }
 
   /** Record a resolved value in the map (immutably) and write it to `:root`. */

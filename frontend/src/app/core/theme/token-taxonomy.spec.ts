@@ -1,3 +1,8 @@
+import {
+  deriveColorTokens,
+  DERIVED_COLOR_NAMES,
+  PRIMARY_COLOR_NAMES,
+} from './theme-derive';
 import { isColorTriplet, resolveToken } from './token-registry';
 import {
   ARCHETYPES,
@@ -89,11 +94,10 @@ describe('SEED_TOKENS', () => {
 });
 
 describe('STATE_TOKENS (P1a WU5 distinct role + state shades)', () => {
-  it('every token resolves in the registry with a valid triplet for both light + dark', () => {
+  const stateNames = new Set(STATE_TOKENS.map((t) => t.name));
+
+  it('every token carries a valid `R G B` triplet for both light + dark', () => {
     for (const token of STATE_TOKENS) {
-      expect(resolveToken(token.name))
-        .withContext(`${token.name} must be a registry member`)
-        .toBeTruthy();
       expect(isColorTriplet(token.light))
         .withContext(`${token.name} light '${token.light}'`)
         .toBe(true);
@@ -103,11 +107,47 @@ describe('STATE_TOKENS (P1a WU5 distinct role + state shades)', () => {
     }
   });
 
-  it('pins each light default to the registry (light) fallback', () => {
+  it('pins each PRIMARY light default to the editable registry fallback', () => {
     for (const token of STATE_TOKENS) {
-      expect(resolveToken(token.name)?.fallback)
-        .withContext(`${token.name} light must equal the registry fallback`)
-        .toBe(token.light);
+      if (PRIMARY_COLOR_NAMES.includes(token.name)) {
+        expect(resolveToken(token.name)?.fallback)
+          .withContext(`${token.name} light must equal the registry fallback`)
+          .toBe(token.light);
+      }
+    }
+  });
+
+  it('THE BYPASS FIX: every DERIVED token is ABSENT from the editable registry', () => {
+    // A derived shade / on-colour is computed, never admin-settable — so
+    // resolveToken rejects its name and no draft-save can set it.
+    for (const name of DERIVED_COLOR_NAMES) {
+      expect(resolveToken(name))
+        .withContext(`${name} must NOT be an editable registry key`)
+        .toBeUndefined();
+      expect(stateNames.has(name))
+        .withContext(`${name} must still be documented in STATE_TOKENS`)
+        .toBe(true);
+    }
+  });
+
+  it('derived light defaults REPRODUCE styles.css :root via deriveColorTokens (<= 6/255)', () => {
+    // The compiled-default derivation reproduces today's hand-authored light
+    // values within a small tolerance — proving no visual regression.
+    const primaries: Record<string, string> = {};
+    for (const token of STATE_TOKENS) {
+      if (PRIMARY_COLOR_NAMES.includes(token.name)) primaries[token.name] = token.light;
+    }
+    const derived = deriveColorTokens(primaries);
+    for (const name of DERIVED_COLOR_NAMES) {
+      const got = derived[name].split(' ').map(Number);
+      const want = (STATE_TOKENS.find((t) => t.name === name) as { light: string }).light
+        .split(' ')
+        .map(Number);
+      for (let i = 0; i < 3; i += 1) {
+        expect(Math.abs(got[i] - want[i]))
+          .withContext(`${name} channel ${i}: derived ${derived[name]} vs styles.css`)
+          .toBeLessThanOrEqual(6);
+      }
     }
   });
 

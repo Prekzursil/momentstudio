@@ -38,6 +38,6 @@ describe('validateToken (fallback behaviour)', () => {
     const entry = resolveToken('--text');
     const result = validateToken('--text', '300 0 0');
     expect(result.ok).toBe(false);
-    expect(result.value).toBe(entry?.fallback);
+    expect(entry?.fallback).toBe(result.value);
   });
 });

@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.db.session import SessionLocal
 from app.models.theme import Theme, ThemeStatus, ThemeVersion
+from app.services.theme_derive import derive_tokens
 
 logger = logging.getLogger("app.services.theme")
 
@@ -144,8 +145,11 @@ class ResolvedTheme:
 
 
 def _resolved_from_theme(theme: Theme) -> ResolvedTheme:
+    # The stored document is the SOURCE-OF-TRUTH primaries (+ fonts / spacing);
+    # the fourteen shade / state tokens are recomputed on read via ``derive_tokens``
+    # so every consumer sees the full effective, contrast-safe token set.
     return ResolvedTheme(
-        tokens=dict(theme.tokens),
+        tokens=derive_tokens(dict(theme.tokens)),
         version=theme.version,
         schema_version=theme.schema_version,
         status=theme.status,
@@ -156,7 +160,7 @@ def _resolved_from_theme(theme: Theme) -> ResolvedTheme:
 
 def _resolved_from_version(snapshot: ThemeVersion) -> ResolvedTheme:
     return ResolvedTheme(
-        tokens=dict(snapshot.tokens),
+        tokens=derive_tokens(dict(snapshot.tokens)),
         version=snapshot.version,
         schema_version=snapshot.schema_version,
         status=snapshot.status,

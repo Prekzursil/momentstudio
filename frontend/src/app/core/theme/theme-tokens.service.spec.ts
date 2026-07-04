@@ -1,12 +1,16 @@
+import { DERIVED_COLOR_NAMES } from './theme-derive';
 import { SEED_TOKENS } from './token-taxonomy';
 import { ThemeTokensService } from './theme-tokens.service';
 
 const ROOT = document.documentElement;
 
-/** Remove every seed token property this suite may have written to `:root`. */
+/** Remove every seed + derived token property this suite may have written. */
 function clearSeedTokens(): void {
   for (const token of SEED_TOKENS) {
     ROOT.style.removeProperty(token.name);
+  }
+  for (const name of DERIVED_COLOR_NAMES) {
+    ROOT.style.removeProperty(name);
   }
   ROOT.style.removeProperty('--totally-unknown');
 }
@@ -80,5 +84,33 @@ describe('ThemeTokensService', () => {
     const service = new ThemeTokensService();
     const map = service.tokens()();
     expect(map.get('--text')).toBe('7 8 9');
+  });
+
+  it('recomputes derived on-colours when a primary changes (live preview)', () => {
+    const service = new ThemeTokensService();
+    // Drive --surface-inverse near-white: the derived --text-inverse must flip to
+    // black to keep contrast — the admin never sets --text-inverse directly.
+    service.applyToken('--surface-inverse', '250 250 250');
+    expect(service.getToken('--text-inverse')).toBe('0 0 0');
+    expect(ROOT.style.getPropertyValue('--text-inverse')).toBe('0 0 0');
+    // And a dark inverse surface -> white on-colour.
+    service.applyToken('--surface-inverse', '15 23 42');
+    expect(service.getToken('--text-inverse')).toBe('255 255 255');
+  });
+
+  it('rejects a DERIVED token name — it is not an editable key', () => {
+    const service = new ThemeTokensService();
+    const spy = spyOn(ROOT.style, 'setProperty').and.callThrough();
+    const result = service.applyToken('--surface-inverse-hover', '255 255 255');
+    expect(result.ok).toBeFalse();
+    expect(result.value).toBe('');
+    expect(spy).not.toHaveBeenCalledWith('--surface-inverse-hover', '255 255 255');
+  });
+
+  it('applies a non-colour editable token without triggering derivation', () => {
+    const service = new ThemeTokensService();
+    const result = service.applyToken('--font-body', 'system-ui, sans-serif');
+    expect(result.ok).toBeTrue();
+    expect(ROOT.style.getPropertyValue('--font-body')).toBe('system-ui, sans-serif');
   });
 });

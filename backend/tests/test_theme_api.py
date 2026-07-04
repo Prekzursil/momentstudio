@@ -24,6 +24,7 @@ from app.models.theme import Theme, ThemeStatus, ThemeVersion
 from app.models.user import UserRole
 from app.schemas.user import UserCreate
 from app.services.auth import create_user, issue_tokens_for_user
+from app.services.theme_derive import derive_tokens
 from app.services.theme_service import (
     DEFAULT_SCHEMA_VERSION,
     default_theme_tokens,
@@ -167,7 +168,9 @@ def test_get_published_theme_is_public(seeded_app: Dict[str, object]) -> None:
     assert body["schema_version"] == DEFAULT_SCHEMA_VERSION
     assert body["status"] == "published"
     assert body["tokens"]["--background"] == "255 255 255"
-    assert body["tokens"] == default_theme_tokens()
+    # The read surface returns the SOURCE-OF-TRUTH primaries + the derived shade /
+    # state tokens recomputed from them (never the raw stored primaries alone).
+    assert body["tokens"] == derive_tokens(default_theme_tokens())
     assert body["published_at"] is not None
 
 
@@ -192,7 +195,7 @@ def test_get_draft_falls_back_to_published_when_no_draft(
     body = resp.json()
     # No draft snapshot yet → the published baseline is returned.
     assert body["status"] == "published"
-    assert body["tokens"] == default_theme_tokens()
+    assert body["tokens"] == derive_tokens(default_theme_tokens())
 
 
 def test_get_draft_returns_saved_draft(seeded_app: Dict[str, object]) -> None:
