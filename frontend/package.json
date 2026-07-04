@@ -11,6 +11,9 @@
     "test": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js test",
     "pretest:coverage": "node scripts/generate-config.mjs",
     "test:coverage": "node --disable-warning=DEP0060 ./node_modules/@angular/cli/bin/ng.js test --code-coverage --watch=false --browsers=ChromeHeadlessNoSandbox",
+    "posttest:coverage": "node scripts/diff-coverage.mjs",
+    "test:coverage:diff": "node scripts/diff-coverage.mjs",
+    "test:coverage:diff-unit": "node --test scripts/diff-coverage.spec.mjs",
     "lint": "eslint .",
     "i18n:check": "node scripts/check-i18n.mjs",
     "e2e": "playwright test",
@@ -87,13 +90,20 @@
   },
   "overrides": {
     "@toast-ui/editor": {
-      "dompurify": "3.3.1"
+      "dompurify": "3.4.11"
     },
-    "fastify": "5.7.2",
-    "hono": "4.12.2",
-    "lodash": "4.17.23",
-    "serialize-javascript": "7.0.3",
-    "tar": "7.5.8",
-    "undici": "7.18.2"
+    "fastify": "5.8.5",
+    "hono": "4.12.25",
+    "lodash": "4.18.0",
+    "serialize-javascript": "7.0.5",
+    "tar": "7.5.16",
+    "undici": "7.28.0",
+    "esbuild": "0.28.1",
+    "vite": "7.3.5",
+    "storybook": "8.6.17",
+    "@babel/core": "7.29.6",
+    "http-proxy-middleware": "3.0.7",
+    "piscina": "5.2.0",
+    "uuid": "11.1.1"
   }
 }
