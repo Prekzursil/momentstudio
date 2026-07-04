@@ -85,7 +85,7 @@ export function parseDiffAddedLines(diffText) {
 export function isSourceFile(f) {
   if (!/\.(ts|tsx|js|jsx|mjs|cjs)$/.test(f)) return false;
   if (!f.startsWith('src/')) return false;
-  if (/\.d\.ts$/.test(f)) return false;
+  if (f.endsWith('.d.ts')) return false;
   if (/\.(spec|test|mock)\.[tj]sx?$/.test(f)) return false;
   if (/(^|\/)(test\.ts|polyfills\.ts|main\.ts|main\.server\.ts)$/.test(f)) return false;
   if (/(^|\/)environments\//.test(f)) return false;
@@ -133,10 +133,14 @@ function tryGit(args) {
 function resolveMergeBase(baseRef) {
   // The quality gate checks out shallow (depth 1). Deepen to find a merge-base.
   tryGit(['fetch', '--no-tags', '--depth=300', 'origin', baseRef]);
-  let base = tryGit(['merge-base', `origin/${baseRef}`, 'HEAD']) || tryGit(['merge-base', 'FETCH_HEAD', 'HEAD']);
+  let base =
+    tryGit(['merge-base', `origin/${baseRef}`, 'HEAD']) ||
+    tryGit(['merge-base', 'FETCH_HEAD', 'HEAD']);
   if (!base) {
     tryGit(['fetch', '--no-tags', '--unshallow', 'origin']);
-    base = tryGit(['merge-base', `origin/${baseRef}`, 'HEAD']) || tryGit(['merge-base', 'FETCH_HEAD', 'HEAD']);
+    base =
+      tryGit(['merge-base', `origin/${baseRef}`, 'HEAD']) ||
+      tryGit(['merge-base', 'FETCH_HEAD', 'HEAD']);
   }
   return base;
 }
@@ -144,11 +148,15 @@ function resolveMergeBase(baseRef) {
 function main() {
   const baseRef = process.env.GITHUB_BASE_REF;
   if (!baseRef) {
-    console.log('[diff-coverage] Not a pull-request context (no GITHUB_BASE_REF) — changed-files gate skipped.');
+    console.log(
+      '[diff-coverage] Not a pull-request context (no GITHUB_BASE_REF) — changed-files gate skipped.',
+    );
     return 0;
   }
   if (!existsSync(LCOV_PATH)) {
-    console.error(`[diff-coverage] FAIL: ${LCOV_PATH} not found — coverage must run before this gate.`);
+    console.error(
+      `[diff-coverage] FAIL: ${LCOV_PATH} not found — coverage must run before this gate.`,
+    );
     return 1;
   }
 
@@ -162,8 +170,18 @@ function main() {
   }
 
   const diff = tryGit([
-    'diff', '--relative', '--unified=0', '--no-color', `${base}...HEAD`,
-    '--', '*.ts', '*.tsx', '*.js', '*.jsx', '*.mjs', '*.cjs',
+    'diff',
+    '--relative',
+    '--unified=0',
+    '--no-color',
+    `${base}...HEAD`,
+    '--',
+    '*.ts',
+    '*.tsx',
+    '*.js',
+    '*.jsx',
+    '*.mjs',
+    '*.cjs',
   ]);
   if (diff === null) {
     console.error('[diff-coverage] FAIL: git diff against the merge-base failed.');
@@ -182,7 +200,9 @@ function main() {
     return 0;
   }
 
-  console.error(`[diff-coverage] FAIL: ${misses.length} changed source line(s)/file(s) not covered:`);
+  console.error(
+    `[diff-coverage] FAIL: ${misses.length} changed source line(s)/file(s) not covered:`,
+  );
   for (const m of misses) console.error(`  - ${m}`);
   console.error(
     '\nEvery line this PR adds or modifies under frontend/src must be covered by a test. ' +

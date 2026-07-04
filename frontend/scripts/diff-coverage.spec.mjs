@@ -34,7 +34,10 @@ test('parseDiffAddedLines tracks new-side added line numbers', () => {
     '+const y = 2;',
   ].join('\n');
   const changed = parseDiffAddedLines(diff);
-  assert.deepEqual([...changed.get('src/app/a.ts')].sort((a, b) => a - b), [11, 12]);
+  assert.deepEqual(
+    [...changed.get('src/app/a.ts')].sort((a, b) => a - b),
+    [11, 12],
+  );
 });
 
 test('parseDiffAddedLines ignores deleted files (+++ /dev/null)', () => {
@@ -76,7 +79,9 @@ test('computeMisses ignores non-executable changed lines (not in lcov)', () => {
 test('computeMisses flags a brand-new source file absent from lcov (untested file hole)', () => {
   const lcov = parseLcov(['SF:src/app/other.ts', 'DA:1,1', 'end_of_record'].join('\n'));
   const changed = new Map([['src/app/brand-new.ts', new Set([1, 2, 3])]]);
-  assert.deepEqual(computeMisses(lcov, changed), ['src/app/brand-new.ts: file not exercised by any test']);
+  assert.deepEqual(computeMisses(lcov, changed), [
+    'src/app/brand-new.ts: file not exercised by any test',
+  ]);
 });
 
 test('computeMisses excludes spec files entirely', () => {
