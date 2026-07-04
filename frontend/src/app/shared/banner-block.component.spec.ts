@@ -158,16 +158,16 @@ describe('BannerBlockComponent', () => {
   describe('overlay / text classes', () => {
     it('uses light styling', () => {
       component.slide = makeSlide({ text_style: 'light' });
-      expect(component.overlayClass()).toContain('from-slate-900/70');
-      expect(component.textClass()).toBe('text-white');
-      expect(component.subTextClass()).toBe('text-slate-100');
+      expect(component.overlayClass()).toContain('from-overlay/70');
+      expect(component.textClass()).toBe('text-onmedia');
+      expect(component.subTextClass()).toBe('text-text-muted');
     });
 
     it('uses dark styling', () => {
       component.slide = makeSlide({ text_style: 'dark' });
-      expect(component.overlayClass()).toContain('from-white/80');
-      expect(component.textClass()).toContain('text-slate-900');
-      expect(component.subTextClass()).toContain('text-slate-700');
+      expect(component.overlayClass()).toContain('from-background/80');
+      expect(component.textClass()).toContain('text-text-heading');
+      expect(component.subTextClass()).toContain('text-text');
     });
   });
 
