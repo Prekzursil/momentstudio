@@ -58,7 +58,7 @@
     "@angular/cli": "^21.2.9",
     "@angular/compiler-cli": "^21.2.9",
     "@applitools/eyes-playwright": "^1.46.0",
-    "@chromatic-com/playwright": "^0.12.8",
+    "@chromatic-com/playwright": "^0.14.10",
     "@codecov/bundle-analyzer": "^1.9.1",
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.58.2",
