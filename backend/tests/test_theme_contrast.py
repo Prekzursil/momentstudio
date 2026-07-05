@@ -61,7 +61,9 @@ _DARK_10TH: dict[str, str] = {
 
 def test_known_contrast_ratios() -> None:
     assert contrast_ratio((0, 0, 0), (255, 255, 255)) == pytest.approx(21.0, abs=1e-6)
-    assert contrast_ratio((255, 255, 255), (255, 255, 255)) == pytest.approx(1.0, abs=1e-9)
+    assert contrast_ratio((255, 255, 255), (255, 255, 255)) == pytest.approx(
+        1.0, abs=1e-9
+    )
 
 
 def test_relative_luminance_extremes_cover_both_linearize_branches() -> None:
@@ -113,7 +115,9 @@ def test_gate_catches_on_color_state_shade_bypass() -> None:
     # Contrast bypass #6: --surface-inverse=117 passes the BASE on-colour pairing
     # (white on 117 = 4.61) but its derived hover shade (127) renders white at
     # 4.00. The render-complete gate must catch the STATE-SHADE pair.
-    tokens = derive_tokens({**default_theme_tokens(), "--surface-inverse": "117 117 117"})
+    tokens = derive_tokens(
+        {**default_theme_tokens(), "--surface-inverse": "117 117 117"}
+    )
     failures = evaluate_contrast(tokens)
     ids = {f.id for f in failures}
     assert "text-inverse-on-surface-inverse-hover" in ids
@@ -172,7 +176,9 @@ def test_render_pairings_reference_present_tokens_and_pass_defaults() -> None:
 
 _CONTRAST_FIXTURE = json.loads(
     (
-        Path(__file__).parent.parent.parent / "test-fixtures" / "theme-contrast-fixture.json"
+        Path(__file__).parent.parent.parent
+        / "test-fixtures"
+        / "theme-contrast-fixture.json"
     ).read_text()
 )
 
@@ -182,7 +188,12 @@ def test_render_pairings_match_shared_parity_fixture() -> None:
     # pairing-matrix.spec.ts asserts the TS list against), in order — a divergence
     # means the server gates one thing and the browser renders another.
     got = [
-        {"id": p.id, "foreground": p.foreground, "background": p.background, "size": p.size}
+        {
+            "id": p.id,
+            "foreground": p.foreground,
+            "background": p.background,
+            "size": p.size,
+        }
         for p in RENDER_PAIRINGS
     ]
     assert got == _CONTRAST_FIXTURE["pairings"]

@@ -173,10 +173,14 @@ def _audit_actions(session_factory: async_sessionmaker) -> list[str]:
     async def _run() -> list[str]:
         async with session_factory() as session:
             rows = (
-                await session.execute(
-                    select(ThemeAuditLog).order_by(ThemeAuditLog.created_at)
+                (
+                    await session.execute(
+                        select(ThemeAuditLog).order_by(ThemeAuditLog.created_at)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return [row.action for row in rows]
 
     return asyncio.run(_run())
@@ -186,10 +190,14 @@ def _audit_rows(session_factory: async_sessionmaker) -> list[dict]:
     async def _run() -> list[dict]:
         async with session_factory() as session:
             rows = (
-                await session.execute(
-                    select(ThemeAuditLog).order_by(ThemeAuditLog.created_at)
+                (
+                    await session.execute(
+                        select(ThemeAuditLog).order_by(ThemeAuditLog.created_at)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return [{"action": row.action, "version": row.version} for row in rows]
 
     return asyncio.run(_run())
@@ -199,10 +207,14 @@ def _versions(session_factory: async_sessionmaker) -> list[dict]:
     async def _run() -> list[dict]:
         async with session_factory() as session:
             rows = (
-                await session.execute(
-                    select(ThemeVersion).order_by(ThemeVersion.version)
+                (
+                    await session.execute(
+                        select(ThemeVersion).order_by(ThemeVersion.version)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             return [{"version": r.version, "status": r.status} for r in rows]
 
     return asyncio.run(_run())
@@ -587,7 +599,8 @@ def test_publish_rejects_surface_inverse_crossover_gray(
     failed = {f["pairing"] for f in detail["failures"]}
     assert "text-inverse-on-surface-inverse-hover" in failed
     hover = next(
-        f for f in detail["failures"]
+        f
+        for f in detail["failures"]
         if f["pairing"] == "text-inverse-on-surface-inverse-hover"
     )
     assert hover["ratio"] < hover["target"] == 4.5
@@ -825,9 +838,7 @@ def test_reset_to_default_bypasses_staleness(seeded_app: Dict[str, object]) -> N
     client: TestClient = seeded_app["client"]  # type: ignore[assignment]
     factory = seeded_app["session_factory"]
     token = _create_admin_token(factory)
-    resp = client.post(
-        "/api/v1/theme/reset-to-default", headers=_auth_headers(token)
-    )
+    resp = client.post("/api/v1/theme/reset-to-default", headers=_auth_headers(token))
     assert resp.status_code == 200, resp.text
     assert _theme_row(factory)["version"] == 2
 
@@ -836,9 +847,7 @@ def test_reset_requires_admin(seeded_app: Dict[str, object]) -> None:
     client: TestClient = seeded_app["client"]  # type: ignore[assignment]
     factory = seeded_app["session_factory"]
     token = _create_customer_token(factory)
-    resp = client.post(
-        "/api/v1/theme/reset-to-default", headers=_auth_headers(token)
-    )
+    resp = client.post("/api/v1/theme/reset-to-default", headers=_auth_headers(token))
     assert resp.status_code == 403, resp.text
 
 
@@ -846,9 +855,7 @@ def test_reset_missing_theme_404(empty_app: Dict[str, object]) -> None:
     client: TestClient = empty_app["client"]  # type: ignore[assignment]
     factory = empty_app["session_factory"]
     token = _create_admin_token(factory)
-    resp = client.post(
-        "/api/v1/theme/reset-to-default", headers=_auth_headers(token)
-    )
+    resp = client.post("/api/v1/theme/reset-to-default", headers=_auth_headers(token))
     assert resp.status_code == 404, resp.text
 
 
@@ -920,4 +927,7 @@ def test_white_surface_inverse_keeps_black_on_color(
     assert effective["--surface-inverse"] == "255 255 255"
     assert effective["--text-inverse"] == "0 0 0"
     # And publish still passes (on-colour is safe by construction).
-    assert client.post("/api/v1/theme/publish", json={}, headers=headers).status_code == 200
+    assert (
+        client.post("/api/v1/theme/publish", json={}, headers=headers).status_code
+        == 200
+    )

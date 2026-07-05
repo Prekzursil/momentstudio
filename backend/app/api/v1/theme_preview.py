@@ -59,9 +59,7 @@ _DRAFT_SELECTOR = "draft"
 # turned into a render-amplification / enumeration lever against the SSR path.
 PREVIEW_TOKEN_RATE_LIMIT = 30
 PREVIEW_RENDER_RATE_LIMIT = 60
-preview_token_rate_limit = limiter(
-    "theme:preview-token", PREVIEW_TOKEN_RATE_LIMIT, 60
-)
+preview_token_rate_limit = limiter("theme:preview-token", PREVIEW_TOKEN_RATE_LIMIT, 60)
 preview_render_rate_limit = per_identifier_limiter(
     lambda request: request.query_params.get("token") or "anon",
     PREVIEW_RENDER_RATE_LIMIT,

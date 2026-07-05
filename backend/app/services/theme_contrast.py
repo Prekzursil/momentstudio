@@ -237,22 +237,33 @@ RENDER_PAIRINGS: tuple[Pairing, ...] = (
     Pairing("text-on-surface-muted", "--text", "--surface-muted", "body"),
     # --text-muted.
     Pairing("muted-on-background", "--text-muted", "--background", "body"),
-    Pairing("muted-on-background-subtle", "--text-muted", "--background-subtle", "body"),
+    Pairing(
+        "muted-on-background-subtle", "--text-muted", "--background-subtle", "body"
+    ),
     # --text-secondary.
     Pairing("secondary-on-background", "--text-secondary", "--background", "body"),
     Pairing(
-        "secondary-on-background-subtle", "--text-secondary", "--background-subtle", "body"
+        "secondary-on-background-subtle",
+        "--text-secondary",
+        "--background-subtle",
+        "body",
     ),
     Pairing("secondary-on-surface", "--text-secondary", "--surface", "body"),
-    Pairing("secondary-on-surface-muted", "--text-secondary", "--surface-muted", "body"),
+    Pairing(
+        "secondary-on-surface-muted", "--text-secondary", "--surface-muted", "body"
+    ),
     # --text-strong.
     Pairing("strong-on-background", "--text-strong", "--background", "body"),
-    Pairing("strong-on-background-subtle", "--text-strong", "--background-subtle", "body"),
+    Pairing(
+        "strong-on-background-subtle", "--text-strong", "--background-subtle", "body"
+    ),
     Pairing("strong-on-surface", "--text-strong", "--surface", "body"),
     Pairing("strong-on-surface-muted", "--text-strong", "--surface-muted", "body"),
     # --text-heading (renders body-size meta too, so gated at body 4.5).
     Pairing("heading-on-background", "--text-heading", "--background", "body"),
-    Pairing("heading-on-background-subtle", "--text-heading", "--background-subtle", "body"),
+    Pairing(
+        "heading-on-background-subtle", "--text-heading", "--background-subtle", "body"
+    ),
     Pairing("heading-on-surface", "--text-heading", "--surface", "body"),
     Pairing("heading-on-field", "--text-heading", "--field", "body"),
     Pairing("heading-on-surface-muted", "--text-heading", "--surface-muted", "body"),
@@ -263,11 +274,18 @@ RENDER_PAIRINGS: tuple[Pairing, ...] = (
     # --accent-strong (the 10th bypass: -background-subtle was the missing gate).
     Pairing("accent-strong-on-background", "--accent-strong", "--background", "body"),
     Pairing(
-        "accent-strong-on-background-subtle", "--accent-strong", "--background-subtle", "body"
+        "accent-strong-on-background-subtle",
+        "--accent-strong",
+        "--background-subtle",
+        "body",
     ),
-    Pairing("accent-strong-on-accent-subtle", "--accent-strong", "--accent-subtle", "body"),
+    Pairing(
+        "accent-strong-on-accent-subtle", "--accent-strong", "--accent-subtle", "body"
+    ),
     # On-colours — gated only on their own dark/accent surfaces (never bare canvas).
-    Pairing("text-inverse-on-surface-inverse", "--text-inverse", "--surface-inverse", "body"),
+    Pairing(
+        "text-inverse-on-surface-inverse", "--text-inverse", "--surface-inverse", "body"
+    ),
     Pairing(
         "text-inverse-on-surface-inverse-hover",
         "--text-inverse",

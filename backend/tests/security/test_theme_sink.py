@@ -65,7 +65,9 @@ _CASES = _CORPUS["cases"]
 _REJECT_CASES = [c for c in _CASES if c["expect"] == "reject"]
 # Value-driven rejects whose NAME is itself admin-editable — these exercise the
 # encoder / per-type validator END-TO-END through the real draft-save path.
-_ADMIN_KEY_VALUE_REJECTS = [c for c in _REJECT_CASES if c["name"] in ADMIN_EDITABLE_NAMES]
+_ADMIN_KEY_VALUE_REJECTS = [
+    c for c in _REJECT_CASES if c["name"] in ADMIN_EDITABLE_NAMES
+]
 
 # Non-editable keys the ramp-gate must reject. Each value is WELL-FORMED for its
 # type, so only the admin-name gate can reject it. The numeric-ramp / wider-space
@@ -111,14 +113,18 @@ def _live_version(factory: Any) -> int:
 # --------------------------------------------------------------------------- #
 # Item 1 — defense in depth over the WU2 corpus
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("case", _REJECT_CASES, ids=[_case_id(c) for c in _REJECT_CASES])
+@pytest.mark.parametrize(
+    "case", _REJECT_CASES, ids=[_case_id(c) for c in _REJECT_CASES]
+)
 def test_corpus_reject_blocked_at_admin_gate(case: dict[str, str]) -> None:
     # Layer 1: the strict draft-save / publish gate rejects every malicious value.
     result = validate_admin_editable(case["name"], case["value"])
     assert result.ok is False, case.get("why", "")
 
 
-@pytest.mark.parametrize("case", _REJECT_CASES, ids=[_case_id(c) for c in _REJECT_CASES])
+@pytest.mark.parametrize(
+    "case", _REJECT_CASES, ids=[_case_id(c) for c in _REJECT_CASES]
+)
 def test_corpus_reject_re_blocked_at_ssr_sink(case: dict[str, str]) -> None:
     # Layer 2 (defense in depth): the broad SSR-sink revalidator ALSO rejects it,
     # so a value that somehow reached the sink still never emits.

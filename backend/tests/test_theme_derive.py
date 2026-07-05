@@ -25,7 +25,11 @@ from app.services.theme_derive import (
 from app.services.theme_validation import resolve_token
 
 _FIXTURE = json.loads(
-    (Path(__file__).parent.parent.parent / "test-fixtures" / "theme-derive-fixture.json").read_text()
+    (
+        Path(__file__).parent.parent.parent
+        / "test-fixtures"
+        / "theme-derive-fixture.json"
+    ).read_text()
 )
 
 
@@ -76,7 +80,9 @@ def test_reproduces_compiled_default_styles_css() -> None:
         got = parse_triplet(derived[name])
         target = parse_triplet(want)
         for i in range(3):
-            assert abs(got[i] - target[i]) <= 4, f"{name} channel {i}: {derived[name]} vs {want}"
+            assert abs(got[i] - target[i]) <= 4, (
+                f"{name} channel {i}: {derived[name]} vs {want}"
+            )
 
 
 def test_parse_format_round_trip() -> None:

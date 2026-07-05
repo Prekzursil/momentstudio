@@ -251,7 +251,10 @@ _SPACE_ANCHOR_DEFAULTS: dict[str, str] = {
 # bypass class end-to-end (a numeric ramp step reaching the published ``:root``).
 _ADMIN_EDITABLE_TOKENS: dict[str, TokenEntry] = {
     **_BASE_TOKENS,
-    **{name: _numeric_entry(default) for name, default in _SPACE_ANCHOR_DEFAULTS.items()},
+    **{
+        name: _numeric_entry(default)
+        for name, default in _SPACE_ANCHOR_DEFAULTS.items()
+    },
 }
 
 #: The exact admin-settable token-name set (the pinning-test contract). Adding or

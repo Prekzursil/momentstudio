@@ -98,7 +98,9 @@ def best_on_color(bg: RgbTriplet) -> RgbTriplet:
     Ties go to white. The chosen extreme always clears >= 4.58:1 (the black/white
     crossover minimum), so an on-colour is AA against ANY background.
     """
-    return _WHITE if contrast_ratio(_WHITE, bg) >= contrast_ratio(_BLACK, bg) else _BLACK
+    return (
+        _WHITE if contrast_ratio(_WHITE, bg) >= contrast_ratio(_BLACK, bg) else _BLACK
+    )
 
 
 # The frozen derivation table (mirror of ``DERIVATIONS`` in theme-derive.ts).
