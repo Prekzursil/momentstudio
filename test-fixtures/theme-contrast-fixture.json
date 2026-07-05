@@ -1,10 +1,16 @@
 {
-  "_comment": "Shared TS<->Python parity fixture for the RENDER-COMPLETE contrast publish gate. pairings is the byte-for-byte gated set that BOTH theme_contrast.RENDER_PAIRINGS (Python) and pairing-matrix.ts RENDER_PAIRINGS (TS) MUST equal, in order. cases pin the failing pairing ids the gate returns for editable-primary overrides merged over the compiled defaults; asserted by BOTH backend/tests/test_theme_contrast.py and pairing-matrix.spec.ts so the server gate and the browser guardrail never diverge.",
+  "_comment": "Shared TS<->Python parity fixture for the RENDER-COMPLETE contrast publish gate. pairings is the byte-for-byte gated set that BOTH theme_contrast.RENDER_PAIRINGS (Python) and pairing-matrix.ts RENDER_PAIRINGS (TS) MUST equal, in order. Every bare-capable foreground (foreground colour tokens minus the on-colours) is gated on BOTH page-canvas gradient endpoints (--background AND --background-subtle) because app.component.ts:40 paints a from-background-subtle to-background gradient; contrast is monotonic in bg luminance so the two endpoints bound the whole band. cases pin the failing pairing ids the gate returns for editable-primary overrides merged over the compiled defaults; asserted by BOTH backend/tests/test_theme_contrast.py and pairing-matrix.spec.ts so the server gate and the browser guardrail never diverge.",
   "pairings": [
     {
       "id": "text-on-background",
       "foreground": "--text",
       "background": "--background",
+      "size": "body"
+    },
+    {
+      "id": "text-on-background-subtle",
+      "foreground": "--text",
+      "background": "--background-subtle",
       "size": "body"
     },
     {
@@ -26,9 +32,21 @@
       "size": "body"
     },
     {
+      "id": "muted-on-background-subtle",
+      "foreground": "--text-muted",
+      "background": "--background-subtle",
+      "size": "body"
+    },
+    {
       "id": "secondary-on-background",
       "foreground": "--text-secondary",
       "background": "--background",
+      "size": "body"
+    },
+    {
+      "id": "secondary-on-background-subtle",
+      "foreground": "--text-secondary",
+      "background": "--background-subtle",
       "size": "body"
     },
     {
@@ -50,6 +68,12 @@
       "size": "body"
     },
     {
+      "id": "strong-on-background-subtle",
+      "foreground": "--text-strong",
+      "background": "--background-subtle",
+      "size": "body"
+    },
+    {
       "id": "strong-on-surface",
       "foreground": "--text-strong",
       "background": "--surface",
@@ -65,6 +89,12 @@
       "id": "heading-on-background",
       "foreground": "--text-heading",
       "background": "--background",
+      "size": "body"
+    },
+    {
+      "id": "heading-on-background-subtle",
+      "foreground": "--text-heading",
+      "background": "--background-subtle",
       "size": "body"
     },
     {
@@ -86,15 +116,15 @@
       "size": "body"
     },
     {
-      "id": "heading-on-background-subtle",
-      "foreground": "--text-heading",
-      "background": "--background-subtle",
-      "size": "body"
-    },
-    {
       "id": "accent-on-background",
       "foreground": "--accent",
       "background": "--background",
+      "size": "body"
+    },
+    {
+      "id": "accent-on-background-subtle",
+      "foreground": "--accent",
+      "background": "--background-subtle",
       "size": "body"
     },
     {
@@ -107,6 +137,12 @@
       "id": "accent-strong-on-background",
       "foreground": "--accent-strong",
       "background": "--background",
+      "size": "body"
+    },
+    {
+      "id": "accent-strong-on-background-subtle",
+      "foreground": "--accent-strong",
+      "background": "--background-subtle",
       "size": "body"
     },
     {
@@ -160,6 +196,42 @@
         "heading-on-field",
         "heading-on-surface",
         "heading-on-surface-muted"
+      ]
+    },
+    {
+      "name": "muted-canvas-subtle-8th",
+      "primaries": {
+        "--text-muted": "117 117 117"
+      },
+      "failures": [
+        "muted-on-background-subtle"
+      ]
+    },
+    {
+      "name": "accent-canvas-subtle-9th",
+      "primaries": {
+        "--accent": "116 116 116"
+      },
+      "failures": [
+        "accent-on-background-subtle",
+        "accent-on-surface"
+      ]
+    },
+    {
+      "name": "accent-strong-canvas-gradient-dark-10th",
+      "primaries": {
+        "--background": "34 0 6",
+        "--surface": "106 39 154",
+        "--accent": "18 217 97",
+        "--surface-inverse": "129 132 214",
+        "--text": "97 214 202",
+        "--text-heading": "39 237 160",
+        "--text-muted": "235 170 242",
+        "--border": "230 170 186",
+        "--overlay": "51 148 228"
+      },
+      "failures": [
+        "accent-strong-on-background-subtle"
       ]
     }
   ]

@@ -24,7 +24,13 @@ import {
   type RgbTriplet,
   type TextSize,
 } from './contrast';
-import { deriveColorTokens, deriveTokens, PRIMARY_DEFAULTS } from './theme-derive';
+import {
+  deriveColorTokens,
+  DERIVED_COLOR_NAMES,
+  deriveTokens,
+  PRIMARY_COLOR_NAMES,
+  PRIMARY_DEFAULTS,
+} from './theme-derive';
 import { type Archetype, ARCHETYPES, getToken } from './token-taxonomy';
 
 /** A curated, pre-validated foreground-on-background pairing. */
@@ -195,6 +201,59 @@ export function onColorPairingsAlwaysContrast(
 }
 
 /**
+ * BARE-CAPABLE FOREGROUND DERIVATION — the root-cause fix (mirror of
+ * `theme_contrast.py`).
+ *
+ * The app-shell paints a canvas GRADIENT from `--background-subtle` to
+ * `--background` (`app.component.ts:40`:
+ * `bg-gradient-to-b from-background-subtle to-background`), so ANY non-on-colour
+ * foreground that renders BARE on the shell (e.g. `hover:text-accent-strong` at
+ * `shop.component.ts:715`) can land on EITHER endpoint. Contrast is MONOTONIC in
+ * background luminance, so gating a foreground on BOTH `CANVAS_BACKGROUNDS`
+ * endpoints bounds it across the whole gradient band.
+ *
+ * The bypass CLASS reappeared 10 times because the gate was HAND-MAINTAINED and
+ * kept forgetting a foreground (the 10th was `--accent-strong`). The cure is to
+ * DERIVE the bare-capable set from the token model instead of re-typing it: it is
+ * every FOREGROUND colour token MINUS the ON-COLOURS. ON-COLOURS (`--text-inverse`
+ * / `--text-onmedia` are black-or-white derived to contrast their own dark/accent
+ * surface; `--border-inverse` is a non-text edge) never render bare on the canvas;
+ * `--accent-subtle` carries an `--accent` prefix but is a tinted SURFACE, not ink.
+ */
+export const ON_COLORS: ReadonlySet<string> = new Set([
+  '--text-inverse',
+  '--text-onmedia',
+  '--border-inverse',
+]);
+
+/** Tinted surfaces sharing a `--text`/`--accent` prefix but rendered AS backgrounds. */
+const TEXT_FAMILY_SURFACES: ReadonlySet<string> = new Set(['--accent-subtle']);
+
+/** The two page-canvas gradient endpoints every bare-capable foreground can land on. */
+export const CANVAS_BACKGROUNDS: readonly string[] = ['--background', '--background-subtle'];
+
+/**
+ * True for a colour token that renders INK (text): the `--text*` / `--accent*`
+ * family, minus the tinted surfaces that merely share the prefix. Parity-identical
+ * to `theme_contrast.is_foreground_color_token`.
+ */
+export function isForegroundColorToken(name: string): boolean {
+  const isTextFamily = name.startsWith('--text') || name.startsWith('--accent');
+  return isTextFamily && !TEXT_FAMILY_SURFACES.has(name);
+}
+
+/**
+ * The foregrounds that can render BARE on the canvas = foreground colour tokens
+ * minus the on-colours, DERIVED from the token model (`theme-derive`'s
+ * `PRIMARY_COLOR_NAMES` + `DERIVED_COLOR_NAMES`) so a NEW foreground token flows in
+ * automatically and the render-complete gate must cover it on both endpoints.
+ */
+export const BARE_CAPABLE_FOREGROUNDS: readonly string[] = [
+  ...PRIMARY_COLOR_NAMES,
+  ...DERIVED_COLOR_NAMES,
+].filter((name) => isForegroundColorToken(name) && !ON_COLORS.has(name));
+
+/**
  * A row of the RENDER-COMPLETE publish gate: one `(foreground, background)` pair
  * the storefront actually renders TEXT for, tagged with the STRICTEST size it
  * renders at. Endpoints may be PRIMARY or DERIVED (state shade / on-colour); they
@@ -222,17 +281,40 @@ export interface RenderPairing {
  * `--text-heading` renders at BOTH large (h1/h2) and body (text-sm meta); gated at
  * BODY, the strictest, which subsumes large. `--text-inverse` is gated on its BASE
  * `--surface-inverse` (safe by construction) AND on the derived
- * `--surface-inverse-hover` STATE shade (the closed bypass).
+ * `--surface-inverse-hover` STATE shade (the closed bypass). Every bare-capable
+ * foreground (`BARE_CAPABLE_FOREGROUNDS`) is gated on BOTH `CANVAS_BACKGROUNDS`
+ * endpoints (7 x 2 = 14 canvas rows) so the app-shell gradient cannot bypass it.
  */
 export const RENDER_PAIRINGS: readonly RenderPairing[] = [
+  // --text (canvas: --background + --background-subtle; then surfaces).
   { id: 'text-on-background', foreground: '--text', background: '--background', size: 'body' },
+  {
+    id: 'text-on-background-subtle',
+    foreground: '--text',
+    background: '--background-subtle',
+    size: 'body',
+  },
   { id: 'text-on-surface', foreground: '--text', background: '--surface', size: 'body' },
   { id: 'text-on-surface-muted', foreground: '--text', background: '--surface-muted', size: 'body' },
+  // --text-muted.
   { id: 'muted-on-background', foreground: '--text-muted', background: '--background', size: 'body' },
+  {
+    id: 'muted-on-background-subtle',
+    foreground: '--text-muted',
+    background: '--background-subtle',
+    size: 'body',
+  },
+  // --text-secondary.
   {
     id: 'secondary-on-background',
     foreground: '--text-secondary',
     background: '--background',
+    size: 'body',
+  },
+  {
+    id: 'secondary-on-background-subtle',
+    foreground: '--text-secondary',
+    background: '--background-subtle',
     size: 'body',
   },
   { id: 'secondary-on-surface', foreground: '--text-secondary', background: '--surface', size: 'body' },
@@ -242,7 +324,14 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     background: '--surface-muted',
     size: 'body',
   },
+  // --text-strong.
   { id: 'strong-on-background', foreground: '--text-strong', background: '--background', size: 'body' },
+  {
+    id: 'strong-on-background-subtle',
+    foreground: '--text-strong',
+    background: '--background-subtle',
+    size: 'body',
+  },
   { id: 'strong-on-surface', foreground: '--text-strong', background: '--surface', size: 'body' },
   {
     id: 'strong-on-surface-muted',
@@ -250,7 +339,14 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     background: '--surface-muted',
     size: 'body',
   },
+  // --text-heading (renders body-size meta too, so gated at body 4.5).
   { id: 'heading-on-background', foreground: '--text-heading', background: '--background', size: 'body' },
+  {
+    id: 'heading-on-background-subtle',
+    foreground: '--text-heading',
+    background: '--background-subtle',
+    size: 'body',
+  },
   { id: 'heading-on-surface', foreground: '--text-heading', background: '--surface', size: 'body' },
   { id: 'heading-on-field', foreground: '--text-heading', background: '--field', size: 'body' },
   {
@@ -259,18 +355,26 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     background: '--surface-muted',
     size: 'body',
   },
+  // --accent.
+  { id: 'accent-on-background', foreground: '--accent', background: '--background', size: 'body' },
   {
-    id: 'heading-on-background-subtle',
-    foreground: '--text-heading',
+    id: 'accent-on-background-subtle',
+    foreground: '--accent',
     background: '--background-subtle',
     size: 'body',
   },
-  { id: 'accent-on-background', foreground: '--accent', background: '--background', size: 'body' },
   { id: 'accent-on-surface', foreground: '--accent', background: '--surface', size: 'body' },
+  // --accent-strong (the 10th bypass: -background-subtle was the missing gate).
   {
     id: 'accent-strong-on-background',
     foreground: '--accent-strong',
     background: '--background',
+    size: 'body',
+  },
+  {
+    id: 'accent-strong-on-background-subtle',
+    foreground: '--accent-strong',
+    background: '--background-subtle',
     size: 'body',
   },
   {
@@ -279,6 +383,7 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     background: '--accent-subtle',
     size: 'body',
   },
+  // On-colours — gated only on their own dark/accent surfaces (never bare canvas).
   {
     id: 'text-inverse-on-surface-inverse',
     foreground: '--text-inverse',

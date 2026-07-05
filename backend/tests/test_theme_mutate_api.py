@@ -630,6 +630,76 @@ def test_publish_rejects_heading_below_body_aa(
     assert _theme_row(factory)["version"] == 1
 
 
+def test_publish_rejects_muted_canvas_background_subtle_8th(
+    seeded_app: Dict[str, object],
+) -> None:
+    """Regression (canvas-gradient bypass, the 8th): a mid-grey --text-muted.
+
+    ``--text-muted = 117 117 117`` clears the white ``--background`` (4.51) so every
+    legacy pairing was green and it USED to publish (200) — but the app-shell paints
+    a ``from-background-subtle to-background`` gradient (``app.component.ts:40``), and
+    muted also renders on the derived ``--background-subtle`` (248 250 252), where it
+    drops below body AA. The render-complete gate now covers muted on BOTH canvas
+    endpoints and rejects the publish (422).
+    """
+    client: TestClient = seeded_app["client"]  # type: ignore[assignment]
+    factory = seeded_app["session_factory"]
+    token = _create_admin_token(factory)
+    headers = _auth_headers(token)
+
+    hostile = {**_primaries(), "--text-muted": "117 117 117"}
+    save = client.put("/api/v1/theme/draft", json={"tokens": hostile}, headers=headers)
+    assert save.status_code == 200, save.text
+    resp = client.post("/api/v1/theme/publish", json={}, headers=headers)
+    assert resp.status_code == 422, resp.text
+    detail = resp.json()["detail"]
+    assert detail["error"] == "contrast"
+    failed = {f["pairing"] for f in detail["failures"]}
+    assert "muted-on-background-subtle" in failed
+    assert "muted-on-background" not in failed  # the old --background gate passed it
+    # Atomic: the failing publish did not flip the live theme.
+    assert _theme_row(factory)["version"] == 1
+
+
+def test_publish_rejects_accent_strong_canvas_gradient_dark_10th(
+    seeded_app: Dict[str, object],
+) -> None:
+    """Regression (canvas-gradient bypass, the 10th): --accent-strong on the shell.
+
+    The filter-reset ``hover:text-accent-strong`` (``shop.component.ts:715``) renders
+    bare on the app-shell canvas gradient (``app.component.ts:40``:
+    ``from-background-subtle to-background``). On this dark theme the derived
+    ``--accent-strong`` (13 152 68) PASSES on ``--background`` (34 0 6 → 5.22) but
+    FAILS on the derived ``--background-subtle`` midpoint (70 20 80 → 3.79). Pre-fix
+    that -subtle pairing did not exist, so the theme published; it is now a 422.
+    """
+    client: TestClient = seeded_app["client"]  # type: ignore[assignment]
+    factory = seeded_app["session_factory"]
+    token = _create_admin_token(factory)
+    headers = _auth_headers(token)
+
+    hostile = {
+        "--background": "34 0 6",
+        "--surface": "106 39 154",
+        "--accent": "18 217 97",
+        "--surface-inverse": "129 132 214",
+        "--text": "97 214 202",
+        "--text-heading": "39 237 160",
+        "--text-muted": "235 170 242",
+        "--border": "230 170 186",
+        "--overlay": "51 148 228",
+    }
+    save = client.put("/api/v1/theme/draft", json={"tokens": hostile}, headers=headers)
+    assert save.status_code == 200, save.text
+    resp = client.post("/api/v1/theme/publish", json={}, headers=headers)
+    assert resp.status_code == 422, resp.text
+    detail = resp.json()["detail"]
+    assert detail["error"] == "contrast"
+    failed = {f["pairing"] for f in detail["failures"]}
+    assert failed == {"accent-strong-on-background-subtle"}  # the sole (10th) bypass
+    assert _theme_row(factory)["version"] == 1
+
+
 def test_publish_requires_admin(seeded_app: Dict[str, object]) -> None:
     client: TestClient = seeded_app["client"]  # type: ignore[assignment]
     factory = seeded_app["session_factory"]
