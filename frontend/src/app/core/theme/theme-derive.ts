@@ -188,9 +188,7 @@ export function deriveColorTokens(
  * a doc that tries to smuggle a derived value can never win — the source of truth
  * is always the primaries.
  */
-export function deriveTokens(
-  input: Readonly<Record<string, string>>,
-): Record<string, string> {
+export function deriveTokens(input: Readonly<Record<string, string>>): Record<string, string> {
   const passthrough: Record<string, string> = {};
   for (const [name, value] of Object.entries(input)) {
     if (!DERIVED_COLOR_NAMES.includes(name)) {

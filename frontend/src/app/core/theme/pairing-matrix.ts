@@ -176,10 +176,7 @@ export const ON_COLOR_PAIRINGS: readonly OnColorPairing[] = [
 export const ON_COLOR_MIN_RATIO = 4.58;
 
 /** Resolve a primary token's triplet from `primaries`, else its compiled default. */
-function primaryTriplet(
-  primaries: Readonly<Record<string, string>>,
-  name: string,
-): RgbTriplet {
+function primaryTriplet(primaries: Readonly<Record<string, string>>, name: string): RgbTriplet {
   return parseTriplet(primaries[name] ?? PRIMARY_DEFAULTS[name]);
 }
 
@@ -295,9 +292,19 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     size: 'body',
   },
   { id: 'text-on-surface', foreground: '--text', background: '--surface', size: 'body' },
-  { id: 'text-on-surface-muted', foreground: '--text', background: '--surface-muted', size: 'body' },
+  {
+    id: 'text-on-surface-muted',
+    foreground: '--text',
+    background: '--surface-muted',
+    size: 'body',
+  },
   // --text-muted.
-  { id: 'muted-on-background', foreground: '--text-muted', background: '--background', size: 'body' },
+  {
+    id: 'muted-on-background',
+    foreground: '--text-muted',
+    background: '--background',
+    size: 'body',
+  },
   {
     id: 'muted-on-background-subtle',
     foreground: '--text-muted',
@@ -317,7 +324,12 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     background: '--background-subtle',
     size: 'body',
   },
-  { id: 'secondary-on-surface', foreground: '--text-secondary', background: '--surface', size: 'body' },
+  {
+    id: 'secondary-on-surface',
+    foreground: '--text-secondary',
+    background: '--surface',
+    size: 'body',
+  },
   {
     id: 'secondary-on-surface-muted',
     foreground: '--text-secondary',
@@ -325,7 +337,12 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     size: 'body',
   },
   // --text-strong.
-  { id: 'strong-on-background', foreground: '--text-strong', background: '--background', size: 'body' },
+  {
+    id: 'strong-on-background',
+    foreground: '--text-strong',
+    background: '--background',
+    size: 'body',
+  },
   {
     id: 'strong-on-background-subtle',
     foreground: '--text-strong',
@@ -340,7 +357,12 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     size: 'body',
   },
   // --text-heading (renders body-size meta too, so gated at body 4.5).
-  { id: 'heading-on-background', foreground: '--text-heading', background: '--background', size: 'body' },
+  {
+    id: 'heading-on-background',
+    foreground: '--text-heading',
+    background: '--background',
+    size: 'body',
+  },
   {
     id: 'heading-on-background-subtle',
     foreground: '--text-heading',
@@ -396,7 +418,12 @@ export const RENDER_PAIRINGS: readonly RenderPairing[] = [
     background: '--surface-inverse-hover',
     size: 'body',
   },
-  { id: 'text-onmedia-on-accent', foreground: '--text-onmedia', background: '--accent', size: 'body' },
+  {
+    id: 'text-onmedia-on-accent',
+    foreground: '--text-onmedia',
+    background: '--accent',
+    size: 'body',
+  },
 ];
 
 /** One render pairing that FAILS its AA target under the evaluated tokens. */

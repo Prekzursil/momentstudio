@@ -67,10 +67,6 @@ export function meetsAa(ratio: number, size: TextSize): boolean {
  * Whether a foreground/background pair meets WCAG AA contrast for the given
  * text size. Order-independent (contrast is symmetric).
  */
-export function passesAa(
-  foreground: RgbTriplet,
-  background: RgbTriplet,
-  size: TextSize,
-): boolean {
+export function passesAa(foreground: RgbTriplet, background: RgbTriplet, size: TextSize): boolean {
   return meetsAa(contrastRatio(foreground, background), size);
 }

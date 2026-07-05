@@ -93,9 +93,7 @@ describe('getPreviewThemeTokens', () => {
   });
 
   it('returns null when the fetch throws (timeout / network)', async () => {
-    expect(
-      await getPreviewThemeTokens('tok', BASE_CONFIG, depsWith(throwingFetch())),
-    ).toBeNull();
+    expect(await getPreviewThemeTokens('tok', BASE_CONFIG, depsWith(throwingFetch()))).toBeNull();
   });
 });
 

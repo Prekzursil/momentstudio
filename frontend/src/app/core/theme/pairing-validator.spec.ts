@@ -122,7 +122,7 @@ describe('validateTokenChange — failing paths + auto-snap', () => {
     }
   });
 
-  it("auto-snap candidate actually passes AA when re-validated", () => {
+  it('auto-snap candidate actually passes AA when re-validated', () => {
     const [candidate] = failing.candidates;
     const revalidated = validateTokenChange('--text', candidate.value);
     expect(revalidated.ok).toBe(true);

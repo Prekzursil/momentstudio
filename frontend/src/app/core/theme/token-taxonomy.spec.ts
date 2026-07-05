@@ -1,8 +1,4 @@
-import {
-  deriveColorTokens,
-  DERIVED_COLOR_NAMES,
-  PRIMARY_COLOR_NAMES,
-} from './theme-derive';
+import { deriveColorTokens, DERIVED_COLOR_NAMES, PRIMARY_COLOR_NAMES } from './theme-derive';
 import { isColorTriplet, resolveToken } from './token-registry';
 import {
   ARCHETYPES,

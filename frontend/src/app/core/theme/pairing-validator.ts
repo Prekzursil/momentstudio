@@ -149,10 +149,7 @@ function resolverFor(
 }
 
 /** Evaluate one pairing against a resolver. */
-function evaluatePairing(
-  pairing: Pairing,
-  resolve: (token: string) => RgbTriplet,
-): PairingResult {
+function evaluatePairing(pairing: Pairing, resolve: (token: string) => RgbTriplet): PairingResult {
   const foreground = resolve(pairing.foreground);
   const background = resolve(pairing.background);
   const ratio = contrastRatio(foreground, background);

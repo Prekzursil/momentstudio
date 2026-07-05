@@ -25,10 +25,7 @@
 import { Component, ElementRef, inject } from '@angular/core';
 
 import { ThemeTokensService } from '../../../core/theme/theme-tokens.service';
-import {
-  validateAdminEditable,
-  type ValidationResult,
-} from '../../../core/theme/token-validation';
+import { validateAdminEditable, type ValidationResult } from '../../../core/theme/token-validation';
 
 @Component({
   selector: 'app-theme-live-preview',

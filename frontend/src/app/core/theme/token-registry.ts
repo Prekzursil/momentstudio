@@ -155,9 +155,10 @@ const SPACE_ANCHOR_DEFAULTS: Record<string, string> = {
 // `backend/app/services/theme_validation.py::_ADMIN_EDITABLE_TOKENS`.
 const ADMIN_EDITABLE_TOKENS = new Map<string, TokenEntry>([
   ...BASE_TOKENS,
-  ...Object.entries(SPACE_ANCHOR_DEFAULTS).map(
-    ([name, fallback]): [string, TokenEntry] => [name, numericEntry(fallback)],
-  ),
+  ...Object.entries(SPACE_ANCHOR_DEFAULTS).map(([name, fallback]): [string, TokenEntry] => [
+    name,
+    numericEntry(fallback),
+  ]),
 ]);
 
 /**
