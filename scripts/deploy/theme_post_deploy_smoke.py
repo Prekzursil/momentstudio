@@ -73,6 +73,13 @@ def make_session_factory(*, seed_theme: bool = True, seed_home: bool = True) -> 
 
     from app.db.base import Base  # noqa: PLC0415
     from app.models.content import ContentBlock, ContentStatus  # noqa: PLC0415
+
+    # Side-effect import: register the theme ORM tables on ``Base.metadata``
+    # BEFORE ``create_all``. ``theme_service`` imports the Theme models lazily,
+    # so under the full pytest suite ``create_all`` would otherwise omit the
+    # ``themes`` table (CI: "no such table: themes"). Names intentionally unused.
+    import app.models.theme  # noqa: PLC0415, F401
+
     from app.services.theme_service import ensure_default_theme  # noqa: PLC0415
 
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", future=True)
