@@ -20,7 +20,11 @@ describe('app.routes admin theme route (WU10)', () => {
   });
 
   it('lazy-loads the AdminThemeComponent for the theme route', async () => {
-    const loaded = await (themeRoute?.loadComponent as () => Promise<unknown>)();
+    // Split the optional chain from the call so it is not invoked on a possibly
+    // ``undefined`` value (oxlint no-unsafe-optional-chaining); themeRoute is
+    // asserted truthy above, so loadComponent is present at runtime.
+    const loadComponent = themeRoute?.loadComponent as () => Promise<unknown>;
+    const loaded = await loadComponent();
     expect(loaded).toBe(AdminThemeComponent);
   });
 });
