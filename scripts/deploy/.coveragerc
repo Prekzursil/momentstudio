@@ -1,0 +1,26 @@
+# Coverage config for the P1a theme deploy-gate checks.
+#
+# These modules live OUTSIDE backend/app, so the lean `quality / quality` gate
+# (whose coverage source is scoped to backend/app) does not measure them. This
+# config enforces their own STRICT 100% line+branch coverage, run by the gate's
+# CI job and locally via:
+#   coverage run --rcfile=scripts/deploy/.coveragerc -m pytest scripts/deploy/tests
+#   coverage report --rcfile=scripts/deploy/.coveragerc --fail-under=100
+[run]
+branch = true
+source =
+    scripts/deploy
+# Mirror the app's greenlet/thread tracer declaration so async seams measured via
+# the backend service layer (TestClient + AsyncSession) are not under-counted.
+concurrency =
+    thread
+    greenlet
+omit =
+    */tests/*
+    */__pycache__/*
+
+[report]
+show_missing = true
+exclude_also =
+    if __name__ == .__main__.:
+    # pragma: no cover

@@ -87,7 +87,11 @@ export function isSourceFile(f) {
   if (!f.startsWith('src/')) return false;
   if (f.endsWith('.d.ts')) return false;
   if (/\.(spec|test|mock)\.[tj]sx?$/.test(f)) return false;
-  if (/(^|\/)(test\.ts|polyfills\.ts|main\.ts|main\.server\.ts)$/.test(f)) return false;
+  // Node-only SSR bootstraps: never loaded in the karma (browser) runtime, so
+  // they cannot be instrumented for lcov. `server.ts` is the express entrypoint
+  // (imports express / @angular/ssr/node); its testable logic lives in
+  // `src/server/*.ts` (karma-covered). Same category as `main.server.ts`.
+  if (/(^|\/)(test\.ts|polyfills\.ts|main\.ts|main\.server\.ts|server\.ts)$/.test(f)) return false;
   if (/(^|\/)environments\//.test(f)) return false;
   if (/\.config\.[cm]?[tj]s$/.test(f)) return false;
   return true;

@@ -25,6 +25,26 @@ from app.db.session import (
     get_session,
 )
 
+# The reload tests below re-execute ``app.db.session``, which replaces
+# ``get_session`` / ``SessionLocal`` / ``engine`` with brand-new objects.
+# ``app.main.app`` captured the ORIGINAL ``get_session`` at import time for its
+# ``Depends(...)``, so after a reload a later test's
+# ``app.dependency_overrides[get_session] = ...`` silently no-ops (the override
+# key no longer matches the app's captured dependency) — which routed the WU15
+# post-deploy smoke's ``GET /theme`` to the real un-seeded session ("no such
+# table: themes"). Snapshot the originals and restore their identities after
+# each reload so the shared app dependency stays valid for the rest of the suite.
+_ORIGINAL_SESSION_ATTRS = {
+    name: getattr(session_module, name)
+    for name in ("engine", "engine_kwargs", "SessionLocal", "get_session")
+    if hasattr(session_module, name)
+}
+
+
+def _restore_original_session_identities() -> None:
+    for _name, _obj in _ORIGINAL_SESSION_ATTRS.items():
+        setattr(session_module, _name, _obj)
+
 
 class _FakeInfo(dict):
     pass
@@ -100,6 +120,7 @@ def test_postgresql_engine_config_branch(monkeypatch) -> None:
         monkeypatch.undo()
         sys.modules["app.db.session"] = session_module
         importlib.reload(session_module)
+        _restore_original_session_identities()
 
 
 def test_postgresql_engine_config_branch_without_pool_overrides(monkeypatch) -> None:
@@ -121,6 +142,7 @@ def test_postgresql_engine_config_branch_without_pool_overrides(monkeypatch) -> 
         monkeypatch.undo()
         sys.modules["app.db.session"] = session_module
         importlib.reload(session_module)
+        _restore_original_session_identities()
 
 
 def test_session_local_is_usable_after_reloads() -> None:

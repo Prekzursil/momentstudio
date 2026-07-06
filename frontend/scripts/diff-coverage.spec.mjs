@@ -55,6 +55,12 @@ test('isSourceFile includes app source, excludes specs/config/bootstrap/declarat
   assert.equal(isSourceFile('src/app/types.d.ts'), false);
   assert.equal(isSourceFile('scripts/generate-config.mjs'), false);
   assert.equal(isSourceFile('karma.conf.cjs'), false);
+  // Node-only SSR express bootstrap — excluded like main.server.ts…
+  assert.equal(isSourceFile('src/server.ts'), false);
+  assert.equal(isSourceFile('src/main.server.ts'), false);
+  // …but the karma-covered server-side theme modules stay enforced.
+  assert.equal(isSourceFile('src/server/theme-head.ts'), true);
+  assert.equal(isSourceFile('src/server/theme-source.ts'), true);
 });
 
 test('computeMisses flags an uncovered changed line', () => {

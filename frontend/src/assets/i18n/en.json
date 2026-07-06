@@ -57,6 +57,7 @@
       "help_center": "Help center | momentstudio",
       "admin_access": "Admin access | momentstudio",
       "admin": "Admin | momentstudio",
+      "admin_theme": "Theme | Admin | momentstudio",
       "admin_content_home": "Content · Home | Admin | momentstudio",
       "admin_content_pages": "Content · Pages | Admin | momentstudio",
       "admin_content_blog": "Content · Blog | Admin | momentstudio",
@@ -1748,7 +1749,8 @@
       "users": "Users",
       "support": "Support",
       "ops": "Ops",
-      "content": "Content"
+      "content": "Content",
+      "theme": "Theme"
     },
     "navGroup": {
       "overview": "Overview",
@@ -1758,6 +1760,98 @@
       "customersSupport": "Customers & support",
       "marketing": "Marketing",
       "operationsSecurity": "Operations & security"
+    },
+    "theme": {
+      "eyebrow": "Appearance",
+      "title": "Storefront theme",
+      "intro": "Change your storefront's colours, typography, and spacing, then publish — no code or rebuild needed. Edits preview live on the right before you save, and publishing is blocked until any failing colour contrast is fixed.",
+      "loading": "Loading theme…",
+      "groups": { "color": "Colour", "type": "Typography", "spacing": "Spacing" },
+      "tokens": {
+        "background": "Page background",
+        "surface": "Cards & panels",
+        "surfaceInverse": "Inverse chips & buttons",
+        "text": "Body text",
+        "textHeading": "Headings",
+        "textMuted": "Muted / captions",
+        "border": "Borders & dividers",
+        "accent": "Accent & links",
+        "overlay": "Overlay scrim",
+        "fontBody": "Body font",
+        "fontHeading": "Heading font",
+        "fontSizeBase": "Base text size",
+        "spaceXs": "Extra-small spacing",
+        "spaceSm": "Small spacing",
+        "spaceMd": "Medium spacing",
+        "spaceLg": "Large spacing",
+        "spaceXl": "Extra-large spacing"
+      },
+      "fonts": {
+        "inter": "Inter (sans-serif)",
+        "cinzel": "Cinzel (serif)",
+        "systemSans": "System sans-serif",
+        "systemSerif": "System serif",
+        "mono": "Monospace",
+        "custom": "Custom"
+      },
+      "sizes": {
+        "compact": "Compact",
+        "default": "Default",
+        "comfortable": "Comfortable",
+        "large": "Large"
+      },
+      "spaces": {
+        "4": "4px (0.25rem)",
+        "8": "8px (0.5rem)",
+        "12": "12px (0.75rem)",
+        "16": "16px (1rem)",
+        "20": "20px (1.25rem)",
+        "24": "24px (1.5rem)",
+        "32": "32px (2rem)",
+        "40": "40px (2.5rem)",
+        "48": "48px (3rem)"
+      },
+      "contrast": {
+        "fails": "Fails AA contrast",
+        "snapHint": "Snap to a passing colour:",
+        "noSnap": "No nearby colour passes every pairing — pick a different shade."
+      },
+      "preview": {
+        "title": "Live preview",
+        "hint": "Updates as you edit — before you save."
+      },
+      "history": {
+        "title": "Version history",
+        "rollback": "Roll back",
+        "empty": "No versions yet."
+      },
+      "status": { "draft": "Draft", "published": "Published" },
+      "actions": {
+        "save": "Save draft",
+        "publish": "Publish",
+        "reset": "Reset to defaults",
+        "saveFirst": "Save your draft before publishing.",
+        "fixContrast": "Fix the contrast warnings before publishing."
+      },
+      "stale": {
+        "message": "This theme changed elsewhere since you opened it. Reload before saving to avoid overwriting newer changes.",
+        "reload": "Reload"
+      },
+      "feedback": {
+        "saved": "Draft saved.",
+        "published": "Theme published.",
+        "rolledBack": "Rolled back to the selected version.",
+        "reset": "Theme reset to safe defaults."
+      },
+      "errors": {
+        "load": "Couldn't load the theme. Try reloading.",
+        "save": "Couldn't save the draft. Please try again.",
+        "publish": "Couldn't publish the theme. Please try again.",
+        "stale": "Someone else published a newer theme. Reload and reapply your changes.",
+        "contrast": "Publish blocked: a colour pairing fails the minimum contrast.",
+        "rollback": "Couldn't roll back. Please try again.",
+        "reset": "Couldn't reset the theme. Please try again."
+      }
     },
     "uiMode": {
       "title": "Admin mode",

@@ -1,0 +1,286 @@
+<section class="mx-auto max-w-6xl px-4 py-6 sm:px-6" aria-labelledby="theme-editor-title">
+  <header class="mb-6">
+    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+      {{ 'adminUi.theme.eyebrow' | translate }}
+    </p>
+    <h1
+      id="theme-editor-title"
+      class="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-50"
+    >
+      {{ 'adminUi.theme.title' | translate }}
+    </h1>
+    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+      {{ 'adminUi.theme.intro' | translate }}
+    </p>
+  </header>
+
+  @if (staleView()) {
+    <div
+      role="alert"
+      class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+    >
+      <span>{{ 'adminUi.theme.stale.message' | translate }}</span>
+      <button
+        type="button"
+        class="rounded-md border border-amber-400 px-3 py-1 font-medium text-amber-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:text-amber-100 dark:hover:bg-amber-500/20"
+        (click)="reload()"
+      >
+        {{ 'adminUi.theme.stale.reload' | translate }}
+      </button>
+    </div>
+  }
+
+  @if (feedback(); as note) {
+    <p
+      [attr.role]="note.tone === 'error' ? 'alert' : 'status'"
+      aria-live="polite"
+      class="mb-4 rounded-lg px-4 py-3 text-sm font-medium"
+      [class.bg-emerald-50]="note.tone === 'success'"
+      [class.text-emerald-800]="note.tone === 'success'"
+      [class.dark:bg-emerald-500/10]="note.tone === 'success'"
+      [class.dark:text-emerald-300]="note.tone === 'success'"
+      [class.bg-rose-50]="note.tone === 'error'"
+      [class.text-rose-800]="note.tone === 'error'"
+      [class.dark:bg-rose-500/10]="note.tone === 'error'"
+      [class.dark:text-rose-300]="note.tone === 'error'"
+    >
+      {{ note.msgKey | translate }}
+    </p>
+  }
+
+  @if (!loaded()) {
+    <p class="py-16 text-center text-sm text-slate-500 dark:text-slate-400">
+      {{ 'adminUi.theme.loading' | translate }}
+    </p>
+  } @else {
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <!-- ── Controls ─────────────────────────────────────────────── -->
+      <div class="space-y-8">
+        @for (group of groups; track group.key) {
+          <fieldset
+            class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+          >
+            <legend
+              class="px-2 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+            >
+              {{ group.labelKey | translate }}
+            </legend>
+
+            @if (group.key === 'color') {
+              <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                @for (control of group.controls; track trackControl($index, control)) {
+                  <div>
+                    <div class="flex items-baseline justify-between gap-2">
+                      <label
+                        [attr.for]="'ctl' + control.name"
+                        class="text-sm font-medium text-slate-800 dark:text-slate-200"
+                      >
+                        {{ control.labelKey | translate }}
+                      </label>
+                      <code class="text-[11px] text-slate-400 dark:text-slate-500">{{
+                        control.name
+                      }}</code>
+                    </div>
+                    <div class="mt-1.5 flex items-center gap-2">
+                      <input
+                        type="color"
+                        [attr.id]="'ctl' + control.name"
+                        class="h-9 w-11 shrink-0 cursor-pointer rounded-md border border-slate-300 bg-transparent p-0.5 dark:border-slate-600"
+                        [value]="hexFor(control.name)"
+                        (input)="onColorHex(control.name, $event)"
+                        [attr.aria-label]="(control.labelKey | translate) + ' colour picker'"
+                      />
+                      <input
+                        type="text"
+                        class="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 font-mono text-sm text-slate-900 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                        [value]="currentValue(control.name)"
+                        (change)="onTriplet(control.name, $event)"
+                        [attr.aria-label]="(control.labelKey | translate) + ' R G B value'"
+                        placeholder="R G B"
+                      />
+                    </div>
+
+                    @if (contrastFor(control.name); as cv) {
+                      <div
+                        role="alert"
+                        class="mt-2 rounded-md border border-rose-300 bg-rose-50 p-2.5 text-xs text-rose-800 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-200"
+                      >
+                        <p class="font-semibold">
+                          {{ 'adminUi.theme.contrast.fails' | translate }}
+                          ({{ fmt(cv.failures[0].swatch.ratio) }}:1 &lt;
+                          {{ cv.failures[0].target }}:1)
+                        </p>
+                        @if (cv.candidates.length) {
+                          <p class="mt-1 text-rose-700 dark:text-rose-300">
+                            {{ 'adminUi.theme.contrast.snapHint' | translate }}
+                          </p>
+                          <div class="mt-1.5 flex flex-wrap gap-1.5">
+                            @for (cand of cv.candidates; track cand.value) {
+                              <button
+                                type="button"
+                                class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-2 py-1 font-mono text-[11px] font-medium text-rose-900 transition hover:bg-rose-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-500 dark:border-rose-500/40 dark:bg-slate-800 dark:text-rose-200 dark:hover:bg-rose-500/20"
+                                (click)="applySnap(cand)"
+                              >
+                                <span
+                                  class="h-3 w-3 rounded-full border border-black/10"
+                                  [style.background]="'rgb(' + cand.value + ')'"
+                                  aria-hidden="true"
+                                ></span>
+                                {{ cand.value }} · {{ fmt(cand.minRatio) }}:1
+                              </button>
+                            }
+                          </div>
+                        } @else {
+                          <p class="mt-1 text-rose-700 dark:text-rose-300">
+                            {{ 'adminUi.theme.contrast.noSnap' | translate }}
+                          </p>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                @for (control of group.controls; track trackControl($index, control)) {
+                  <div>
+                    <label
+                      [attr.for]="'ctl' + control.name"
+                      class="block text-sm font-medium text-slate-800 dark:text-slate-200"
+                    >
+                      {{ control.labelKey | translate }}
+                    </label>
+                    <select
+                      [attr.id]="'ctl' + control.name"
+                      class="mt-1.5 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                      [value]="currentValue(control.name)"
+                      (change)="onSelect(control.name, $event)"
+                    >
+                      @for (option of control.options; track option.value) {
+                        <option
+                          [value]="option.value"
+                          [selected]="option.value === currentValue(control.name)"
+                        >
+                          {{ option.labelKey | translate }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                }
+              </div>
+            }
+          </fieldset>
+        }
+
+        <!-- ── Version history ──────────────────────────────────────── -->
+        <section
+          class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+          aria-labelledby="theme-history-title"
+        >
+          <h2
+            id="theme-history-title"
+            class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+          >
+            {{ 'adminUi.theme.history.title' | translate }}
+          </h2>
+          @if (versions().length) {
+            <ul class="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+              @for (version of versions(); track trackVersion($index, version)) {
+                <li class="flex items-center justify-between gap-3 py-2.5">
+                  <span class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+                    <span class="font-mono font-semibold text-slate-900 dark:text-slate-100"
+                      >v{{ version.version }}</span
+                    >
+                    <span
+                      class="rounded-full px-2 py-0.5 text-[11px] font-medium"
+                      [class.bg-emerald-100]="version.status === 'published'"
+                      [class.text-emerald-800]="version.status === 'published'"
+                      [class.dark:bg-emerald-500/15]="version.status === 'published'"
+                      [class.dark:text-emerald-300]="version.status === 'published'"
+                      [class.bg-slate-100]="version.status !== 'published'"
+                      [class.text-slate-600]="version.status !== 'published'"
+                      [class.dark:bg-slate-800]="version.status !== 'published'"
+                      [class.dark:text-slate-400]="version.status !== 'published'"
+                    >
+                      {{ 'adminUi.theme.status.' + version.status | translate }}
+                    </span>
+                  </span>
+                  @if (version.status === 'published') {
+                    <button
+                      type="button"
+                      class="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:border-indigo-400 hover:text-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:text-indigo-300"
+                      [disabled]="busy()"
+                      (click)="rollback(version.version)"
+                    >
+                      {{ 'adminUi.theme.history.rollback' | translate }}
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
+              {{ 'adminUi.theme.history.empty' | translate }}
+            </p>
+          }
+        </section>
+      </div>
+
+      <!-- ── Preview + actions (sticky rail) ──────────────────────────── -->
+      <aside class="lg:sticky lg:top-6 lg:self-start">
+        <div
+          class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+        >
+          <h2
+            class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400"
+          >
+            {{ 'adminUi.theme.preview.title' | translate }}
+          </h2>
+          <p class="mb-3 mt-1 text-xs text-slate-500 dark:text-slate-400">
+            {{ 'adminUi.theme.preview.hint' | translate }}
+          </p>
+          <app-theme-live-preview></app-theme-live-preview>
+
+          <div class="mt-5 space-y-2.5">
+            <button
+              type="button"
+              class="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-white"
+              [disabled]="busy() || !dirty()"
+              (click)="save()"
+            >
+              {{ 'adminUi.theme.actions.save' | translate }}
+            </button>
+            <button
+              type="button"
+              class="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-40"
+              [disabled]="publishDisabled"
+              (click)="publish()"
+            >
+              {{ 'adminUi.theme.actions.publish' | translate }}
+            </button>
+            @if (dirty()) {
+              <p class="text-center text-xs text-slate-500 dark:text-slate-400">
+                {{ 'adminUi.theme.actions.saveFirst' | translate }}
+              </p>
+            } @else if (hasContrastFailures()) {
+              <p class="text-center text-xs text-rose-600 dark:text-rose-400">
+                {{ 'adminUi.theme.actions.fixContrast' | translate }}
+              </p>
+            }
+            <button
+              type="button"
+              class="w-full rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              [disabled]="busy()"
+              (click)="reset()"
+            >
+              {{ 'adminUi.theme.actions.reset' | translate }}
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  }
+
+  <!-- Always-mounted WU9 panic frame (theme-immune shadow-DOM overlay). -->
+  <app-theme-reset-frame (done)="onPanicReset()"></app-theme-reset-frame>
+</section>

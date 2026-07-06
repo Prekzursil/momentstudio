@@ -550,6 +550,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       exact: true,
     },
     { path: '/admin/content', labelKey: 'adminUi.nav.content', section: 'content' },
+    { path: '/admin/theme', labelKey: 'adminUi.nav.theme', section: 'theme' },
     { path: '/admin/products', labelKey: 'adminUi.nav.products', section: 'products' },
     { path: '/admin/inventory', labelKey: 'adminUi.nav.inventory', section: 'inventory' },
     { path: '/admin/orders', labelKey: 'adminUi.nav.orders', section: 'orders' },
@@ -562,6 +563,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
   private readonly ownerBasicSections = new Set([
     'dashboard',
     'content',
+    'theme',
     'products',
     'orders',
     'returns',
@@ -574,6 +576,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     inventory: 'ordersFulfillment',
     products: 'catalog',
     content: 'content',
+    theme: 'content',
     users: 'customersSupport',
     support: 'customersSupport',
     coupons: 'marketing',

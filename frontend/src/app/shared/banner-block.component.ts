@@ -15,17 +15,17 @@ import { ButtonComponent } from './button.component';
           <div class="grid gap-4">
             <p
               *ngIf="tagline"
-              class="font-cinzel font-semibold text-[28px] tracking-[0.3em] text-slate-500 dark:text-slate-400"
+              class="font-cinzel font-semibold text-[28px] tracking-[0.3em] text-text-muted"
             >
               {{ tagline }}
             </p>
             <h2
               *ngIf="slide.headline"
-              class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-slate-900 dark:text-slate-50"
+              class="text-3xl sm:text-4xl lg:text-5xl font-semibold leading-tight text-text-heading"
             >
               {{ slide.headline }}
             </h2>
-            <p *ngIf="slide.subheadline" class="text-lg text-slate-600 dark:text-slate-300">
+            <p *ngIf="slide.subheadline" class="text-lg text-text-secondary">
               {{ slide.subheadline }}
             </p>
             <div class="flex flex-wrap gap-3" *ngIf="slide.cta_label && slide.cta_url">
@@ -85,7 +85,7 @@ import { ButtonComponent } from './button.component';
             <ng-template #splitPlaceholder>
               <div
                 [ngClass]="imageClass()"
-                class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 grid place-items-center text-white text-xl font-semibold"
+                class="bg-gradient-to-br from-surface-inverse via-surface to-surface-raised grid place-items-center text-onmedia text-xl font-semibold"
               >
                 Banner image slot
               </div>
@@ -96,7 +96,7 @@ import { ButtonComponent } from './button.component';
 
       <ng-template #fullTpl>
         <div
-          class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          class="relative overflow-hidden rounded-3xl border border-border bg-background shadow-sm"
         >
           <ng-container *ngIf="imageUrl(); else fullPlaceholder">
             <ng-container *ngIf="useOptimizedAsset(); else fullPlainImage">
@@ -139,7 +139,7 @@ import { ButtonComponent } from './button.component';
           <ng-template #fullPlaceholder>
             <div
               [ngClass]="fullImageClass()"
-              class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 grid place-items-center text-white text-xl font-semibold"
+              class="bg-gradient-to-br from-surface-inverse via-surface to-surface-raised grid place-items-center text-onmedia text-xl font-semibold"
             >
               Banner image slot
             </div>
@@ -262,17 +262,15 @@ export class BannerBlockComponent {
 
   overlayClass(): string {
     return this.slide.text_style === 'light'
-      ? 'bg-gradient-to-t from-slate-900/70 via-slate-900/30 to-transparent'
-      : 'bg-gradient-to-t from-white/80 via-white/20 to-transparent dark:from-slate-900/70 dark:via-slate-900/30';
+      ? 'bg-gradient-to-t from-overlay/70 via-overlay/30 to-transparent'
+      : 'bg-gradient-to-t from-background/80 via-background/20 to-transparent';
   }
 
   textClass(): string {
-    return this.slide.text_style === 'light' ? 'text-white' : 'text-slate-900 dark:text-slate-50';
+    return this.slide.text_style === 'light' ? 'text-onmedia' : 'text-text-heading';
   }
 
   subTextClass(): string {
-    return this.slide.text_style === 'light'
-      ? 'text-slate-100'
-      : 'text-slate-700 dark:text-slate-200';
+    return this.slide.text_style === 'light' ? 'text-text-muted' : 'text-text';
   }
 }

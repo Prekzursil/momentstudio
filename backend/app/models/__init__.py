@@ -90,6 +90,12 @@ from app.models.media import (  # noqa: F401
     MediaCollectionItem,
     MediaApprovalEvent,
 )
+from app.models.theme import (  # noqa: F401
+    Theme,
+    ThemeStatus,
+    ThemeVersion,
+    ThemeAuditLog,
+)
 from app.models.wishlist import WishlistItem  # noqa: F401
 from app.models.webhook import PayPalWebhookEvent, StripeWebhookEvent  # noqa: F401
 from app.models.blog import (
@@ -186,6 +192,10 @@ __all__ = [
     "ContentAuditLog",
     "ContentBlockTranslation",
     "ContentRedirect",
+    "Theme",
+    "ThemeStatus",
+    "ThemeVersion",
+    "ThemeAuditLog",
     "MediaAsset",
     "MediaAssetType",
     "MediaAssetStatus",
