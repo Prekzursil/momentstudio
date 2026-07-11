@@ -18,10 +18,15 @@
 
 const HEX_ESCAPE = /\\([0-9a-fA-F]{1,6})[ \t\n\f\r]?/g;
 const LITERAL_ESCAPE = /\\([^0-9a-fA-F])/g;
-// Excludes whitespace from the URL-target class so the surrounding `\s*` cannot
-// overlap it — prevents polynomial backtracking (ReDoS) on `url(` + many spaces.
-// Valid URLs carry no unescaped whitespace, so a spaced target correctly fails.
-const URL_CALL = /url\(\s*(['"]?)([^'")\s]*)\1\s*\)/gi;
+// URL-target class excludes quotes, `)`, `(` and whitespace. Excluding `(`
+// mirrors the CSS url-token grammar (an unquoted `url()` value cannot contain an
+// unescaped `(`) and keeps matching linear: the scan stops at the next `(`
+// instead of running to end-of-input and backtracking, so `url(` followed by
+// many `url(!` repetitions can no longer drive polynomial backtracking (ReDoS).
+// Mirrors the backend theme_validation `_URL_CALL` (which additionally matches
+// the class possessively; JS has no possessive quantifier, but the `(` exclusion
+// alone is linear and match-equivalent — a spaced/`(`-bearing target still fails).
+const URL_CALL = /url\(\s*(['"]?)([^'")(\s]*)\1\s*\)/gi;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
 /** True if the value contains a C0 control character or DEL (0x00-0x1f, 0x7f). */

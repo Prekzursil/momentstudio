@@ -13,6 +13,7 @@ the CSS-escape decoder edge cases.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -253,3 +254,33 @@ def test_encode_css_safe_url_allowlist() -> None:
     ok_result = encode_css_safe("15 23 42", allow_url=True)
     assert ok_result.ok is True
     assert ok_result.value == "15 23 42"
+
+
+def test_encode_css_safe_url_matching_is_linear_not_redos() -> None:
+    # Regression for CodeQL py/polynomial-redos: a ``url(`` prefix followed by
+    # many ``url(!`` repetitions previously drove polynomial backtracking in the
+    # ``_URL_CALL`` scan (the greedy target class ran to end-of-input at every
+    # ``url(`` start, then backtracked hunting for a closing ``)``). The hardened
+    # pattern (possessive quantifier + a target class that also excludes ``(``)
+    # is linear, so this ~100k-char pathological input resolves near-instantly and
+    # still hard-rejects (no closing ``)`` -> no match -> reject). A generous 1s
+    # budget flags a regression (the vulnerable form takes many seconds here)
+    # without being flaky (the fixed form is single-digit milliseconds).
+    pathological = "url(" + "url(!" * 20000
+    start = time.perf_counter()
+    result = encode_css_safe(pathological, allow_url=True)
+    elapsed = time.perf_counter() - start
+    assert result.ok is False
+    assert elapsed < 1.0, f"url() scan took {elapsed:.3f}s — possible ReDoS regression"
+
+
+def test_encode_css_safe_url_rejects_unescaped_paren_target() -> None:
+    # The hardened target class excludes ``(`` to match the CSS url-token grammar
+    # (an unquoted ``url()`` value cannot contain an unescaped ``(``), so such
+    # already-invalid values hard-reject (the scan finds no complete ``url(...)``).
+    # This is a strict tightening on invalid CSS only; spec-valid targets below
+    # still validate exactly as before.
+    assert encode_css_safe("url(https://a.com/a(b).png)", allow_url=True).ok is False
+    assert encode_css_safe("url(a(b))", allow_url=True).ok is False
+    assert encode_css_safe("url(https://a.com/a-b.png)", allow_url=True).ok is True
+    assert encode_css_safe("url(/self/a-b.woff2)", allow_url=True).ok is True
