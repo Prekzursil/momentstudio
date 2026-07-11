@@ -62,10 +62,21 @@ _SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*:", re.IGNORECASE)
 _HEX_ESCAPE = re.compile(r"\\([0-9a-fA-F]{1,6})[ \t\n\f\r]?")
 _LITERAL_ESCAPE = re.compile(r"\\([^0-9a-fA-F])")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
-# ``\s``-excluded target class so the surrounding ``\s*`` cannot overlap it —
-# prevents polynomial backtracking (ReDoS) on ``url(`` + many spaces. Mirrors
-# the frontend css-safe-encode URL_CALL.
-_URL_CALL = re.compile(r"url\(\s*(['\"]?)([^'\")\s]*)\1\s*\)", re.IGNORECASE)
+# URL-target class excludes quotes, ``)``, ``(`` AND whitespace, matched
+# possessively (``*+``). Two guarantees flow from this:
+#   1. Linear time — the scan stops at the next ``(`` instead of running to
+#      end-of-input and then backtracking, so ``url(`` followed by many ``url(!``
+#      repetitions can no longer drive polynomial backtracking (CodeQL
+#      py/polynomial-redos). The possessive ``*+`` additionally forbids ALL
+#      backtracking into the class (its followers ``\1``/``\s*``/``\)`` are
+#      disjoint from it, so this never changes what is matched).
+#   2. Correctness — an unquoted ``url()`` value cannot contain an unescaped
+#      ``(`` per the CSS url-token grammar, so excluding it only ever rejects
+#      values that were already invalid CSS; every legitimate (spec-valid) value
+#      classifies identically to before.
+# Mirrors the frontend css-safe-encode URL_CALL (same class; JS has no possessive
+# quantifier, but excluding ``(`` alone is linear and match-equivalent there).
+_URL_CALL = re.compile(r"url\(\s*(['\"]?)([^'\")(\s]*+)\1\s*\)", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
