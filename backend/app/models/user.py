@@ -3,7 +3,6 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime, date
-from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
@@ -23,8 +22,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
-if TYPE_CHECKING:
-    from app.models.passkeys import UserPasskey
+# NOTE: `UserPasskey` is intentionally NOT imported here (not even under
+# TYPE_CHECKING) to avoid a module-level import cycle with app.models.passkeys
+# that CodeQL flags as py/unsafe-cyclic-import. SQLAlchemy resolves the
+# relationship target via the registry using the string "UserPasskey"; the
+# `Mapped[list["UserPasskey"]]` annotation is a forward reference suppressed
+# with a noqa F821 directive on the field below.
 
 
 class UserRole(str, enum.Enum):
@@ -172,7 +175,7 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="selectin",
     )
-    passkeys: Mapped[list["UserPasskey"]] = relationship(
+    passkeys: Mapped[list["UserPasskey"]] = relationship(  # type: ignore[name-defined]  # noqa: F821  # forward ref resolved by SQLAlchemy registry; import omitted to break a cyclic import (CodeQL py/unsafe-cyclic-import)
         "UserPasskey",
         back_populates="user",
         cascade="all, delete-orphan",
