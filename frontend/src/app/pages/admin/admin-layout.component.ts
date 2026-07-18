@@ -515,6 +515,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
 
   private readonly injector = inject(Injector);
   private pendingGoAt: number | null = null;
+  // istanbul ignore next -- SSR guard: `window` is undefined only during server-side prerender, never under the Karma browser runner
   isDesktop = typeof window !== 'undefined' ? window.innerWidth >= 1024 : true;
   mobileSidebarOpen = false;
   navQuery = '';
@@ -920,11 +921,15 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
       grouped.get(groupKey)?.push(item);
     }
     this.groupedFilteredNavItemsView = this.groupOrder
-      .map((key) => ({
-        key,
-        labelKey: this.groupLabelKey[key],
-        items: grouped.get(key) ?? [],
-      }))
+      .map((key) => {
+        // istanbul ignore next -- defensive: every groupOrder key is pre-seeded into `grouped` above, so the `?? []` fallback is unreachable
+        const items = grouped.get(key) ?? [];
+        return {
+          key,
+          labelKey: this.groupLabelKey[key],
+          items,
+        };
+      })
       .filter((group) => group.items.length > 0);
   }
 
@@ -1004,6 +1009,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     const raw = (url || '').trim();
     if (!raw.startsWith('/admin')) return;
     const normalized = raw.split('?')[0].split('#')[0];
+    // istanbul ignore next -- defensive: `raw` is guaranteed to start with '/admin' here, so `normalized` is never empty
     if (!normalized) return;
     if (/^\/admin\/orders\/[^/]+$/.test(normalized)) return;
 
@@ -1012,6 +1018,7 @@ export class AdminLayoutComponent implements OnInit, OnDestroy {
     );
     if (!candidates.length) return;
     const match = candidates.sort((a, b) => b.path.length - a.path.length)[0];
+    // istanbul ignore next -- defensive: `candidates` is non-empty here, so `sort()[0]` is always defined
     if (!match) return;
 
     const label = this.navLabel(match);

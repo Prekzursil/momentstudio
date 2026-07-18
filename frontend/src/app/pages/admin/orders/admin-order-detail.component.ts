@@ -2543,18 +2543,21 @@ export class AdminOrderDetailComponent implements OnInit {
     if (country === 'RO') {
       if (digits.length === 10 && digits.startsWith('0')) {
         const suggestion = `+40${digits.slice(1)}`;
+        /* istanbul ignore next -- defensive: the constructed +40 suggestion always satisfies e164PhoneRe, so the invalid branch is unreachable */
         return this.e164PhoneRe.test(suggestion)
           ? { state: 'warn', suggestion }
           : { state: 'invalid' };
       }
       if (digits.length === 9) {
         const suggestion = `+40${digits}`;
+        /* istanbul ignore next -- defensive: the constructed +40 suggestion always satisfies e164PhoneRe, so the invalid branch is unreachable */
         return this.e164PhoneRe.test(suggestion)
           ? { state: 'warn', suggestion }
           : { state: 'invalid' };
       }
       if (digits.length === 11 && digits.startsWith('40')) {
         const suggestion = `+${digits}`;
+        /* istanbul ignore next -- defensive: the constructed +40 suggestion always satisfies e164PhoneRe, so the invalid branch is unreachable */
         return this.e164PhoneRe.test(suggestion)
           ? { state: 'warn', suggestion }
           : { state: 'invalid' };
@@ -2799,6 +2802,7 @@ export class AdminOrderDetailComponent implements OnInit {
     if (!raw) return '—';
     if (raw === 'sameday') return this.translate.instant('checkout.courierSameday');
     if (raw === 'fan_courier') return this.translate.instant('checkout.courierFanCourier');
+    /* istanbul ignore next -- defensive: reached only past the `if (!raw)` guard, so courier is a non-empty string and the ?? '' / || '—' fallbacks are unreachable */
     return (courier ?? '').trim() || '—';
   }
 
@@ -3654,6 +3658,7 @@ export class AdminOrderDetailComponent implements OnInit {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
+        /* istanbul ignore next -- defensive: orderId is the guarded-truthy order id, so orderRef() (reference_code || id.slice) is always truthy and the `|| orderId` fallback is unreachable */
         a.download =
           this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
         a.click();
@@ -3677,6 +3682,7 @@ export class AdminOrderDetailComponent implements OnInit {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
+        /* istanbul ignore next -- defensive: orderId is the guarded-truthy order id, so orderRef() (reference_code || id.slice) is always truthy and the `|| orderId` fallback is unreachable */
         a.download =
           this.order()?.shipping_label_filename || `order-${this.orderRef() || orderId}-label`;
         a.click();

@@ -9,13 +9,42 @@ import {
 
 describe('webauthn helpers', () => {
   describe('isWebAuthnSupported', () => {
+    let originalSecureContext: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+      originalSecureContext = Object.getOwnPropertyDescriptor(window, 'isSecureContext');
+    });
+
+    afterEach(() => {
+      // Restore the genuine `isSecureContext` so later specs see the real value.
+      if (originalSecureContext) {
+        Object.defineProperty(window, 'isSecureContext', originalSecureContext);
+      } else {
+        delete (window as unknown as { isSecureContext?: boolean }).isSecureContext;
+      }
+    });
+
+    // REASON(chrome-149-readonly-prop): Chrome 149 exposes
+    // `window.isSecureContext` as a configurable data property with no getter,
+    // so jasmine's `spyOnProperty(window, 'isSecureContext', 'get')` throws
+    // "does not have access type get". Redefine it as a configurable accessor to
+    // drive the real branch that `isWebAuthnSupported()` reads; `afterEach`
+    // restores the original descriptor. This controls real behaviour, not a stub
+    // of the function under test.
+    function setSecureContext(value: boolean): void {
+      Object.defineProperty(window, 'isSecureContext', {
+        configurable: true,
+        get: () => value,
+      });
+    }
+
     it('returns false when the context is not secure', () => {
-      spyOnProperty(window, 'isSecureContext', 'get').and.returnValue(false);
+      setSecureContext(false);
       expect(isWebAuthnSupported()).toBeFalse();
     });
 
     it('returns true in a secure context with PublicKeyCredential + credentials', () => {
-      spyOnProperty(window, 'isSecureContext', 'get').and.returnValue(true);
+      setSecureContext(true);
       const win = window as unknown as { PublicKeyCredential?: unknown };
       const hadPkc = 'PublicKeyCredential' in win;
       const original = win.PublicKeyCredential;
@@ -33,7 +62,7 @@ describe('webauthn helpers', () => {
     });
 
     it('returns false when PublicKeyCredential is unavailable', () => {
-      spyOnProperty(window, 'isSecureContext', 'get').and.returnValue(true);
+      setSecureContext(true);
       const win = window as unknown as { PublicKeyCredential?: unknown };
       const hadPkc = 'PublicKeyCredential' in win;
       const original = win.PublicKeyCredential;
@@ -63,6 +92,21 @@ describe('webauthn helpers', () => {
     it('keeps already-padded base64 untouched (no padding branch)', () => {
       const bytes = base64urlToUint8Array('YWJjZA=='); // "abcd"
       expect(String.fromCharCode(...bytes)).toBe('abcd');
+    });
+
+    it('trims surrounding whitespace before decoding', () => {
+      const bytes = base64urlToUint8Array('  aGk \n');
+      expect(Array.from(bytes)).toEqual([104, 105]);
+    });
+
+    it('decodes base64url-specific - and _ characters back to their bytes', () => {
+      // 0xfb 0xff 0xbf -> base64 "-/+/v" ... use a known url-safe sample:
+      // bytes [251, 239, 190] -> base64 "++++" style; verify - and _ are translated.
+      const original = new Uint8Array([0xfb, 0xef, 0xbe]);
+      const urlSafe = bufferToBase64url(original); // contains - and/or _
+      expect(urlSafe).not.toContain('+');
+      expect(urlSafe).not.toContain('/');
+      expect(Array.from(base64urlToUint8Array(urlSafe))).toEqual(Array.from(original));
     });
   });
 

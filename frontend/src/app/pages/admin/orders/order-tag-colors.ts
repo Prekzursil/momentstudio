@@ -90,10 +90,12 @@ export function tagColorFor(tag: string, overrides: Record<string, TagColor>): T
     hash = (hash * 31 + key.charCodeAt(i)) | 0;
   }
   const idx = Math.abs(hash) % TAG_COLOR_PALETTE.length;
+  /* istanbul ignore next -- defensive fallback: idx is always an in-range palette index (Math.abs(hash) % length), so the lookup never yields undefined */
   return TAG_COLOR_PALETTE[idx] || 'slate';
 }
 
 export function tagChipColorClass(tag: string, overrides: Record<string, TagColor>): string {
   const color = tagColorFor(tag, overrides);
+  /* istanbul ignore next -- defensive fallback: tagColorFor always returns a valid TagColor, and every palette colour has a class entry, so the lookup never yields undefined */
   return TAG_COLOR_CLASSES[color] || TAG_COLOR_CLASSES.slate;
 }

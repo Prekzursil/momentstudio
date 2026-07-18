@@ -26,30 +26,24 @@ import {
   AdminProductDetail,
   FeaturedCollection,
   ContentImageAssetRead,
-  ContentBlockVersionListItem,
-  ContentBlockVersionRead,
   ContentPageListItem,
   ContentRedirectRead,
   ContentRedirectImportResult,
-  StructuredDataValidationResponse,
   ContentLinkCheckIssue,
   ContentFindReplacePreviewResponse,
   ContentFindReplaceApplyResponse,
   ContentPreviewTokenResponse,
 } from '../../core/admin.service';
-import { AdminBlogComment, BlogService } from '../../core/blog.service';
+import { BlogService } from '../../core/blog.service';
 import { FxAdminService, FxAdminStatus, FxOverrideAuditEntry } from '../../core/fx-admin.service';
 import { TaxGroupRead, TaxesAdminService } from '../../core/taxes-admin.service';
 import { ToastService } from '../../core/toast.service';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { combineLatest, firstValueFrom, forkJoin, of, Subscription } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { combineLatest, firstValueFrom, Subscription } from 'rxjs';
 import { MarkdownService } from '../../core/markdown.service';
 import { AuthService } from '../../core/auth.service';
-import { appConfig } from '../../core/app-config';
 import { AdminProductListItem, AdminProductsService } from '../../core/admin-products.service';
-import { diffLines } from 'diff';
 import { formatIdentity } from '../../shared/user-identity';
 import { ContentRevisionsComponent } from './shared/content-revisions.component';
 import { AssetLibraryComponent } from './shared/asset-library.component';
@@ -62,6 +56,16 @@ import {
   CmsBlockLibraryTemplate,
 } from './shared/cms-block-library.component';
 import { LocalizedTextEditorComponent } from './shared/localized-text-editor.component';
+import { AdminCompanyInfoComponent } from './settings/admin-company-info.component';
+import { AdminCheckoutSettingsComponent } from './settings/admin-checkout-settings.component';
+import { AdminSiteAssetsComponent } from './settings/admin-site-assets.component';
+import { AdminSocialLinksComponent } from './settings/admin-social-links.component';
+import { AdminSeoComponent } from './settings/admin-seo.component';
+import { AdminLegalPagesComponent, LegalPageKey } from './settings/admin-legal-pages.component';
+import { AdminReportsComponent } from './settings/admin-reports.component';
+import { AdminCategoryManagerComponent } from './content/admin-category-manager.component';
+import { AdminBlogEditorComponent } from './content/admin-blog-editor.component';
+import { AdminCmsStateService, CmsDraftManager } from './content/admin-cms-state.service';
 import {
   CMS_GLOBAL_SECTIONS,
   CmsGlobalSectionKey,
@@ -71,13 +75,8 @@ import {
 } from '../../shared/cms-global-sections';
 
 type AdminContentSection = 'home' | 'pages' | 'blog' | 'settings';
-type UiLang = 'en' | 'ro';
+export type UiLang = 'en' | 'ro';
 type ContentStatusUi = 'draft' | 'review' | 'published';
-type LegalPageKey =
-  | 'page.terms'
-  | 'page.terms-and-conditions'
-  | 'page.privacy-policy'
-  | 'page.anpc';
 const CMS_DRAFT_POLL_INTERVAL_MS = 1200;
 
 type HomeSectionId =
@@ -174,7 +173,7 @@ type CmsReusableBlock = {
   block: Omit<PageBlockDraft, 'key'>;
 };
 
-type HomeBlockDraft = {
+export type HomeBlockDraft = {
   key: string;
   type: HomeBlockType;
   enabled: boolean;
@@ -207,7 +206,8 @@ type HomeBlockDraft = {
   layout?: CmsBlockLayout;
 };
 
-type PageBuilderKey = `page.${string}` | CmsGlobalSectionKey;
+export type PageBuilderKey = `page.${string}` | CmsGlobalSectionKey;
+type BuilderContext = 'home' | 'page';
 type PageBlockType =
   | 'text'
   | 'columns'
@@ -222,7 +222,7 @@ type PageBlockType =
   | 'carousel';
 type PageBlockDraft = Omit<HomeBlockDraft, 'type'> & { type: PageBlockType };
 
-type PageBlocksDraftState = {
+export type PageBlocksDraftState = {
   blocks: PageBlockDraft[];
   status: ContentStatusUi;
   publishedAt: string;
@@ -232,7 +232,7 @@ type PageBlocksDraftState = {
 
 type PageCreationTemplate = 'blank' | 'about' | 'faq' | 'shipping' | 'returns';
 
-type BlogDraftState = {
+export type BlogDraftState = {
   title: string;
   body_markdown: string;
   status: ContentStatusUi;
@@ -255,248 +255,10 @@ type CmsPublishChecklistResult = {
   linkIssues: ContentLinkCheckIssue[];
 };
 
-type CmsAutosaveEnvelope = {
-  v: 1;
-  ts: string;
-  state_json: string;
-};
-
-class CmsDraftManager<T> {
-  private initialized = false;
-  private past: string[] = [];
-  private future: string[] = [];
-  private present = '';
-  private server = '';
-  private restoreCandidate: CmsAutosaveEnvelope | null = null;
-  private pending: string | null = null;
-  private pendingTimer: number | null = null;
-  dirty = false;
-  autosavePending = false;
-  lastAutosavedAt: string | null = null;
-
-  constructor(
-    private readonly storageKey: string,
-    private readonly opts: { debounceMs: number; limit: number } = { debounceMs: 650, limit: 60 },
-  ) {}
-
-  get hasRestorableAutosave(): boolean {
-    return Boolean(this.restoreCandidate?.state_json);
-  }
-
-  get restorableAutosaveAt(): string | null {
-    return this.restoreCandidate?.ts || null;
-  }
-
-  isReady(): boolean {
-    return this.initialized;
-  }
-
-  initFromServer(state: T): void {
-    const serialized = this.serialize(state);
-    this.initialized = true;
-    this.past = [];
-    this.future = [];
-    this.present = serialized;
-    this.server = serialized;
-    this.pending = null;
-    this.clearPendingTimer();
-    this.dirty = false;
-    this.autosavePending = false;
-    this.lastAutosavedAt = null;
-    this.restoreCandidate = this.readAutosaveCandidate(serialized);
-  }
-
-  markServerSaved(state: T, clearAutosave = true): void {
-    if (!this.initialized) return;
-    this.commitNow(state);
-    this.server = this.present;
-    this.dirty = false;
-    if (clearAutosave) this.clearAutosave();
-  }
-
-  observe(state: T): void {
-    if (!this.initialized) return;
-    const serialized = this.serialize(state);
-    this.dirty = serialized !== this.server;
-    if (serialized === this.present) return;
-    this.pending = serialized;
-    this.autosavePending = true;
-    this.resetCommitTimer();
-  }
-
-  canUndo(current: T): boolean {
-    if (!this.initialized) return false;
-    const serialized = this.serialize(current);
-    return this.past.length > 0 || serialized !== this.present;
-  }
-
-  canRedo(current: T): boolean {
-    if (!this.initialized) return false;
-    const serialized = this.serialize(current);
-    if (serialized !== this.present) return false;
-    return this.future.length > 0;
-  }
-
-  undo(current: T): T | null {
-    if (!this.initialized) return null;
-    this.commitNow(current);
-    if (!this.past.length) return null;
-    this.future.push(this.present);
-    const prev = this.past.pop()!;
-    this.present = prev;
-    this.dirty = this.present !== this.server;
-    this.writeAutosave(this.present);
-    return this.deserialize(prev);
-  }
-
-  redo(current: T): T | null {
-    if (!this.initialized) return null;
-    this.commitNow(current);
-    if (!this.future.length) return null;
-    this.past.push(this.present);
-    const next = this.future.pop()!;
-    this.present = next;
-    this.dirty = this.present !== this.server;
-    this.writeAutosave(this.present);
-    return this.deserialize(next);
-  }
-
-  restoreAutosave(current: T): T | null {
-    if (!this.initialized) return null;
-    const candidate = this.restoreCandidate;
-    if (!candidate?.state_json) return null;
-    const restored = candidate.state_json;
-    this.commitNow(current);
-    if (restored === this.present) {
-      this.restoreCandidate = null;
-      return null;
-    }
-    this.past.push(this.present);
-    this.trimPast();
-    this.present = restored;
-    this.lastAutosavedAt = candidate.ts;
-    this.dirty = this.present !== this.server;
-    this.restoreCandidate = null;
-    this.writeAutosave(restored, candidate.ts);
-    return this.deserialize(restored);
-  }
-
-  discardAutosave(): void {
-    this.clearAutosave();
-    this.restoreCandidate = null;
-  }
-
-  dispose(): void {
-    this.clearPendingTimer();
-  }
-
-  private commitNow(state: T): void {
-    const serialized = this.serialize(state);
-    this.clearPendingTimer();
-    this.pending = null;
-    this.autosavePending = false;
-    this.dirty = serialized !== this.server;
-    if (serialized === this.present) return;
-    if (this.present) {
-      this.past.push(this.present);
-      this.trimPast();
-    }
-    this.present = serialized;
-    this.future = [];
-    this.writeAutosave(serialized);
-  }
-
-  private resetCommitTimer(): void {
-    this.clearPendingTimer();
-    this.pendingTimer = window.setTimeout(() => this.commitPending(), this.opts.debounceMs);
-  }
-
-  private commitPending(): void {
-    if (!this.pending) {
-      this.autosavePending = false;
-      return;
-    }
-    const next = this.pending;
-    this.pending = null;
-    this.pendingTimer = null;
-    this.autosavePending = false;
-    if (next === this.present) return;
-    if (this.present) {
-      this.past.push(this.present);
-      this.trimPast();
-    }
-    this.present = next;
-    this.future = [];
-    this.dirty = this.present !== this.server;
-    this.writeAutosave(next);
-  }
-
-  private trimPast(): void {
-    if (this.past.length <= this.opts.limit) return;
-    this.past.splice(0, this.past.length - this.opts.limit);
-  }
-
-  private clearPendingTimer(): void {
-    if (this.pendingTimer !== null) {
-      window.clearTimeout(this.pendingTimer);
-      this.pendingTimer = null;
-    }
-  }
-
-  private serialize(state: T): string {
-    return JSON.stringify(state);
-  }
-
-  private deserialize(raw: string): T {
-    return JSON.parse(raw) as T;
-  }
-
-  private writeAutosave(stateJson: string, tsOverride?: string): void {
-    if (typeof window === 'undefined') return;
-    const ts = tsOverride || new Date().toISOString();
-    this.lastAutosavedAt = ts;
-    try {
-      const payload: CmsAutosaveEnvelope = { v: 1, ts, state_json: stateJson };
-      window.localStorage.setItem(this.storageKey, JSON.stringify(payload));
-    } catch {
-      // ignore quota / browser storage errors
-    }
-  }
-
-  private clearAutosave(): void {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.removeItem(this.storageKey);
-    } catch {
-      // ignore
-    }
-    this.lastAutosavedAt = null;
-  }
-
-  private readAutosaveCandidate(serverStateJson: string): CmsAutosaveEnvelope | null {
-    if (typeof window === 'undefined') return null;
-    const raw = window.localStorage.getItem(this.storageKey);
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw) as Partial<CmsAutosaveEnvelope> | null;
-      if (!parsed || parsed.v !== 1) return null;
-      const ts = typeof parsed.ts === 'string' ? parsed.ts : '';
-      const stateJson = typeof parsed.state_json === 'string' ? parsed.state_json : '';
-      if (!ts || !stateJson) return null;
-      if (stateJson === serverStateJson) {
-        window.localStorage.removeItem(this.storageKey);
-        return null;
-      }
-      return { v: 1, ts, state_json: stateJson };
-    } catch {
-      return null;
-    }
-  }
-}
-
 @Component({
   selector: 'app-admin',
   standalone: true,
+  providers: [AdminCmsStateService],
   imports: [
     CommonModule,
     FormsModule,
@@ -515,6 +277,15 @@ class CmsDraftManager<T> {
     BannerBlockComponent,
     CarouselBlockComponent,
     LocalizedTextEditorComponent,
+    AdminCompanyInfoComponent,
+    AdminCheckoutSettingsComponent,
+    AdminSiteAssetsComponent,
+    AdminSocialLinksComponent,
+    AdminSeoComponent,
+    AdminLegalPagesComponent,
+    AdminReportsComponent,
+    AdminCategoryManagerComponent,
+    AdminBlogEditorComponent,
     TranslateModule,
   ],
   template: `
@@ -529,245 +300,21 @@ class CmsDraftManager<T> {
         (retry)="retryLoadAll()"
       ></app-error-state>
       <div class="grid gap-6" *ngIf="!loading(); else loadingTpl">
-        <section
+        <app-admin-site-assets
           *ngIf="section() === 'settings'"
-          class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.site.assets.title' | translate }}
-            </h2>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.actions.refresh' | translate"
-              (action)="loadAssets()"
-            ></app-button>
-          </div>
-          <div class="grid md:grid-cols-3 gap-3 text-sm">
-            <app-input
-              [label]="'adminUi.site.assets.logoUrl' | translate"
-              [(value)]="assetsForm.logo_url"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.assets.faviconUrl' | translate"
-              [(value)]="assetsForm.favicon_url"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.assets.socialImageUrl' | translate"
-              [(value)]="assetsForm.social_image_url"
-            ></app-input>
-          </div>
-          <div class="flex items-center gap-2 text-sm">
-            <app-button
-              size="sm"
-              [label]="'adminUi.site.assets.save' | translate"
-              (action)="saveAssets()"
-            ></app-button>
-            <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="assetsMessage">{{
-              assetsMessage
-            }}</span>
-            <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="assetsError">{{
-              assetsError
-            }}</span>
-          </div>
+          [rememberContentVersion]="boundRememberContentVersion"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+          [forgetContentVersion]="boundForgetContentVersion"
+        ></app-admin-site-assets>
 
-          <details
-            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
-          >
-            <summary
-              class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-            >
-              {{ 'adminUi.site.assets.library.title' | translate }}
-            </summary>
-            <div class="mt-3">
-              <app-asset-library
-                [initialKey]="'site.assets'"
-                [allowSelect]="false"
-              ></app-asset-library>
-            </div>
-          </details>
-        </section>
-
-        <section
+        <app-admin-social-links
           *ngIf="section() === 'settings'"
-          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.site.social.title' | translate }}
-            </h2>
-            <div class="flex items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.actions.refresh' | translate"
-                (action)="loadSocial()"
-              ></app-button>
-              <app-button
-                size="sm"
-                [label]="'adminUi.actions.save' | translate"
-                (action)="saveSocial()"
-              ></app-button>
-            </div>
-          </div>
-          <div class="grid md:grid-cols-2 gap-3 text-sm">
-            <app-input
-              [label]="'adminUi.site.social.phone' | translate"
-              [(value)]="socialForm.phone"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.social.email' | translate"
-              [(value)]="socialForm.email"
-            ></app-input>
-          </div>
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="grid gap-2">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.site.social.instagramPages' | translate }}
-                </p>
-                <button
-                  class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
-                  type="button"
-                  (click)="addSocialLink('instagram')"
-                >
-                  {{ 'adminUi.actions.add' | translate }}
-                </button>
-              </div>
-              <div
-                *ngFor="let page of socialForm.instagram_pages; let i = index"
-                class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
-              >
-                <app-input
-                  [label]="'adminUi.site.social.label' | translate"
-                  [(value)]="page.label"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.site.social.url' | translate"
-                  [(value)]="page.url"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.site.social.thumbnailUrlOptional' | translate"
-                  [(value)]="page.thumbnail_url"
-                ></app-input>
-                <div class="flex items-center gap-2">
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.site.social.fetchThumbnail' | translate"
-                    [disabled]="
-                      socialThumbLoading[socialThumbKey('instagram', i)] || !(page.url || '').trim()
-                    "
-                    (action)="fetchSocialThumbnail('instagram', i)"
-                  ></app-button>
-                  <span
-                    *ngIf="socialThumbLoading[socialThumbKey('instagram', i)]"
-                    class="text-xs text-slate-600 dark:text-slate-300"
-                  >
-                    {{ 'adminUi.site.social.fetching' | translate }}
-                  </span>
-                  <span
-                    *ngIf="socialThumbErrors[socialThumbKey('instagram', i)]"
-                    class="text-xs text-rose-700 dark:text-rose-300"
-                  >
-                    {{ socialThumbErrors[socialThumbKey('instagram', i)] }}
-                  </span>
-                </div>
-                <img
-                  *ngIf="(page.thumbnail_url || '').trim()"
-                  [src]="page.thumbnail_url"
-                  [alt]="page.label"
-                  class="h-10 w-10 rounded-full border border-slate-200 object-cover dark:border-slate-800"
-                  loading="lazy"
-                />
-                <button
-                  class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start"
-                  type="button"
-                  (click)="removeSocialLink('instagram', i)"
-                >
-                  {{ 'adminUi.actions.remove' | translate }}
-                </button>
-              </div>
-            </div>
-            <div class="grid gap-2">
-              <div class="flex items-center justify-between">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.site.social.facebookPages' | translate }}
-                </p>
-                <button
-                  class="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300"
-                  type="button"
-                  (click)="addSocialLink('facebook')"
-                >
-                  {{ 'adminUi.actions.add' | translate }}
-                </button>
-              </div>
-              <div
-                *ngFor="let page of socialForm.facebook_pages; let i = index"
-                class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
-              >
-                <app-input
-                  [label]="'adminUi.site.social.label' | translate"
-                  [(value)]="page.label"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.site.social.url' | translate"
-                  [(value)]="page.url"
-                ></app-input>
-                <app-input
-                  [label]="'adminUi.site.social.thumbnailUrlOptional' | translate"
-                  [(value)]="page.thumbnail_url"
-                ></app-input>
-                <div class="flex items-center gap-2">
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.site.social.fetchThumbnail' | translate"
-                    [disabled]="
-                      socialThumbLoading[socialThumbKey('facebook', i)] || !(page.url || '').trim()
-                    "
-                    (action)="fetchSocialThumbnail('facebook', i)"
-                  ></app-button>
-                  <span
-                    *ngIf="socialThumbLoading[socialThumbKey('facebook', i)]"
-                    class="text-xs text-slate-600 dark:text-slate-300"
-                  >
-                    {{ 'adminUi.site.social.fetching' | translate }}
-                  </span>
-                  <span
-                    *ngIf="socialThumbErrors[socialThumbKey('facebook', i)]"
-                    class="text-xs text-rose-700 dark:text-rose-300"
-                  >
-                    {{ socialThumbErrors[socialThumbKey('facebook', i)] }}
-                  </span>
-                </div>
-                <img
-                  *ngIf="(page.thumbnail_url || '').trim()"
-                  [src]="page.thumbnail_url"
-                  [alt]="page.label"
-                  class="h-10 w-10 rounded-full border border-slate-200 object-cover dark:border-slate-800"
-                  loading="lazy"
-                />
-                <button
-                  class="text-xs text-rose-700 hover:underline dark:text-rose-300 justify-self-start"
-                  type="button"
-                  (click)="removeSocialLink('facebook', i)"
-                >
-                  {{ 'adminUi.actions.remove' | translate }}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 text-sm">
-            <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="socialMessage">{{
-              socialMessage
-            }}</span>
-            <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="socialError">{{
-              socialError
-            }}</span>
-          </div>
-        </section>
+          [rememberContentVersion]="boundRememberContentVersion"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+          [forgetContentVersion]="boundForgetContentVersion"
+        ></app-admin-social-links>
 
         <section
           *ngIf="section() === 'settings'"
@@ -1073,664 +620,38 @@ class CmsDraftManager<T> {
           </div>
         </section>
 
-        <section
+        <app-admin-company-info
           *ngIf="section() === 'settings'"
-          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.site.company.title' | translate }}
-            </h2>
-            <div class="flex items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.actions.refresh' | translate"
-                (action)="loadCompany()"
-              ></app-button>
-              <app-button
-                size="sm"
-                [label]="'adminUi.actions.save' | translate"
-                (action)="saveCompany()"
-              ></app-button>
-            </div>
-          </div>
-          <p class="text-xs text-slate-600 dark:text-slate-300">
-            {{ 'adminUi.site.company.hint' | translate }}
-          </p>
-          <div class="grid md:grid-cols-2 gap-3 text-sm">
-            <app-input
-              [label]="'adminUi.site.company.fields.name' | translate"
-              [(value)]="companyForm.name"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.company.fields.registrationNumber' | translate"
-              [(value)]="companyForm.registration_number"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.company.fields.cui' | translate"
-              [(value)]="companyForm.cui"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.company.fields.phone' | translate"
-              [(value)]="companyForm.phone"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.company.fields.email' | translate"
-              [(value)]="companyForm.email"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.company.fields.address' | translate"
-              [(value)]="companyForm.address"
-            ></app-input>
-          </div>
+          [rememberContentVersion]="boundRememberContentVersion"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+          [forgetContentVersion]="boundForgetContentVersion"
+        ></app-admin-company-info>
 
-          <div
-            *ngIf="companyMissingFields().length"
-            class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-          >
-            <p class="text-xs font-semibold uppercase tracking-[0.2em]">
-              {{ 'adminUi.site.company.missing.title' | translate }}
-            </p>
-            <ul class="mt-2 list-disc pl-5 text-xs">
-              <li *ngFor="let fieldKey of companyMissingFields()">{{ fieldKey | translate }}</li>
-            </ul>
-          </div>
-
-          <div class="flex items-center gap-2 text-sm">
-            <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="companyMessage">{{
-              companyMessage
-            }}</span>
-            <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="companyError">{{
-              companyError
-            }}</span>
-          </div>
-        </section>
-
-        <section
+        <app-admin-checkout-settings
           *ngIf="section() === 'settings'"
-          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.site.checkout.title' | translate }}
-            </h2>
-            <div class="flex items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.actions.refresh' | translate"
-                (action)="loadCheckoutSettings()"
-              ></app-button>
-              <app-button
-                size="sm"
-                [label]="'adminUi.actions.save' | translate"
-                (action)="saveCheckoutSettings()"
-              ></app-button>
-            </div>
-          </div>
-          <p class="text-xs text-slate-600 dark:text-slate-300">
-            {{ 'adminUi.site.checkout.hint' | translate }}
-          </p>
-          <div class="grid md:grid-cols-2 gap-3 text-sm">
-            <app-input
-              [label]="'adminUi.site.checkout.shippingFee' | translate"
-              type="number"
-              [min]="0"
-              [step]="0.01"
-              placeholder="20.00"
-              [(value)]="checkoutSettingsForm.shipping_fee_ron"
-            ></app-input>
-            <app-input
-              [label]="'adminUi.site.checkout.freeShippingThreshold' | translate"
-              type="number"
-              [min]="0"
-              [step]="0.01"
-              placeholder="300.00"
-              [(value)]="checkoutSettingsForm.free_shipping_threshold_ron"
-            ></app-input>
-          </div>
+          [rememberContentVersion]="boundRememberContentVersion"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+          [forgetContentVersion]="boundForgetContentVersion"
+        ></app-admin-checkout-settings>
 
-          <div
-            class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950"
-          >
-            <p
-              class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300"
-            >
-              {{ 'adminUi.site.checkout.roundingTitle' | translate }}
-            </p>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'adminUi.site.checkout.roundingMode' | translate }}
-              <select
-                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [(ngModel)]="checkoutSettingsForm.money_rounding"
-              >
-                <option value="half_up">
-                  {{ 'adminUi.site.checkout.roundingModeHalfUp' | translate }}
-                </option>
-                <option value="half_even">
-                  {{ 'adminUi.site.checkout.roundingModeHalfEven' | translate }}
-                </option>
-                <option value="up">{{ 'adminUi.site.checkout.roundingModeUp' | translate }}</option>
-                <option value="down">
-                  {{ 'adminUi.site.checkout.roundingModeDown' | translate }}
-                </option>
-              </select>
-              <span class="text-xs font-normal text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.site.checkout.roundingHint' | translate }}
-              </span>
-            </label>
-          </div>
-
-          <div
-            class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950"
-          >
-            <p
-              class="text-xs font-semibold text-slate-600 uppercase tracking-[0.2em] dark:text-slate-300"
-            >
-              {{ 'adminUi.site.checkout.phoneRequirementsTitle' | translate }}
-            </p>
-            <label class="flex items-center gap-2">
-              <input type="checkbox" [(ngModel)]="checkoutSettingsForm.phone_required_home" />
-              <span class="text-slate-700 dark:text-slate-200">{{
-                'adminUi.site.checkout.phoneRequiredHome' | translate
-              }}</span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="checkbox" [(ngModel)]="checkoutSettingsForm.phone_required_locker" />
-              <span class="text-slate-700 dark:text-slate-200">{{
-                'adminUi.site.checkout.phoneRequiredLocker' | translate
-              }}</span>
-            </label>
-          </div>
-
-          <div class="grid gap-3 text-sm">
-            <label class="flex items-center gap-2">
-              <input type="checkbox" [(ngModel)]="checkoutSettingsForm.fee_enabled" />
-              <span class="text-slate-700 dark:text-slate-200">{{
-                'adminUi.site.checkout.feeEnabled' | translate
-              }}</span>
-            </label>
-            <div class="grid md:grid-cols-2 gap-3" *ngIf="checkoutSettingsForm.fee_enabled">
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.site.checkout.feeType' | translate }}
-                <select
-                  class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="checkoutSettingsForm.fee_type"
-                >
-                  <option value="flat">
-                    {{ 'adminUi.site.checkout.feeTypeFlat' | translate }}
-                  </option>
-                  <option value="percent">
-                    {{ 'adminUi.site.checkout.feeTypePercent' | translate }}
-                  </option>
-                </select>
-              </label>
-              <app-input
-                [label]="'adminUi.site.checkout.feeValue' | translate"
-                type="number"
-                [min]="0"
-                [step]="0.01"
-                placeholder="0.00"
-                [(value)]="checkoutSettingsForm.fee_value"
-              ></app-input>
-            </div>
-          </div>
-
-          <div class="grid gap-3 text-sm">
-            <label class="flex items-center gap-2">
-              <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_enabled" />
-              <span class="text-slate-700 dark:text-slate-200">{{
-                'adminUi.site.checkout.vatEnabled' | translate
-              }}</span>
-            </label>
-            <div class="grid md:grid-cols-2 gap-3" *ngIf="checkoutSettingsForm.vat_enabled">
-              <app-input
-                [label]="'adminUi.site.checkout.vatRatePercent' | translate"
-                type="number"
-                [min]="0"
-                [max]="100"
-                [step]="0.01"
-                placeholder="10.00"
-                [(value)]="checkoutSettingsForm.vat_rate_percent"
-              ></app-input>
-              <div
-                class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950"
-              >
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                  <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_apply_to_shipping" />
-                  <span>{{ 'adminUi.site.checkout.vatApplyToShipping' | translate }}</span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                  <input type="checkbox" [(ngModel)]="checkoutSettingsForm.vat_apply_to_fee" />
-                  <span>{{ 'adminUi.site.checkout.vatApplyToFee' | translate }}</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid md:grid-cols-2 gap-3 text-sm">
-            <app-input
-              [label]="'adminUi.site.checkout.receiptShareDays' | translate"
-              type="number"
-              [min]="1"
-              [step]="1"
-              placeholder="365"
-              [(value)]="checkoutSettingsForm.receipt_share_days"
-            ></app-input>
-          </div>
-          <div class="flex items-center gap-2 text-sm">
-            <span
-              class="text-xs text-emerald-700 dark:text-emerald-300"
-              *ngIf="checkoutSettingsMessage"
-              >{{ checkoutSettingsMessage }}</span
-            >
-            <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="checkoutSettingsError">{{
-              checkoutSettingsError
-            }}</span>
-          </div>
-        </section>
-
-        <section
+        <app-admin-reports
           *ngIf="section() === 'settings'"
-          class="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.reports.title' | translate }}
-              </h2>
-              <p class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.reports.hint' | translate }}
-              </p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.reports.weekly.sendNow' | translate"
-                [disabled]="reportsSending"
-                (action)="sendReportNow('weekly')"
-              ></app-button>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.reports.monthly.sendNow' | translate"
-                [disabled]="reportsSending"
-                (action)="sendReportNow('monthly')"
-              ></app-button>
-              <app-button
-                size="sm"
-                [label]="'adminUi.actions.save' | translate"
-                [disabled]="reportsSending"
-                (action)="saveReportsSettings()"
-              ></app-button>
-            </div>
-          </div>
+          [rememberContentVersion]="boundRememberContentVersion"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+          [forgetContentVersion]="boundForgetContentVersion"
+        ></app-admin-reports>
 
-          <div class="grid lg:grid-cols-2 gap-4">
-            <div
-              class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/30"
-            >
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.reports.weekly.title' | translate }}
-              </div>
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" [(ngModel)]="reportsSettingsForm.weekly_enabled" />
-                <span>{{ 'adminUi.reports.weekly.enabled' | translate }}</span>
-              </label>
-              <div class="grid md:grid-cols-2 gap-3" *ngIf="reportsSettingsForm.weekly_enabled">
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.reports.weekly.weekday' | translate }}
-                  <select
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="reportsSettingsForm.weekly_weekday"
-                  >
-                    <option
-                      *ngFor="let wd of reportsWeekdays"
-                      class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-                      [value]="wd.value"
-                    >
-                      {{ wd.labelKey | translate }}
-                    </option>
-                  </select>
-                </label>
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.reports.weekly.hourUtc' | translate }}
-                  <select
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="reportsSettingsForm.weekly_hour_utc"
-                  >
-                    <option
-                      *ngFor="let h of reportsHours"
-                      class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-                      [value]="h"
-                    >
-                      {{ (h < 10 ? '0' + h : h) + ':00' }}
-                    </option>
-                  </select>
-                </label>
-              </div>
-              <div class="grid gap-1 text-xs text-slate-500 dark:text-slate-400">
-                <div>
-                  {{ 'adminUi.reports.weekly.lastSent' | translate }}:
-                  <span *ngIf="reportsWeeklyLastSent; else weeklyNone">{{
-                    reportsWeeklyLastSent | date: 'medium'
-                  }}</span>
-                  <ng-template #weeklyNone>—</ng-template>
-                </div>
-                <div *ngIf="reportsWeeklyLastError" class="text-rose-700 dark:text-rose-300">
-                  {{ 'adminUi.reports.weekly.lastError' | translate }}: {{ reportsWeeklyLastError }}
-                </div>
-              </div>
-            </div>
-
-            <div
-              class="rounded-xl border border-slate-200 bg-slate-50 p-3 grid gap-3 dark:border-slate-800 dark:bg-slate-950/30"
-            >
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.reports.monthly.title' | translate }}
-              </div>
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" [(ngModel)]="reportsSettingsForm.monthly_enabled" />
-                <span>{{ 'adminUi.reports.monthly.enabled' | translate }}</span>
-              </label>
-              <div class="grid md:grid-cols-2 gap-3" *ngIf="reportsSettingsForm.monthly_enabled">
-                <app-input
-                  [label]="'adminUi.reports.monthly.day' | translate"
-                  type="number"
-                  [min]="1"
-                  [max]="28"
-                  [step]="1"
-                  placeholder="1"
-                  [(value)]="reportsSettingsForm.monthly_day"
-                ></app-input>
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.reports.monthly.hourUtc' | translate }}
-                  <select
-                    class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="reportsSettingsForm.monthly_hour_utc"
-                  >
-                    <option
-                      *ngFor="let h of reportsHours"
-                      class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-                      [value]="h"
-                    >
-                      {{ (h < 10 ? '0' + h : h) + ':00' }}
-                    </option>
-                  </select>
-                </label>
-              </div>
-              <div class="grid gap-1 text-xs text-slate-500 dark:text-slate-400">
-                <div>
-                  {{ 'adminUi.reports.monthly.lastSent' | translate }}:
-                  <span *ngIf="reportsMonthlyLastSent; else monthlyNone">{{
-                    reportsMonthlyLastSent | date: 'medium'
-                  }}</span>
-                  <ng-template #monthlyNone>—</ng-template>
-                </div>
-                <div *ngIf="reportsMonthlyLastError" class="text-rose-700 dark:text-rose-300">
-                  {{ 'adminUi.reports.monthly.lastError' | translate }}:
-                  {{ reportsMonthlyLastError }}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid gap-2 text-sm">
-            <app-input
-              [label]="'adminUi.reports.recipients' | translate"
-              [placeholder]="'adminUi.reports.recipientsPlaceholder' | translate"
-              [(value)]="reportsSettingsForm.recipients"
-            ></app-input>
-            <div class="text-xs text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.reports.recipientsHint' | translate }}
-            </div>
-          </div>
-
-          <div class="flex items-center gap-2 text-sm">
-            <span
-              class="text-xs text-emerald-700 dark:text-emerald-300"
-              *ngIf="reportsSettingsMessage"
-              >{{ reportsSettingsMessage }}</span
-            >
-            <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="reportsSettingsError">{{
-              reportsSettingsError
-            }}</span>
-          </div>
-        </section>
-
-        <section
+        <app-admin-seo
           *ngIf="section() === 'settings' && cmsAdvanced()"
-          class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.site.seo.title' | translate }}
-            </h2>
-            <div class="flex gap-2 text-sm">
-              <label class="flex items-center gap-2">
-                {{ 'adminUi.site.seo.page' | translate }}
-                <select
-                  class="rounded border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="seoPage"
-                  (ngModelChange)="loadSeo()"
-                >
-                  <option value="home">{{ 'adminUi.site.seo.pages.home' | translate }}</option>
-                  <option value="shop">{{ 'adminUi.site.seo.pages.shop' | translate }}</option>
-                  <option value="product">
-                    {{ 'adminUi.site.seo.pages.product' | translate }}
-                  </option>
-                  <option value="category">
-                    {{ 'adminUi.site.seo.pages.category' | translate }}
-                  </option>
-                  <option value="about">{{ 'adminUi.site.seo.pages.about' | translate }}</option>
-                </select>
-              </label>
-              <div class="flex items-center gap-2">
-                <button
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="seoLang === 'en'"
-                  [class.text-white]="seoLang === 'en'"
-                  (click)="selectSeoLang('en')"
-                >
-                  EN
-                </button>
-                <button
-                  class="px-3 py-1 rounded border"
-                  [class.bg-slate-900]="seoLang === 'ro'"
-                  [class.text-white]="seoLang === 'ro'"
-                  (click)="selectSeoLang('ro')"
-                >
-                  RO
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="grid md:grid-cols-2 gap-3 text-sm">
-            <app-input
-              [label]="'adminUi.site.seo.metaTitle' | translate"
-              [(value)]="seoForm.title"
-            ></app-input>
-            <label
-              class="grid text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
-            >
-              {{ 'adminUi.site.seo.metaDescription' | translate }}
-              <textarea
-                rows="2"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [(ngModel)]="seoForm.description"
-              ></textarea>
-            </label>
-          </div>
-          <div class="flex items-center gap-2 text-sm">
-            <app-button
-              size="sm"
-              [label]="'adminUi.site.seo.save' | translate"
-              (action)="saveSeo()"
-            ></app-button>
-            <span class="text-xs text-emerald-700 dark:text-emerald-300" *ngIf="seoMessage">{{
-              seoMessage
-            }}</span>
-            <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="seoError">{{
-              seoError
-            }}</span>
-          </div>
-
-          <details
-            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
-          >
-            <summary
-              class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-            >
-              {{ 'adminUi.site.seo.sitemapPreview.title' | translate }}
-            </summary>
-            <div class="mt-3 grid gap-3">
-              <p class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.site.seo.sitemapPreview.hint' | translate }}
-              </p>
-              <div class="flex flex-wrap items-center gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [disabled]="sitemapPreviewLoading"
-                  [label]="'adminUi.site.seo.sitemapPreview.load' | translate"
-                  (action)="loadSitemapPreview()"
-                ></app-button>
-                <span
-                  *ngIf="sitemapPreviewError"
-                  class="text-xs text-rose-700 dark:text-rose-300"
-                  >{{ sitemapPreviewError }}</span
-                >
-              </div>
-              <div *ngIf="sitemapPreviewLoading" class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'notifications.loading' | translate }}
-              </div>
-              <div
-                *ngIf="!sitemapPreviewLoading && sitemapPreviewByLang"
-                class="grid gap-3 md:grid-cols-2"
-              >
-                <div
-                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <h3 class="font-semibold text-slate-900 dark:text-slate-50">
-                    EN ({{ sitemapPreviewByLang['en']?.length || 0 }})
-                  </h3>
-                  <div class="mt-2 grid gap-1 text-[11px]">
-                    <a
-                      *ngFor="let url of sitemapPreviewByLang['en'] || []"
-                      [href]="url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="truncate text-indigo-600 hover:underline dark:text-indigo-300"
-                    >
-                      {{ url }}
-                    </a>
-                  </div>
-                </div>
-                <div
-                  class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <h3 class="font-semibold text-slate-900 dark:text-slate-50">
-                    RO ({{ sitemapPreviewByLang['ro']?.length || 0 }})
-                  </h3>
-                  <div class="mt-2 grid gap-1 text-[11px]">
-                    <a
-                      *ngFor="let url of sitemapPreviewByLang['ro'] || []"
-                      [href]="url"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="truncate text-indigo-600 hover:underline dark:text-indigo-300"
-                    >
-                      {{ url }}
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </details>
-
-          <details
-            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
-          >
-            <summary
-              class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-            >
-              {{ 'adminUi.site.seo.structuredData.title' | translate }}
-            </summary>
-            <div class="mt-3 grid gap-3">
-              <p class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.site.seo.structuredData.hint' | translate }}
-              </p>
-              <div class="flex flex-wrap items-center gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [disabled]="structuredDataLoading"
-                  [label]="'adminUi.site.seo.structuredData.run' | translate"
-                  (action)="runStructuredDataValidation()"
-                ></app-button>
-                <span
-                  *ngIf="structuredDataError"
-                  class="text-xs text-rose-700 dark:text-rose-300"
-                  >{{ structuredDataError }}</span
-                >
-              </div>
-              <div *ngIf="structuredDataLoading" class="text-sm text-slate-600 dark:text-slate-300">
-                {{ 'notifications.loading' | translate }}
-              </div>
-              <div *ngIf="!structuredDataLoading && structuredDataResult" class="grid gap-3">
-                <p class="text-xs text-slate-700 dark:text-slate-200">
-                  {{
-                    'adminUi.site.seo.structuredData.summary'
-                      | translate
-                        : {
-                            products: structuredDataResult.checked_products,
-                            pages: structuredDataResult.checked_pages,
-                            errors: structuredDataResult.errors,
-                            warnings: structuredDataResult.warnings,
-                          }
-                  }}
-                </p>
-                <div
-                  *ngIf="structuredDataResult.issues?.length; else noStructuredDataIssues"
-                  class="grid gap-2"
-                >
-                  <div
-                    *ngFor="let issue of structuredDataResult.issues"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <span
-                        class="font-semibold"
-                        [class.text-rose-700]="issue.severity === 'error'"
-                        [class.dark:text-rose-300]="issue.severity === 'error'"
-                        [class.text-amber-800]="issue.severity === 'warning'"
-                        [class.dark:text-amber-200]="issue.severity === 'warning'"
-                      >
-                        {{ issue.severity.toUpperCase() }}
-                      </span>
-                      <a
-                        class="font-mono text-indigo-600 hover:underline dark:text-indigo-300"
-                        [href]="structuredDataIssueUrl(issue)"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {{ issue.entity_type }} · {{ issue.entity_key }}
-                      </a>
-                    </div>
-                    <p class="mt-1 text-slate-700 dark:text-slate-200">{{ issue.message }}</p>
-                  </div>
-                </div>
-                <ng-template #noStructuredDataIssues>
-                  <p class="text-sm text-emerald-700 dark:text-emerald-300">
-                    {{ 'adminUi.site.seo.structuredData.ok' | translate }}
-                  </p>
-                </ng-template>
-              </div>
-            </div>
-          </details>
-        </section>
+          [(seoPage)]="seoPage"
+          [rememberContentVersion]="boundRememberContentVersion"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+          [forgetContentVersion]="boundForgetContentVersion"
+        ></app-admin-seo>
 
         <section
           *ngIf="section() === 'pages'"
@@ -1980,132 +901,14 @@ class CmsDraftManager<T> {
               </div>
             </div>
 
-            <details
-              class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
-            >
-              <summary
-                class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-              >
-                {{ 'adminUi.site.pages.legal.title' | translate }}
-              </summary>
-              <div class="mt-3 grid gap-3">
-                <p class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.site.pages.legal.hint' | translate }}
-                </p>
-
-                <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.site.pages.legal.documentLabel' | translate }}
-                    <select
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      [(ngModel)]="legalPageKey"
-                      (ngModelChange)="onLegalPageKeyChange($event)"
-                    >
-                      <option [ngValue]="'page.terms'">
-                        {{ 'adminUi.site.pages.legal.documents.termsIndex' | translate }}
-                      </option>
-                      <option [ngValue]="'page.terms-and-conditions'">
-                        {{ 'adminUi.site.pages.legal.documents.terms' | translate }}
-                      </option>
-                      <option [ngValue]="'page.privacy-policy'">
-                        {{ 'adminUi.site.pages.legal.documents.privacy' | translate }}
-                      </option>
-                      <option [ngValue]="'page.anpc'">
-                        {{ 'adminUi.site.pages.legal.documents.anpc' | translate }}
-                      </option>
-                    </select>
-                  </label>
-                  <div class="flex flex-wrap items-center justify-end gap-2">
-                    <a
-                      class="inline-flex h-10 items-center justify-center rounded-full px-3 text-sm font-medium bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
-                      [attr.href]="pagePublicUrlForKey(legalPageKey)"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      {{ 'adminUi.site.pages.legal.open' | translate }}
-                    </a>
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.actions.refresh' | translate"
-                      (action)="loadLegalPage(legalPageKey)"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-[260px_1fr] items-end">
-                  <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.site.pages.legal.lastUpdatedLabel' | translate }}
-                    <input
-                      type="date"
-                      class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                      [(ngModel)]="legalPageLastUpdated"
-                    />
-                    <span class="text-xs text-slate-500 dark:text-slate-400">{{
-                      'adminUi.site.pages.legal.lastUpdatedHint' | translate
-                    }}</span>
-                  </label>
-                </div>
-
-                <div
-                  *ngIf="legalPageError"
-                  class="rounded-lg border border-rose-200 bg-rose-50 p-2 text-sm text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-                >
-                  {{ legalPageError }}
-                </div>
-                <div *ngIf="legalPageLoading" class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'notifications.loading' | translate }}
-                </div>
-
-                <ng-container
-                  *ngIf="cmsPrefs.translationLayout() === 'sideBySide'; else legalPagesSingle"
-                >
-                  <div class="grid gap-3 md:grid-cols-2">
-                    <div class="grid gap-1">
-                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300"
-                        >RO</span
-                      >
-                      <app-rich-editor
-                        height="520px"
-                        [(value)]="legalPageForm.ro"
-                      ></app-rich-editor>
-                    </div>
-                    <div class="grid gap-1">
-                      <span class="text-xs font-semibold text-slate-600 dark:text-slate-300"
-                        >EN</span
-                      >
-                      <app-rich-editor
-                        height="520px"
-                        [(value)]="legalPageForm.en"
-                      ></app-rich-editor>
-                    </div>
-                  </div>
-                </ng-container>
-                <ng-template #legalPagesSingle>
-                  <app-rich-editor
-                    height="520px"
-                    [(value)]="legalPageForm[infoLang]"
-                  ></app-rich-editor>
-                </ng-template>
-
-                <div class="flex flex-wrap items-center gap-2">
-                  <app-button
-                    size="sm"
-                    [label]="'adminUi.actions.save' | translate"
-                    [disabled]="legalPageSaving"
-                    (action)="saveLegalPageUi()"
-                  ></app-button>
-                  <span
-                    class="text-xs text-emerald-700 dark:text-emerald-300"
-                    *ngIf="legalPageMessage"
-                    >{{ legalPageMessage }}</span
-                  >
-                  <span class="text-xs text-rose-700 dark:text-rose-300" *ngIf="legalPageError">{{
-                    legalPageError
-                  }}</span>
-                </div>
-              </div>
-            </details>
+            <app-admin-legal-pages
+              [(legalPageKey)]="legalPageKey"
+              [infoLang]="infoLang"
+              [rememberContentVersion]="boundRememberContentVersion"
+              [withExpectedVersion]="boundWithExpectedVersion"
+              [handleContentConflict]="boundHandleContentConflict"
+              [applyPageBlockSaved]="boundApplyPageBlockSaved"
+            ></app-admin-legal-pages>
 
             <details
               class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30"
@@ -6931,362 +5734,10 @@ class CmsDraftManager<T> {
           *ngIf="section() === 'settings'"
           class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
         >
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.categories.title' | translate }}
-            </h2>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.categories.wizard.start' | translate"
-              (action)="startCategoryWizard()"
-            ></app-button>
-          </div>
-
-          <app-help-panel
-            [titleKey]="'adminUi.help.title'"
-            [subtitleKey]="'adminUi.categories.help.subtitle'"
-            [mediaSrc]="'assets/help/admin-categories-help.svg'"
-            [mediaAltKey]="'adminUi.categories.help.mediaAlt'"
-          >
-            <ul class="list-disc pl-5 text-xs text-slate-600 dark:text-slate-300">
-              <li>{{ 'adminUi.categories.help.points.slug' | translate }}</li>
-              <li>{{ 'adminUi.categories.help.points.parent' | translate }}</li>
-              <li>{{ 'adminUi.categories.help.points.translations' | translate }}</li>
-            </ul>
-          </app-help-panel>
-
-          <app-modal
-            [open]="categoryDeleteConfirmOpen()"
-            [title]="
-              'adminUi.categories.confirmDelete.title'
-                | translate: { name: categoryDeleteConfirmTarget()?.name || '' }
-            "
-            [subtitle]="'adminUi.categories.confirmDelete.subtitle' | translate"
-            [closeLabel]="'adminUi.actions.cancel' | translate"
-            [cancelLabel]="'adminUi.actions.cancel' | translate"
-            [confirmLabel]="
-              categoryDeleteConfirmBusy()
-                ? ('adminUi.actions.loading' | translate)
-                : ('adminUi.actions.delete' | translate)
-            "
-            [confirmDisabled]="categoryDeleteConfirmBusy()"
-            (closed)="closeCategoryDeleteConfirm()"
-            (confirm)="confirmDeleteCategory()"
-          >
-            <div class="grid gap-3">
-              <div
-                *ngIf="categoryDeleteConfirmTarget() as cat"
-                class="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/20"
-              >
-                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Slug: {{ cat.slug }}</p>
-              </div>
-
-              <ul class="list-disc pl-5 text-sm text-slate-700 dark:text-slate-200">
-                <li>{{ 'adminUi.categories.confirmDelete.points.permanent' | translate }}</li>
-                <li>{{ 'adminUi.categories.confirmDelete.points.inUse' | translate }}</li>
-                <li>{{ 'adminUi.categories.confirmDelete.points.urls' | translate }}</li>
-              </ul>
-            </div>
-          </app-modal>
-
-          <div
-            *ngIf="categoryWizardOpen()"
-            class="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-100"
-          >
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="grid gap-1">
-                <p class="font-semibold">{{ 'adminUi.categories.wizard.title' | translate }}</p>
-                <p class="text-xs text-indigo-800 dark:text-indigo-200">
-                  {{ categoryWizardDescriptionKey() | translate }}
-                </p>
-              </div>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.actions.exit' | translate"
-                (action)="exitCategoryWizard()"
-              ></app-button>
-            </div>
-
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                *ngFor="let step of categoryWizardSteps; let idx = index"
-                type="button"
-                class="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/10 dark:text-indigo-100 dark:hover:bg-indigo-900/30"
-                [class.bg-indigo-600]="idx === categoryWizardStep()"
-                [class.text-white]="idx === categoryWizardStep()"
-                [class.border-indigo-600]="idx === categoryWizardStep()"
-                [class.hover:bg-indigo-700]="idx === categoryWizardStep()"
-                [class.dark:bg-indigo-500/30]="idx === categoryWizardStep()"
-                [class.dark:hover:bg-indigo-500/40]="idx === categoryWizardStep()"
-                (click)="goToCategoryWizardStep(idx)"
-              >
-                {{ step.labelKey | translate }}
-              </button>
-            </div>
-
-            <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.actions.back' | translate"
-                (action)="categoryWizardPrev()"
-                [disabled]="categoryWizardStep() === 0"
-              ></app-button>
-
-              <div class="flex flex-wrap items-center gap-2">
-                <app-button
-                  *ngIf="categoryWizardStep() === 0"
-                  size="sm"
-                  [label]="'adminUi.categories.add' | translate"
-                  (action)="addCategory()"
-                  [disabled]="!categoryName.trim()"
-                ></app-button>
-                <app-button
-                  *ngIf="categoryWizardStep() === 1 && categoryWizardSlug()"
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.categories.translations.button' | translate"
-                  (action)="openCategoryWizardTranslations()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  [label]="categoryWizardNextLabelKey() | translate"
-                  (action)="categoryWizardNext()"
-                  [disabled]="!categoryWizardCanNext()"
-                ></app-button>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid md:grid-cols-[1fr_260px_auto] gap-2 items-end text-sm">
-            <app-input
-              [label]="'adminUi.products.table.name' | translate"
-              [(value)]="categoryName"
-            ></app-input>
-            <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {{ 'adminUi.categories.parent' | translate }}
-              <select
-                class="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                [(ngModel)]="categoryParentId"
-              >
-                <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
-                <option *ngFor="let cat of categories" [value]="cat.id">{{ cat.name }}</option>
-              </select>
-            </label>
-            <app-button
-              size="sm"
-              [label]="'adminUi.categories.add' | translate"
-              (action)="addCategory()"
-            ></app-button>
-          </div>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
-            {{ 'adminUi.categories.slugAutoHint' | translate }}
-          </p>
-          <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <div
-              *ngFor="let cat of categories"
-              class="rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-              (dragover)="onCategoryDragOver($event)"
-              (drop)="onCategoryDrop(cat.slug)"
-            >
-              <div
-                class="flex items-center justify-between gap-3"
-                draggable="true"
-                (dragstart)="onCategoryDragStart(cat.slug)"
-              >
-                <div>
-                  <p class="font-semibold text-slate-900 dark:text-slate-50">{{ cat.name }}</p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Slug: {{ cat.slug }} · Order: {{ cat.sort_order }} · Parent:
-                    {{ categoryParentLabel(cat) }}
-                  </p>
-                </div>
-                <div class="flex flex-wrap justify-end gap-2">
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    label="↑"
-                    (action)="moveCategory(cat, -1)"
-                  ></app-button>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    label="↓"
-                    (action)="moveCategory(cat, 1)"
-                  ></app-button>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.categories.translations.button' | translate"
-                    (action)="toggleCategoryTranslations(cat.slug)"
-                  ></app-button>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.actions.delete' | translate"
-                    (action)="openCategoryDeleteConfirm(cat)"
-                  ></app-button>
-                </div>
-              </div>
-              <label
-                class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
-              >
-                <span class="font-semibold">{{ 'adminUi.categories.parent' | translate }}:</span>
-                <select
-                  class="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [ngModel]="cat.parent_id || ''"
-                  (ngModelChange)="updateCategoryParent(cat, $event)"
-                >
-                  <option value="">{{ 'adminUi.categories.parentNone' | translate }}</option>
-                  <option *ngFor="let parent of categoryParentOptions(cat)" [value]="parent.id">
-                    {{ parent.name }}
-                  </option>
-                </select>
-              </label>
-
-              <label
-                class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
-              >
-                <span class="font-semibold"
-                  >{{ 'adminUi.lowStock.thresholdLabel' | translate }}:</span
-                >
-                <input
-                  type="number"
-                  min="0"
-                  class="h-8 w-28 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [ngModel]="cat.low_stock_threshold ?? ''"
-                  (ngModelChange)="updateCategoryLowStockThreshold(cat, $event)"
-                />
-                <span class="text-xs text-slate-500 dark:text-slate-400">{{
-                  'adminUi.lowStock.thresholdHint' | translate
-                }}</span>
-              </label>
-
-              <label
-                class="mt-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
-              >
-                <span class="font-semibold"
-                  >{{ 'adminUi.taxes.categoryGroupLabel' | translate }}:</span
-                >
-                <select
-                  class="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [ngModel]="cat.tax_group_id || ''"
-                  (ngModelChange)="updateCategoryTaxGroup(cat, $event)"
-                >
-                  <option value="">{{ 'adminUi.taxes.categoryGroupDefault' | translate }}</option>
-                  <option *ngFor="let tg of taxGroups" [value]="tg.id">
-                    {{ tg.name }} ({{ tg.code }})
-                  </option>
-                </select>
-              </label>
-
-              <div
-                *ngIf="categoryTranslationsSlug === cat.slug"
-                class="mt-3 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/30"
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <p
-                    class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300"
-                  >
-                    {{ 'adminUi.categories.translations.title' | translate }}
-                  </p>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.actions.cancel' | translate"
-                    (action)="closeCategoryTranslations()"
-                  ></app-button>
-                </div>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.categories.translations.hint' | translate }}
-                </p>
-
-                <div
-                  *ngIf="categoryTranslationsError()"
-                  class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-                >
-                  {{ categoryTranslationsError() }}
-                </div>
-
-                <div class="grid gap-4 lg:grid-cols-2">
-                  <div
-                    class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <div class="flex items-center justify-between gap-3">
-                      <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">RO</p>
-                      <div class="flex items-center gap-2">
-                        <app-button
-                          size="sm"
-                          [label]="'adminUi.actions.save' | translate"
-                          (action)="saveCategoryTranslation('ro')"
-                        ></app-button>
-                        <app-button
-                          *ngIf="categoryTranslationExists.ro"
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.delete' | translate"
-                          (action)="deleteCategoryTranslation('ro')"
-                        ></app-button>
-                      </div>
-                    </div>
-                    <app-input
-                      [label]="'adminUi.products.table.name' | translate"
-                      [(value)]="categoryTranslations.ro.name"
-                    ></app-input>
-                    <label
-                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
-                    >
-                      {{ 'adminUi.categories.description' | translate }}
-                      <textarea
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        rows="2"
-                        [(ngModel)]="categoryTranslations.ro.description"
-                      ></textarea>
-                    </label>
-                  </div>
-
-                  <div
-                    class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <div class="flex items-center justify-between gap-3">
-                      <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">EN</p>
-                      <div class="flex items-center gap-2">
-                        <app-button
-                          size="sm"
-                          [label]="'adminUi.actions.save' | translate"
-                          (action)="saveCategoryTranslation('en')"
-                        ></app-button>
-                        <app-button
-                          *ngIf="categoryTranslationExists.en"
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.actions.delete' | translate"
-                          (action)="deleteCategoryTranslation('en')"
-                        ></app-button>
-                      </div>
-                    </div>
-                    <app-input
-                      [label]="'adminUi.products.table.name' | translate"
-                      [(value)]="categoryTranslations.en.name"
-                    ></app-input>
-                    <label
-                      class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
-                    >
-                      {{ 'adminUi.categories.description' | translate }}
-                      <textarea
-                        class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                        rows="2"
-                        [(ngModel)]="categoryTranslations.en.description"
-                      ></textarea>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <app-admin-category-manager
+            [(categories)]="categories"
+            [taxGroups]="taxGroups"
+          ></app-admin-category-manager>
 
           <div
             class="grid gap-3 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
@@ -7819,1647 +6270,14 @@ class CmsDraftManager<T> {
           </div>
         </section>
 
-        <section
+        <app-admin-blog-editor
           *ngIf="section() === 'blog'"
-          class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.blog.title' | translate }}
-            </h2>
-            <div class="flex items-center gap-2">
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.blog.actions.newPost' | translate"
-                (action)="startBlogCreate()"
-              ></app-button>
-              <app-button
-                *ngIf="selectedBlogKey"
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.blog.actions.closeEditor' | translate"
-                (action)="closeBlogEditor()"
-              ></app-button>
-            </div>
-          </div>
-
-          <div
-            class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="flex flex-wrap items-center gap-3">
-                <label
-                  class="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300"
-                >
-                  <input
-                    type="checkbox"
-                    [checked]="areAllBlogSelected()"
-                    [disabled]="blogPosts().length === 0"
-                    (change)="toggleSelectAllBlogs($event)"
-                  />
-                  {{ 'adminUi.blog.bulk.selectAll' | translate }}
-                </label>
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.bulk.selected' | translate: { count: blogBulkSelection.size } }}
-                </span>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.blog.bulk.clear' | translate"
-                  (action)="clearBlogBulkSelection()"
-                  [disabled]="blogBulkSelection.size === 0"
-                ></app-button>
-              </div>
-              <div class="text-xs text-rose-600 dark:text-rose-300" *ngIf="blogBulkError">
-                {{ blogBulkError }}
-              </div>
-            </div>
-
-            <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              <label class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                {{ 'adminUi.blog.bulk.actionLabel' | translate }}
-                <select
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogBulkAction"
-                >
-                  <option value="publish">
-                    {{ 'adminUi.blog.bulk.actionPublish' | translate }}
-                  </option>
-                  <option value="unpublish">
-                    {{ 'adminUi.blog.bulk.actionUnpublish' | translate }}
-                  </option>
-                  <option value="schedule">
-                    {{ 'adminUi.blog.bulk.actionSchedule' | translate }}
-                  </option>
-                  <option value="tags_add">
-                    {{ 'adminUi.blog.bulk.actionTagsAdd' | translate }}
-                  </option>
-                  <option value="tags_remove">
-                    {{ 'adminUi.blog.bulk.actionTagsRemove' | translate }}
-                  </option>
-                </select>
-              </label>
-
-              <label
-                *ngIf="blogBulkAction === 'schedule'"
-                class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300"
-              >
-                {{ 'adminUi.blog.bulk.publishAt' | translate }}
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogBulkPublishAt"
-                />
-              </label>
-
-              <label
-                *ngIf="blogBulkAction === 'schedule'"
-                class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300"
-              >
-                {{ 'adminUi.blog.bulk.unpublishAt' | translate }}
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogBulkUnpublishAt"
-                />
-              </label>
-
-              <label
-                *ngIf="blogBulkAction === 'tags_add' || blogBulkAction === 'tags_remove'"
-                class="grid gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300 md:col-span-2"
-              >
-                {{ 'adminUi.blog.bulk.tagsLabel' | translate }}
-                <input
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [placeholder]="'adminUi.blog.bulk.tagsPlaceholder' | translate"
-                  [(ngModel)]="blogBulkTags"
-                />
-              </label>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ blogBulkPreview() }}</p>
-              <app-button
-                size="sm"
-                [label]="
-                  blogBulkSaving
-                    ? ('adminUi.common.saving' | translate)
-                    : ('adminUi.blog.bulk.apply' | translate)
-                "
-                (action)="applyBlogBulkAction()"
-                [disabled]="!canApplyBlogBulk() || blogBulkSaving"
-              ></app-button>
-            </div>
-          </div>
-
-          <div
-            *ngIf="blogPinnedPosts().length"
-            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <p class="font-semibold text-slate-900 dark:text-slate-50">
-                {{ 'adminUi.blog.pins.title' | translate }}
-              </p>
-              <span *ngIf="blogPinsSaving" class="text-xs text-slate-500 dark:text-slate-400">{{
-                'adminUi.common.saving' | translate
-              }}</span>
-            </div>
-            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.blog.pins.hint' | translate }}
-            </p>
-            <div class="mt-2 grid gap-2">
-              <div
-                *ngFor="let post of blogPinnedPosts()"
-                class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-                [class.opacity-60]="blogPinsSaving"
-                [attr.draggable]="blogPinsSaving ? null : 'true'"
-                (dragstart)="onBlogPinDragStart(post.key)"
-                (dragover)="onBlogPinDragOver($event)"
-                (drop)="onBlogPinDrop(post.key)"
-              >
-                <div class="min-w-0">
-                  <p class="font-medium text-slate-900 dark:text-slate-50 truncate">
-                    {{ post.title || post.key }}
-                  </p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ post.key }}</p>
-                </div>
-                <span
-                  class="shrink-0 inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200"
-                >
-                  #{{ blogPinnedSlot(post) || 1 }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="grid gap-2 text-sm text-slate-700 dark:text-slate-200">
-            <div
-              *ngIf="blogPosts().length === 0"
-              class="text-sm text-slate-500 dark:text-slate-400"
-            >
-              {{ 'adminUi.blog.empty' | translate }}
-            </div>
-            <div
-              *ngFor="let post of blogPosts()"
-              class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-              [ngClass]="
-                isBlogSelected(post.key)
-                  ? 'bg-indigo-50/60 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900'
-                  : ''
-              "
-            >
-              <label class="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  [checked]="isBlogSelected(post.key)"
-                  (change)="toggleBlogSelection(post.key, $event)"
-                />
-              </label>
-              <div>
-                <p class="font-semibold text-slate-900 dark:text-slate-50">{{ post.title }}</p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  <ng-container *ngIf="blogPinnedSlot(post) as slot">
-                    <span
-                      class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-200"
-                    >
-                      {{ 'adminUi.blog.pins.badge' | translate: { slot } }}
-                    </span>
-                    ·
-                  </ng-container>
-                  {{ post.key }} · {{ 'adminUi.status.' + (post.status || 'draft') | translate }} ·
-                  {{ post.author ? commentAuthorLabel(post.author) : '—' }} · v{{ post.version }} ·
-                  {{ post.updated_at | date: 'short' }}
-                </p>
-              </div>
-              <div class="flex items-center gap-3">
-                <a
-                  class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                  [attr.href]="'/blog/' + extractBlogSlug(post.key)"
-                  target="_blank"
-                  rel="noopener"
-                  (click)="$event.stopPropagation()"
-                >
-                  {{ 'adminUi.blog.actions.view' | translate }}
-                </a>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.delete' | translate"
-                  [disabled]="blogDeleteBusy.has(post.key)"
-                  (action)="deleteBlogPost(post)"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.edit' | translate"
-                  (action)="selectBlogPost(post)"
-                ></app-button>
-              </div>
-            </div>
-          </div>
-
-          <div
-            *ngIf="showBlogCreate"
-            class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800"
-          >
-            <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.blog.create.title' | translate }}
-            </p>
-            <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <label
-                *ngIf="cmsAdvanced()"
-                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200"
-              >
-                {{ 'adminUi.blog.fields.slug' | translate }}
-                <div
-                  class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-300"
-                >
-                  {{ blogCreateSlug() || '—' }}
-                </div>
-                <span class="text-xs text-slate-500 dark:text-slate-400">{{
-                  'adminUi.products.form.slugAutoHint' | translate
-                }}</span>
-              </label>
-              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.baseLanguage' | translate }}
-                <select
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.baseLang"
-                >
-                  <option value="en">EN</option>
-                  <option value="ro">RO</option>
-                </select>
-              </label>
-              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.status' | translate }}
-                <select
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.status"
-                >
-                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-                  <option value="review">{{ 'adminUi.status.review' | translate }}</option>
-                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-                </select>
-              </label>
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.publishAtOptional' | translate }}
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.published_at"
-                  [disabled]="blogCreate.status !== 'published'"
-                />
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.fields.publishAtHint' | translate }}
-                </span>
-              </label>
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.unpublishAtOptional' | translate }}
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.published_until"
-                  [disabled]="blogCreate.status !== 'published'"
-                />
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.fields.unpublishAtHint' | translate }}
-                </span>
-              </label>
-              <div class="md:col-span-2">
-                <app-input
-                  [label]="'adminUi.blog.fields.title' | translate"
-                  [(value)]="blogCreate.title"
-                ></app-input>
-              </div>
-              <label
-                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
-              >
-                {{ 'adminUi.blog.fields.summaryOptional' | translate }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.summary"
-                ></textarea>
-              </label>
-              <app-input
-                [label]="'adminUi.blog.fields.tags' | translate"
-                [(value)]="blogCreate.tags"
-                [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
-              ></app-input>
-              <app-input
-                [label]="'adminUi.blog.fields.seriesOptional' | translate"
-                [(value)]="blogCreate.series"
-                [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
-                [hint]="'adminUi.blog.fields.seriesHint' | translate"
-              ></app-input>
-              <app-input
-                [label]="'adminUi.blog.fields.coverImageUrlOptional' | translate"
-                [(value)]="blogCreate.cover_image_url"
-                [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
-              ></app-input>
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
-                <input
-                  type="number"
-                  min="1"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.reading_time_minutes"
-                />
-              </label>
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" [(ngModel)]="blogCreate.pinned" />
-                {{ 'adminUi.blog.fields.pinned' | translate }}
-              </label>
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.pinOrder' | translate }}
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.pin_order"
-                  [disabled]="!blogCreate.pinned"
-                />
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
-                </span>
-              </label>
-              <div
-                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
-              >
-                {{ 'adminUi.blog.fields.body' | translate }}
-                <app-rich-editor
-                  [(value)]="blogCreate.body_markdown"
-                  [initialEditType]="'wysiwyg'"
-                  [height]="'420px'"
-                ></app-rich-editor>
-              </div>
-            </div>
-
-            <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-              <input type="checkbox" [(ngModel)]="blogCreate.includeTranslation" />
-              {{ 'adminUi.blog.create.addTranslation' | translate }}
-            </label>
-
-            <div *ngIf="blogCreate.includeTranslation" class="grid md:grid-cols-2 gap-3 text-sm">
-              <p class="md:col-span-2 text-xs text-slate-500 dark:text-slate-400">
-                {{
-                  'adminUi.blog.create.translationHint'
-                    | translate: { lang: blogCreate.baseLang === 'en' ? 'RO' : 'EN' }
-                }}
-              </p>
-              <app-input
-                [label]="'adminUi.blog.create.translationTitle' | translate"
-                [(value)]="blogCreate.translationTitle"
-              ></app-input>
-              <label
-                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
-              >
-                {{ 'adminUi.blog.create.translationBody' | translate }}
-                <textarea
-                  rows="5"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogCreate.translationBody"
-                ></textarea>
-              </label>
-            </div>
-
-            <div class="flex gap-2">
-              <app-button
-                [label]="'adminUi.blog.actions.createPost' | translate"
-                (action)="createBlogPost()"
-              ></app-button>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.actions.cancel' | translate"
-                (action)="cancelBlogCreate()"
-              ></app-button>
-            </div>
-          </div>
-
-          <div
-            *ngIf="selectedBlogKey"
-            class="grid gap-3 pt-3 border-t border-slate-200 dark:border-slate-800"
-          >
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="grid gap-1">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.blog.editing.title' | translate }}: {{ selectedBlogKey }}
-                </p>
-                <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{
-                    'adminUi.blog.editing.languages'
-                      | translate
-                        : { base: blogBaseLang.toUpperCase(), edit: blogEditLang.toUpperCase() }
-                  }}
-                </p>
-              </div>
-              <div class="flex items-center gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  label="EN"
-                  [disabled]="blogEditLang === 'en'"
-                  (action)="setBlogEditLang('en')"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  label="RO"
-                  [disabled]="blogEditLang === 'ro'"
-                  (action)="setBlogEditLang('ro')"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="grid md:grid-cols-2 gap-3 text-sm">
-              <app-input
-                [label]="'adminUi.blog.fields.title' | translate"
-                [(value)]="blogForm.title"
-              ></app-input>
-              <label class="grid text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.editing.statusBaseOnly' | translate }}
-                <select
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogForm.status"
-                  [disabled]="blogEditLang !== blogBaseLang"
-                >
-                  <option value="draft">{{ 'adminUi.status.draft' | translate }}</option>
-                  <option value="review">{{ 'adminUi.status.review' | translate }}</option>
-                  <option value="published">{{ 'adminUi.status.published' | translate }}</option>
-                </select>
-              </label>
-              <label
-                *ngIf="cmsAdvanced()"
-                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
-              >
-                {{ 'adminUi.blog.editing.publishAtBaseOnlyOptional' | translate }}
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogForm.published_at"
-                  [disabled]="blogEditLang !== blogBaseLang || blogForm.status !== 'published'"
-                />
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.editing.publishAtBaseOnlyHint' | translate }}
-                </span>
-              </label>
-              <label
-                *ngIf="cmsAdvanced()"
-                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
-              >
-                {{ 'adminUi.blog.editing.unpublishAtBaseOnlyOptional' | translate }}
-                <input
-                  type="datetime-local"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogForm.published_until"
-                  [disabled]="blogEditLang !== blogBaseLang || blogForm.status !== 'published'"
-                />
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.editing.unpublishAtBaseOnlyHint' | translate }}
-                </span>
-              </label>
-              <label
-                class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-2"
-              >
-                {{
-                  'adminUi.blog.editing.summaryOptional'
-                    | translate: { lang: blogEditLang.toUpperCase() }
-                }}
-                <textarea
-                  rows="3"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogForm.summary"
-                ></textarea>
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.editing.summaryHint' | translate }}
-                </span>
-              </label>
-              <app-input
-                [label]="'adminUi.blog.fields.tags' | translate"
-                [(value)]="blogForm.tags"
-                [placeholder]="'adminUi.blog.fields.tagsPlaceholder' | translate"
-              ></app-input>
-              <app-input
-                [label]="'adminUi.blog.fields.seriesOptional' | translate"
-                [(value)]="blogForm.series"
-                [placeholder]="'adminUi.blog.fields.seriesPlaceholder' | translate"
-                [hint]="'adminUi.blog.fields.seriesHint' | translate"
-                [disabled]="blogEditLang !== blogBaseLang"
-              ></app-input>
-              <div class="grid gap-2 md:col-span-2">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {{ 'adminUi.blog.cover.title' | translate }}
-                  </p>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
-                      [disabled]="blogEditLang !== blogBaseLang"
-                      (click)="blogCoverUploadInput.click()"
-                    >
-                      {{ 'adminUi.blog.cover.upload' | translate }}
-                    </button>
-                    <input
-                      #blogCoverUploadInput
-                      type="file"
-                      accept="image/*"
-                      class="hidden"
-                      (change)="uploadBlogCoverImage($event)"
-                    />
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
-                      [disabled]="blogEditLang !== blogBaseLang"
-                      (click)="showBlogCoverLibrary = !showBlogCoverLibrary"
-                    >
-                      {{
-                        showBlogCoverLibrary
-                          ? ('adminUi.common.close' | translate)
-                          : ('adminUi.blog.cover.choose' | translate)
-                      }}
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-slate-300 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-600"
-                      [disabled]="blogEditLang !== blogBaseLang || !blogForm.cover_image_url.trim()"
-                      (click)="clearBlogCoverOverride()"
-                    >
-                      {{ 'adminUi.blog.cover.clear' | translate }}
-                    </button>
-                  </div>
-                </div>
-
-                <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  {{ 'adminUi.blog.fields.coverImageUrlOptional' | translate }}
-                  <input
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="blogForm.cover_image_url"
-                    [placeholder]="'adminUi.blog.fields.coverImagePlaceholder' | translate"
-                    [disabled]="blogEditLang !== blogBaseLang"
-                  />
-                  <span class="text-xs text-slate-500 dark:text-slate-400">{{
-                    'adminUi.blog.cover.hint' | translate
-                  }}</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400">{{
-                    'adminUi.blog.cover.sizeHint' | translate
-                  }}</span>
-                </label>
-
-                <label
-                  class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200 sm:max-w-xs"
-                >
-                  {{ 'adminUi.blog.cover.fitModeLabel' | translate }}
-                  <select
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    [(ngModel)]="blogForm.cover_fit"
-                    [disabled]="blogEditLang !== blogBaseLang"
-                  >
-                    <option value="cover">
-                      {{ 'adminUi.blog.cover.fitModeCover' | translate }}
-                    </option>
-                    <option value="contain">
-                      {{ 'adminUi.blog.cover.fitModeContain' | translate }}
-                    </option>
-                  </select>
-                </label>
-
-                <div *ngIf="blogCoverPreviewUrl() as coverUrl" class="grid gap-3 sm:grid-cols-2">
-                  <div class="grid gap-2">
-                    <p
-                      class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                    >
-                      {{ 'adminUi.blog.cover.previewDesktop' | translate }}
-                    </p>
-                    <div
-                      class="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
-                    >
-                      <img
-                        [src]="coverUrl"
-                        [alt]="blogForm.title || 'cover'"
-                        class="w-full aspect-[16/9]"
-                        [ngClass]="
-                          blogForm.cover_fit === 'contain'
-                            ? 'object-contain bg-slate-50 dark:bg-slate-900'
-                            : 'object-cover'
-                        "
-                        [style.object-position]="blogCoverPreviewFocalPosition()"
-                        loading="eager"
-                        decoding="async"
-                      />
-                    </div>
-                  </div>
-                  <div class="grid gap-2">
-                    <p
-                      class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                    >
-                      {{ 'adminUi.blog.cover.previewMobile' | translate }}
-                    </p>
-                    <div
-                      class="max-w-[280px] relative overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"
-                    >
-                      <img
-                        [src]="coverUrl"
-                        [alt]="blogForm.title || 'cover'"
-                        class="w-full aspect-[1/1]"
-                        [ngClass]="
-                          blogForm.cover_fit === 'contain'
-                            ? 'object-contain bg-slate-50 dark:bg-slate-900'
-                            : 'object-cover'
-                        "
-                        [style.object-position]="blogCoverPreviewFocalPosition()"
-                        loading="eager"
-                        decoding="async"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  *ngIf="blogCoverPreviewAsset() as coverAsset"
-                  class="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400"
-                >
-                  <span>{{
-                    'adminUi.blog.cover.focalLabel'
-                      | translate: { x: coverAsset.focal_x, y: coverAsset.focal_y }
-                  }}</span>
-                  <button
-                    type="button"
-                    class="text-xs text-slate-700 hover:underline disabled:opacity-60 dark:text-slate-200"
-                    [disabled]="blogEditLang !== blogBaseLang"
-                    (click)="editBlogCoverFocalPoint()"
-                  >
-                    {{ 'adminUi.blog.cover.editFocal' | translate }}
-                  </button>
-                </div>
-
-                <div
-                  *ngIf="showBlogCoverLibrary && selectedBlogKey"
-                  class="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900"
-                >
-                  <app-asset-library
-                    titleKey="adminUi.blog.cover.libraryTitle"
-                    [allowUpload]="false"
-                    [allowSelect]="true"
-                    [scopedKeys]="[selectedBlogKey]"
-                    [initialKey]="selectedBlogKey"
-                    [uploadKey]="selectedBlogKey"
-                    (selectAsset)="selectBlogCoverAsset($event)"
-                  ></app-asset-library>
-                </div>
-              </div>
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.readingTimeOptional' | translate }}
-                <input
-                  type="number"
-                  min="1"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogForm.reading_time_minutes"
-                />
-              </label>
-              <label
-                class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200 md:col-span-2"
-              >
-                <input
-                  type="checkbox"
-                  [(ngModel)]="blogForm.pinned"
-                  [disabled]="blogEditLang !== blogBaseLang"
-                />
-                {{ 'adminUi.blog.fields.pinned' | translate }}
-              </label>
-              <label class="grid gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ 'adminUi.blog.fields.pinOrder' | translate }}
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [(ngModel)]="blogForm.pin_order"
-                  [disabled]="blogEditLang !== blogBaseLang || !blogForm.pinned"
-                />
-                <span class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.fields.pinOrderHint' | translate }}
-                </span>
-              </label>
-              <div class="grid gap-2 md:col-span-2">
-                <div class="grid gap-3 lg:grid-cols-[1fr_280px]">
-                  <div class="grid gap-2">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                      <p class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {{ 'adminUi.blog.fields.body' | translate }}
-                      </p>
-                      <div class="flex flex-wrap items-center gap-3">
-                        <label
-                          class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
-                        >
-                          <input type="checkbox" [(ngModel)]="useRichBlogEditor" />
-                          {{ 'adminUi.blog.editing.richEditor' | translate }}
-                        </label>
-                        <label
-                          *ngIf="!useRichBlogEditor"
-                          class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
-                        >
-                          <input type="checkbox" [(ngModel)]="showBlogPreview" />
-                          {{ 'adminUi.blog.editing.livePreview' | translate }}
-                        </label>
-                      </div>
-                    </div>
-
-                    <ng-container *ngIf="useRichBlogEditor; else markdownBlogEditor">
-                      <div class="flex flex-wrap items-center gap-2 text-xs">
-                        <label
-                          class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
-                        >
-                          {{ 'adminUi.blog.images.layout.label' | translate }}
-                          <select
-                            class="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [(ngModel)]="blogImageLayout"
-                          >
-                            <option value="default">
-                              {{ 'adminUi.blog.images.layout.default' | translate }}
-                            </option>
-                            <option value="wide">
-                              {{ 'adminUi.blog.images.layout.wide' | translate }}
-                            </option>
-                            <option value="left">
-                              {{ 'adminUi.blog.images.layout.left' | translate }}
-                            </option>
-                            <option value="right">
-                              {{ 'adminUi.blog.images.layout.right' | translate }}
-                            </option>
-                            <option value="gallery">
-                              {{ 'adminUi.blog.images.layout.gallery' | translate }}
-                            </option>
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="blogImageInputRich.click()"
-                        >
-                          {{ 'adminUi.blog.actions.image' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogEmbed(blogEditor, 'product')"
-                        >
-                          {{ 'adminUi.blog.toolbar.product' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogEmbed(blogEditor, 'category')"
-                        >
-                          {{ 'adminUi.blog.toolbar.category' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogEmbed(blogEditor, 'collection')"
-                        >
-                          {{ 'adminUi.blog.toolbar.collection' | translate }}
-                        </button>
-                        <input
-                          #blogImageInputRich
-                          type="file"
-                          accept="image/*"
-                          class="hidden"
-                          (change)="uploadAndInsertBlogImage(blogEditor, $event)"
-                        />
-                      </div>
-
-                      <div
-                        (dragover)="onBlogImageDragOver($event)"
-                        (drop)="onBlogImageDrop(blogEditor, $event)"
-                      >
-                        <app-rich-editor
-                          #blogEditor
-                          [(value)]="blogForm.body_markdown"
-                          [initialEditType]="'wysiwyg'"
-                          [height]="'520px'"
-                        ></app-rich-editor>
-                      </div>
-                    </ng-container>
-
-                    <ng-template #markdownBlogEditor>
-                      <div class="flex flex-wrap items-center gap-2 text-xs">
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="applyBlogHeading(blogBody, 1)"
-                        >
-                          H1
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="applyBlogHeading(blogBody, 2)"
-                        >
-                          H2
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="wrapBlogSelection(blogBody, '**', '**', 'bold text')"
-                        >
-                          B
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 italic text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="wrapBlogSelection(blogBody, '*', '*', 'italic text')"
-                        >
-                          I
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogLink(blogBody)"
-                        >
-                          {{ 'adminUi.blog.toolbar.link' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogCodeBlock(blogBody)"
-                        >
-                          {{ 'adminUi.blog.toolbar.code' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogEmbed(blogBody, 'product')"
-                        >
-                          {{ 'adminUi.blog.toolbar.product' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogEmbed(blogBody, 'category')"
-                        >
-                          {{ 'adminUi.blog.toolbar.category' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 font-mono text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="insertBlogEmbed(blogBody, 'collection')"
-                        >
-                          {{ 'adminUi.blog.toolbar.collection' | translate }}
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="applyBlogList(blogBody)"
-                        >
-                          {{ 'adminUi.blog.toolbar.list' | translate }}
-                        </button>
-                        <label
-                          class="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300"
-                        >
-                          {{ 'adminUi.blog.images.layout.label' | translate }}
-                          <select
-                            class="rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [(ngModel)]="blogImageLayout"
-                          >
-                            <option value="default">
-                              {{ 'adminUi.blog.images.layout.default' | translate }}
-                            </option>
-                            <option value="wide">
-                              {{ 'adminUi.blog.images.layout.wide' | translate }}
-                            </option>
-                            <option value="left">
-                              {{ 'adminUi.blog.images.layout.left' | translate }}
-                            </option>
-                            <option value="right">
-                              {{ 'adminUi.blog.images.layout.right' | translate }}
-                            </option>
-                            <option value="gallery">
-                              {{ 'adminUi.blog.images.layout.gallery' | translate }}
-                            </option>
-                          </select>
-                        </label>
-                        <button
-                          type="button"
-                          class="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-700 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:text-white"
-                          (click)="blogImageInput.click()"
-                        >
-                          {{ 'adminUi.blog.actions.image' | translate }}
-                        </button>
-                        <input
-                          #blogImageInput
-                          type="file"
-                          accept="image/*"
-                          class="hidden"
-                          (change)="uploadAndInsertBlogImage(blogBody, $event)"
-                        />
-                      </div>
-
-                      <div
-                        class="grid gap-3"
-                        [ngClass]="
-                          showBlogPreview && cmsPrefs.previewLayout() === 'split'
-                            ? 'lg:grid-cols-2'
-                            : ''
-                        "
-                      >
-                        <textarea
-                          #blogBody
-                          rows="10"
-                          class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          (dragover)="onBlogImageDragOver($event)"
-                          (drop)="onBlogImageDrop(blogBody, $event)"
-                          [(ngModel)]="blogForm.body_markdown"
-                          (scroll)="syncSplitScroll(blogBody, blogPreview)"
-                        ></textarea>
-
-                        <div
-                          class="mx-auto w-full"
-                          [ngClass]="cmsPreviewMaxWidthClass()"
-                          [class.hidden]="!showBlogPreview"
-                        >
-                          <div
-                            #blogPreview
-                            class="markdown rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-800 shadow-sm max-h-[520px] overflow-auto dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                            [innerHTML]="
-                              showBlogPreview
-                                ? renderMarkdown(
-                                    blogForm.body_markdown ||
-                                      ('adminUi.blog.editing.previewEmpty' | translate)
-                                  )
-                                : ''
-                            "
-                            (scroll)="syncSplitScroll(blogPreview, blogBody)"
-                          ></div>
-                        </div>
-                      </div>
-                    </ng-template>
-                  </div>
-
-                  <div
-                    class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-950/30"
-                  >
-                    <ng-container *ngIf="blogWritingAids() as aids">
-                      <p
-                        class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                      >
-                        {{ 'adminUi.blog.writing.title' | translate }}
-                      </p>
-                      <div class="mt-2 grid gap-3">
-                        <div class="grid gap-1">
-                          <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                            {{ 'adminUi.blog.writing.words' | translate: { count: aids.words } }}
-                          </p>
-                          <p class="text-xs text-slate-600 dark:text-slate-300">
-                            {{
-                              'adminUi.blog.writing.estimate'
-                                | translate: { minutes: aids.minutes || 0 }
-                            }}
-                          </p>
-                          <app-button
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.blog.writing.applyEstimate' | translate"
-                            [disabled]="!aids.minutes"
-                            (action)="applyBlogReadingTimeEstimate()"
-                          ></app-button>
-                        </div>
-
-                        <div class="grid gap-1">
-                          <p class="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                            {{ 'adminUi.blog.writing.outline' | translate }}
-                          </p>
-                          <p
-                            *ngIf="!aids.headings.length"
-                            class="text-xs text-slate-500 dark:text-slate-400"
-                          >
-                            {{ 'adminUi.blog.writing.outlineEmpty' | translate }}
-                          </p>
-                          <div
-                            *ngFor="let h of aids.headings"
-                            class="truncate text-slate-700 dark:text-slate-200"
-                            [style.paddingLeft.px]="(h.level - 1) * 8"
-                          >
-                            {{ h.text }}
-                          </div>
-                        </div>
-                      </div>
-                    </ng-container>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <ng-container *ngIf="blogA11yIssues() as issues">
-              <details
-                *ngIf="issues.length"
-                class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/30"
-                [open]="blogA11yOpen"
-              >
-                <summary
-                  class="cursor-pointer select-none font-semibold text-amber-900 dark:text-amber-100"
-                >
-                  {{ 'adminUi.blog.a11y.title' | translate }} ({{ issues.length }})
-                </summary>
-                <div class="mt-2 grid gap-2">
-                  <p class="text-xs text-amber-900/80 dark:text-amber-100/80">
-                    {{ 'adminUi.blog.a11y.hint' | translate }}
-                  </p>
-                  <div
-                    *ngFor="let issue of issues"
-                    class="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white p-2 text-xs dark:border-amber-900/50 dark:bg-slate-900"
-                  >
-                    <a
-                      class="text-indigo-600 dark:text-indigo-300 hover:underline truncate"
-                      [href]="issue.url"
-                      target="_blank"
-                      rel="noopener"
-                    >
-                      {{ issue.url }}
-                    </a>
-                    <div class="flex items-center gap-2">
-                      <span class="text-slate-600 dark:text-slate-300">{{ issue.alt || '—' }}</span>
-                      <app-button
-                        size="sm"
-                        variant="ghost"
-                        [label]="'adminUi.blog.a11y.fixAlt' | translate"
-                        (action)="promptFixBlogImageAlt(issue.index)"
-                      ></app-button>
-                    </div>
-                  </div>
-                </div>
-              </details>
-            </ng-container>
-
-            <div class="grid gap-2">
-              <div *ngIf="blogImages.length" class="grid gap-2">
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                  {{ 'adminUi.blog.images.title' | translate }}
-                </p>
-                <div
-                  *ngFor="let img of blogImages"
-                  class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-                >
-                  <a
-                    class="text-xs text-indigo-600 dark:text-indigo-300 hover:underline truncate"
-                    [href]="img.url"
-                    target="_blank"
-                    rel="noopener"
-                  >
-                    {{ img.url }}
-                  </a>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.blog.images.insertMarkdown' | translate"
-                    (action)="insertBlogImageMarkdown(img.url, img.alt_text)"
-                  ></app-button>
-                </div>
-              </div>
-            </div>
-
-            <div
-              *ngIf="blogDraftHasRestore()"
-              class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-            >
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="font-semibold">{{
-                  'adminUi.content.autosave.restoreFound' | translate
-                }}</span>
-                <span *ngIf="blogDraftRestoreAt()" class="text-amber-700 dark:text-amber-200">{{
-                  blogDraftRestoreAt() | date: 'short'
-                }}</span>
-              </div>
-              <div class="flex flex-wrap items-center gap-2">
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.restore' | translate"
-                  (action)="restoreBlogDraftAutosave()"
-                ></app-button>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.dismiss' | translate"
-                  (action)="dismissBlogDraftAutosave()"
-                ></app-button>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-              <app-button
-                [label]="'adminUi.actions.save' | translate"
-                (action)="saveBlogPost()"
-              ></app-button>
-              <app-button
-                size="sm"
-                variant="ghost"
-                [label]="'adminUi.blog.actions.previewLink' | translate"
-                (action)="generateBlogPreviewLink()"
-              ></app-button>
-              <a
-                class="inline-flex items-center justify-center rounded-full font-semibold transition px-3 py-2 text-sm bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-slate-800 dark:text-slate-50 dark:border-slate-700 dark:hover:border-slate-600"
-                [attr.href]="'/blog/' + currentBlogSlug()"
-                target="_blank"
-                rel="noopener"
-              >
-                {{ 'adminUi.blog.actions.view' | translate }}
-              </a>
-              <span *ngIf="blogDraftReady()" class="text-xs text-slate-500 dark:text-slate-400">
-                <ng-container *ngIf="!blogDraftDirty()">
-                  {{ 'adminUi.content.autosave.state.saved' | translate }}
-                </ng-container>
-                <ng-container *ngIf="blogDraftDirty() && blogDraftAutosaving()">
-                  {{ 'adminUi.content.autosave.state.autosaving' | translate }}
-                </ng-container>
-                <ng-container
-                  *ngIf="blogDraftDirty() && !blogDraftAutosaving() && blogDraftLastAutosavedAt()"
-                >
-                  {{ 'adminUi.content.autosave.state.autosaved' | translate }}
-                  {{ blogDraftLastAutosavedAt() | date: 'shortTime' }}
-                </ng-container>
-                <ng-container
-                  *ngIf="blogDraftDirty() && !blogDraftAutosaving() && !blogDraftLastAutosavedAt()"
-                >
-                  {{ 'adminUi.content.autosave.state.unsaved' | translate }}
-                </ng-container>
-              </span>
-            </div>
-            <div
-              *ngIf="blogPreviewUrl"
-              class="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-950/30"
-            >
-              <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.blog.preview.title' | translate }}
-              </p>
-              <div class="flex items-center gap-2">
-                <input
-                  class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  [value]="blogPreviewUrl"
-                  readonly
-                />
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.blog.actions.copy' | translate"
-                  (action)="copyBlogPreviewLink()"
-                ></app-button>
-              </div>
-              <p *ngIf="blogPreviewExpiresAt" class="text-xs text-slate-500 dark:text-slate-400">
-                {{ 'adminUi.blog.preview.expires' | translate }}
-                {{ blogPreviewExpiresAt | date: 'short' }}
-              </p>
-            </div>
-
-            <details
-              class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-            >
-              <summary
-                class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-              >
-                {{ 'adminUi.blog.seo.title' | translate }}
-              </summary>
-              <div class="mt-3 grid gap-3">
-                <p class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.blog.seo.hint' | translate }}
-                </p>
-
-                <div class="grid gap-4 md:grid-cols-2">
-                  <div
-                    *ngFor="let lang of blogSocialLangs"
-                    class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
-                  >
-                    <div class="flex items-center justify-between gap-2">
-                      <p
-                        class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300"
-                      >
-                        {{ lang.toUpperCase() }}
-                      </p>
-                      <div class="flex items-center gap-2">
-                        <a
-                          class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                          [attr.href]="blogPublicUrl(lang)"
-                          target="_blank"
-                          rel="noopener"
-                        >
-                          {{ 'adminUi.blog.actions.view' | translate }}
-                        </a>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.blog.actions.copy' | translate"
-                          (action)="copyText(blogPublicUrl(lang))"
-                        ></app-button>
-                      </div>
-                    </div>
-
-                    <div *ngIf="blogSeoHasContent(lang); else seoMissingLang" class="grid gap-3">
-                      <div class="grid gap-1">
-                        <p
-                          class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                        >
-                          {{ 'adminUi.blog.seo.searchPreview' | translate }}
-                        </p>
-                        <div
-                          class="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900"
-                        >
-                          <p class="text-emerald-700 dark:text-emerald-300 truncate">
-                            {{ blogPublicUrl(lang) }}
-                          </p>
-                          <p
-                            class="mt-1 text-sm font-semibold text-indigo-700 dark:text-indigo-200 truncate"
-                          >
-                            {{ blogSeoTitlePreview(lang) }}
-                          </p>
-                          <p class="mt-1 text-xs text-slate-700 dark:text-slate-200">
-                            {{ blogSeoDescriptionPreview(lang) }}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div class="grid gap-1 text-xs">
-                        <p
-                          class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                        >
-                          {{ 'adminUi.blog.seo.checks' | translate }}
-                        </p>
-                        <div
-                          class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
-                        >
-                          <span class="text-slate-700 dark:text-slate-200">
-                            {{
-                              'adminUi.blog.seo.length.title'
-                                | translate: { count: blogSeoTitleFull(lang).length }
-                            }}
-                          </span>
-                          <span class="text-slate-700 dark:text-slate-200">
-                            {{
-                              'adminUi.blog.seo.length.description'
-                                | translate: { count: blogSeoDescriptionFull(lang).length }
-                            }}
-                          </span>
-                        </div>
-
-                        <div
-                          *ngFor="let issue of blogSeoIssues(lang)"
-                          class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
-                        >
-                          {{ issue.key | translate: issue.params }}
-                        </div>
-                      </div>
-
-                      <div class="grid gap-1">
-                        <p
-                          class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400"
-                        >
-                          {{ 'adminUi.blog.seo.socialPreview' | translate }}
-                        </p>
-                        <div
-                          class="rounded-lg border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900"
-                        >
-                          <img
-                            *ngIf="blogPreviewToken || blogForm.status === 'published'"
-                            [src]="blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)"
-                            [alt]="'adminUi.blog.social.ogAlt' | translate"
-                            class="w-full rounded-lg border border-slate-200 bg-white object-cover dark:border-slate-800 dark:bg-slate-900"
-                            loading="lazy"
-                          />
-                          <p
-                            class="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50 truncate"
-                          >
-                            {{ blogSeoTitlePreview(lang) }}
-                          </p>
-                          <p class="mt-1 text-xs text-slate-700 dark:text-slate-200">
-                            {{ blogSeoDescriptionPreview(lang) }}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <ng-template #seoMissingLang>
-                      <div
-                        class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-                      >
-                        {{ 'adminUi.blog.seo.missingLang' | translate }}
-                      </div>
-                    </ng-template>
-                  </div>
-                </div>
-              </div>
-            </details>
-
-            <details
-              class="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-            >
-              <summary
-                class="cursor-pointer select-none font-semibold text-slate-900 dark:text-slate-50"
-              >
-                {{ 'adminUi.blog.social.title' | translate }}
-              </summary>
-              <div class="mt-3 grid gap-3">
-                <p class="text-sm text-slate-600 dark:text-slate-300">
-                  {{ 'adminUi.blog.social.hint' | translate }}
-                </p>
-
-                <div
-                  *ngIf="!blogPreviewToken"
-                  class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100"
-                >
-                  <p class="font-semibold">
-                    {{ 'adminUi.blog.social.previewTokenTitle' | translate }}
-                  </p>
-                  <p class="text-xs">{{ 'adminUi.blog.social.previewTokenCopy' | translate }}</p>
-                  <div class="mt-2">
-                    <app-button
-                      size="sm"
-                      variant="ghost"
-                      [label]="'adminUi.blog.actions.previewLink' | translate"
-                      (action)="generateBlogPreviewLink()"
-                    ></app-button>
-                  </div>
-                </div>
-
-                <div class="grid gap-4 md:grid-cols-2">
-                  <div
-                    *ngFor="let lang of blogSocialLangs"
-                    class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/30"
-                  >
-                    <div class="flex items-center justify-between gap-2">
-                      <p
-                        class="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300"
-                      >
-                        {{ lang.toUpperCase() }}
-                      </p>
-                      <div class="flex items-center gap-2">
-                        <a
-                          class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                          [attr.href]="blogPublicUrl(lang)"
-                          target="_blank"
-                          rel="noopener"
-                        >
-                          {{ 'adminUi.blog.actions.view' | translate }}
-                        </a>
-                        <app-button
-                          size="sm"
-                          variant="ghost"
-                          [label]="'adminUi.blog.actions.copy' | translate"
-                          (action)="copyText(blogPublicUrl(lang))"
-                        ></app-button>
-                      </div>
-                    </div>
-
-                    <img
-                      *ngIf="blogPreviewToken || blogForm.status === 'published'"
-                      [src]="blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)"
-                      [alt]="'adminUi.blog.social.ogAlt' | translate"
-                      class="w-full rounded-lg border border-slate-200 bg-white object-cover dark:border-slate-800 dark:bg-slate-900"
-                      loading="lazy"
-                    />
-
-                    <div class="grid gap-2">
-                      <label
-                        class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200"
-                      >
-                        {{ 'adminUi.blog.social.pageUrl' | translate }}
-                        <input
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                          [value]="blogPublicUrl(lang)"
-                          readonly
-                        />
-                      </label>
-
-                      <label
-                        class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200"
-                        *ngIf="blogPreviewToken"
-                      >
-                        {{ 'adminUi.blog.social.previewImageUrl' | translate }}
-                        <div class="flex items-center gap-2">
-                          <input
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [value]="blogPreviewOgImageUrl(lang) || ''"
-                            readonly
-                          />
-                          <app-button
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.blog.actions.copy' | translate"
-                            (action)="copyText(blogPreviewOgImageUrl(lang) || '')"
-                          ></app-button>
-                        </div>
-                      </label>
-
-                      <label
-                        class="grid gap-1 text-xs font-medium text-slate-700 dark:text-slate-200"
-                      >
-                        {{ 'adminUi.blog.social.publishedImageUrl' | translate }}
-                        <div class="flex items-center gap-2">
-                          <input
-                            class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                            [value]="blogPublishedOgImageUrl(lang)"
-                            readonly
-                          />
-                          <app-button
-                            size="sm"
-                            variant="ghost"
-                            [label]="'adminUi.blog.actions.copy' | translate"
-                            (action)="copyText(blogPublishedOgImageUrl(lang))"
-                          ></app-button>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </details>
-
-            <div
-              class="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-700 dark:bg-slate-900"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.blog.revisions.title' | translate }}
-                </p>
-                <app-button
-                  size="sm"
-                  variant="ghost"
-                  [label]="'adminUi.actions.refresh' | translate"
-                  (action)="loadBlogVersions()"
-                ></app-button>
-              </div>
-              <div
-                *ngIf="blogVersions.length === 0"
-                class="text-xs text-slate-500 dark:text-slate-400"
-              >
-                {{ 'adminUi.blog.revisions.empty' | translate }}
-              </div>
-              <div
-                *ngFor="let v of blogVersions"
-                class="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-              >
-                <div>
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                    v{{ v.version }} · {{ v.created_at | date: 'short' }}
-                  </p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    {{ 'adminUi.status.' + v.status | translate }}
-                  </p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.blog.revisions.diff' | translate"
-                    (action)="selectBlogVersion(v.version)"
-                  ></app-button>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.blog.revisions.rollback' | translate"
-                    (action)="rollbackBlogVersion(v.version)"
-                  ></app-button>
-                </div>
-              </div>
-
-              <div
-                *ngIf="blogVersionDetail"
-                class="grid gap-2 pt-2 border-t border-slate-200 dark:border-slate-800"
-              >
-                <p class="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-                  {{
-                    'adminUi.blog.revisions.diffVsCurrent'
-                      | translate: { version: blogVersionDetail.version }
-                  }}
-                </p>
-                <div
-                  class="rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-xs whitespace-pre-wrap text-slate-900 dark:border-slate-700 dark:bg-slate-950/30 dark:text-slate-100"
-                >
-                  <ng-container *ngFor="let part of blogDiffParts">
-                    <span
-                      [ngClass]="
-                        part.added
-                          ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100'
-                          : part.removed
-                            ? 'bg-rose-200 text-rose-900 dark:bg-rose-900/40 dark:text-rose-100'
-                            : ''
-                      "
-                      >{{ part.value }}</span
-                    >
-                  </ng-container>
-                </div>
-              </div>
-            </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              {{ 'adminUi.blog.editing.toolbarTip' | translate }}
-            </p>
-          </div>
-        </section>
-
-        <section
-          *ngIf="section() === 'blog'"
-          class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
-        >
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-50">
-              {{ 'adminUi.blog.moderation.title' | translate }}
-            </h2>
-            <app-button
-              size="sm"
-              variant="ghost"
-              [label]="'adminUi.actions.refresh' | translate"
-              (action)="loadFlaggedComments()"
-            ></app-button>
-          </div>
-          <div
-            *ngIf="flaggedCommentsError"
-            class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100"
-          >
-            {{ flaggedCommentsError }}
-          </div>
-          <div *ngIf="flaggedCommentsLoading()" class="text-sm text-slate-600 dark:text-slate-300">
-            {{ 'adminUi.blog.moderation.loading' | translate }}
-          </div>
-          <div
-            *ngIf="
-              !flaggedCommentsLoading() && !flaggedCommentsError && flaggedComments().length === 0
-            "
-            class="text-sm text-slate-500 dark:text-slate-400"
-          >
-            {{ 'adminUi.blog.moderation.empty' | translate }}
-          </div>
-          <div *ngIf="!flaggedCommentsLoading() && flaggedComments().length" class="grid gap-3">
-            <div
-              *ngFor="let c of flaggedComments()"
-              class="rounded-lg border border-slate-200 p-3 dark:border-slate-700"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="grid gap-0.5">
-                  <p class="font-semibold text-slate-900 dark:text-slate-50">
-                    {{ commentAuthorLabel(c.author) }}
-                  </p>
-                  <p class="text-xs text-slate-500 dark:text-slate-400">
-                    /blog/{{ c.post_slug }} · {{ c.created_at | date: 'short' }} ·
-                    {{ 'adminUi.blog.moderation.flagsCount' | translate: { count: c.flag_count } }}
-                  </p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <a
-                    class="text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200"
-                    [attr.href]="'/blog/' + c.post_slug"
-                    target="_blank"
-                    rel="noopener"
-                    (click)="$event.stopPropagation()"
-                  >
-                    {{ 'adminUi.blog.actions.view' | translate }}
-                  </a>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.blog.moderation.actions.resolve' | translate"
-                    (action)="resolveFlags(c)"
-                  ></app-button>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="
-                      c.is_hidden
-                        ? ('adminUi.blog.moderation.actions.unhide' | translate)
-                        : ('adminUi.blog.moderation.actions.hide' | translate)
-                    "
-                    [disabled]="blogCommentModerationBusy.has(c.id)"
-                    (action)="toggleHide(c)"
-                  ></app-button>
-                  <app-button
-                    size="sm"
-                    variant="ghost"
-                    [label]="'adminUi.actions.delete' | translate"
-                    [disabled]="blogCommentModerationBusy.has(c.id)"
-                    (action)="adminDeleteComment(c)"
-                  ></app-button>
-                </div>
-              </div>
-              <p class="mt-2 text-sm whitespace-pre-line text-slate-700 dark:text-slate-200">
-                {{ c.body || ('adminUi.blog.moderation.deletedBody' | translate) }}
-              </p>
-              <div
-                *ngIf="c.flags?.length"
-                class="mt-2 grid gap-1 text-xs text-slate-600 dark:text-slate-300"
-              >
-                <p class="font-semibold text-slate-900 dark:text-slate-50">
-                  {{ 'adminUi.blog.moderation.flagsTitle' | translate }}
-                </p>
-                <div *ngFor="let f of c.flags" class="flex items-center justify-between gap-2">
-                  <span>{{ f.reason || '—' }}</span>
-                  <span class="text-slate-500 dark:text-slate-400">{{
-                    f.created_at | date: 'short'
-                  }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+          [contentBlocks]="contentBlocks"
+          [reloadContentBlocks]="boundReloadContentBlocks"
+          [withExpectedVersion]="boundWithExpectedVersion"
+          [rememberContentVersion]="boundRememberContentVersion"
+          [handleContentConflict]="boundHandleContentConflict"
+        ></app-admin-blog-editor>
 
         <section
           *ngIf="section() === 'settings'"
@@ -10089,33 +6907,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   products: AdminProduct[] = [];
   categories: AdminCategory[] = [];
-  categoryName = '';
-  categoryParentId = '';
-  categoryWizardOpen = signal(false);
-  categoryWizardStep = signal(0);
-  categoryWizardSlug = signal<string | null>(null);
-  readonly categoryWizardSteps = [
-    {
-      id: 'basics',
-      labelKey: 'adminUi.categories.wizard.steps.basics',
-      descriptionKey: 'adminUi.categories.wizard.desc.basics',
-    },
-    {
-      id: 'translations',
-      labelKey: 'adminUi.categories.wizard.steps.translations',
-      descriptionKey: 'adminUi.categories.wizard.desc.translations',
-    },
-  ];
-  categoryTranslationsSlug: string | null = null;
-  categoryTranslationsError = signal<string | null>(null);
-  categoryTranslationExists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
-  categoryTranslations: Record<'en' | 'ro', { name: string; description: string }> = {
-    en: this.blankCategoryTranslation(),
-    ro: this.blankCategoryTranslation(),
-  };
-  categoryDeleteConfirmOpen = signal(false);
-  categoryDeleteConfirmBusy = signal(false);
-  categoryDeleteConfirmTarget = signal<AdminCategory | null>(null);
   taxGroups: TaxGroupRead[] = [];
   taxGroupsLoading = false;
   taxGroupsError: string | null = null;
@@ -10124,7 +6915,6 @@ export class AdminComponent implements OnInit, OnDestroy {
   taxRatePercent: Record<string, string> = {};
   maintenanceEnabledValue = false;
   maintenanceEnabled = signal<boolean>(false);
-  draggingSlug: string | null = null;
   selectedIds = new Set<string>();
   allSelected = false;
   homeBlocksLang: UiLang = 'en';
@@ -10196,142 +6986,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   };
   showContentPreview = false;
 
-  showBlogCreate = false;
-  blogCreate: {
-    baseLang: 'en' | 'ro';
-    status: ContentStatusUi;
-    published_at: string;
-    published_until: string;
-    title: string;
-    body_markdown: string;
-    summary: string;
-    tags: string;
-    series: string;
-    cover_image_url: string;
-    reading_time_minutes: string;
-    pinned: boolean;
-    pin_order: string;
-    includeTranslation: boolean;
-    translationTitle: string;
-    translationBody: string;
-  } = {
-    baseLang: 'en',
-    status: 'draft',
-    published_at: '',
-    published_until: '',
-    title: '',
-    body_markdown: '',
-    summary: '',
-    tags: '',
-    series: '',
-    cover_image_url: '',
-    reading_time_minutes: '',
-    pinned: false,
-    pin_order: '1',
-    includeTranslation: false,
-    translationTitle: '',
-    translationBody: '',
-  };
-  selectedBlogKey: string | null = null;
-  blogBaseLang: 'en' | 'ro' = 'en';
-  blogEditLang: 'en' | 'ro' = 'en';
-  blogForm = {
-    title: '',
-    body_markdown: '',
-    status: 'draft',
-    published_at: '',
-    published_until: '',
-    summary: '',
-    tags: '',
-    series: '',
-    cover_image_url: '',
-    cover_fit: 'cover' as 'cover' | 'contain',
-    reading_time_minutes: '',
-    pinned: false,
-    pin_order: '1',
-  };
-  blogMeta: Record<string, any> = {};
-  blogImages: {
-    id: string;
-    url: string;
-    alt_text?: string | null;
-    sort_order: number;
-    focal_x: number;
-    focal_y: number;
-  }[] = [];
-  blogBulkSelection = new Set<string>();
-  blogDeleteBusy = new Set<string>();
-  blogBulkAction: 'publish' | 'unpublish' | 'schedule' | 'tags_add' | 'tags_remove' = 'publish';
-  blogBulkPublishAt = '';
-  blogBulkUnpublishAt = '';
-  blogBulkTags = '';
-  blogBulkSaving = false;
-  blogBulkError = '';
-  blogPinsSaving = false;
-  draggingBlogPinKey: string | null = null;
-  showBlogCoverLibrary = false;
-  showBlogPreview = false;
-  blogA11yOpen = false;
-  blogSeoSnapshots: Record<UiLang, { title: string; body_markdown: string } | null> = {
-    en: null,
-    ro: null,
-  };
-  blogSeoSnapshotsKey: string | null = null;
-  blogSeoSnapshotsLoading = false;
-  useRichBlogEditor = true;
-  blogImageLayout: 'default' | 'wide' | 'left' | 'right' | 'gallery' = 'default';
-  blogSocialLangs: UiLang[] = ['en', 'ro'];
-  blogPreviewUrl: string | null = null;
-  blogPreviewToken: string | null = null;
-  blogPreviewExpiresAt: string | null = null;
-  blogVersions: ContentBlockVersionListItem[] = [];
-  blogVersionDetail: ContentBlockVersionRead | null = null;
-  blogDiffParts: { value: string; added?: boolean; removed?: boolean }[] = [];
-  blogCommentModerationBusy = new Set<string>();
-  flaggedComments = signal<AdminBlogComment[]>([]);
-  flaggedCommentsLoading = signal<boolean>(false);
-  flaggedCommentsError: string | null = null;
 
-  assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
-  assetsMessage: string | null = null;
-  assetsError: string | null = null;
-  socialForm: {
-    phone: string;
-    email: string;
-    instagram_pages: Array<{ label: string; url: string; thumbnail_url: string }>;
-    facebook_pages: Array<{ label: string; url: string; thumbnail_url: string }>;
-  } = {
-    phone: '+40723204204',
-    email: 'momentstudio.ro@gmail.com',
-    instagram_pages: [
-      {
-        label: 'Moments in Clay - Studio',
-        url: 'https://www.instagram.com/moments_in_clay_studio?igsh=ZmdnZTdudnNieDQx',
-        thumbnail_url: '',
-      },
-      {
-        label: 'momentstudio',
-        url: 'https://www.instagram.com/adrianaartizanat?igsh=ZmZmaDU1MGcxZHEy',
-        thumbnail_url: '',
-      },
-    ],
-    facebook_pages: [
-      {
-        label: 'Moments in Clay - Studio',
-        url: 'https://www.facebook.com/share/17YqBmfX5x/',
-        thumbnail_url: '',
-      },
-      {
-        label: 'momentstudio',
-        url: 'https://www.facebook.com/share/1APqKJM6Zi/',
-        thumbnail_url: '',
-      },
-    ],
-  };
-  socialMessage: string | null = null;
-  socialError: string | null = null;
-  socialThumbLoading: Record<string, boolean> = {};
-  socialThumbErrors: Record<string, string> = {};
   navigationForm: {
     header_links: Array<{ id: string; url: string; label: LocalizedText }>;
     footer_handcrafted_links: Array<{ id: string; url: string; label: LocalizedText }>;
@@ -10341,100 +6996,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   navigationError: string | null = null;
   private draggingNavList: 'header' | 'footer_handcrafted' | 'footer_legal' | null = null;
   private draggingNavId: string | null = null;
-  companyForm: {
-    name: string;
-    registration_number: string;
-    cui: string;
-    address: string;
-    phone: string;
-    email: string;
-  } = {
-    name: '',
-    registration_number: '',
-    cui: '',
-    address: '',
-    phone: '',
-    email: '',
-  };
-  companyMessage: string | null = null;
-  companyError: string | null = null;
-  checkoutSettingsForm: {
-    shipping_fee_ron: number | string;
-    free_shipping_threshold_ron: number | string;
-    phone_required_home: boolean;
-    phone_required_locker: boolean;
-    fee_enabled: boolean;
-    fee_type: 'flat' | 'percent';
-    fee_value: number | string;
-    vat_enabled: boolean;
-    vat_rate_percent: number | string;
-    vat_apply_to_shipping: boolean;
-    vat_apply_to_fee: boolean;
-    receipt_share_days: number | string;
-    money_rounding: 'half_up' | 'half_even' | 'up' | 'down';
-  } = {
-    shipping_fee_ron: 20,
-    free_shipping_threshold_ron: 300,
-    phone_required_home: true,
-    phone_required_locker: true,
-    fee_enabled: false,
-    fee_type: 'flat',
-    fee_value: 0,
-    vat_enabled: true,
-    vat_rate_percent: 10,
-    vat_apply_to_shipping: false,
-    vat_apply_to_fee: false,
-    receipt_share_days: 365,
-    money_rounding: 'half_up',
-  };
-  checkoutSettingsMessage: string | null = null;
-  checkoutSettingsError: string | null = null;
-  reportsSettingsMeta: Record<string, any> = {};
-  reportsSettingsForm: {
-    weekly_enabled: boolean;
-    weekly_weekday: number;
-    weekly_hour_utc: number;
-    monthly_enabled: boolean;
-    monthly_day: number | string;
-    monthly_hour_utc: number;
-    recipients: string;
-  } = {
-    weekly_enabled: false,
-    weekly_weekday: 0,
-    weekly_hour_utc: 8,
-    monthly_enabled: false,
-    monthly_day: 1,
-    monthly_hour_utc: 8,
-    recipients: '',
-  };
-  reportsWeeklyLastSent: string | null = null;
-  reportsWeeklyLastError: string | null = null;
-  reportsMonthlyLastSent: string | null = null;
-  reportsMonthlyLastError: string | null = null;
-  reportsSettingsMessage: string | null = null;
-  reportsSettingsError: string | null = null;
-  reportsSending = false;
-  readonly reportsWeekdays = [
-    { value: 0, labelKey: 'adminUi.reports.weekdays.mon' },
-    { value: 1, labelKey: 'adminUi.reports.weekdays.tue' },
-    { value: 2, labelKey: 'adminUi.reports.weekdays.wed' },
-    { value: 3, labelKey: 'adminUi.reports.weekdays.thu' },
-    { value: 4, labelKey: 'adminUi.reports.weekdays.fri' },
-    { value: 5, labelKey: 'adminUi.reports.weekdays.sat' },
-    { value: 6, labelKey: 'adminUi.reports.weekdays.sun' },
-  ];
-  readonly reportsHours = Array.from({ length: 24 }, (_, hour) => hour);
-  seoLang: 'en' | 'ro' = 'en';
   seoPage: 'home' | 'shop' | 'product' | 'category' | 'about' = 'home';
-  seoForm = { title: '', description: '' };
-  seoMessage: string | null = null;
-  seoError: string | null = null;
-  sitemapPreviewLoading = false;
-  sitemapPreviewError: string | null = null;
-  sitemapPreviewByLang: Record<string, string[]> | null = null;
-  structuredDataLoading = false;
-  structuredDataError: string | null = null;
-  structuredDataResult: StructuredDataValidationResponse | null = null;
   infoLang: UiLang = 'en';
   infoForm: {
     about: LocalizedText;
@@ -10449,15 +7011,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   };
   infoMessage: string | null = null;
   infoError: string | null = null;
+  /**
+   * Selected legal document, retained here (not on the extracted
+   * <app-admin-legal-pages> child) so the choice survives leaving and
+   * re-entering the pages section, which destroys/recreates the child.
+   */
   legalPageKey: LegalPageKey = 'page.terms';
-  legalPageForm: LocalizedText = { en: '', ro: '' };
-  legalPageLastUpdated = '';
-  private legalPageLastUpdatedOriginal = '';
-  private legalPageMeta: Record<string, unknown> = {};
-  legalPageLoading = false;
-  legalPageSaving = false;
-  legalPageMessage: string | null = null;
-  legalPageError: string | null = null;
   contentPages: ContentPageListItem[] = [];
   contentPagesLoading = false;
   contentPagesError: string | null = null;
@@ -10561,11 +7120,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   pageInsertDragActive = false;
   cmsAriaAnnouncement = '';
   private cmsDraftPoller: number | null = null;
-  private readonly cmsHomeDraft = new CmsDraftManager<HomeBlockDraft[]>(
-    'adrianaart.cms.autosave.home.sections',
-  );
-  private readonly cmsPageDrafts = new Map<string, CmsDraftManager<PageBlocksDraftState>>();
-  private readonly cmsBlogDrafts = new Map<string, CmsDraftManager<BlogDraftState>>();
+  private get cmsHomeDraft(): CmsDraftManager<HomeBlockDraft[]> {
+    return this.cmsState.cmsHomeDraft;
+  }
+  private get cmsPageDrafts(): Map<string, CmsDraftManager<PageBlocksDraftState>> {
+    return this.cmsState.cmsPageDrafts;
+  }
   coupons: AdminCoupon[] = [];
   newCoupon: Partial<AdminCoupon> = { code: '', percentage_off: 0, active: true, currency: 'RON' };
   stockEdits: Record<string, number> = {};
@@ -10607,6 +7167,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     private readonly translate: TranslateService,
     private readonly markdown: MarkdownService,
     private readonly sanitizer: DomSanitizer,
+    private readonly cmsState: AdminCmsStateService = new AdminCmsStateService(),
   ) {}
 
   private t(key: string, params?: Record<string, unknown>): string {
@@ -10631,22 +7192,11 @@ export class AdminComponent implements OnInit, OnDestroy {
       pageDraft.observe(this.currentPageDraftState(pageKey));
     }
 
-    const blogKey = this.selectedBlogKey;
-    if (blogKey) {
-      const id = this.blogDraftId(blogKey, this.blogEditLang);
-      const manager = this.cmsBlogDrafts.get(id);
-      if (manager?.isReady()) {
-        manager.observe(this.currentBlogDraftState());
-      }
-    }
+    // Blog draft observation is owned by <app-admin-blog-editor> (its own poller).
   }
 
   private ensurePageDraft(pageKey: PageBuilderKey): CmsDraftManager<PageBlocksDraftState> {
-    const existing = this.cmsPageDrafts.get(pageKey);
-    if (existing) return existing;
-    const created = new CmsDraftManager<PageBlocksDraftState>(`adrianaart.cms.autosave.${pageKey}`);
-    this.cmsPageDrafts.set(pageKey, created);
-    return created;
+    return this.cmsState.ensurePageDraft(pageKey);
   }
 
   private currentPageDraftState(pageKey: PageBuilderKey): PageBlocksDraftState {
@@ -10676,98 +7226,17 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.pageBlocksRequiresAuth[safePageKey] = Boolean(draft?.requiresAuth);
   }
 
-  private blogDraftId(key: string, lang: UiLang): string {
-    return `${key}.${lang}`;
-  }
 
-  private ensureBlogDraft(key: string, lang: UiLang): CmsDraftManager<BlogDraftState> {
-    const id = this.blogDraftId(key, lang);
-    const existing = this.cmsBlogDrafts.get(id);
-    if (existing) return existing;
-    const created = new CmsDraftManager<BlogDraftState>(`adrianaart.cms.autosave.${id}`);
-    this.cmsBlogDrafts.set(id, created);
-    return created;
-  }
 
-  private currentBlogDraftState(): BlogDraftState {
-    return {
-      title: this.blogForm.title,
-      body_markdown: this.blogForm.body_markdown,
-      status:
-        this.blogForm.status === 'published'
-          ? 'published'
-          : this.blogForm.status === 'review'
-            ? 'review'
-            : 'draft',
-      published_at: this.blogForm.published_at,
-      published_until: this.blogForm.published_until,
-      summary: this.blogForm.summary,
-      tags: this.blogForm.tags,
-      series: this.blogForm.series,
-      cover_image_url: this.blogForm.cover_image_url,
-      cover_fit: this.blogForm.cover_fit,
-      reading_time_minutes: this.blogForm.reading_time_minutes,
-      pinned: Boolean(this.blogForm.pinned),
-      pin_order: this.blogForm.pin_order,
-    };
-  }
 
-  private applyBlogDraftState(draft: BlogDraftState): void {
-    this.blogForm = {
-      ...this.blogForm,
-      ...draft,
-    };
-  }
 
-  blogDraftReady(): boolean {
-    if (!this.selectedBlogKey) return false;
-    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
-    const manager = this.cmsBlogDrafts.get(id);
-    return manager?.isReady() ?? false;
-  }
 
-  blogDraftDirty(): boolean {
-    if (!this.selectedBlogKey) return false;
-    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
-    return this.cmsBlogDrafts.get(id)?.dirty ?? false;
-  }
 
-  blogDraftAutosaving(): boolean {
-    if (!this.selectedBlogKey) return false;
-    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
-    return this.cmsBlogDrafts.get(id)?.autosavePending ?? false;
-  }
 
-  blogDraftLastAutosavedAt(): string | null {
-    if (!this.selectedBlogKey) return null;
-    const id = this.blogDraftId(this.selectedBlogKey, this.blogEditLang);
-    return this.cmsBlogDrafts.get(id)?.lastAutosavedAt ?? null;
-  }
 
-  blogDraftHasRestore(): boolean {
-    if (!this.selectedBlogKey) return false;
-    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
-    return manager.hasRestorableAutosave && !manager.dirty;
-  }
 
-  blogDraftRestoreAt(): string | null {
-    if (!this.selectedBlogKey) return null;
-    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
-    return manager.restorableAutosaveAt;
-  }
 
-  restoreBlogDraftAutosave(): void {
-    if (!this.selectedBlogKey) return;
-    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
-    const next = manager.restoreAutosave(this.currentBlogDraftState());
-    if (next) this.applyBlogDraftState(next);
-  }
 
-  dismissBlogDraftAutosave(): void {
-    if (!this.selectedBlogKey) return;
-    const manager = this.ensureBlogDraft(this.selectedBlogKey, this.blogEditLang);
-    manager.discardAutosave();
-  }
 
   homeDraftReady(): boolean {
     return this.cmsHomeDraft.isReady();
@@ -10916,6 +7385,52 @@ export class AdminComponent implements OnInit, OnDestroy {
     return true;
   }
 
+  private forgetContentVersion(key: string): void {
+    this.deleteRecordValue(this.contentVersions, this.safeRecordKey(key));
+  }
+
+  /**
+   * Stable, pre-bound references to the shared content-version helpers so they
+   * can be threaded into extracted CMS panel components (e.g.
+   * <app-admin-company-info>) without losing `this` or churning OnPush inputs.
+   */
+  readonly boundRememberContentVersion = (
+    key: string,
+    block: { version?: number } | null | undefined,
+  ): void => this.rememberContentVersion(key, block);
+  readonly boundWithExpectedVersion = <T extends Record<string, unknown>>(
+    key: string,
+    payload: T,
+  ): T & { expected_version?: number } => this.withExpectedVersion(key, payload);
+  readonly boundHandleContentConflict = (err: any, key: string, reload: () => void): boolean =>
+    this.handleContentConflict(err, key, reload);
+  readonly boundForgetContentVersion = (key: string): void => this.forgetContentVersion(key);
+  /** Reloads the shared content-blocks list for the extracted blog editor. */
+  readonly boundReloadContentBlocks = (): void => this.reloadContentBlocks();
+
+  /**
+   * Applies the shared needs-translation + content-pages bookkeeping after the
+   * extracted legal-pages panel persists a markdown block. Kept on the parent
+   * because it mutates the shared page-builder state maps.
+   */
+  readonly boundApplyPageBlockSaved = (
+    key: string,
+    block: { needs_translation_en?: boolean; needs_translation_ro?: boolean } | null | undefined,
+  ): void => {
+    const safePageKey = this.safePageRecordKey(key as PageBuilderKey);
+    this.setPageRecordValue(
+      this.pageBlocksNeedsTranslationEn,
+      safePageKey,
+      Boolean(block?.needs_translation_en),
+    );
+    this.setPageRecordValue(
+      this.pageBlocksNeedsTranslationRo,
+      safePageKey,
+      Boolean(block?.needs_translation_ro),
+    );
+    this.loadContentPages();
+  };
+
   pagesRevisionTitleKey(): string | undefined {
     switch (String(this.pagesRevisionKey || '').trim()) {
       case 'page.about':
@@ -11037,7 +7552,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.stopCmsDraftPoller();
     this.cmsHomeDraft.dispose();
     for (const manager of this.cmsPageDrafts.values()) manager.dispose();
-    for (const manager of this.cmsBlogDrafts.values()) manager.dispose();
+    for (const manager of this.cmsState.cmsBlogDrafts.values()) manager.dispose();
     for (const key of Object.keys(this.contentVersions)) {
       delete this.contentVersions[key];
     }
@@ -11050,7 +7565,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       if (manager.isReady() && manager.dirty) return true;
     }
 
-    for (const manager of this.cmsBlogDrafts.values()) {
+    for (const manager of this.cmsState.cmsBlogDrafts.values()) {
       if (manager.isReady() && manager.dirty) return true;
     }
 
@@ -11060,7 +7575,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   discardUnsavedChanges(): void {
     if (this.cmsHomeDraft.isReady()) this.cmsHomeDraft.discardAutosave();
     for (const manager of this.cmsPageDrafts.values()) manager.discardAutosave();
-    for (const manager of this.cmsBlogDrafts.values()) manager.discardAutosave();
+    for (const manager of this.cmsState.cmsBlogDrafts.values()) manager.discardAutosave();
   }
 
   loadAll(): void {
@@ -11098,13 +7613,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const cleaned = raw.trim();
     if (!cleaned) return;
 
-    if (section === 'blog') {
-      const key = cleaned.startsWith('blog.') ? cleaned : `blog.${cleaned}`;
-      if (this.selectedBlogKey === key) return;
-      this.loadBlogEditor(key);
-      return;
-    }
-
+    // The blog `?edit=` deep-link is handled inside <app-admin-blog-editor>.
     if (section === 'pages') {
       const key = isCmsGlobalSectionKey(cleaned)
         ? cleaned
@@ -11141,12 +7650,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private resetSectionState(next: AdminContentSection): void {
     this.error.set(null);
     this.errorRequestId.set(null);
-    if (next !== 'blog') {
-      this.closeBlogEditor();
-      this.showBlogCreate = false;
-      this.flaggedComments.set([]);
-      this.flaggedCommentsError = null;
-    }
+    // Blog editor + moderation state resets with the child component (removed by *ngIf).
     if (next !== 'settings') {
       this.selectedContent = null;
       this.showContentPreview = false;
@@ -11170,7 +7674,6 @@ export class AdminComponent implements OnInit, OnDestroy {
 
     if (section === 'pages') {
       this.loadInfo();
-      this.loadLegalPage(this.legalPageKey);
       this.loadCategories();
       this.loadCollections();
       this.loadContentPages();
@@ -11182,8 +7685,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
 
     if (section === 'blog') {
+      // <app-admin-blog-editor> loads flagged comments itself on init.
       this.reloadContentBlocks();
-      this.loadFlaggedComments();
       this.loading.set(false);
       return;
     }
@@ -11210,13 +7713,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
     this.loadCategories();
     this.loadTaxGroups();
-    this.loadAssets();
-    this.loadSocial();
-    this.loadCompany();
     this.loadNavigation();
-    this.loadCheckoutSettings();
-    this.loadReportsSettings();
-    this.loadSeo();
     this.loadFxStatus();
     this.admin.getMaintenance().subscribe({
       next: (m) => {
@@ -11490,107 +7987,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  startCategoryWizard(): void {
-    this.categoryWizardOpen.set(true);
-    this.categoryWizardStep.set(0);
-    this.categoryWizardSlug.set(null);
-  }
-
-  exitCategoryWizard(): void {
-    this.categoryWizardOpen.set(false);
-    this.categoryWizardStep.set(0);
-    this.categoryWizardSlug.set(null);
-  }
-
-  categoryWizardDescriptionKey(): string {
-    return (
-      this.categoryWizardSteps[this.categoryWizardStep()]?.descriptionKey ??
-      'adminUi.categories.wizard.desc.basics'
-    );
-  }
-
-  categoryWizardNextLabelKey(): string {
-    return this.categoryWizardStep() >= this.categoryWizardSteps.length - 1
-      ? 'adminUi.actions.done'
-      : 'adminUi.actions.next';
-  }
-
-  categoryWizardCanNext(): boolean {
-    if (!this.categoryWizardOpen()) return false;
-    if (this.categoryWizardStep() >= this.categoryWizardSteps.length - 1) return true;
-    return Boolean(this.categoryWizardSlug());
-  }
-
-  categoryWizardPrev(): void {
-    const next = this.categoryWizardStep() - 1;
-    if (next < 0) return;
-    this.categoryWizardStep.set(next);
-  }
-
-  categoryWizardNext(): void {
-    if (!this.categoryWizardOpen()) return;
-    if (this.categoryWizardStep() >= this.categoryWizardSteps.length - 1) {
-      this.exitCategoryWizard();
-      return;
-    }
-    if (!this.categoryWizardCanNext()) {
-      this.toast.error(this.t('adminUi.categories.wizard.addFirst'));
-      return;
-    }
-    this.categoryWizardStep.set(this.categoryWizardStep() + 1);
-    if (this.categoryWizardStep() === 1) {
-      this.openCategoryWizardTranslations();
-    }
-  }
-
-  goToCategoryWizardStep(index: number): void {
-    if (!this.categoryWizardOpen()) return;
-    if (index < 0 || index >= this.categoryWizardSteps.length) return;
-    if (index > 0 && !this.categoryWizardSlug()) {
-      this.toast.error(this.t('adminUi.categories.wizard.addFirst'));
-      this.categoryWizardStep.set(0);
-      return;
-    }
-    this.categoryWizardStep.set(index);
-    if (index === 1) {
-      this.openCategoryWizardTranslations();
-    }
-  }
-
-  openCategoryWizardTranslations(): void {
-    const slug = this.categoryWizardSlug();
-    if (!slug) return;
-    if (this.categoryTranslationsSlug !== slug) {
-      this.categoryTranslationsSlug = slug;
-      this.loadCategoryTranslations(slug);
-    }
-  }
-
-  addCategory(): void {
-    if (!this.categoryName) {
-      this.toast.error(this.t('adminUi.categories.errors.required'));
-      return;
-    }
-    const parent_id = (this.categoryParentId || '').trim() || null;
-    this.admin.createCategory({ name: this.categoryName, parent_id }).subscribe({
-      next: (cat) => {
-        this.categories = [cat, ...this.categories];
-        this.categoryName = '';
-        this.categoryParentId = '';
-        this.toast.success(this.t('adminUi.categories.success.add'));
-        if (this.categoryWizardOpen() && this.categoryWizardStep() === 0) {
-          const slug = typeof cat?.slug === 'string' ? cat.slug : '';
-          if (slug) {
-            this.categoryWizardSlug.set(slug);
-            this.categoryWizardStep.set(1);
-            this.openCategoryWizardTranslations();
-          }
-        }
-      },
-      error: () => this.toast.error(this.t('adminUi.categories.errors.add')),
-    });
-  }
-
   loadTaxGroups(): void {
     this.taxGroupsLoading = true;
     this.taxGroupsError = null;
@@ -11706,239 +8102,6 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: (err) =>
         this.toast.error(err?.error?.detail || this.t('adminUi.taxes.errors.rateDelete')),
-    });
-  }
-
-  categoryParentLabel(cat: AdminCategory): string {
-    const parentId = (cat.parent_id ?? '').trim();
-    if (!parentId) return this.t('adminUi.categories.parentNone');
-    return (
-      this.categories.find((c) => c.id === parentId)?.name ??
-      this.t('adminUi.categories.parentNone')
-    );
-  }
-
-  categoryParentOptions(cat: AdminCategory): AdminCategory[] {
-    const currentId = cat.id;
-    const excluded = this.categoryDescendantIds(currentId);
-    excluded.add(currentId);
-    return this.categories
-      .filter((candidate) => !excluded.has(candidate.id))
-      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-  }
-
-  private categoryDescendantIds(rootId: string): Set<string> {
-    const childrenByParent = new Map<string, string[]>();
-    for (const cat of this.categories) {
-      const parentId = (cat.parent_id ?? '').trim();
-      if (!parentId) continue;
-      const bucket = childrenByParent.get(parentId);
-      if (bucket) {
-        bucket.push(cat.id);
-      } else {
-        childrenByParent.set(parentId, [cat.id]);
-      }
-    }
-    const resolved = new Set<string>();
-    const stack = [...(childrenByParent.get(rootId) ?? [])];
-    while (stack.length) {
-      const next = stack.pop()!;
-      if (resolved.has(next)) continue;
-      resolved.add(next);
-      const kids = childrenByParent.get(next);
-      if (kids?.length) stack.push(...kids);
-    }
-    return resolved;
-  }
-
-  updateCategoryParent(cat: AdminCategory, raw: string): void {
-    const nextParentId = (raw ?? '').trim() || null;
-    const prevParentId = (cat.parent_id ?? '').trim() || null;
-    if (nextParentId === prevParentId) return;
-    cat.parent_id = nextParentId;
-    this.admin.updateCategory(cat.slug, { parent_id: nextParentId }).subscribe({
-      next: (updated) => {
-        cat.parent_id = updated.parent_id ?? null;
-        this.toast.success(this.t('adminUi.categories.success.updateParent'));
-      },
-      error: () => {
-        cat.parent_id = prevParentId;
-        this.toast.error(this.t('adminUi.categories.errors.updateParent'));
-      },
-    });
-  }
-
-  updateCategoryLowStockThreshold(cat: AdminCategory, raw: string | number): void {
-    const prevThreshold = cat.low_stock_threshold ?? null;
-    const trimmed = String(raw ?? '').trim();
-    const nextThreshold = trimmed ? Number(trimmed) : null;
-    if (nextThreshold !== null && (!Number.isFinite(nextThreshold) || nextThreshold < 0)) {
-      cat.low_stock_threshold = prevThreshold;
-      this.toast.error(this.t('adminUi.categories.errors.updateLowStockThreshold'));
-      return;
-    }
-    if (nextThreshold === prevThreshold) return;
-    cat.low_stock_threshold = nextThreshold;
-    this.admin.updateCategory(cat.slug, { low_stock_threshold: nextThreshold }).subscribe({
-      next: (updated) => {
-        cat.low_stock_threshold = updated.low_stock_threshold ?? null;
-        this.toast.success(this.t('adminUi.categories.success.updateLowStockThreshold'));
-      },
-      error: () => {
-        cat.low_stock_threshold = prevThreshold;
-        this.toast.error(this.t('adminUi.categories.errors.updateLowStockThreshold'));
-      },
-    });
-  }
-
-  updateCategoryTaxGroup(cat: AdminCategory, raw: string): void {
-    const nextGroupId = (raw ?? '').trim() || null;
-    const prevGroupId = (cat.tax_group_id ?? '').trim() || null;
-    if (nextGroupId === prevGroupId) return;
-    cat.tax_group_id = nextGroupId;
-    this.admin.updateCategory(cat.slug, { tax_group_id: nextGroupId }).subscribe({
-      next: (updated) => {
-        cat.tax_group_id = updated.tax_group_id ?? null;
-        this.toast.success(this.t('adminUi.taxes.success.categoryAssign'));
-      },
-      error: () => {
-        cat.tax_group_id = prevGroupId;
-        this.toast.error(this.t('adminUi.taxes.errors.categoryAssign'));
-      },
-    });
-  }
-
-  openCategoryDeleteConfirm(cat: AdminCategory): void {
-    this.categoryDeleteConfirmTarget.set(cat);
-    this.categoryDeleteConfirmBusy.set(false);
-    this.categoryDeleteConfirmOpen.set(true);
-  }
-
-  closeCategoryDeleteConfirm(): void {
-    this.categoryDeleteConfirmOpen.set(false);
-    this.categoryDeleteConfirmBusy.set(false);
-    this.categoryDeleteConfirmTarget.set(null);
-  }
-
-  confirmDeleteCategory(): void {
-    const target = this.categoryDeleteConfirmTarget();
-    if (!target) return;
-    if (this.categoryDeleteConfirmBusy()) return;
-    this.categoryDeleteConfirmBusy.set(true);
-    this.deleteCategory(target.slug, {
-      done: (ok) => {
-        this.categoryDeleteConfirmBusy.set(false);
-        if (ok) this.closeCategoryDeleteConfirm();
-      },
-    });
-  }
-
-  deleteCategory(slug: string, opts?: { done?: (ok: boolean) => void }): void {
-    this.admin.deleteCategory(slug).subscribe({
-      next: () => {
-        this.categories = this.categories.filter((c) => c.slug !== slug);
-        if (this.categoryTranslationsSlug === slug) this.closeCategoryTranslations();
-        this.toast.success(this.t('adminUi.categories.success.delete'));
-        opts?.done?.(true);
-      },
-      error: () => {
-        this.toast.error(this.t('adminUi.categories.errors.delete'));
-        opts?.done?.(false);
-      },
-    });
-  }
-
-  toggleCategoryTranslations(slug: string): void {
-    if (this.categoryTranslationsSlug === slug) {
-      this.closeCategoryTranslations();
-      return;
-    }
-    this.categoryTranslationsSlug = slug;
-    this.loadCategoryTranslations(slug);
-  }
-
-  closeCategoryTranslations(): void {
-    this.categoryTranslationsSlug = null;
-    this.categoryTranslationsError.set(null);
-    this.categoryTranslationExists = { en: false, ro: false };
-    this.categoryTranslations = {
-      en: this.blankCategoryTranslation(),
-      ro: this.blankCategoryTranslation(),
-    };
-  }
-
-  saveCategoryTranslation(lang: 'en' | 'ro'): void {
-    const slug = this.categoryTranslationsSlug;
-    if (!slug) return;
-    this.categoryTranslationsError.set(null);
-
-    const name = this.categoryTranslations[lang].name.trim();
-    if (!name) {
-      this.toast.error(this.t('adminUi.categories.translations.errors.nameRequired'));
-      return;
-    }
-
-    const payload = {
-      name,
-      description: this.categoryTranslations[lang].description.trim()
-        ? this.categoryTranslations[lang].description.trim()
-        : null,
-    };
-    this.admin.upsertCategoryTranslation(slug, lang, payload).subscribe({
-      next: (updated) => {
-        this.categoryTranslationExists[lang] = true;
-        this.categoryTranslations[lang] = {
-          name: (updated.name || name).toString(),
-          description: (updated.description || '').toString(),
-        };
-        this.toast.success(this.t('adminUi.categories.translations.success.save'));
-      },
-      error: () =>
-        this.categoryTranslationsError.set(this.t('adminUi.categories.translations.errors.save')),
-    });
-  }
-
-  deleteCategoryTranslation(lang: 'en' | 'ro'): void {
-    const slug = this.categoryTranslationsSlug;
-    if (!slug) return;
-    this.categoryTranslationsError.set(null);
-    this.admin.deleteCategoryTranslation(slug, lang).subscribe({
-      next: () => {
-        this.categoryTranslationExists[lang] = false;
-        this.categoryTranslations[lang] = this.blankCategoryTranslation();
-        this.toast.success(this.t('adminUi.categories.translations.success.delete'));
-      },
-      error: () =>
-        this.categoryTranslationsError.set(this.t('adminUi.categories.translations.errors.delete')),
-    });
-  }
-
-  private blankCategoryTranslation(): { name: string; description: string } {
-    return { name: '', description: '' };
-  }
-
-  private loadCategoryTranslations(slug: string): void {
-    this.categoryTranslationsError.set(null);
-    this.admin.getCategoryTranslations(slug).subscribe({
-      next: (items) => {
-        const mapped: Record<'en' | 'ro', { name: string; description: string }> = {
-          en: this.blankCategoryTranslation(),
-          ro: this.blankCategoryTranslation(),
-        };
-        const exists: Record<'en' | 'ro', boolean> = { en: false, ro: false };
-        for (const t of items || []) {
-          if (t.lang !== 'en' && t.lang !== 'ro') continue;
-          exists[t.lang] = true;
-          mapped[t.lang] = {
-            name: (t.name || '').toString(),
-            description: (t.description || '').toString(),
-          };
-        }
-        this.categoryTranslationExists = exists;
-        this.categoryTranslations = mapped;
-      },
-      error: () =>
-        this.categoryTranslationsError.set(this.t('adminUi.categories.translations.errors.load')),
     });
   }
 
@@ -12118,14 +8281,6 @@ export class AdminComponent implements OnInit, OnDestroy {
     return formatIdentity(user, user.email);
   }
 
-  commentAuthorLabel(author: {
-    id: string;
-    name?: string | null;
-    username?: string | null;
-    name_tag?: number | null;
-  }): string {
-    return formatIdentity(author, author.id);
-  }
 
   updateRole(): void {
     if (!this.selectedUserId || !this.selectedUserRole) return;
@@ -12141,64 +8296,6 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
       error: () => this.toast.error(this.t('adminUi.users.errors.role')),
     });
-  }
-
-  moveCategory(cat: AdminCategory, delta: number): void {
-    const sorted = [...this.categories].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-    const index = sorted.findIndex((c) => c.slug === cat.slug);
-    const swapIndex = index + delta;
-    if (index < 0 || swapIndex < 0 || swapIndex >= sorted.length) return;
-    const tmp = sorted[index].sort_order ?? 0;
-    sorted[index].sort_order = sorted[swapIndex].sort_order ?? 0;
-    sorted[swapIndex].sort_order = tmp;
-    this.admin
-      .reorderCategories(sorted.map((c) => ({ slug: c.slug, sort_order: c.sort_order ?? 0 })))
-      .subscribe({
-        next: (cats) => {
-          this.categories = cats
-            .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
-            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-          this.toast.success(this.t('adminUi.categories.success.reorder'));
-        },
-        error: () => this.toast.error(this.t('adminUi.categories.errors.reorder')),
-      });
-  }
-
-  onCategoryDragStart(slug: string): void {
-    this.draggingSlug = slug;
-  }
-
-  onCategoryDragOver(event: DragEvent): void {
-    event.preventDefault();
-  }
-
-  onCategoryDrop(targetSlug: string): void {
-    if (!this.draggingSlug || this.draggingSlug === targetSlug) {
-      this.draggingSlug = null;
-      return;
-    }
-    const sorted = [...this.categories].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-    const fromIdx = sorted.findIndex((c) => c.slug === this.draggingSlug);
-    const toIdx = sorted.findIndex((c) => c.slug === targetSlug);
-    if (fromIdx === -1 || toIdx === -1) {
-      this.draggingSlug = null;
-      return;
-    }
-    const [moved] = sorted.splice(fromIdx, 1);
-    sorted.splice(toIdx, 0, moved);
-    sorted.forEach((c, idx) => (c.sort_order = idx));
-    this.admin
-      .reorderCategories(sorted.map((c) => ({ slug: c.slug, sort_order: c.sort_order ?? 0 })))
-      .subscribe({
-        next: (cats) => {
-          this.categories = cats
-            .map((c) => ({ ...c, sort_order: c.sort_order ?? 0 }))
-            .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-          this.toast.success(this.t('adminUi.categories.success.reorder'));
-        },
-        error: () => this.toast.error(this.t('adminUi.categories.errors.reorder')),
-        complete: () => (this.draggingSlug = null),
-      });
   }
 
   createCoupon(): void {
@@ -12279,612 +8376,33 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.selectedContent = null;
   }
 
-  blogPosts(): AdminContent[] {
-    return this.contentBlocks.filter((c) => c.key.startsWith('blog.'));
-  }
 
-  private pinnedSlotFromMeta(meta: Record<string, any> | null | undefined): number | null {
-    if (!meta) return null;
-    const pinned = meta['pinned'];
-    let pinnedFlag = false;
-    if (typeof pinned === 'boolean') pinnedFlag = pinned;
-    else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
-    else if (typeof pinned === 'string')
-      pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
-    if (!pinnedFlag) return null;
-    const raw = meta['pin_order'];
-    const parsed = Number(typeof raw === 'number' ? raw : typeof raw === 'string' ? raw.trim() : 1);
-    const normalized = Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : 1;
-    return Math.max(1, normalized);
-  }
 
-  blogPinnedSlot(post: AdminContent): number | null {
-    return this.pinnedSlotFromMeta(post.meta || null);
-  }
 
-  blogPinnedPosts(): AdminContent[] {
-    const pinned = this.blogPosts().filter((p) => Boolean(this.blogPinnedSlot(p)));
-    return pinned.sort((a, b) => {
-      const ao = this.blogPinnedSlot(a) ?? 999;
-      const bo = this.blogPinnedSlot(b) ?? 999;
-      if (ao !== bo) return ao - bo;
-      const ap = a.published_at ? Date.parse(a.published_at) : 0;
-      const bp = b.published_at ? Date.parse(b.published_at) : 0;
-      if (ap !== bp) return bp - ap;
-      return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
-    });
-  }
 
-  private nextBlogPinOrder(): number {
-    const orders = this.blogPosts()
-      .map((p) => this.blogPinnedSlot(p))
-      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-    const max = orders.length ? Math.max(...orders) : 0;
-    return max + 1;
-  }
 
-  onBlogPinDragStart(key: string): void {
-    this.draggingBlogPinKey = (key || '').trim() || null;
-  }
 
-  onBlogPinDragOver(event: DragEvent): void {
-    event.preventDefault();
-  }
 
-  async onBlogPinDrop(targetKey: string): Promise<void> {
-    const fromKey = (this.draggingBlogPinKey || '').trim();
-    const toKey = (targetKey || '').trim();
-    this.draggingBlogPinKey = null;
-    if (!fromKey || !toKey || fromKey === toKey || this.blogPinsSaving) return;
 
-    const pinned = this.blogPinnedPosts();
-    const pinnedKeys = pinned.map((p) => p.key);
-    const fromIdx = pinnedKeys.indexOf(fromKey);
-    const toIdx = pinnedKeys.indexOf(toKey);
-    if (fromIdx === -1 || toIdx === -1) return;
 
-    const nextKeys = [...pinnedKeys];
-    nextKeys.splice(fromIdx, 1);
-    const insertIdx = fromIdx < toIdx ? toIdx - 1 : toIdx;
-    nextKeys.splice(insertIdx, 0, fromKey);
 
-    const updates: Array<{ key: string; meta: Record<string, any> }> = [];
-    nextKeys.forEach((key, idx) => {
-      const post = pinned.find((p) => p.key === key);
-      if (!post) return;
-      const nextOrder = idx + 1;
-      if ((this.blogPinnedSlot(post) ?? 1) === nextOrder) return;
-      const meta = { ...post.meta };
-      meta['pinned'] = true;
-      meta['pin_order'] = nextOrder;
-      updates.push({ key, meta });
-    });
-    if (!updates.length) return;
 
-    this.blogPinsSaving = true;
-    try {
-      for (const update of updates) {
-        const updated = await firstValueFrom(
-          this.admin.updateContentBlock(
-            update.key,
-            this.withExpectedVersion(update.key, { meta: update.meta }),
-          ),
-        );
-        this.rememberContentVersion(update.key, updated);
-      }
-      this.toast.success(this.t('adminUi.blog.pins.success.reordered'));
-      this.reloadContentBlocks();
-    } catch {
-      this.toast.error(this.t('adminUi.blog.pins.errors.reorder'));
-      this.reloadContentBlocks();
-    } finally {
-      this.blogPinsSaving = false;
-    }
-  }
 
-  isBlogSelected(key: string): boolean {
-    return this.blogBulkSelection.has(key);
-  }
 
-  toggleBlogSelection(key: string, event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    if (target?.checked) {
-      this.blogBulkSelection.add(key);
-    } else {
-      this.blogBulkSelection.delete(key);
-    }
-    this.blogBulkError = '';
-  }
 
-  areAllBlogSelected(): boolean {
-    const posts = this.blogPosts();
-    if (!posts.length) return false;
-    return posts.every((post) => this.blogBulkSelection.has(post.key));
-  }
 
-  toggleSelectAllBlogs(event: Event): void {
-    const target = event.target as HTMLInputElement | null;
-    if (!target) return;
-    if (target.checked) {
-      this.blogPosts().forEach((post) => this.blogBulkSelection.add(post.key));
-    } else {
-      this.blogBulkSelection.clear();
-    }
-    this.blogBulkError = '';
-  }
 
-  clearBlogBulkSelection(): void {
-    this.blogBulkSelection.clear();
-    this.blogBulkError = '';
-  }
 
-  canApplyBlogBulk(): boolean {
-    if (this.blogBulkSelection.size === 0) return false;
-    if (this.blogBulkAction === 'schedule') {
-      const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
-      if (!publishIso) return false;
-      if (this.blogBulkUnpublishAt) {
-        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
-        if (!unpublishIso) return false;
-        if (new Date(unpublishIso).getTime() <= new Date(publishIso).getTime()) return false;
-      }
-    }
-    if (this.blogBulkAction === 'tags_add' || this.blogBulkAction === 'tags_remove') {
-      return this.parseTags(this.blogBulkTags).length > 0;
-    }
-    return true;
-  }
 
-  blogBulkPreview(): string {
-    const count = this.blogBulkSelection.size;
-    if (!count) return this.t('adminUi.blog.bulk.previewEmpty');
-    switch (this.blogBulkAction) {
-      case 'publish':
-        return this.t('adminUi.blog.bulk.previewPublish', { count });
-      case 'unpublish':
-        return this.t('adminUi.blog.bulk.previewUnpublish', { count });
-      case 'schedule': {
-        const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
-        const publishLabel = publishIso ? new Date(publishIso).toLocaleString() : '—';
-        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
-        const unpublishLabel = unpublishIso ? new Date(unpublishIso).toLocaleString() : '—';
-        return this.t('adminUi.blog.bulk.previewSchedule', {
-          count,
-          publish: publishLabel,
-          unpublish: unpublishLabel,
-        });
-      }
-      case 'tags_add':
-        return this.t('adminUi.blog.bulk.previewTagsAdd', {
-          count,
-          tags: this.parseTags(this.blogBulkTags).join(', '),
-        });
-      case 'tags_remove':
-        return this.t('adminUi.blog.bulk.previewTagsRemove', {
-          count,
-          tags: this.parseTags(this.blogBulkTags).join(', '),
-        });
-      default:
-        return this.t('adminUi.blog.bulk.previewEmpty');
-    }
-  }
 
-  applyBlogBulkAction(): void {
-    if (!this.canApplyBlogBulk()) return;
-    this.blogBulkSaving = true;
-    this.blogBulkError = '';
-    const keys = Array.from(this.blogBulkSelection);
-    const detailRequests = keys.map((key) =>
-      this.admin.getContent(key).pipe(
-        map((block) => ({ key, block })),
-        catchError(() => of({ key, block: null })),
-      ),
-    );
-    forkJoin(detailRequests).subscribe({
-      next: (rows) => {
-        const updates = rows
-          .map(({ key, block }) => {
-            if (!block) return { key, update$: null };
-            this.rememberContentVersion(key, block);
-            const payload = this.buildBlogBulkPayload(block);
-            if (!payload) return { key, update$: null };
-            return {
-              key,
-              update$: this.admin
-                .updateContentBlock(key, this.withExpectedVersion(key, payload))
-                .pipe(
-                  map((res) => ({ key, res })),
-                  catchError((error) => of({ key, error })),
-                ),
-            };
-          })
-          .filter((row) => row.update$ !== null) as Array<{ key: string; update$: any }>;
 
-        if (!updates.length) {
-          this.blogBulkSaving = false;
-          this.blogBulkError = this.t('adminUi.blog.bulk.noChanges');
-          return;
-        }
 
-        forkJoin(updates.map((row) => row.update$)).subscribe({
-          next: (results) => {
-            const failures = results.filter((r: any) => r?.error);
-            const successCount = results.length - failures.length;
-            if (successCount) {
-              this.toast.success(this.t('adminUi.blog.bulk.success', { count: successCount }));
-            }
-            if (failures.length) {
-              this.toast.error(this.t('adminUi.blog.bulk.errors', { count: failures.length }));
-            }
-            this.blogBulkSaving = false;
-            this.reloadContentBlocks();
-          },
-          error: () => {
-            this.blogBulkSaving = false;
-            this.blogBulkError = this.t('adminUi.blog.bulk.errors', { count: keys.length });
-          },
-        });
-      },
-      error: () => {
-        this.blogBulkSaving = false;
-        this.blogBulkError = this.t('adminUi.blog.bulk.loadError');
-      },
-    });
-  }
 
-  extractBlogSlug(key: string): string {
-    return key.startsWith('blog.') ? key.slice('blog.'.length) : key;
-  }
 
-  currentBlogSlug(): string {
-    return this.selectedBlogKey ? this.extractBlogSlug(this.selectedBlogKey) : '';
-  }
 
-  startBlogCreate(): void {
-    this.showBlogCreate = true;
-    this.selectedBlogKey = null;
-    this.blogImages = [];
-    this.showBlogCoverLibrary = false;
-    this.blogCreate = {
-      baseLang: 'en',
-      status: 'draft',
-      published_at: '',
-      published_until: '',
-      title: '',
-      body_markdown: '',
-      summary: '',
-      tags: '',
-      series: '',
-      cover_image_url: '',
-      reading_time_minutes: '',
-      pinned: false,
-      pin_order: String(this.nextBlogPinOrder()),
-      includeTranslation: false,
-      translationTitle: '',
-      translationBody: '',
-    };
-  }
 
-  cancelBlogCreate(): void {
-    this.showBlogCreate = false;
-  }
 
-  closeBlogEditor(): void {
-    this.selectedBlogKey = null;
-    this.blogImages = [];
-    this.showBlogCoverLibrary = false;
-    this.blogPreviewUrl = null;
-    this.blogPreviewToken = null;
-    this.blogPreviewExpiresAt = null;
-    this.blogVersions = [];
-    this.blogVersionDetail = null;
-    this.blogDiffParts = [];
-    this.resetBlogForm();
-  }
 
-  async createBlogPost(): Promise<void> {
-    const baseSlug = this.blogCreateSlug();
-    if (!baseSlug) {
-      this.toast.error(
-        this.t('adminUi.blog.errors.slugRequiredTitle'),
-        this.t('adminUi.blog.errors.slugRequiredCopy'),
-      );
-      return;
-    }
-    if (!this.blogCreate.title.trim() || !this.blogCreate.body_markdown.trim()) {
-      this.toast.error(this.t('adminUi.blog.errors.titleBodyRequired'));
-      return;
-    }
-
-    const baseLang = this.blogCreate.baseLang;
-    const translationLang: 'en' | 'ro' = baseLang === 'en' ? 'ro' : 'en';
-    const meta: Record<string, any> = {};
-    const summary = this.blogCreate.summary.trim();
-    if (summary) {
-      meta['summary'] = { [baseLang]: summary };
-    }
-    const tags = this.parseTags(this.blogCreate.tags);
-    if (tags.length) {
-      meta['tags'] = tags;
-    }
-    const series = this.blogCreate.series.trim();
-    if (series) {
-      meta['series'] = series;
-    }
-    const cover = this.blogCreate.cover_image_url.trim();
-    if (cover) {
-      meta['cover_image_url'] = cover;
-    }
-    const rt = Number(String(this.blogCreate.reading_time_minutes || '').trim());
-    if (Number.isFinite(rt) && rt > 0) {
-      meta['reading_time_minutes'] = Math.trunc(rt);
-    }
-    if (this.blogCreate.pinned) {
-      const rawOrder = Number(String(this.blogCreate.pin_order || '').trim());
-      const normalized =
-        Number.isFinite(rawOrder) && rawOrder > 0 ? Math.trunc(rawOrder) : this.nextBlogPinOrder();
-      meta['pinned'] = true;
-      meta['pin_order'] = Math.max(1, normalized);
-    }
-    const published_at = this.blogCreate.published_at
-      ? new Date(this.blogCreate.published_at).toISOString()
-      : undefined;
-    const published_until = this.blogCreate.published_until
-      ? new Date(this.blogCreate.published_until).toISOString()
-      : undefined;
-
-    try {
-      const payload = {
-        title: this.blogCreate.title.trim(),
-        body_markdown: this.blogCreate.body_markdown,
-        status: this.blogCreate.status,
-        lang: baseLang,
-        published_at,
-        published_until,
-        meta: Object.keys(meta).length ? meta : undefined,
-      };
-
-      let slug = baseSlug;
-      let key = `blog.${slug}`;
-      let created = null as any;
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        try {
-          created = await firstValueFrom(this.admin.createContent(key, payload));
-          break;
-        } catch (err: any) {
-          const detail = String(err?.error?.detail || '').trim();
-          if (detail === 'Content key exists' && attempt < 4) {
-            slug = `${baseSlug}-${attempt + 2}`;
-            key = `blog.${slug}`;
-            continue;
-          }
-          throw err;
-        }
-      }
-      this.rememberContentVersion(key, created);
-
-      if (this.blogCreate.includeTranslation) {
-        const tTitle = this.blogCreate.translationTitle.trim();
-        const tBody = this.blogCreate.translationBody.trim();
-        if (tTitle || tBody) {
-          await firstValueFrom(
-            this.admin.updateContentBlock(
-              key,
-              this.withExpectedVersion(key, {
-                title: tTitle || this.blogCreate.title.trim(),
-                body_markdown: tBody || this.blogCreate.body_markdown,
-                lang: translationLang,
-              }),
-            ),
-          );
-        }
-      }
-
-      this.toast.success(this.t('adminUi.blog.success.created'));
-      this.showBlogCreate = false;
-      this.reloadContentBlocks();
-      this.loadBlogEditor(key);
-    } catch {
-      this.toast.error(this.t('adminUi.blog.errors.create'));
-    }
-  }
-
-  selectBlogPost(post: AdminContent): void {
-    this.showBlogCreate = false;
-    this.loadBlogEditor(post.key);
-  }
-
-  deleteBlogPost(post: AdminContent): void {
-    const key = (post?.key || '').trim();
-    if (!key) return;
-    const label = (post?.title || '').trim() || key;
-    const ok = window.confirm(this.t('adminUi.blog.confirms.deletePost', { title: label }));
-    if (!ok) return;
-
-    this.blogDeleteBusy.add(key);
-    this.admin.deleteContent(key).subscribe({
-      next: () => {
-        this.blogDeleteBusy.delete(key);
-        this.blogBulkSelection.delete(key);
-        if (this.selectedBlogKey === key) {
-          this.closeBlogEditor();
-        }
-        this.toast.success(this.t('adminUi.blog.success.deleted'));
-        this.reloadContentBlocks();
-      },
-      error: () => {
-        this.blogDeleteBusy.delete(key);
-        this.toast.error(this.t('adminUi.blog.errors.delete'));
-      },
-    });
-  }
-
-  setBlogEditLang(lang: 'en' | 'ro'): void {
-    if (!this.selectedBlogKey) return;
-    this.blogEditLang = lang;
-    const key = this.selectedBlogKey;
-    const wantsBase = lang === this.blogBaseLang;
-    this.admin.getContent(key, wantsBase ? undefined : lang).subscribe({
-      next: (block) => {
-        this.rememberContentVersion(key, block);
-        this.blogForm.title = block.title;
-        this.blogForm.body_markdown = block.body_markdown;
-        if (wantsBase) {
-          this.blogForm.status = block.status;
-        }
-        this.blogForm.published_at = block.published_at
-          ? this.toLocalDateTime(block.published_at)
-          : '';
-        this.blogForm.published_until = block.published_until
-          ? this.toLocalDateTime(block.published_until)
-          : '';
-        this.blogMeta = block.meta || this.blogMeta || {};
-        this.syncBlogMetaToForm(lang);
-        this.ensureBlogDraft(key, lang).initFromServer(this.currentBlogDraftState());
-        this.setBlogSeoSnapshot(lang, block.title, block.body_markdown);
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.errors.loadContent')),
-    });
-  }
-
-  saveBlogPost(): void {
-    if (!this.selectedBlogKey) return;
-    if (!this.blogForm.title.trim() || !this.blogForm.body_markdown.trim()) {
-      this.toast.error(this.t('adminUi.blog.errors.titleBodyRequired'));
-      return;
-    }
-
-    const key = this.selectedBlogKey;
-    const nextMeta = this.buildBlogMeta(this.blogEditLang);
-    const metaChanged = JSON.stringify(nextMeta) !== JSON.stringify(this.blogMeta || {});
-    const isBase = this.blogEditLang === this.blogBaseLang;
-    if (isBase && this.blogForm.status === 'published') {
-      const issues = this.blogA11yIssues();
-      if (issues.length) {
-        this.blogA11yOpen = true;
-        const ok = confirm(
-          this.t('adminUi.blog.a11y.confirmPublishAnyway', { count: issues.length }),
-        );
-        if (!ok) return;
-      }
-    }
-    const published_at = isBase
-      ? this.blogForm.published_at
-        ? new Date(this.blogForm.published_at).toISOString()
-        : null
-      : undefined;
-    const published_until = isBase
-      ? this.blogForm.published_until
-        ? new Date(this.blogForm.published_until).toISOString()
-        : null
-      : undefined;
-    if (isBase) {
-      const payload = this.withExpectedVersion(key, {
-        title: this.blogForm.title.trim(),
-        body_markdown: this.blogForm.body_markdown,
-        status: this.blogForm.status as any,
-        published_at,
-        published_until,
-        meta: nextMeta,
-      });
-      this.admin.updateContentBlock(key, payload).subscribe({
-        next: (block) => {
-          this.rememberContentVersion(key, block);
-          this.blogMeta = nextMeta;
-          this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(
-            this.currentBlogDraftState(),
-          );
-          this.toast.success(this.t('adminUi.blog.success.saved'));
-          this.reloadContentBlocks();
-          this.loadBlogEditor(key);
-        },
-        error: (err) => {
-          if (this.handleContentConflict(err, key, () => this.loadBlogEditor(key))) return;
-          this.toast.error(this.t('adminUi.blog.errors.save'));
-        },
-      });
-      return;
-    }
-
-    this.admin
-      .updateContentBlock(
-        key,
-        this.withExpectedVersion(key, {
-          title: this.blogForm.title.trim(),
-          body_markdown: this.blogForm.body_markdown,
-          lang: this.blogEditLang,
-        }),
-      )
-      .subscribe({
-        next: (block) => {
-          this.rememberContentVersion(key, block);
-          const onDone = () => {
-            this.toast.success(this.t('adminUi.blog.success.translationSaved'));
-            this.reloadContentBlocks();
-            this.setBlogEditLang(this.blogEditLang);
-          };
-          if (!metaChanged) {
-            this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(
-              this.currentBlogDraftState(),
-            );
-            onDone();
-            return;
-          }
-          this.admin
-            .updateContentBlock(key, this.withExpectedVersion(key, { meta: nextMeta }))
-            .subscribe({
-              next: (metaBlock) => {
-                this.rememberContentVersion(key, metaBlock);
-                this.blogMeta = nextMeta;
-                this.ensureBlogDraft(key, this.blogEditLang).markServerSaved(
-                  this.currentBlogDraftState(),
-                );
-                onDone();
-              },
-              error: (err) => {
-                if (
-                  this.handleContentConflict(err, key, () =>
-                    this.setBlogEditLang(this.blogEditLang),
-                  )
-                )
-                  return;
-                this.toast.error(this.t('adminUi.blog.errors.translationMetaSave'));
-                onDone();
-              },
-            });
-        },
-        error: (err) => {
-          if (this.handleContentConflict(err, key, () => this.setBlogEditLang(this.blogEditLang)))
-            return;
-          this.toast.error(this.t('adminUi.blog.errors.translationSave'));
-        },
-      });
-  }
-
-  generateBlogPreviewLink(): void {
-    if (!this.selectedBlogKey) return;
-    const slug = this.currentBlogSlug();
-    this.blog.createPreviewToken(slug, { lang: this.blogEditLang }).subscribe({
-      next: (resp) => {
-        this.blogPreviewUrl = resp.url;
-        this.blogPreviewToken = resp.token;
-        this.blogPreviewExpiresAt = resp.expires_at;
-        this.toast.success(this.t('adminUi.blog.preview.success.ready'));
-        void this.copyToClipboard(resp.url).then((ok) => {
-          if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
-        });
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.preview.errors.generate')),
-    });
-  }
-
-  copyBlogPreviewLink(): void {
-    if (!this.blogPreviewUrl) return;
-    void this.copyToClipboard(this.blogPreviewUrl).then((ok) => {
-      if (ok) this.toast.info(this.t('adminUi.blog.preview.success.copied'));
-      else this.toast.error(this.t('adminUi.blog.preview.errors.copy'));
-    });
-  }
 
   pagePreviewSlug(pageKey: PageBuilderKey): string | null {
     const raw = (pageKey || '').trim();
@@ -13025,169 +8543,19 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  private setBlogSeoSnapshot(lang: UiLang, title: string, body_markdown: string): void {
-    this.blogSeoSnapshots[lang] = { title: title || '', body_markdown: body_markdown || '' };
-  }
 
-  private loadBlogSeoSnapshots(key: string): void {
-    this.blogSeoSnapshotsKey = key;
-    this.blogSeoSnapshotsLoading = true;
-    const langs: UiLang[] = ['en', 'ro'];
-    type BlogSeoRow = { lang: UiLang; title: string; body_markdown: string; missing?: true };
-    const requests = langs.map((lang) =>
-      this.admin.getContent(key, lang).pipe(
-        map(
-          (block) =>
-            ({
-              lang,
-              title: block.title || '',
-              body_markdown: block.body_markdown || '',
-            }) as BlogSeoRow,
-        ),
-        catchError(() => of({ lang, title: '', body_markdown: '', missing: true } as BlogSeoRow)),
-      ),
-    );
-    forkJoin(requests).subscribe({
-      next: (rows: BlogSeoRow[]) => {
-        if (this.selectedBlogKey !== key || this.blogSeoSnapshotsKey !== key) return;
-        for (const row of rows) {
-          const lang = row.lang;
-          if (row.missing) this.blogSeoSnapshots[lang] = null;
-          else this.setBlogSeoSnapshot(lang, row.title, row.body_markdown);
-        }
-      },
-      complete: () => {
-        if (this.blogSeoSnapshotsKey === key) this.blogSeoSnapshotsLoading = false;
-      },
-    });
-  }
 
-  blogSeoHasContent(lang: UiLang): boolean {
-    if (!this.selectedBlogKey) return false;
-    if (lang === this.blogEditLang)
-      return Boolean(
-        (this.blogForm.title || '').trim() || (this.blogForm.body_markdown || '').trim(),
-      );
-    return Boolean(
-      this.blogSeoSnapshots[lang]?.title || this.blogSeoSnapshots[lang]?.body_markdown,
-    );
-  }
 
-  blogSeoTitleFull(lang: UiLang): string {
-    const rawTitle =
-      lang === this.blogEditLang
-        ? (this.blogForm.title || '').trim()
-        : (this.blogSeoSnapshots[lang]?.title || '').trim();
-    if (!rawTitle) return '';
-    return `${rawTitle} | momentstudio`;
-  }
 
-  blogSeoDescriptionFull(lang: UiLang): string {
-    return this.blogSeoDescriptionSource(lang).slice(0, 160).trim();
-  }
 
-  blogSeoTitlePreview(lang: UiLang): string {
-    return this.truncateForPreview(this.blogSeoTitleFull(lang), 62);
-  }
 
-  blogSeoDescriptionPreview(lang: UiLang): string {
-    return this.truncateForPreview(this.blogSeoDescriptionSource(lang), 160);
-  }
 
-  blogSeoIssues(lang: UiLang): Array<{ key: string; params?: Record<string, unknown> }> {
-    const title = this.blogSeoTitleFull(lang);
-    const metaDescription = this.blogSeoDescriptionFull(lang);
-    const sourceDescription = this.blogSeoDescriptionSource(lang);
-    const titleLen = title.length;
-    const descMetaLen = metaDescription.length;
-    const descSourceLen = sourceDescription.length;
-    const issues: Array<{ key: string; params?: Record<string, unknown> }> = [];
-    if (!title.trim()) issues.push({ key: 'adminUi.blog.seo.issues.missingTitle' });
-    if (!metaDescription.trim()) issues.push({ key: 'adminUi.blog.seo.issues.missingDescription' });
-    if (titleLen > 70)
-      issues.push({ key: 'adminUi.blog.seo.issues.titleTooLong', params: { count: titleLen } });
-    if (titleLen > 0 && titleLen < 25)
-      issues.push({ key: 'adminUi.blog.seo.issues.titleTooShort', params: { count: titleLen } });
-    if (descSourceLen > 160)
-      issues.push({
-        key: 'adminUi.blog.seo.issues.descriptionTooLong',
-        params: { count: descSourceLen },
-      });
-    if (descMetaLen > 0 && descMetaLen < 70)
-      issues.push({
-        key: 'adminUi.blog.seo.issues.descriptionTooShort',
-        params: { count: descMetaLen },
-      });
-    const summary = this.getBlogSummary(this.blogMeta || {}, lang);
-    if (!summary.trim() && metaDescription.trim())
-      issues.push({ key: 'adminUi.blog.seo.issues.derivedFromBody' });
-    if (!this.blogPreviewToken && this.blogForm.status !== 'published')
-      issues.push({ key: 'adminUi.blog.seo.issues.previewTokenRecommended' });
-    return issues;
-  }
 
-  private truncateForPreview(value: string, max: number): string {
-    const text = String(value || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!text) return '';
-    if (text.length <= max) return text;
-    return text.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
-  }
 
-  private toSeoDescription(markdownOrText: string): string {
-    const cleaned = String(markdownOrText || '')
-      .replace(/```[\s\S]*?```/g, ' ')
-      .replace(/`[^`]*`/g, ' ')
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/[#>*_~]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return cleaned;
-  }
 
-  private blogSeoDescriptionSource(lang: UiLang): string {
-    const summary = this.getBlogSummary(this.blogMeta || {}, lang);
-    const body =
-      lang === this.blogEditLang
-        ? (this.blogForm.body_markdown || '').trim()
-        : (this.blogSeoSnapshots[lang]?.body_markdown || '').trim();
-    const source = (summary || '').trim() || body;
-    return this.toSeoDescription(source);
-  }
 
-  blogPublicUrl(lang: UiLang): string {
-    if (typeof window === 'undefined') return `/blog/${this.currentBlogSlug()}?lang=${lang}`;
-    return `${window.location.origin}/blog/${this.currentBlogSlug()}?lang=${lang}`;
-  }
 
-  blogPublishedOgImageUrl(lang: UiLang): string {
-    const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
-    const ogPath = `${apiBaseUrl}/blog/posts/${this.currentBlogSlug()}/og.png?lang=${lang}`;
-    if (
-      ogPath.startsWith('http://') ||
-      ogPath.startsWith('https://') ||
-      typeof window === 'undefined'
-    )
-      return ogPath;
-    return `${window.location.origin}${ogPath}`;
-  }
 
-  blogPreviewOgImageUrl(lang: UiLang): string | null {
-    if (!this.blogPreviewToken) return null;
-    const apiBaseUrl = (appConfig.apiBaseUrl || '/api/v1').replace(/\/$/, '');
-    const token = encodeURIComponent(this.blogPreviewToken);
-    const ogPath = `${apiBaseUrl}/blog/posts/${this.currentBlogSlug()}/og-preview.png?lang=${lang}&token=${token}`;
-    if (
-      ogPath.startsWith('http://') ||
-      ogPath.startsWith('https://') ||
-      typeof window === 'undefined'
-    )
-      return ogPath;
-    return `${window.location.origin}${ogPath}`;
-  }
 
   copyText(text: string): void {
     const value = (text || '').trim();
@@ -13198,127 +8566,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  loadBlogVersions(): void {
-    if (!this.selectedBlogKey) return;
-    this.admin.listContentVersions(this.selectedBlogKey).subscribe({
-      next: (items) => {
-        this.blogVersions = items;
-        this.blogVersionDetail = null;
-        this.blogDiffParts = [];
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.revisions.errors.load')),
-    });
-  }
 
-  loadFlaggedComments(): void {
-    this.flaggedCommentsLoading.set(true);
-    this.flaggedCommentsError = null;
-    this.blog.listFlaggedComments().subscribe({
-      next: (resp) => {
-        this.flaggedComments.set(resp.items || []);
-      },
-      error: () => {
-        this.flaggedComments.set([]);
-        this.flaggedCommentsError = this.t('adminUi.blog.moderation.errors.load');
-      },
-      complete: () => this.flaggedCommentsLoading.set(false),
-    });
-  }
 
-  resolveFlags(comment: AdminBlogComment): void {
-    this.blog.resolveCommentFlagsAdmin(comment.id).subscribe({
-      next: () => {
-        this.toast.success(this.t('adminUi.blog.moderation.success.flagsResolved'));
-        this.loadFlaggedComments();
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.resolveFlags')),
-    });
-  }
 
-  toggleHide(comment: AdminBlogComment): void {
-    if (this.blogCommentModerationBusy.has(comment.id)) return;
 
-    const setHidden = (value: boolean) => {
-      this.flaggedComments.update((items) =>
-        items.map((c) => (c.id === comment.id ? { ...c, is_hidden: value } : c)),
-      );
-    };
 
-    if (comment.is_hidden) {
-      setHidden(false);
-      this.blogCommentModerationBusy.add(comment.id);
-      this.blog.unhideCommentAdmin(comment.id).subscribe({
-        next: () => {
-          this.blogCommentModerationBusy.delete(comment.id);
-          this.toast.success(this.t('adminUi.blog.moderation.success.commentUnhidden'));
-          this.loadFlaggedComments();
-        },
-        error: () => {
-          this.blogCommentModerationBusy.delete(comment.id);
-          setHidden(true);
-          this.toast.error(this.t('adminUi.blog.moderation.errors.unhide'));
-        },
-      });
-      return;
-    }
-    const reasonPrompt = prompt(this.t('adminUi.blog.moderation.prompts.hideReason'));
-    if (reasonPrompt === null) return;
-    const reason = reasonPrompt || '';
-    setHidden(true);
-    this.blogCommentModerationBusy.add(comment.id);
-    this.blog.hideCommentAdmin(comment.id, { reason: reason.trim() || null }).subscribe({
-      next: () => {
-        this.blogCommentModerationBusy.delete(comment.id);
-        this.toast.success(this.t('adminUi.blog.moderation.success.commentHidden'));
-        this.loadFlaggedComments();
-      },
-      error: () => {
-        this.blogCommentModerationBusy.delete(comment.id);
-        setHidden(false);
-        this.toast.error(this.t('adminUi.blog.moderation.errors.hide'));
-      },
-    });
-  }
 
-  adminDeleteComment(comment: AdminBlogComment): void {
-    if (this.blogCommentModerationBusy.has(comment.id)) return;
-    const ok = confirm(this.t('adminUi.blog.moderation.confirms.deleteComment'));
-    if (!ok) return;
-    this.blog.deleteComment(comment.id).subscribe({
-      next: () => {
-        this.toast.success(this.t('adminUi.blog.moderation.success.commentDeleted'));
-        this.loadFlaggedComments();
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.moderation.errors.delete')),
-    });
-  }
-
-  selectBlogVersion(version: number): void {
-    if (!this.selectedBlogKey) return;
-    this.admin.getContentVersion(this.selectedBlogKey, version).subscribe({
-      next: (v) => {
-        this.blogVersionDetail = v;
-        this.blogDiffParts = diffLines(v.body_markdown || '', this.blogForm.body_markdown || '');
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.revisions.errors.loadVersion')),
-    });
-  }
-
-  rollbackBlogVersion(version: number): void {
-    if (!this.selectedBlogKey) return;
-    const ok = confirm(this.t('adminUi.blog.revisions.confirms.rollback', { version }));
-    if (!ok) return;
-    const key = this.selectedBlogKey;
-    this.admin.rollbackContentVersion(key, version).subscribe({
-      next: () => {
-        this.toast.success(this.t('adminUi.blog.revisions.success.rolledBack'));
-        this.reloadContentBlocks();
-        this.loadBlogEditor(key);
-        this.loadBlogVersions();
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.revisions.errors.rollback')),
-    });
-  }
 
   private async copyToClipboard(text: string): Promise<boolean> {
     try {
@@ -13346,547 +8599,34 @@ export class AdminComponent implements OnInit, OnDestroy {
     return this.markdown.render(markdown);
   }
 
-  applyBlogHeading(textarea: HTMLTextAreaElement, level: 1 | 2): void {
-    const prefix = `${'#'.repeat(level)} `;
-    this.prefixBlogLines(textarea, prefix);
-  }
 
-  applyBlogList(textarea: HTMLTextAreaElement): void {
-    this.prefixBlogLines(textarea, '- ');
-  }
 
-  wrapBlogSelection(
-    textarea: HTMLTextAreaElement,
-    before: string,
-    after: string,
-    placeholder: string,
-  ): void {
-    const value = textarea.value;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? start;
-    const hasSelection = end > start;
-    const selected = hasSelection ? value.slice(start, end) : placeholder;
-    const next = value.slice(0, start) + before + selected + after + value.slice(end);
-    const selStart = start + before.length;
-    const selEnd = selStart + selected.length;
-    this.updateBlogBody(textarea, next, selStart, selEnd);
-  }
 
-  insertBlogLink(textarea: HTMLTextAreaElement): void {
-    const value = textarea.value;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? start;
-    const hasSelection = end > start;
-    const text = hasSelection ? value.slice(start, end) : 'link text';
-    const url = 'https://';
-    const snippet = `[${text}](${url})`;
-    const next = value.slice(0, start) + snippet + value.slice(end);
-    const urlStart = start + text.length + 3;
-    this.updateBlogBody(textarea, next, urlStart, urlStart + url.length);
-  }
 
-  insertBlogCodeBlock(textarea: HTMLTextAreaElement): void {
-    const value = textarea.value;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? start;
-    const hasSelection = end > start;
-    const selected = hasSelection ? value.slice(start, end) : 'code';
-    const snippet = `\n\`\`\`\n${selected}\n\`\`\`\n`;
-    const next = value.slice(0, start) + snippet + value.slice(end);
-    const codeStart = start + 5;
-    this.updateBlogBody(textarea, next, codeStart, codeStart + selected.length);
-  }
 
-  insertBlogEmbed(
-    target: HTMLTextAreaElement | RichEditorComponent,
-    kind: 'product' | 'category' | 'collection',
-  ): void {
-    const hintKey =
-      kind === 'product'
-        ? 'adminUi.blog.embeds.prompt.product'
-        : kind === 'category'
-          ? 'adminUi.blog.embeds.prompt.category'
-          : 'adminUi.blog.embeds.prompt.collection';
-    const raw = prompt(this.t(hintKey), '') || '';
-    const slug = raw.trim();
-    if (!slug) return;
-    const snippet = `{{${kind}:${slug}}}`;
-    if (target instanceof HTMLTextAreaElement) {
-      this.insertAtCursor(target, snippet);
-    } else {
-      target.insertMarkdown(snippet);
-    }
-  }
 
-  uploadAndInsertBlogImage(target: HTMLTextAreaElement | RichEditorComponent, event: Event): void {
-    if (!this.selectedBlogKey) return;
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
-      next: (block) => {
-        const images = (block.images || [])
-          .map((img) => ({
-            id: img.id,
-            url: img.url,
-            alt_text: img.alt_text,
-            sort_order: img.sort_order ?? 0,
-            focal_x: img.focal_x ?? 50,
-            focal_y: img.focal_y ?? 50,
-          }))
-          .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = images;
-        this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
-        const inserted = images[images.length - 1];
-        if (inserted?.url) {
-          const alt =
-            file.name
-              .replace(/\.[^.]+$/, '')
-              .replace(/[\r\n]+/g, ' ')
-              .trim() || 'image';
-          const layoutToken = this.blogImageLayout === 'default' ? '' : this.blogImageLayout;
-          const snippet = layoutToken
-            ? `![${alt}](${inserted.url} "${layoutToken}")`
-            : `![${alt}](${inserted.url})`;
-          if (target instanceof HTMLTextAreaElement) {
-            this.insertAtCursor(target, snippet);
-          } else {
-            target.insertMarkdown(snippet);
-          }
-          this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
-        }
-        input.value = '';
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.images.errors.upload')),
-    });
-  }
 
-  onBlogImageDragOver(event: DragEvent): void {
-    const transfer = event?.dataTransfer;
-    const types = Array.from(transfer?.types || []);
-    if (!types.includes('Files')) return;
-    event.preventDefault();
-    if (transfer) transfer.dropEffect = 'copy';
-  }
 
-  async onBlogImageDrop(
-    target: HTMLTextAreaElement | RichEditorComponent,
-    event: DragEvent,
-  ): Promise<void> {
-    const transfer = event?.dataTransfer;
-    const files = Array.from(transfer?.files || []).filter(
-      (file) => file && file.type.startsWith('image/'),
-    );
-    if (!files.length) return;
-    event.preventDefault();
-    event.stopPropagation();
 
-    if (!this.selectedBlogKey) return;
-    let insertedCount = 0;
 
-    for (const file of files) {
-      try {
-        const block = await firstValueFrom(
-          this.admin.uploadContentImage(this.selectedBlogKey, file),
-        );
-        const images = (block.images || [])
-          .map((img) => ({
-            id: img.id,
-            url: img.url,
-            alt_text: img.alt_text,
-            sort_order: img.sort_order ?? 0,
-            focal_x: img.focal_x ?? 50,
-            focal_y: img.focal_y ?? 50,
-          }))
-          .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = images;
-        const inserted = images[images.length - 1];
-        if (!inserted?.url) continue;
 
-        const alt =
-          file.name
-            .replace(/\.[^.]+$/, '')
-            .replace(/[\r\n]+/g, ' ')
-            .trim() || 'image';
-        const layoutToken = this.blogImageLayout === 'default' ? '' : this.blogImageLayout;
-        const snippet = layoutToken
-          ? `![${alt}](${inserted.url} "${layoutToken}")`
-          : `![${alt}](${inserted.url})`;
-        if (target instanceof HTMLTextAreaElement) {
-          this.insertAtCursor(target, snippet);
-        } else {
-          target.insertMarkdown(snippet);
-        }
-        insertedCount += 1;
-      } catch {
-        this.toast.error(this.t('adminUi.blog.images.errors.upload'));
-        return;
-      }
-    }
 
-    if (insertedCount) {
-      this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
-      this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
-    }
-  }
 
-  insertBlogImageMarkdown(url: string, altText?: string | null): void {
-    const alt = (altText || 'image').replace(/[\r\n]+/g, ' ').trim();
-    const snippet = `\n\n![${alt}](${url})\n`;
-    this.blogForm.body_markdown = (this.blogForm.body_markdown || '').trimEnd() + snippet;
-    this.toast.info(this.t('adminUi.blog.images.success.insertedMarkdown'));
-  }
 
-  blogA11yIssues(): Array<{ index: number; url: string; alt: string }> {
-    const markdown = this.blogForm.body_markdown || '';
-    const issues: Array<{ index: number; url: string; alt: string }> = [];
-    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
-    let match: RegExpExecArray | null;
-    let idx = 0;
-    while ((match = re.exec(markdown))) {
-      const alt = String(match[1] || '').trim();
-      const url = String(match[2] || '').trim();
-      const altKey = alt.toLowerCase();
-      const missing = !alt || altKey === 'image' || altKey === 'photo' || altKey === 'picture';
-      if (url && missing) issues.push({ index: idx, url, alt });
-      idx += 1;
-    }
-    return issues;
-  }
 
-  promptFixBlogImageAlt(imageIndex: number): void {
-    const markdown = this.blogForm.body_markdown || '';
-    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
-    let match: RegExpExecArray | null;
-    let idx = 0;
-    while ((match = re.exec(markdown))) {
-      if (idx !== imageIndex) {
-        idx += 1;
-        continue;
-      }
-      const url = String(match[2] || '').trim();
-      const suggestion = this.suggestAltFromUrl(url);
-      const next = (prompt(this.t('adminUi.blog.a11y.promptAlt'), suggestion) || '').trim();
-      if (!next) return;
-      this.setBlogMarkdownImageAlt(imageIndex, next);
-      this.toast.success(this.t('adminUi.blog.a11y.fixed'));
-      this.blogA11yOpen = true;
-      return;
-    }
-  }
 
-  private suggestAltFromUrl(url: string): string {
-    const cleaned = String(url || '')
-      .split('?')[0]
-      .split('#')[0]
-      .trim();
-    const filename = cleaned.split('/').pop() || '';
-    const base = filename.replace(/\.[^.]+$/, '');
-    return base.replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim() || 'image';
-  }
 
-  private setBlogMarkdownImageAlt(imageIndex: number, alt: string): void {
-    const markdown = this.blogForm.body_markdown || '';
-    const safeAlt = String(alt || '')
-      .replace(/[\r\n]+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!safeAlt) return;
 
-    const re = /!\[([^\]]*)\]\(([^)\s]+)([^)]*)\)/g;
-    let match: RegExpExecArray | null;
-    let idx = 0;
-    let out = '';
-    let lastIndex = 0;
-    while ((match = re.exec(markdown))) {
-      const start = match.index;
-      const end = re.lastIndex;
-      out += markdown.slice(lastIndex, start);
-      if (idx === imageIndex) {
-        out += `![${safeAlt}](${match[2]}${match[3]})`;
-      } else {
-        out += markdown.slice(start, end);
-      }
-      lastIndex = end;
-      idx += 1;
-    }
-    out += markdown.slice(lastIndex);
-    this.blogForm.body_markdown = out;
-  }
 
-  blogWritingAids(): {
-    words: number;
-    minutes: number;
-    headings: Array<{ level: number; text: string }>;
-  } {
-    const markdown = this.blogForm.body_markdown || '';
-    const words = this.countMarkdownWords(markdown);
-    const minutes = words ? Math.max(1, Math.ceil(words / 200)) : 0;
-    return { words, minutes, headings: this.extractMarkdownHeadings(markdown) };
-  }
 
-  applyBlogReadingTimeEstimate(): void {
-    const aids = this.blogWritingAids();
-    if (!aids.minutes) return;
-    this.blogForm.reading_time_minutes = String(aids.minutes);
-    this.toast.info(this.t('adminUi.blog.writing.applied', { minutes: aids.minutes }));
-  }
 
-  private countMarkdownWords(markdown: string): number {
-    const cleaned = String(markdown || '')
-      .replace(/```[\s\S]*?```/g, ' ')
-      .replace(/`[^`]*`/g, ' ')
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/[#>*_~`-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const matches = cleaned.match(/[\p{L}\p{N}]+/gu);
-    return matches?.length ?? 0;
-  }
 
-  private extractMarkdownHeadings(markdown: string): Array<{ level: number; text: string }> {
-    const lines = String(markdown || '').split('\n');
-    const out: Array<{ level: number; text: string }> = [];
-    let inCode = false;
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (line.startsWith('```')) {
-        inCode = !inCode;
-        continue;
-      }
-      if (inCode) continue;
-      const match = /^(#{1,6})\s+(.+)$/.exec(line);
-      if (!match) continue;
-      const level = match[1].length;
-      if (level > 3) continue;
-      const text = match[2]
-        .replace(/\s+#+\s*$/, '')
-        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-        .trim();
-      if (!text) continue;
-      out.push({ level, text });
-      if (out.length >= 40) break;
-    }
-    return out;
-  }
 
-  blogCoverPreviewUrl(): string | null {
-    const explicit = (this.blogForm.cover_image_url || '').trim();
-    if (explicit) return explicit;
-    const first = this.blogImages[0];
-    return first?.url ? String(first.url) : null;
-  }
 
-  blogCoverPreviewAsset(): {
-    id: string;
-    url: string;
-    sort_order: number;
-    focal_x: number;
-    focal_y: number;
-    alt_text?: string | null;
-  } | null {
-    const url = this.blogCoverPreviewUrl();
-    if (!url) return null;
-    return this.blogImages.find((img) => img.url === url) ?? null;
-  }
 
-  blogCoverPreviewFocalPosition(): string {
-    const img = this.blogCoverPreviewAsset();
-    const x = Math.max(0, Math.min(100, Math.round(Number(img?.focal_x ?? 50))));
-    const y = Math.max(0, Math.min(100, Math.round(Number(img?.focal_y ?? 50))));
-    return `${x}% ${y}%`;
-  }
 
-  clearBlogCoverOverride(): void {
-    this.blogForm.cover_image_url = '';
-  }
 
-  uploadBlogCoverImage(event: Event): void {
-    if (!this.selectedBlogKey) return;
-    if (this.blogEditLang !== this.blogBaseLang) return;
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    this.admin.uploadContentImage(this.selectedBlogKey, file).subscribe({
-      next: (block) => {
-        const images = (block.images || [])
-          .map((img) => ({
-            id: img.id,
-            url: img.url,
-            alt_text: img.alt_text,
-            sort_order: img.sort_order ?? 0,
-            focal_x: img.focal_x ?? 50,
-            focal_y: img.focal_y ?? 50,
-          }))
-          .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = images;
-        const inserted = images[images.length - 1];
-        if (inserted?.url) {
-          this.blogForm.cover_image_url = inserted.url;
-        }
-        this.toast.success(this.t('adminUi.blog.images.success.uploaded'));
-        input.value = '';
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.images.errors.upload')),
-    });
-  }
 
-  selectBlogCoverAsset(asset: ContentImageAssetRead): void {
-    const url = (asset?.url || '').trim();
-    if (!url) return;
-    if (this.blogEditLang !== this.blogBaseLang) return;
-    this.blogForm.cover_image_url = url;
-    const id = String(asset.id || '').trim();
-    if (!id) return;
-    const next = [...this.blogImages];
-    const idx = next.findIndex((img) => img.id === id);
-    const row = {
-      id,
-      url,
-      alt_text: asset.alt_text ?? null,
-      sort_order: Number.isFinite(asset.sort_order as any) ? Number(asset.sort_order) : 0,
-      focal_x: Number.isFinite(asset.focal_x as any) ? Number(asset.focal_x) : 50,
-      focal_y: Number.isFinite(asset.focal_y as any) ? Number(asset.focal_y) : 50,
-    };
-    if (idx >= 0) next[idx] = { ...next[idx], ...row };
-    else next.push(row);
-    next.sort((a, b) => a.sort_order - b.sort_order);
-    this.blogImages = next;
-    this.showBlogCoverLibrary = false;
-  }
-
-  editBlogCoverFocalPoint(): void {
-    if (this.blogEditLang !== this.blogBaseLang) return;
-    const img = this.blogCoverPreviewAsset();
-    if (!img) return;
-    const entered = window.prompt(
-      this.t('adminUi.site.assets.library.focalPrompt'),
-      `${img.focal_x}, ${img.focal_y}`,
-    );
-    if (entered === null) return;
-    const parts = entered
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
-    if (parts.length < 2) {
-      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
-      return;
-    }
-    const focalX = Math.max(0, Math.min(100, Math.round(Number(parts[0]))));
-    const focalY = Math.max(0, Math.min(100, Math.round(Number(parts[1]))));
-    if (!Number.isFinite(focalX) || !Number.isFinite(focalY)) {
-      this.toast.error(this.t('adminUi.site.assets.library.focalErrorsFormat'));
-      return;
-    }
-    this.admin.updateContentImageFocalPoint(img.id, focalX, focalY).subscribe({
-      next: (updated) => {
-        this.blogImages = this.blogImages.map((item) =>
-          item.id === img.id
-            ? { ...item, focal_x: updated.focal_x, focal_y: updated.focal_y }
-            : item,
-        );
-        this.toast.success(this.t('adminUi.site.assets.library.focalSaved'));
-      },
-      error: () => this.toast.error(this.t('adminUi.site.assets.library.focalErrorsSave')),
-    });
-  }
-
-  private prefixBlogLines(textarea: HTMLTextAreaElement, prefix: string): void {
-    const value = textarea.value;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? start;
-    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-    const lineEnd = end === start ? value.indexOf('\n', start) : value.indexOf('\n', end);
-    const safeLineEnd = lineEnd === -1 ? value.length : lineEnd;
-    const segment = value.slice(lineStart, safeLineEnd);
-    const lines = segment.split('\n');
-    const nextSegment = lines
-      .map((line) => {
-        const trimmed = line.trim();
-        if (!trimmed) return line;
-        if (line.startsWith(prefix)) return line;
-        return prefix + line;
-      })
-      .join('\n');
-    const nextValue = value.slice(0, lineStart) + nextSegment + value.slice(safeLineEnd);
-    const added = nextSegment.length - segment.length;
-    this.updateBlogBody(textarea, nextValue, start + added, end + added);
-  }
-
-  private insertAtCursor(textarea: HTMLTextAreaElement, text: string): void {
-    const value = textarea.value;
-    const start = textarea.selectionStart ?? 0;
-    const end = textarea.selectionEnd ?? start;
-    const next = value.slice(0, start) + text + value.slice(end);
-    const pos = start + text.length;
-    this.updateBlogBody(textarea, next, pos, pos);
-  }
-
-  private updateBlogBody(
-    textarea: HTMLTextAreaElement,
-    nextValue: string,
-    selectionStart: number,
-    selectionEnd: number,
-  ): void {
-    this.blogForm.body_markdown = nextValue;
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(selectionStart, selectionEnd);
-    });
-  }
-
-  private loadBlogEditor(key: string): void {
-    this.selectedBlogKey = key;
-    this.resetBlogForm();
-    this.showBlogCoverLibrary = false;
-    this.blogPreviewUrl = null;
-    this.blogPreviewExpiresAt = null;
-    this.blogVersions = [];
-    this.blogVersionDetail = null;
-    this.blogDiffParts = [];
-    this.admin.getContent(key).subscribe({
-      next: (block) => {
-        this.rememberContentVersion(key, block);
-        this.blogBaseLang = (block.lang === 'ro' ? 'ro' : 'en') as 'en' | 'ro';
-        this.blogEditLang = this.blogBaseLang;
-        this.blogMeta = block.meta || {};
-        this.blogForm = {
-          title: block.title,
-          body_markdown: block.body_markdown,
-          status: block.status,
-          published_at: block.published_at ? this.toLocalDateTime(block.published_at) : '',
-          published_until: block.published_until ? this.toLocalDateTime(block.published_until) : '',
-          summary: '',
-          tags: '',
-          series: '',
-          cover_image_url: '',
-          cover_fit: 'cover',
-          reading_time_minutes: '',
-          pinned: false,
-          pin_order: '1',
-        };
-        this.syncBlogMetaToForm(this.blogEditLang);
-        this.ensureBlogDraft(key, this.blogEditLang).initFromServer(this.currentBlogDraftState());
-        this.loadBlogSeoSnapshots(key);
-        const images = (block.images || [])
-          .map((img) => ({
-            id: img.id,
-            url: img.url,
-            alt_text: img.alt_text,
-            sort_order: img.sort_order ?? 0,
-            focal_x: img.focal_x ?? 50,
-            focal_y: img.focal_y ?? 50,
-          }))
-          .sort((a, b) => a.sort_order - b.sort_order);
-        this.blogImages = [...images];
-        this.loadBlogVersions();
-      },
-      error: () => this.toast.error(this.t('adminUi.blog.errors.loadPost')),
-    });
-  }
 
   private reloadContentBlocks(): void {
     this.admin.content().subscribe({
@@ -13894,7 +8634,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         const nextBlocks = Array.isArray(c) ? [...c] : [];
         this.contentBlocks = nextBlocks;
         this.syncContentVersions(nextBlocks);
-        this.pruneBlogBulkSelection();
+        // Blog bulk-selection pruning is handled by <app-admin-blog-editor> (ngOnChanges).
       },
       error: () => {
         this.contentBlocks = [];
@@ -13902,896 +8642,21 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
-  private resetBlogForm(): void {
-    this.blogForm = {
-      title: '',
-      body_markdown: '',
-      status: 'draft',
-      published_at: '',
-      published_until: '',
-      summary: '',
-      tags: '',
-      series: '',
-      cover_image_url: '',
-      cover_fit: 'cover',
-      reading_time_minutes: '',
-      pinned: false,
-      pin_order: '1',
-    };
-    this.blogMeta = {};
-  }
 
-  private normalizeBlogSlug(raw: string): string {
-    return raw
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '-')
-      .replace(/[^a-z0-9-]/g, '')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
 
-  blogCreateSlug(): string {
-    return this.normalizeBlogSlug(this.blogCreate.title || '');
-  }
 
-  private parseTags(raw: string): string[] {
-    const parts = (raw || '')
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const part of parts) {
-      const key = part.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(part);
-    }
-    return out;
-  }
 
-  private toIsoFromLocal(value: string): string | null {
-    const trimmed = (value || '').trim();
-    if (!trimmed) return null;
-    const date = new Date(trimmed);
-    if (!Number.isFinite(date.getTime())) return null;
-    return date.toISOString();
-  }
 
-  private buildBlogBulkPayload(block: {
-    meta?: Record<string, any> | null;
-  }): Record<string, unknown> | null {
-    switch (this.blogBulkAction) {
-      case 'publish':
-        return { status: 'published', published_at: null };
-      case 'unpublish':
-        return { status: 'draft' };
-      case 'schedule': {
-        const publishIso = this.toIsoFromLocal(this.blogBulkPublishAt);
-        if (!publishIso) return null;
-        const unpublishIso = this.toIsoFromLocal(this.blogBulkUnpublishAt);
-        if (unpublishIso && new Date(unpublishIso).getTime() <= new Date(publishIso).getTime()) {
-          this.blogBulkError = this.t('adminUi.blog.bulk.invalidSchedule');
-          return null;
-        }
-        return {
-          status: 'published',
-          published_at: publishIso,
-          published_until: unpublishIso ?? null,
-        };
-      }
-      case 'tags_add':
-      case 'tags_remove': {
-        const tagsInput = this.parseTags(this.blogBulkTags);
-        if (!tagsInput.length) return null;
-        const meta = { ...block.meta } as Record<string, unknown>;
-        const existingRaw = meta['tags'];
-        const existing = Array.isArray(existingRaw)
-          ? existingRaw.map((t) => String(t))
-          : typeof existingRaw === 'string'
-            ? this.parseTags(existingRaw)
-            : [];
-        const merged =
-          this.blogBulkAction === 'tags_add'
-            ? this.mergeTags(existing, tagsInput)
-            : this.removeTags(existing, tagsInput);
-        if (merged.length) meta['tags'] = merged;
-        else delete meta['tags'];
-        return { meta };
-      }
-      default:
-        return null;
-    }
-  }
 
-  private mergeTags(existing: string[], incoming: string[]): string[] {
-    const out: string[] = [];
-    const seen = new Set<string>();
-    for (const value of [...existing, ...incoming]) {
-      const trimmed = String(value || '').trim();
-      if (!trimmed) continue;
-      const key = trimmed.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(trimmed);
-    }
-    return out;
-  }
 
-  private removeTags(existing: string[], remove: string[]): string[] {
-    const removeSet = new Set(
-      remove
-        .map((t) =>
-          String(t || '')
-            .trim()
-            .toLowerCase(),
-        )
-        .filter(Boolean),
-    );
-    return existing.filter(
-      (t) =>
-        !removeSet.has(
-          String(t || '')
-            .trim()
-            .toLowerCase(),
-        ),
-    );
-  }
 
-  private pruneBlogBulkSelection(): void {
-    const blogKeys = new Set(this.blogPosts().map((p) => p.key));
-    for (const key of Array.from(this.blogBulkSelection)) {
-      if (!blogKeys.has(key)) this.blogBulkSelection.delete(key);
-    }
-  }
 
   private syncContentVersions(blocks: AdminContent[]): void {
     blocks.forEach((block) => this.rememberContentVersion(block.key, block));
   }
 
-  private getBlogSummary(meta: Record<string, any>, lang: 'en' | 'ro'): string {
-    const summary = meta?.['summary'];
-    if (summary && typeof summary === 'object' && !Array.isArray(summary)) {
-      const value = summary[lang];
-      return typeof value === 'string' ? value : '';
-    }
-    if (typeof summary === 'string') {
-      return lang === this.blogBaseLang ? summary : '';
-    }
-    return '';
-  }
 
-  private syncBlogMetaToForm(lang: 'en' | 'ro'): void {
-    const meta = this.blogMeta || {};
-    this.blogForm.summary = this.getBlogSummary(meta, lang);
-    const tags = meta['tags'];
-    if (Array.isArray(tags)) {
-      this.blogForm.tags = tags.join(', ');
-    } else if (typeof tags === 'string') {
-      this.blogForm.tags = tags;
-    } else {
-      this.blogForm.tags = '';
-    }
 
-    const series = meta['series'];
-    this.blogForm.series = typeof series === 'string' ? series : '';
-
-    const cover = meta['cover_image_url'] || meta['cover_image'] || '';
-    this.blogForm.cover_image_url = typeof cover === 'string' ? cover : '';
-    const coverFit =
-      typeof meta['cover_fit'] === 'string' ? String(meta['cover_fit']).trim().toLowerCase() : '';
-    this.blogForm.cover_fit = coverFit === 'contain' ? 'contain' : 'cover';
-    const rt = meta['reading_time_minutes'] ?? meta['reading_time'] ?? '';
-    this.blogForm.reading_time_minutes = rt ? String(rt) : '';
-
-    const pinned = meta['pinned'];
-    let pinnedFlag = false;
-    if (typeof pinned === 'boolean') pinnedFlag = pinned;
-    else if (typeof pinned === 'number') pinnedFlag = pinned === 1;
-    else if (typeof pinned === 'string')
-      pinnedFlag = ['1', 'true', 'yes', 'on'].includes(pinned.trim().toLowerCase());
-    this.blogForm.pinned = pinnedFlag;
-    const rawPinOrder = meta['pin_order'];
-    const parsedPinOrder = Number(
-      typeof rawPinOrder === 'number'
-        ? rawPinOrder
-        : typeof rawPinOrder === 'string'
-          ? rawPinOrder.trim()
-          : '1',
-    );
-    const normalized =
-      Number.isFinite(parsedPinOrder) && parsedPinOrder > 0 ? Math.trunc(parsedPinOrder) : 1;
-    this.blogForm.pin_order = String(Math.max(1, normalized));
-  }
-
-  private buildBlogMeta(lang: 'en' | 'ro'): Record<string, any> {
-    const meta: Record<string, any> = { ...this.blogMeta };
-
-    const tags = this.parseTags(this.blogForm.tags);
-    if (tags.length) meta['tags'] = tags;
-    else delete meta['tags'];
-
-    const series = this.blogForm.series.trim();
-    if (series) meta['series'] = series;
-    else delete meta['series'];
-
-    const cover = this.blogForm.cover_image_url.trim();
-    if (cover) meta['cover_image_url'] = cover;
-    else delete meta['cover_image_url'];
-    if (this.blogForm.cover_fit === 'contain') meta['cover_fit'] = 'contain';
-    else delete meta['cover_fit'];
-
-    const rt = Number(String(this.blogForm.reading_time_minutes || '').trim());
-    if (Number.isFinite(rt) && rt > 0) meta['reading_time_minutes'] = Math.trunc(rt);
-    else delete meta['reading_time_minutes'];
-
-    const summaryValue = this.blogForm.summary.trim();
-    const existing = meta['summary'];
-    let summary: Record<string, any> = {};
-    if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
-      summary = { ...existing };
-    } else if (typeof existing === 'string' && existing.trim()) {
-      summary = { [this.blogBaseLang]: existing.trim() };
-    }
-    if (summaryValue) summary[lang] = summaryValue;
-    else delete summary[lang];
-    if (Object.keys(summary).length) meta['summary'] = summary;
-    else delete meta['summary'];
-
-    if (this.blogForm.pinned) {
-      meta['pinned'] = true;
-      const rawOrder = Number(String(this.blogForm.pin_order || '').trim());
-      const normalized = Number.isFinite(rawOrder) && rawOrder > 0 ? Math.trunc(rawOrder) : 1;
-      meta['pin_order'] = Math.max(1, normalized);
-    } else {
-      delete meta['pinned'];
-      delete meta['pin_order'];
-    }
-
-    return meta;
-  }
-
-  loadAssets(): void {
-    this.assetsError = null;
-    this.assetsMessage = null;
-    this.admin.getContent('site.assets').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('site.assets', block);
-        this.assetsForm = {
-          logo_url: block.meta?.['logo_url'] || '',
-          favicon_url: block.meta?.['favicon_url'] || '',
-          social_image_url: block.meta?.['social_image_url'] || '',
-        };
-        this.assetsMessage = null;
-      },
-      error: () => {
-        delete this.contentVersions['site.assets'];
-        this.assetsForm = { logo_url: '', favicon_url: '', social_image_url: '' };
-      },
-    });
-  }
-
-  loadCheckoutSettings(): void {
-    this.checkoutSettingsError = null;
-    this.checkoutSettingsMessage = null;
-    this.admin.getContent('site.checkout').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('site.checkout', block);
-        const meta = (block.meta || {}) as Record<string, any>;
-        const parseBool = (value: any, fallback: boolean) => {
-          if (typeof value === 'boolean') return value;
-          if (typeof value === 'number') return Boolean(value);
-          if (typeof value === 'string') {
-            const v = value.trim().toLowerCase();
-            if (['1', 'true', 'yes', 'on'].includes(v)) return true;
-            if (['0', 'false', 'no', 'off'].includes(v)) return false;
-          }
-          return fallback;
-        };
-        const shipping = Number(meta['shipping_fee_ron']);
-        const threshold = Number(meta['free_shipping_threshold_ron']);
-        const phoneRequiredHome = parseBool(meta['phone_required_home'], true);
-        const phoneRequiredLocker = parseBool(meta['phone_required_locker'], true);
-        const feeEnabled = parseBool(meta['fee_enabled'], false);
-        const feeTypeRaw = String(meta['fee_type'] ?? 'flat')
-          .trim()
-          .toLowerCase();
-        const feeType = feeTypeRaw === 'percent' ? 'percent' : 'flat';
-        const feeValueRaw = Number(meta['fee_value']);
-        const feeValue = Number.isFinite(feeValueRaw) && feeValueRaw >= 0 ? feeValueRaw : 0;
-        const vatEnabled = parseBool(meta['vat_enabled'], true);
-        const vatRateRaw = Number(meta['vat_rate_percent']);
-        const vatRate =
-          Number.isFinite(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100 ? vatRateRaw : 10;
-        const vatApplyToShipping = parseBool(meta['vat_apply_to_shipping'], false);
-        const vatApplyToFee = parseBool(meta['vat_apply_to_fee'], false);
-        const receiptDaysRaw = Number(meta['receipt_share_days']);
-        const receiptShareDays =
-          Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650
-            ? Math.trunc(receiptDaysRaw)
-            : 365;
-        const roundingRaw = String(meta['money_rounding'] ?? 'half_up')
-          .trim()
-          .toLowerCase();
-        const moneyRounding: 'half_up' | 'half_even' | 'up' | 'down' =
-          roundingRaw === 'half_even' || roundingRaw === 'up' || roundingRaw === 'down'
-            ? roundingRaw
-            : 'half_up';
-        this.checkoutSettingsForm = {
-          shipping_fee_ron: Number.isFinite(shipping) && shipping >= 0 ? shipping : 20,
-          free_shipping_threshold_ron:
-            Number.isFinite(threshold) && threshold >= 0 ? threshold : 300,
-          phone_required_home: phoneRequiredHome,
-          phone_required_locker: phoneRequiredLocker,
-          fee_enabled: feeEnabled,
-          fee_type: feeType,
-          fee_value: feeValue,
-          vat_enabled: vatEnabled,
-          vat_rate_percent: vatRate,
-          vat_apply_to_shipping: vatApplyToShipping,
-          vat_apply_to_fee: vatApplyToFee,
-          receipt_share_days: receiptShareDays,
-          money_rounding: moneyRounding,
-        };
-      },
-      error: () => {
-        delete this.contentVersions['site.checkout'];
-        this.checkoutSettingsForm = {
-          shipping_fee_ron: 20,
-          free_shipping_threshold_ron: 300,
-          phone_required_home: true,
-          phone_required_locker: true,
-          fee_enabled: false,
-          fee_type: 'flat',
-          fee_value: 0,
-          vat_enabled: true,
-          vat_rate_percent: 10,
-          vat_apply_to_shipping: false,
-          vat_apply_to_fee: false,
-          receipt_share_days: 365,
-          money_rounding: 'half_up',
-        };
-      },
-    });
-  }
-
-  saveCheckoutSettings(): void {
-    this.checkoutSettingsMessage = null;
-    this.checkoutSettingsError = null;
-    const shippingRaw = Number(this.checkoutSettingsForm.shipping_fee_ron);
-    const thresholdRaw = Number(this.checkoutSettingsForm.free_shipping_threshold_ron);
-    const shipping =
-      Number.isFinite(shippingRaw) && shippingRaw >= 0 ? Math.round(shippingRaw * 100) / 100 : 20;
-    const threshold =
-      Number.isFinite(thresholdRaw) && thresholdRaw >= 0
-        ? Math.round(thresholdRaw * 100) / 100
-        : 300;
-
-    const phoneRequiredHome = Boolean(this.checkoutSettingsForm.phone_required_home);
-    const phoneRequiredLocker = Boolean(this.checkoutSettingsForm.phone_required_locker);
-
-    const feeEnabled = Boolean(this.checkoutSettingsForm.fee_enabled);
-    const feeType = this.checkoutSettingsForm.fee_type === 'percent' ? 'percent' : 'flat';
-    const feeValueRaw = Number(this.checkoutSettingsForm.fee_value);
-    const feeValue =
-      Number.isFinite(feeValueRaw) && feeValueRaw >= 0 ? Math.round(feeValueRaw * 100) / 100 : 0;
-
-    const vatEnabled = Boolean(this.checkoutSettingsForm.vat_enabled);
-    const vatRateRaw = Number(this.checkoutSettingsForm.vat_rate_percent);
-    const vatRate =
-      Number.isFinite(vatRateRaw) && vatRateRaw >= 0 && vatRateRaw <= 100
-        ? Math.round(vatRateRaw * 100) / 100
-        : 10;
-    const vatApplyToShipping = Boolean(this.checkoutSettingsForm.vat_apply_to_shipping);
-    const vatApplyToFee = Boolean(this.checkoutSettingsForm.vat_apply_to_fee);
-
-    const receiptDaysRaw = Number(this.checkoutSettingsForm.receipt_share_days);
-    const receiptShareDays =
-      Number.isFinite(receiptDaysRaw) && receiptDaysRaw >= 1 && receiptDaysRaw <= 3650
-        ? Math.trunc(receiptDaysRaw)
-        : 365;
-
-    const roundingRaw = String(this.checkoutSettingsForm.money_rounding || 'half_up')
-      .trim()
-      .toLowerCase();
-    const moneyRounding: 'half_up' | 'half_even' | 'up' | 'down' =
-      roundingRaw === 'half_even' || roundingRaw === 'up' || roundingRaw === 'down'
-        ? roundingRaw
-        : 'half_up';
-
-    const payload = {
-      title: 'Checkout settings',
-      body_markdown:
-        'Checkout pricing settings (shipping, discounts, VAT, additional fees, and receipt sharing).',
-      status: 'published',
-      meta: {
-        version: 1,
-        shipping_fee_ron: shipping,
-        free_shipping_threshold_ron: threshold,
-        phone_required_home: phoneRequiredHome,
-        phone_required_locker: phoneRequiredLocker,
-        fee_enabled: feeEnabled,
-        fee_type: feeType,
-        fee_value: feeValue,
-        vat_enabled: vatEnabled,
-        vat_rate_percent: vatRate,
-        vat_apply_to_shipping: vatApplyToShipping,
-        vat_apply_to_fee: vatApplyToFee,
-        receipt_share_days: receiptShareDays,
-        money_rounding: moneyRounding,
-      },
-    };
-
-    const onSuccess = (block?: { version?: number } | null) => {
-      this.rememberContentVersion('site.checkout', block);
-      this.checkoutSettingsMessage = this.t('adminUi.site.checkout.success.save');
-      this.checkoutSettingsError = null;
-    };
-
-    this.admin
-      .updateContentBlock('site.checkout', this.withExpectedVersion('site.checkout', payload))
-      .subscribe({
-        next: (block) => onSuccess(block),
-        error: (err) => {
-          if (this.handleContentConflict(err, 'site.checkout', () => this.loadCheckoutSettings())) {
-            this.checkoutSettingsError = this.t('adminUi.site.checkout.errors.save');
-            this.checkoutSettingsMessage = null;
-            return;
-          }
-          this.admin.createContent('site.checkout', payload).subscribe({
-            next: (created) => onSuccess(created),
-            error: () => {
-              this.checkoutSettingsError = this.t('adminUi.site.checkout.errors.save');
-              this.checkoutSettingsMessage = null;
-            },
-          });
-        },
-      });
-  }
-
-  loadReportsSettings(): void {
-    this.reportsSettingsError = null;
-    this.reportsSettingsMessage = null;
-    this.reportsWeeklyLastSent = null;
-    this.reportsWeeklyLastError = null;
-    this.reportsMonthlyLastSent = null;
-    this.reportsMonthlyLastError = null;
-    this.admin.getContent('site.reports').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('site.reports', block);
-        const meta = (block.meta || {}) as Record<string, any>;
-        this.reportsSettingsMeta = { ...meta };
-
-        const parseBool = (value: any, fallback: boolean) => {
-          if (typeof value === 'boolean') return value;
-          if (typeof value === 'number') return Boolean(value);
-          if (typeof value === 'string') {
-            const v = value.trim().toLowerCase();
-            if (['1', 'true', 'yes', 'on'].includes(v)) return true;
-            if (['0', 'false', 'no', 'off'].includes(v)) return false;
-          }
-          return fallback;
-        };
-
-        const parseIntSafe = (value: any, fallback: number) => {
-          const n = Number(value);
-          return Number.isFinite(n) ? Math.trunc(n) : fallback;
-        };
-
-        this.reportsSettingsForm.weekly_enabled = parseBool(meta['reports_weekly_enabled'], false);
-        this.reportsSettingsForm.weekly_weekday = Math.min(
-          6,
-          Math.max(0, parseIntSafe(meta['reports_weekly_weekday'], 0)),
-        );
-        this.reportsSettingsForm.weekly_hour_utc = Math.min(
-          23,
-          Math.max(0, parseIntSafe(meta['reports_weekly_hour_utc'], 8)),
-        );
-        this.reportsSettingsForm.monthly_enabled = parseBool(
-          meta['reports_monthly_enabled'],
-          false,
-        );
-        this.reportsSettingsForm.monthly_day = String(
-          Math.min(28, Math.max(1, parseIntSafe(meta['reports_monthly_day'], 1))),
-        );
-        this.reportsSettingsForm.monthly_hour_utc = Math.min(
-          23,
-          Math.max(0, parseIntSafe(meta['reports_monthly_hour_utc'], 8)),
-        );
-
-        const rawRecipients = meta['reports_recipients'];
-        let recipients: string[] = [];
-        if (Array.isArray(rawRecipients)) {
-          recipients = rawRecipients.map((v) => String(v || '').trim()).filter(Boolean);
-        } else if (typeof rawRecipients === 'string') {
-          recipients = rawRecipients
-            .split(/[,;\n]+/)
-            .map((v) => String(v || '').trim())
-            .filter(Boolean);
-        }
-        this.reportsSettingsForm.recipients = recipients.join(', ');
-
-        this.reportsWeeklyLastSent = meta['reports_weekly_last_sent_period_end']
-          ? String(meta['reports_weekly_last_sent_period_end'])
-          : null;
-        this.reportsWeeklyLastError = meta['reports_weekly_last_error']
-          ? String(meta['reports_weekly_last_error'])
-          : null;
-        this.reportsMonthlyLastSent = meta['reports_monthly_last_sent_period_end']
-          ? String(meta['reports_monthly_last_sent_period_end'])
-          : null;
-        this.reportsMonthlyLastError = meta['reports_monthly_last_error']
-          ? String(meta['reports_monthly_last_error'])
-          : null;
-      },
-      error: () => {
-        delete this.contentVersions['site.reports'];
-        this.reportsSettingsMeta = {};
-        this.reportsSettingsForm = {
-          weekly_enabled: false,
-          weekly_weekday: 0,
-          weekly_hour_utc: 8,
-          monthly_enabled: false,
-          monthly_day: 1,
-          monthly_hour_utc: 8,
-          recipients: '',
-        };
-      },
-    });
-  }
-
-  saveReportsSettings(): void {
-    this.reportsSettingsMessage = null;
-    this.reportsSettingsError = null;
-
-    const meta: Record<string, any> = { ...this.reportsSettingsMeta };
-    meta['reports_weekly_enabled'] = Boolean(this.reportsSettingsForm.weekly_enabled);
-    meta['reports_weekly_weekday'] = Math.min(
-      6,
-      Math.max(0, Number(this.reportsSettingsForm.weekly_weekday || 0)),
-    );
-    meta['reports_weekly_hour_utc'] = Math.min(
-      23,
-      Math.max(0, Number(this.reportsSettingsForm.weekly_hour_utc || 0)),
-    );
-    meta['reports_monthly_enabled'] = Boolean(this.reportsSettingsForm.monthly_enabled);
-    const monthlyDayRaw = Number(String(this.reportsSettingsForm.monthly_day || '').trim());
-    meta['reports_monthly_day'] = Number.isFinite(monthlyDayRaw)
-      ? Math.min(28, Math.max(1, Math.trunc(monthlyDayRaw)))
-      : 1;
-    meta['reports_monthly_hour_utc'] = Math.min(
-      23,
-      Math.max(0, Number(this.reportsSettingsForm.monthly_hour_utc || 0)),
-    );
-
-    const recipients = String(this.reportsSettingsForm.recipients || '')
-      .split(/[,;\n]+/)
-      .map((v) => v.trim().toLowerCase())
-      .filter(Boolean)
-      .filter((email) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email));
-    const uniqueRecipients = Array.from(new Set(recipients));
-    if (uniqueRecipients.length) meta['reports_recipients'] = uniqueRecipients;
-    else delete meta['reports_recipients'];
-
-    if (!('reports_top_products_limit' in meta)) meta['reports_top_products_limit'] = 5;
-    if (!('reports_low_stock_limit' in meta)) meta['reports_low_stock_limit'] = 20;
-    if (!('reports_retry_cooldown_minutes' in meta)) meta['reports_retry_cooldown_minutes'] = 60;
-
-    const payload = {
-      title: 'Reports settings',
-      body_markdown: 'Admin scheduled email reports (weekly/monthly summaries).',
-      status: 'published',
-      meta,
-    };
-
-    const onSuccess = (block?: { version?: number; meta?: Record<string, any> | null } | null) => {
-      this.rememberContentVersion('site.reports', block);
-      this.reportsSettingsMeta = { ...(block?.meta || meta) };
-      this.reportsSettingsMessage = this.t('adminUi.reports.success.save');
-      this.reportsSettingsError = null;
-    };
-
-    this.admin
-      .updateContentBlock('site.reports', this.withExpectedVersion('site.reports', payload))
-      .subscribe({
-        next: (block) => onSuccess(block),
-        error: (err) => {
-          if (this.handleContentConflict(err, 'site.reports', () => this.loadReportsSettings())) {
-            this.reportsSettingsError = this.t('adminUi.reports.errors.save');
-            this.reportsSettingsMessage = null;
-            return;
-          }
-          this.admin.createContent('site.reports', payload).subscribe({
-            next: (created) => onSuccess(created),
-            error: () => {
-              this.reportsSettingsError = this.t('adminUi.reports.errors.save');
-              this.reportsSettingsMessage = null;
-            },
-          });
-        },
-      });
-  }
-
-  sendReportNow(kind: 'weekly' | 'monthly', force = false): void {
-    if (this.reportsSending) return;
-    this.reportsSending = true;
-    this.reportsSettingsError = null;
-    this.reportsSettingsMessage = null;
-    this.admin.sendScheduledReport({ kind, force }).subscribe({
-      next: (res) => {
-        this.reportsSending = false;
-        this.reportsSettingsMessage = res.skipped
-          ? this.t('adminUi.reports.success.skipped')
-          : this.t('adminUi.reports.success.sent');
-        this.loadReportsSettings();
-      },
-      error: () => {
-        this.reportsSending = false;
-        this.reportsSettingsError = this.t('adminUi.reports.errors.send');
-      },
-    });
-  }
-
-  saveAssets(): void {
-    const payload = {
-      title: 'Site assets',
-      status: 'published',
-      meta: { ...this.assetsForm },
-    };
-    const onSuccess = (block?: { version?: number } | null) => {
-      this.rememberContentVersion('site.assets', block);
-      this.assetsMessage = this.t('adminUi.site.assets.success.save');
-      this.assetsError = null;
-    };
-    this.admin
-      .updateContentBlock('site.assets', this.withExpectedVersion('site.assets', payload))
-      .subscribe({
-        next: (block) => onSuccess(block),
-        error: (err) => {
-          if (this.handleContentConflict(err, 'site.assets', () => this.loadAssets())) {
-            this.assetsError = this.t('adminUi.site.assets.errors.save');
-            this.assetsMessage = null;
-            return;
-          }
-          this.admin.createContent('site.assets', payload).subscribe({
-            next: (created) => onSuccess(created),
-            error: () => {
-              this.assetsError = this.t('adminUi.site.assets.errors.save');
-              this.assetsMessage = null;
-            },
-          });
-        },
-      });
-  }
-
-  loadCompany(): void {
-    this.companyError = null;
-    this.companyMessage = null;
-    this.admin.getContent('site.company').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('site.company', block);
-        const meta = (block.meta || {}) as Record<string, any>;
-        const company = (meta['company'] || {}) as Record<string, any>;
-        this.companyForm = {
-          name: String(company['name'] || '').trim(),
-          registration_number: String(company['registration_number'] || '').trim(),
-          cui: String(company['cui'] || '').trim(),
-          address: String(company['address'] || '').trim(),
-          phone: String(company['phone'] || '').trim(),
-          email: String(company['email'] || '').trim(),
-        };
-        this.companyMessage = null;
-      },
-      error: () => {
-        delete this.contentVersions['site.company'];
-        this.companyForm = {
-          name: '',
-          registration_number: '',
-          cui: '',
-          address: '',
-          phone: '',
-          email: '',
-        };
-      },
-    });
-  }
-
-  companyMissingFields(): string[] {
-    const missing: string[] = [];
-    if (!(this.companyForm.name || '').trim()) missing.push('adminUi.site.company.fields.name');
-    if (!(this.companyForm.registration_number || '').trim())
-      missing.push('adminUi.site.company.fields.registrationNumber');
-    if (!(this.companyForm.cui || '').trim()) missing.push('adminUi.site.company.fields.cui');
-    if (!(this.companyForm.address || '').trim())
-      missing.push('adminUi.site.company.fields.address');
-    if (!(this.companyForm.phone || '').trim()) missing.push('adminUi.site.company.fields.phone');
-    if (!(this.companyForm.email || '').trim()) missing.push('adminUi.site.company.fields.email');
-    return missing;
-  }
-
-  saveCompany(): void {
-    this.companyMessage = null;
-    this.companyError = null;
-    if (this.companyMissingFields().length) {
-      this.companyError = this.t('adminUi.site.company.errors.required');
-      return;
-    }
-    const payload = {
-      title: 'Company information',
-      body_markdown: 'Company identification details (used in footer).',
-      status: 'published',
-      meta: {
-        version: 1,
-        company: {
-          name: (this.companyForm.name || '').trim(),
-          registration_number: (this.companyForm.registration_number || '').trim(),
-          cui: (this.companyForm.cui || '').trim(),
-          address: (this.companyForm.address || '').trim(),
-          phone: (this.companyForm.phone || '').trim(),
-          email: (this.companyForm.email || '').trim(),
-        },
-      },
-    };
-    const onSuccess = (block?: { version?: number } | null) => {
-      this.rememberContentVersion('site.company', block);
-      this.companyMessage = this.t('adminUi.site.company.success.save');
-      this.companyError = null;
-    };
-    this.admin
-      .updateContentBlock('site.company', this.withExpectedVersion('site.company', payload))
-      .subscribe({
-        next: (block) => onSuccess(block),
-        error: (err) => {
-          if (this.handleContentConflict(err, 'site.company', () => this.loadCompany())) {
-            this.companyError = this.t('adminUi.site.company.errors.save');
-            this.companyMessage = null;
-            return;
-          }
-          this.admin.createContent('site.company', payload).subscribe({
-            next: (created) => onSuccess(created),
-            error: () => {
-              this.companyError = this.t('adminUi.site.company.errors.save');
-              this.companyMessage = null;
-            },
-          });
-        },
-      });
-  }
-
-  loadSocial(): void {
-    this.socialError = null;
-    this.socialMessage = null;
-    this.admin.getContent('site.social').subscribe({
-      next: (block) => {
-        this.rememberContentVersion('site.social', block);
-        const meta = (block.meta || {}) as Record<string, any>;
-        const contact = (meta['contact'] || {}) as Record<string, any>;
-        this.socialForm.phone = String(contact['phone'] || this.socialForm.phone || '').trim();
-        this.socialForm.email = String(contact['email'] || this.socialForm.email || '').trim();
-        this.socialForm.instagram_pages = this.parseSocialPages(
-          meta['instagram_pages'],
-          this.socialForm.instagram_pages,
-        );
-        this.socialForm.facebook_pages = this.parseSocialPages(
-          meta['facebook_pages'],
-          this.socialForm.facebook_pages,
-        );
-      },
-      error: () => {
-        delete this.contentVersions['site.social'];
-        // Keep defaults.
-      },
-    });
-  }
-
-  addSocialLink(platform: 'instagram' | 'facebook'): void {
-    const item = { label: '', url: '', thumbnail_url: '' };
-    if (platform === 'instagram')
-      this.socialForm.instagram_pages = [...this.socialForm.instagram_pages, item];
-    else this.socialForm.facebook_pages = [...this.socialForm.facebook_pages, item];
-  }
-
-  removeSocialLink(platform: 'instagram' | 'facebook', index: number): void {
-    if (platform === 'instagram') {
-      this.socialForm.instagram_pages = this.socialForm.instagram_pages.filter(
-        (_, i) => i !== index,
-      );
-      return;
-    }
-    this.socialForm.facebook_pages = this.socialForm.facebook_pages.filter((_, i) => i !== index);
-  }
-
-  socialThumbKey(platform: 'instagram' | 'facebook', index: number): string {
-    return `${platform}-${index}`;
-  }
-
-  fetchSocialThumbnail(platform: 'instagram' | 'facebook', index: number): void {
-    const key = this.socialThumbKey(platform, index);
-    const pages =
-      platform === 'instagram' ? this.socialForm.instagram_pages : this.socialForm.facebook_pages;
-    const page = pages[index];
-    const url = String(page?.url || '').trim();
-    if (!url) {
-      this.socialThumbErrors[key] = this.t('adminUi.site.social.errors.urlRequired');
-      return;
-    }
-
-    this.socialThumbErrors[key] = '';
-    this.socialThumbLoading[key] = true;
-
-    this.admin.fetchSocialThumbnail(url).subscribe({
-      next: (res) => {
-        this.socialThumbLoading[key] = false;
-        const thumb = String(res?.thumbnail_url || '').trim();
-        if (!thumb) {
-          this.socialThumbErrors[key] = this.t('adminUi.site.social.errors.noThumbnail');
-          return;
-        }
-        page.thumbnail_url = thumb;
-        this.toast.success(
-          this.t('adminUi.site.social.success.thumbnailUpdated'),
-          (page.label || '').trim() ||
-            (page.url || '').trim() ||
-            this.t('adminUi.site.social.socialLink'),
-        );
-      },
-      error: (err) => {
-        this.socialThumbLoading[key] = false;
-        const msg = err?.error?.detail
-          ? String(err.error.detail)
-          : this.t('adminUi.site.social.errors.fetchFailed');
-        this.socialThumbErrors[key] = msg;
-      },
-    });
-  }
-
-  saveSocial(): void {
-    this.socialMessage = null;
-    this.socialError = null;
-    const instagram_pages = this.sanitizeSocialPages(this.socialForm.instagram_pages);
-    const facebook_pages = this.sanitizeSocialPages(this.socialForm.facebook_pages);
-    const payload = {
-      title: 'Site social links',
-      body_markdown: 'Social pages and contact details used across the storefront.',
-      status: 'published',
-      meta: {
-        version: 1,
-        contact: {
-          phone: (this.socialForm.phone || '').trim(),
-          email: (this.socialForm.email || '').trim(),
-        },
-        instagram_pages,
-        facebook_pages,
-      },
-    };
-    const onSuccess = (block?: { version?: number } | null) => {
-      this.rememberContentVersion('site.social', block);
-      this.socialMessage = this.t('adminUi.site.social.success.save');
-      this.socialError = null;
-    };
-    this.admin
-      .updateContentBlock('site.social', this.withExpectedVersion('site.social', payload))
-      .subscribe({
-        next: (block) => onSuccess(block),
-        error: (err) => {
-          if (this.handleContentConflict(err, 'site.social', () => this.loadSocial())) {
-            this.socialError = this.t('adminUi.site.social.errors.save');
-            this.socialMessage = null;
-            return;
-          }
-          this.admin.createContent('site.social', payload).subscribe({
-            next: (created) => onSuccess(created),
-            error: () => {
-              this.socialError = this.t('adminUi.site.social.errors.save');
-              this.socialMessage = null;
-            },
-          });
-        },
-      });
-  }
 
   private newNavigationId(prefix: string): string {
     const rand = Math.random().toString(36).slice(2, 8);
@@ -15091,151 +8956,6 @@ export class AdminComponent implements OnInit, OnDestroy {
       });
   }
 
-  private parseSocialPages(
-    raw: unknown,
-    fallback: Array<{ label: string; url: string; thumbnail_url: string }>,
-  ): Array<{ label: string; url: string; thumbnail_url: string }> {
-    if (!Array.isArray(raw)) return fallback;
-    return raw
-      .map((item) => {
-        if (!item || typeof item !== 'object') return null;
-        const label = String(item.label ?? '').trim();
-        const url = String(item.url ?? '').trim();
-        const thumb = String(item.thumbnail_url ?? '').trim();
-        return { label, url, thumbnail_url: thumb };
-      })
-      .filter((x): x is { label: string; url: string; thumbnail_url: string } => !!x);
-  }
-
-  private sanitizeSocialPages(
-    pages: Array<{ label: string; url: string; thumbnail_url: string }>,
-  ): Array<{ label: string; url: string; thumbnail_url?: string | null }> {
-    const out: Array<{ label: string; url: string; thumbnail_url?: string | null }> = [];
-    for (const page of pages) {
-      const label = String(page.label || '').trim();
-      const url = String(page.url || '').trim();
-      const thumb = String(page.thumbnail_url || '').trim();
-      if (!label || !url) continue;
-      out.push({ label, url, thumbnail_url: thumb || null });
-    }
-    return out;
-  }
-
-  selectSeoLang(lang: 'en' | 'ro'): void {
-    this.seoLang = lang;
-    this.loadSeo();
-  }
-
-  loadSeo(): void {
-    this.seoMessage = null;
-    this.seoError = null;
-    this.admin.getContent(`seo.${this.seoPage}`, this.seoLang).subscribe({
-      next: (block) => {
-        this.rememberContentVersion(`seo.${this.seoPage}`, block);
-        this.seoForm = {
-          title: block.title || '',
-          description: block.meta?.['description'] || '',
-        };
-        this.seoMessage = null;
-      },
-      error: () => {
-        delete this.contentVersions[`seo.${this.seoPage}`];
-        this.seoForm = { title: '', description: '' };
-      },
-    });
-  }
-
-  saveSeo(): void {
-    const payload = {
-      title: this.seoForm.title,
-      status: 'published',
-      lang: this.seoLang,
-      meta: { description: this.seoForm.description },
-    };
-    const key = `seo.${this.seoPage}`;
-    const onSuccess = () => {
-      this.seoMessage = this.t('adminUi.site.seo.success.save');
-      this.seoError = null;
-    };
-    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
-      next: (block) => {
-        this.rememberContentVersion(key, block);
-        onSuccess();
-      },
-      error: (err) => {
-        if (this.handleContentConflict(err, key, () => this.loadSeo())) {
-          this.seoError = this.t('adminUi.site.seo.errors.save');
-          this.seoMessage = null;
-          return;
-        }
-        this.admin.createContent(key, payload).subscribe({
-          next: (created) => {
-            this.rememberContentVersion(key, created);
-            onSuccess();
-          },
-          error: () => {
-            this.seoError = this.t('adminUi.site.seo.errors.save');
-            this.seoMessage = null;
-          },
-        });
-      },
-    });
-  }
-
-  loadSitemapPreview(): void {
-    this.sitemapPreviewLoading = true;
-    this.sitemapPreviewError = null;
-    this.sitemapPreviewByLang = null;
-    this.admin.getSitemapPreview().subscribe({
-      next: (res) => {
-        this.sitemapPreviewByLang = (res && typeof res === 'object' ? res.by_lang : null) || {};
-        this.sitemapPreviewLoading = false;
-      },
-      error: (err) => {
-        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
-        this.sitemapPreviewLoading = false;
-        this.sitemapPreviewByLang = null;
-        this.sitemapPreviewError = detail || this.t('adminUi.site.seo.sitemapPreview.errors.load');
-      },
-    });
-  }
-
-  structuredDataIssueUrl(issue: { entity_type: string; entity_key: string }): string {
-    const type = String(issue?.entity_type || '')
-      .trim()
-      .toLowerCase();
-    const key = String(issue?.entity_key || '').trim();
-    if (type === 'product') {
-      return `/products/${encodeURIComponent(key)}`;
-    }
-    if (type === 'page') {
-      const raw = key.startsWith('page.') ? key.slice('page.'.length) : key;
-      if (raw === 'about') return '/about';
-      if (raw === 'contact') return '/contact';
-      if (!raw) return '/pages';
-      return `/pages/${encodeURIComponent(raw)}`;
-    }
-    return '/';
-  }
-
-  runStructuredDataValidation(): void {
-    this.structuredDataLoading = true;
-    this.structuredDataError = null;
-    this.structuredDataResult = null;
-    this.admin.validateStructuredData().subscribe({
-      next: (res) => {
-        this.structuredDataLoading = false;
-        this.structuredDataResult = res || null;
-      },
-      error: (err) => {
-        const detail = typeof err?.error?.detail === 'string' ? String(err.error.detail) : '';
-        this.structuredDataLoading = false;
-        this.structuredDataResult = null;
-        this.structuredDataError = detail || this.t('adminUi.site.seo.structuredData.errors.load');
-      },
-    });
-  }
-
   selectInfoLang(lang: UiLang): void {
     this.infoLang = lang;
   }
@@ -15422,228 +9142,6 @@ export class AdminComponent implements OnInit, OnDestroy {
           this.contentPages = [...this.contentPages];
         }
         this.toast.error(this.t('adminUi.site.pages.visibility.errors.load'));
-      },
-    });
-  }
-
-  onLegalPageKeyChange(next: LegalPageKey): void {
-    if (!next || next === this.legalPageKey) return;
-    this.legalPageKey = next;
-    this.loadLegalPage(next);
-  }
-
-  loadLegalPage(key: LegalPageKey): void {
-    this.legalPageLoading = true;
-    this.legalPageMessage = null;
-    this.legalPageError = null;
-    const target = (key || '').trim();
-    if (!target) {
-      this.legalPageLoading = false;
-      this.legalPageError = 'Missing page key.';
-      return;
-    }
-
-    forkJoin([
-      this.admin
-        .getContent(target, 'en')
-        .pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err)))),
-      this.admin
-        .getContent(target, 'ro')
-        .pipe(catchError((err) => (err?.status === 404 ? of(null) : of(err)))),
-    ]).subscribe({
-      next: ([enRes, roRes]) => {
-        const enBlock =
-          enRes && typeof enRes === 'object' && 'body_markdown' in enRes ? enRes : null;
-        const roBlock =
-          roRes && typeof roRes === 'object' && 'body_markdown' in roRes ? roRes : null;
-
-        if (!enBlock && enRes?.status && enRes.status !== 404) {
-          this.legalPageError = this.t('adminUi.site.pages.errors.load');
-        }
-
-        if (enBlock) this.rememberContentVersion(target, enBlock);
-        if (!enBlock && roBlock) this.rememberContentVersion(target, roBlock);
-
-        this.legalPageForm = {
-          en: (enBlock?.body_markdown as string) || '',
-          ro: (roBlock?.body_markdown as string) || '',
-        };
-        const meta = ((enBlock?.meta as Record<string, unknown> | null | undefined) ??
-          (roBlock?.meta as Record<string, unknown> | null | undefined) ??
-          {}) as Record<string, unknown>;
-        this.legalPageMeta = { ...(meta && typeof meta === 'object' ? meta : {}) };
-        const lastUpdated =
-          typeof this.legalPageMeta['last_updated'] === 'string'
-            ? String(this.legalPageMeta['last_updated'])
-            : '';
-        this.legalPageLastUpdated = lastUpdated;
-        this.legalPageLastUpdatedOriginal = lastUpdated;
-
-        this.legalPageLoading = false;
-      },
-      error: () => {
-        this.legalPageLoading = false;
-        this.legalPageError = this.t('adminUi.site.pages.errors.load');
-      },
-    });
-  }
-
-  private saveLegalMetaIfNeeded(
-    key: LegalPageKey,
-    onSuccess: () => void,
-    onError: () => void,
-  ): void {
-    const next = String(this.legalPageLastUpdated || '').trim();
-    const prev = String(this.legalPageLastUpdatedOriginal || '').trim();
-    if (next === prev) {
-      onSuccess();
-      return;
-    }
-    const meta: Record<string, unknown> = { ...this.legalPageMeta };
-    if (next) meta['last_updated'] = next;
-    else delete meta['last_updated'];
-
-    this.admin.updateContentBlock(key, this.withExpectedVersion(key, { meta })).subscribe({
-      next: (updated) => {
-        this.rememberContentVersion(key, updated);
-        const updatedMeta = ((updated as { meta?: Record<string, unknown> | null }).meta ||
-          {}) as Record<string, unknown>;
-        this.legalPageMeta = {
-          ...(updatedMeta && typeof updatedMeta === 'object' ? updatedMeta : {}),
-        };
-        const lastUpdated =
-          typeof this.legalPageMeta['last_updated'] === 'string'
-            ? String(this.legalPageMeta['last_updated'])
-            : '';
-        this.legalPageLastUpdated = lastUpdated;
-        this.legalPageLastUpdatedOriginal = lastUpdated;
-        onSuccess();
-      },
-      error: (err) => {
-        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key))) {
-          onError();
-          return;
-        }
-        onError();
-      },
-    });
-  }
-
-  saveLegalPageUi(): void {
-    const key = this.legalPageKey;
-    if (!key) return;
-    if (this.cmsPrefs.translationLayout() === 'sideBySide') {
-      this.saveLegalPageBoth(key, this.legalPageForm);
-      return;
-    }
-    this.saveLegalPage(key, this.legalPageForm[this.infoLang] || '', this.infoLang);
-  }
-
-  private saveLegalPage(key: LegalPageKey, body: string, lang: UiLang): void {
-    this.legalPageMessage = null;
-    this.legalPageError = null;
-    this.legalPageSaving = true;
-    this.saveLegalMetaIfNeeded(
-      key,
-      () => {
-        this.savePageMarkdownInternal(
-          key,
-          body,
-          lang,
-          () => {
-            this.legalPageSaving = false;
-            this.legalPageMessage = this.t('adminUi.site.pages.success.save');
-          },
-          () => {
-            this.legalPageSaving = false;
-            this.legalPageError = this.t('adminUi.site.pages.errors.save');
-          },
-        );
-      },
-      () => {
-        this.legalPageSaving = false;
-        this.legalPageError = this.t('adminUi.site.pages.errors.save');
-      },
-    );
-  }
-
-  private saveLegalPageBoth(key: LegalPageKey, body: LocalizedText): void {
-    this.legalPageMessage = null;
-    this.legalPageError = null;
-    this.legalPageSaving = true;
-    this.saveLegalMetaIfNeeded(
-      key,
-      () => {
-        this.savePageMarkdownInternal(
-          key,
-          body.en || '',
-          'en',
-          () => {
-            this.savePageMarkdownInternal(
-              key,
-              body.ro || '',
-              'ro',
-              () => {
-                this.legalPageSaving = false;
-                this.legalPageMessage = this.t('adminUi.site.pages.success.save');
-              },
-              () => {
-                this.legalPageSaving = false;
-                this.legalPageError = this.t('adminUi.site.pages.errors.save');
-              },
-            );
-          },
-          () => {
-            this.legalPageSaving = false;
-            this.legalPageError = this.t('adminUi.site.pages.errors.save');
-          },
-        );
-      },
-      () => {
-        this.legalPageSaving = false;
-        this.legalPageError = this.t('adminUi.site.pages.errors.save');
-      },
-    );
-  }
-
-  private savePageMarkdownInternal(
-    key: string,
-    body: string,
-    lang: UiLang,
-    onSuccess: () => void,
-    onError: () => void,
-  ): void {
-    const payload = { body_markdown: body, status: 'published', lang };
-    const createPayload = { title: key, ...payload };
-
-    const onSuccessWithBlock = (block?: any | null) => {
-      this.rememberContentVersion(key, block);
-      const safePageKey = this.safePageRecordKey(key as PageBuilderKey);
-      this.setPageRecordValue(
-        this.pageBlocksNeedsTranslationEn,
-        safePageKey,
-        Boolean(block?.needs_translation_en),
-      );
-      this.setPageRecordValue(
-        this.pageBlocksNeedsTranslationRo,
-        safePageKey,
-        Boolean(block?.needs_translation_ro),
-      );
-      this.loadContentPages();
-      onSuccess();
-    };
-
-    this.admin.updateContentBlock(key, this.withExpectedVersion(key, payload)).subscribe({
-      next: (block) => onSuccessWithBlock(block),
-      error: (err) => {
-        if (this.handleContentConflict(err, key, () => this.loadLegalPage(key as LegalPageKey))) {
-          onError();
-          return;
-        }
-        this.admin.createContent(key, createPayload).subscribe({
-          next: (created) => onSuccessWithBlock(created),
-          error: () => onError(),
-        });
       },
     });
   }
@@ -16872,7 +10370,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   setPageInsertDragActive(active: boolean): void {
-    this.pageInsertDragActive = active;
+    this.setBuilderInsertDragActive('page', active);
   }
 
   addPageBlockFromLibrary(
@@ -17152,49 +10650,25 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   togglePageBlockEnabled(pageKey: PageBuilderKey, blockKey: string, event: Event): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
     const target = event.target as HTMLInputElement | null;
     const enabled = target?.checked !== false;
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) =>
-      b.key === blockKey ? { ...b, enabled } : b,
-    );
+    this.setBuilderBlockEnabled('page', pageKey, blockKey, enabled);
   }
 
   pageBlockLabel(block: PageBlockDraft): string {
-    const key = `adminUi.home.sections.blocks.${block.type}`;
-    const translated = this.t(key);
-    return translated !== key ? translated : String(block.type);
+    return this.builderBlockLabel(block);
   }
 
   movePageBlock(pageKey: PageBuilderKey, blockKey: string, delta: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const current = [...(this.pageBlocks[safePageKey] || [])];
-    const from = current.findIndex((b) => b.key === blockKey);
-    if (from === -1) return;
-    const to = from + delta;
-    if (to < 0 || to >= current.length) return;
-    const [moved] = current.splice(from, 1);
-    current.splice(to, 0, moved);
-    this.pageBlocks[safePageKey] = current;
-    this.announceCms(
-      this.t('adminUi.content.reorder.moved', {
-        label: this.pageBlockLabel(moved),
-        pos: to + 1,
-        count: current.length,
-      }),
-    );
+    this.moveBuilderBlock('page', pageKey, blockKey, delta);
   }
 
   onPageBlockDragStart(pageKey: PageBuilderKey, blockKey: string): void {
-    this.pageInsertDragActive = true;
-    this.draggingPageBlocksKey = pageKey;
-    this.draggingPageBlockKey = blockKey;
+    this.onBuilderBlockDragStart('page', pageKey, blockKey);
   }
 
   onPageBlockDragEnd(): void {
-    this.draggingPageBlocksKey = null;
-    this.draggingPageBlockKey = null;
-    this.pageInsertDragActive = false;
+    this.onBuilderBlockDragEnd('page');
   }
 
   onPageBlockDragOver(event: DragEvent): void {
@@ -17210,92 +10684,19 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onPageMediaDropOnContainer(event: DragEvent, pageKey: PageBuilderKey): void {
-    if (event.target !== event.currentTarget) return;
-    const files = this.extractCmsImageFiles(event);
-    if (!files.length) return;
-    event.preventDefault();
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const index = (this.pageBlocks[safePageKey] || []).length;
-    void this.insertPageMediaFiles(safePageKey, index, files);
+    this.onBuilderMediaDropOnContainer('page', pageKey, event);
   }
 
   onHomeMediaDropOnContainer(event: DragEvent): void {
-    if (event.target !== event.currentTarget) return;
-    const files = this.extractCmsImageFiles(event);
-    if (!files.length) return;
-    event.preventDefault();
-    void this.insertHomeMediaFiles(this.homeBlocks.length, files);
+    this.onBuilderMediaDropOnContainer('home', undefined, event);
   }
 
   onPageBlockDropZone(event: DragEvent, pageKey: PageBuilderKey, index: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    event.preventDefault();
-    const current = [...(this.pageBlocks[safePageKey] || [])];
-
-    if (this.draggingPageBlocksKey === safePageKey && this.draggingPageBlockKey) {
-      const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
-      if (from === -1) {
-        this.onPageBlockDragEnd();
-        return;
-      }
-      const safeIndex = Math.max(0, Math.min(index, current.length));
-      const [moved] = current.splice(from, 1);
-      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
-      current.splice(nextIndex, 0, moved);
-      this.pageBlocks[safePageKey] = current;
-      this.onPageBlockDragEnd();
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (!payload || payload.scope !== 'page') {
-      this.onPageBlockDragEnd();
-      return;
-    }
-
-    this.insertPageBlockAt(safePageKey, payload.type, index, payload.template);
-    this.pageInsertDragActive = false;
+    this.onBuilderBlockDropZone('page', pageKey, event, index);
   }
 
   onPageBlockDrop(event: DragEvent, pageKey: PageBuilderKey, targetKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    event.preventDefault();
-
-    const mediaFiles = this.extractCmsImageFiles(event);
-    if (mediaFiles.length) {
-      const current = [...(this.pageBlocks[safePageKey] || [])];
-      const to = current.findIndex((b) => b.key === targetKey);
-      const safeIndex = to !== -1 ? to : current.length;
-      void this.insertPageMediaFiles(safePageKey, safeIndex, mediaFiles);
-      this.pageInsertDragActive = false;
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'page') {
-      const current = [...(this.pageBlocks[safePageKey] || [])];
-      const to = current.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
-        this.insertPageBlockAt(safePageKey, payload.type, to, payload.template);
-      }
-      this.pageInsertDragActive = false;
-      return;
-    }
-
-    if (!this.draggingPageBlocksKey || !this.draggingPageBlockKey) return;
-    if (this.draggingPageBlocksKey !== safePageKey) return;
-    if (this.draggingPageBlockKey === targetKey) return;
-
-    const current = [...(this.pageBlocks[safePageKey] || [])];
-    const from = current.findIndex((b) => b.key === this.draggingPageBlockKey);
-    const to = current.findIndex((b) => b.key === targetKey);
-    if (from === -1 || to === -1) return;
-
-    const [moved] = current.splice(from, 1);
-    const nextIndex = from < to ? to - 1 : to;
-    current.splice(nextIndex, 0, moved);
-    this.pageBlocks[safePageKey] = current;
-    this.onPageBlockDragEnd();
+    this.onBuilderBlockDrop('page', pageKey, event, targetKey);
   }
 
   private dragEventHasFiles(event: DragEvent): boolean {
@@ -17534,15 +10935,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     blockKey: string,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) =>
-      b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b,
-    );
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderImageBlockUrl('page', pageKey, blockKey, asset);
   }
 
   setPageBannerSlideImage(
@@ -17550,34 +10943,15 @@ export class AdminComponent implements OnInit, OnDestroy {
     blockKey: string,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderBannerSlideImage('page', pageKey, blockKey, asset);
   }
 
   addPageCarouselSlide(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      return { ...b, slides: [...(b.slides || []), this.emptySlideDraft()] };
-    });
+    this.addBuilderCarouselSlide('page', pageKey, blockKey);
   }
 
   removePageCarouselSlide(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const next = [...(b.slides || [])];
-      next.splice(idx, 1);
-      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
-    });
+    this.removeBuilderCarouselSlide('page', pageKey, blockKey, idx);
   }
 
   movePageCarouselSlide(
@@ -17586,18 +10960,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     idx: number,
     delta: number,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const from = idx;
-      const to = idx + delta;
-      if (from < 0 || from >= slides.length) return b;
-      if (to < 0 || to >= slides.length) return b;
-      const [moved] = slides.splice(from, 1);
-      slides.splice(to, 0, moved);
-      return { ...b, slides };
-    });
+    this.moveBuilderCarouselSlide('page', pageKey, blockKey, idx, delta);
   }
 
   setPageCarouselSlideImage(
@@ -17606,40 +10969,11 @@ export class AdminComponent implements OnInit, OnDestroy {
     idx: number,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const target = slides[idx];
-      if (!target) return b;
-      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
-      return { ...b, slides };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderCarouselSlideImage('page', pageKey, blockKey, idx, asset);
   }
 
   addPageGalleryImage(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: '',
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: 50,
-            focal_y: 50,
-          },
-        ],
-      };
-    });
+    this.addBuilderGalleryImage('page', pageKey, blockKey);
   }
 
   addPageGalleryImageFromAsset(
@@ -17647,61 +10981,19 @@ export class AdminComponent implements OnInit, OnDestroy {
     blockKey: string,
     asset: ContentImageAssetRead,
   ): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: value,
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: focalX,
-            focal_y: focalY,
-          },
-        ],
-      };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.addBuilderGalleryImageFromAsset('page', pageKey, blockKey, asset);
   }
 
   removePageGalleryImage(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      const next = [...b.images];
-      next.splice(idx, 1);
-      return { ...b, images: next };
-    });
+    this.removeBuilderGalleryImage('page', pageKey, blockKey, idx);
   }
 
   addPageColumnsColumn(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length >= 3) return b;
-      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
-      return { ...b, columns: cols };
-    });
+    this.addBuilderColumnsColumn('page', pageKey, blockKey);
   }
 
   removePageColumnsColumn(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length <= 2) return b;
-      if (idx < 0 || idx >= cols.length) return b;
-      cols.splice(idx, 1);
-      return { ...b, columns: cols };
-    });
+    this.removeBuilderColumnsColumn('page', pageKey, blockKey, idx);
   }
 
   private parseProductGridSlugs(raw: string): string[] {
@@ -17788,56 +11080,19 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   addPageFaqItem(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length >= 20) return b;
-      items.push({
-        question: this.emptyLocalizedText(),
-        answer_markdown: this.emptyLocalizedText(),
-      });
-      return { ...b, faq_items: items };
-    });
+    this.addBuilderFaqItem('page', pageKey, blockKey);
   }
 
   removePageFaqItem(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, faq_items: items };
-    });
+    this.removeBuilderFaqItem('page', pageKey, blockKey, idx);
   }
 
   addPageTestimonial(pageKey: PageBuilderKey, blockKey: string): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length >= 12) return b;
-      items.push({
-        quote_markdown: this.emptyLocalizedText(),
-        author: this.emptyLocalizedText(),
-        role: this.emptyLocalizedText(),
-      });
-      return { ...b, testimonials: items };
-    });
+    this.addBuilderTestimonial('page', pageKey, blockKey);
   }
 
   removePageTestimonial(pageKey: PageBuilderKey, blockKey: string, idx: number): void {
-    const safePageKey = this.safePageRecordKey(pageKey);
-    this.pageBlocks[safePageKey] = (this.pageBlocks[safePageKey] || []).map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, testimonials: items };
-    });
+    this.removeBuilderTestimonial('page', pageKey, blockKey, idx);
   }
 
   private buildPageBlocksMeta(pageKey: PageBuilderKey): Record<string, unknown> {
@@ -18119,9 +11374,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (!checklist) return false;
     return Boolean(
       checklist.missingTranslations.length ||
-        checklist.missingAlt.length ||
-        checklist.emptySections.length ||
-        checklist.linkIssues.length,
+      checklist.missingAlt.length ||
+      checklist.emptySections.length ||
+      checklist.linkIssues.length,
     );
   }
 
@@ -18290,6 +11545,510 @@ export class AdminComponent implements OnInit, OnDestroy {
       return 'page.about';
     }
     return value as PageBuilderKey;
+  }
+
+  // --- Unified home/page builder block helpers ---------------------------------
+  // The home builder writes to `this.homeBlocks` (a single flat list) while the
+  // page builder writes to `this.pageBlocks[safeKey]` (a per-page record). These
+  // helpers expose the active block list for a `(context, pageKey)` pair so the
+  // block-body mutators can share one implementation behind the existing public
+  // method names. Observable behaviour is unchanged: the home path never touches
+  // `safePageRecordKey`, and the page path preserves the exact key normalization.
+  private builderBlockList(context: BuilderContext, pageKey?: PageBuilderKey): HomeBlockDraft[] {
+    if (context === 'home') return this.homeBlocks;
+    const safeKey = this.safePageRecordKey(pageKey as PageBuilderKey);
+    return this.pageBlocks[safeKey] || [];
+  }
+
+  private setBuilderBlockList(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blocks: HomeBlockDraft[],
+  ): void {
+    if (context === 'home') {
+      this.homeBlocks = blocks;
+      return;
+    }
+    const safeKey = this.safePageRecordKey(pageKey as PageBuilderKey);
+    this.pageBlocks[safeKey] = blocks as PageBlockDraft[];
+  }
+
+  private updateBuilderBlock(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    requiredType: HomeBlockType | null,
+    transform: (block: HomeBlockDraft) => HomeBlockDraft,
+  ): void {
+    const next = this.builderBlockList(context, pageKey).map((b) =>
+      b.key === blockKey && (requiredType === null || b.type === requiredType) ? transform(b) : b,
+    );
+    this.setBuilderBlockList(context, pageKey, next);
+  }
+
+  private setBuilderImageBlockUrl(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, null, (b) => ({
+      ...b,
+      url: value,
+      focal_x: focalX,
+      focal_y: focalY,
+    }));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private addBuilderGalleryImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'gallery', (b) => ({
+      ...b,
+      images: [
+        ...b.images,
+        {
+          url: '',
+          alt: this.emptyLocalizedText(),
+          caption: this.emptyLocalizedText(),
+          focal_x: 50,
+          focal_y: 50,
+        },
+      ],
+    }));
+  }
+
+  private addBuilderGalleryImageFromAsset(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, 'gallery', (b) => ({
+      ...b,
+      images: [
+        ...b.images,
+        {
+          url: value,
+          alt: this.emptyLocalizedText(),
+          caption: this.emptyLocalizedText(),
+          focal_x: focalX,
+          focal_y: focalY,
+        },
+      ],
+    }));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private removeBuilderGalleryImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'gallery', (b) => {
+      const next = [...b.images];
+      next.splice(idx, 1);
+      return { ...b, images: next };
+    });
+  }
+
+  private addBuilderColumnsColumn(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'columns', (b) => {
+      const cols = [...(b.columns || [])];
+      if (cols.length >= 3) return b;
+      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
+      return { ...b, columns: cols };
+    });
+  }
+
+  private removeBuilderColumnsColumn(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'columns', (b) => {
+      const cols = [...(b.columns || [])];
+      if (cols.length <= 2) return b;
+      if (idx < 0 || idx >= cols.length) return b;
+      cols.splice(idx, 1);
+      return { ...b, columns: cols };
+    });
+  }
+
+  private addBuilderFaqItem(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'faq', (b) => {
+      const items = [...(b.faq_items || [])];
+      if (items.length >= 20) return b;
+      items.push({
+        question: this.emptyLocalizedText(),
+        answer_markdown: this.emptyLocalizedText(),
+      });
+      return { ...b, faq_items: items };
+    });
+  }
+
+  private removeBuilderFaqItem(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'faq', (b) => {
+      const items = [...(b.faq_items || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, faq_items: items };
+    });
+  }
+
+  private addBuilderTestimonial(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'testimonials', (b) => {
+      const items = [...(b.testimonials || [])];
+      if (items.length >= 12) return b;
+      items.push({
+        quote_markdown: this.emptyLocalizedText(),
+        author: this.emptyLocalizedText(),
+        role: this.emptyLocalizedText(),
+      });
+      return { ...b, testimonials: items };
+    });
+  }
+
+  private removeBuilderTestimonial(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'testimonials', (b) => {
+      const items = [...(b.testimonials || [])];
+      if (items.length <= 1) return b;
+      if (idx < 0 || idx >= items.length) return b;
+      items.splice(idx, 1);
+      return { ...b, testimonials: items };
+    });
+  }
+
+  private setBuilderBannerSlideImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, 'banner', (b) => ({
+      ...b,
+      slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY },
+    }));
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private addBuilderCarouselSlide(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => ({
+      ...b,
+      slides: [...(b.slides || []), this.emptySlideDraft()],
+    }));
+  }
+
+  private removeBuilderCarouselSlide(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => {
+      const next = [...(b.slides || [])];
+      next.splice(idx, 1);
+      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
+    });
+  }
+
+  private moveBuilderCarouselSlide(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+    delta: number,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => {
+      const slides = [...(b.slides || [])];
+      const from = idx;
+      const to = idx + delta;
+      if (from < 0 || from >= slides.length) return b;
+      if (to < 0 || to >= slides.length) return b;
+      const [moved] = slides.splice(from, 1);
+      slides.splice(to, 0, moved);
+      return { ...b, slides };
+    });
+  }
+
+  private setBuilderCarouselSlideImage(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    idx: number,
+    asset: ContentImageAssetRead,
+  ): void {
+    const value = (asset?.url || '').trim();
+    if (!value) return;
+    const focalX = this.toFocalValue(asset.focal_x);
+    const focalY = this.toFocalValue(asset.focal_y);
+    this.updateBuilderBlock(context, pageKey, blockKey, 'carousel', (b) => {
+      const slides = [...(b.slides || [])];
+      const target = slides[idx];
+      if (!target) return b;
+      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
+      return { ...b, slides };
+    });
+    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+  }
+
+  private builderBlockLabel(block: HomeBlockDraft | PageBlockDraft): string {
+    const key = `adminUi.home.sections.blocks.${block.type}`;
+    const translated = this.t(key);
+    return translated !== key ? translated : String(block.type);
+  }
+
+  private moveBuilderBlock(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    delta: number,
+  ): void {
+    const current = [...this.builderBlockList(context, pageKey)];
+    const from = current.findIndex((b) => b.key === blockKey);
+    if (from === -1) return;
+    const to = from + delta;
+    if (to < 0 || to >= current.length) return;
+    const [moved] = current.splice(from, 1);
+    current.splice(to, 0, moved);
+    this.setBuilderBlockList(context, pageKey, current);
+    this.announceCms(
+      this.t('adminUi.content.reorder.moved', {
+        label: this.builderBlockLabel(moved),
+        pos: to + 1,
+        count: current.length,
+      }),
+    );
+  }
+
+  private setBuilderBlockEnabled(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+    enabled: boolean,
+  ): void {
+    this.updateBuilderBlock(context, pageKey, blockKey, null, (b) => ({ ...b, enabled }));
+  }
+
+  // --- Unified home/page builder drag & drop -----------------------------------
+  // R5: drag state stays scoped per-context — home tracks a single
+  // `draggingHomeBlockKey`, while the page builder additionally tracks
+  // `draggingPageBlocksKey` (which page owns the drag) so a drag started on one
+  // page cannot drop-reorder another. `builderDragActiveKey` returns the dragged
+  // block key only when the active drag belongs to this (context, pageKey),
+  // which encodes the page's cross-page guard while leaving home unscoped.
+  // `homeInsertDragActive` / `pageInsertDragActive` remain distinct fields so the
+  // two dropzones can be active simultaneously.
+  private builderDragActiveKey(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+  ): string | null {
+    if (context === 'home') return this.draggingHomeBlockKey;
+    const safeKey = this.safePageRecordKey(pageKey as PageBuilderKey);
+    if (this.draggingPageBlocksKey !== safeKey) return null;
+    return this.draggingPageBlockKey;
+  }
+
+  private setBuilderInsertDragActive(context: BuilderContext, active: boolean): void {
+    if (context === 'home') {
+      this.homeInsertDragActive = active;
+      return;
+    }
+    this.pageInsertDragActive = active;
+  }
+
+  private onBuilderBlockDragStart(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    blockKey: string,
+  ): void {
+    if (context === 'home') {
+      this.homeInsertDragActive = true;
+      this.draggingHomeBlockKey = blockKey;
+      return;
+    }
+    this.pageInsertDragActive = true;
+    this.draggingPageBlocksKey = pageKey as PageBuilderKey;
+    this.draggingPageBlockKey = blockKey;
+  }
+
+  private onBuilderBlockDragEnd(context: BuilderContext): void {
+    if (context === 'home') {
+      this.draggingHomeBlockKey = null;
+      this.homeInsertDragActive = false;
+      return;
+    }
+    this.draggingPageBlocksKey = null;
+    this.draggingPageBlockKey = null;
+    this.pageInsertDragActive = false;
+  }
+
+  // Route drag-end through the public per-context wrappers so the original
+  // internal call graph (dropzone/drop -> onPageBlockDragEnd/onHomeBlockDragEnd)
+  // is preserved for callers and tests that observe those methods.
+  private dispatchBlockDragEnd(context: BuilderContext): void {
+    if (context === 'home') {
+      this.onHomeBlockDragEnd();
+      return;
+    }
+    this.onPageBlockDragEnd();
+  }
+
+  private insertBuilderBlockAt(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    type: CmsBlockLibraryBlockType,
+    index: number,
+    template: CmsBlockLibraryTemplate,
+  ): string | null {
+    if (context === 'home') return this.insertHomeBlockAt(type, index, template);
+    return this.insertPageBlockAt(this.safePageRecordKey(pageKey as PageBuilderKey), type, index, template);
+  }
+
+  private insertBuilderMediaFiles(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    index: number,
+    files: File[],
+  ): Promise<void> {
+    if (context === 'home') return this.insertHomeMediaFiles(index, files);
+    return this.insertPageMediaFiles(this.safePageRecordKey(pageKey as PageBuilderKey), index, files);
+  }
+
+  private onBuilderMediaDropOnContainer(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    event: DragEvent,
+  ): void {
+    if (event.target !== event.currentTarget) return;
+    const files = this.extractCmsImageFiles(event);
+    if (!files.length) return;
+    event.preventDefault();
+    const index = this.builderBlockList(context, pageKey).length;
+    void this.insertBuilderMediaFiles(context, pageKey, index, files);
+  }
+
+  private onBuilderBlockDropZone(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    event: DragEvent,
+    index: number,
+  ): void {
+    event.preventDefault();
+    const current = [...this.builderBlockList(context, pageKey)];
+
+    const dragKey = this.builderDragActiveKey(context, pageKey);
+    if (dragKey) {
+      const from = current.findIndex((b) => b.key === dragKey);
+      if (from === -1) {
+        this.dispatchBlockDragEnd(context);
+        return;
+      }
+      const safeIndex = Math.max(0, Math.min(index, current.length));
+      const [moved] = current.splice(from, 1);
+      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
+      current.splice(nextIndex, 0, moved);
+      this.setBuilderBlockList(context, pageKey, current);
+      this.dispatchBlockDragEnd(context);
+      return;
+    }
+
+    const payload = this.readCmsBlockPayload(event);
+    if (!payload || payload.scope !== context) {
+      this.dispatchBlockDragEnd(context);
+      return;
+    }
+
+    this.insertBuilderBlockAt(context, pageKey, payload.type, index, payload.template);
+    this.setBuilderInsertDragActive(context, false);
+  }
+
+  private onBuilderBlockDrop(
+    context: BuilderContext,
+    pageKey: PageBuilderKey | undefined,
+    event: DragEvent,
+    targetKey: string,
+  ): void {
+    event.preventDefault();
+    const list = this.builderBlockList(context, pageKey);
+
+    const mediaFiles = this.extractCmsImageFiles(event);
+    if (mediaFiles.length) {
+      const to = list.findIndex((b) => b.key === targetKey);
+      const safeIndex = to !== -1 ? to : list.length;
+      void this.insertBuilderMediaFiles(context, pageKey, safeIndex, mediaFiles);
+      this.setBuilderInsertDragActive(context, false);
+      return;
+    }
+
+    const payload = this.readCmsBlockPayload(event);
+    if (payload && payload.scope === context) {
+      const to = list.findIndex((b) => b.key === targetKey);
+      if (to !== -1) {
+        this.insertBuilderBlockAt(context, pageKey, payload.type, to, payload.template);
+      }
+      this.setBuilderInsertDragActive(context, false);
+      return;
+    }
+
+    const dragKey = this.builderDragActiveKey(context, pageKey);
+    if (!dragKey || dragKey === targetKey) return;
+    const current = [...list];
+    const from = current.findIndex((b) => b.key === dragKey);
+    const to = current.findIndex((b) => b.key === targetKey);
+    if (from === -1 || to === -1) {
+      if (context === 'home') this.dispatchBlockDragEnd(context);
+      return;
+    }
+    const [moved] = current.splice(from, 1);
+    const nextIndex = from < to ? to - 1 : to;
+    current.splice(nextIndex, 0, moved);
+    this.setBuilderBlockList(context, pageKey, current);
+    this.dispatchBlockDragEnd(context);
   }
 
   private safeRecordKey(key: string, fallback = 'unknown'): string {
@@ -18645,37 +12404,21 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   homeBlockLabel(block: HomeBlockDraft): string {
-    const key = `adminUi.home.sections.blocks.${block.type}`;
-    const translated = this.t(key);
-    return translated !== key ? translated : String(block.type);
+    return this.builderBlockLabel(block);
   }
 
   toggleHomeBlockEnabled(block: HomeBlockDraft, event: Event): void {
     const target = event.target as HTMLInputElement | null;
     const enabled = target?.checked !== false;
-    this.homeBlocks = this.homeBlocks.map((b) => (b.key === block.key ? { ...b, enabled } : b));
+    this.setBuilderBlockEnabled('home', undefined, block.key, enabled);
   }
 
   moveHomeBlock(blockKey: string, delta: number): void {
-    const current = [...this.homeBlocks];
-    const from = current.findIndex((b) => b.key === blockKey);
-    if (from === -1) return;
-    const to = from + delta;
-    if (to < 0 || to >= current.length) return;
-    const [moved] = current.splice(from, 1);
-    current.splice(to, 0, moved);
-    this.homeBlocks = current;
-    this.announceCms(
-      this.t('adminUi.content.reorder.moved', {
-        label: this.homeBlockLabel(moved),
-        pos: to + 1,
-        count: current.length,
-      }),
-    );
+    this.moveBuilderBlock('home', undefined, blockKey, delta);
   }
 
   setHomeInsertDragActive(active: boolean): void {
-    this.homeInsertDragActive = active;
+    this.setBuilderInsertDragActive('home', active);
   }
 
   addHomeBlockFromLibrary(type: CmsBlockLibraryBlockType, template: CmsBlockLibraryTemplate): void {
@@ -18700,13 +12443,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onHomeBlockDragStart(key: string): void {
-    this.homeInsertDragActive = true;
-    this.draggingHomeBlockKey = key;
+    this.onBuilderBlockDragStart('home', undefined, key);
   }
 
   onHomeBlockDragEnd(): void {
-    this.draggingHomeBlockKey = null;
-    this.homeInsertDragActive = false;
+    this.onBuilderBlockDragEnd('home');
   }
 
   onHomeBlockDragOver(event: DragEvent): void {
@@ -18714,69 +12455,11 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   onHomeBlockDropZone(event: DragEvent, index: number): void {
-    event.preventDefault();
-    const current = [...this.homeBlocks];
-
-    if (this.draggingHomeBlockKey) {
-      const from = current.findIndex((b) => b.key === this.draggingHomeBlockKey);
-      if (from === -1) {
-        this.onHomeBlockDragEnd();
-        return;
-      }
-      const safeIndex = Math.max(0, Math.min(index, current.length));
-      const [moved] = current.splice(from, 1);
-      const nextIndex = from < safeIndex ? safeIndex - 1 : safeIndex;
-      current.splice(nextIndex, 0, moved);
-      this.homeBlocks = current;
-      this.onHomeBlockDragEnd();
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (!payload || payload.scope !== 'home') {
-      this.onHomeBlockDragEnd();
-      return;
-    }
-
-    this.insertHomeBlockAt(payload.type, index, payload.template);
-    this.homeInsertDragActive = false;
+    this.onBuilderBlockDropZone('home', undefined, event, index);
   }
 
   onHomeBlockDrop(event: DragEvent, targetKey: string): void {
-    event.preventDefault();
-
-    const mediaFiles = this.extractCmsImageFiles(event);
-    if (mediaFiles.length) {
-      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
-      const safeIndex = to !== -1 ? to : this.homeBlocks.length;
-      void this.insertHomeMediaFiles(safeIndex, mediaFiles);
-      this.homeInsertDragActive = false;
-      return;
-    }
-
-    const payload = this.readCmsBlockPayload(event);
-    if (payload && payload.scope === 'home') {
-      const to = this.homeBlocks.findIndex((b) => b.key === targetKey);
-      if (to !== -1) {
-        this.insertHomeBlockAt(payload.type, to, payload.template);
-      }
-      this.homeInsertDragActive = false;
-      return;
-    }
-
-    if (!this.draggingHomeBlockKey || this.draggingHomeBlockKey === targetKey) return;
-    const current = [...this.homeBlocks];
-    const from = current.findIndex((b) => b.key === this.draggingHomeBlockKey);
-    const to = current.findIndex((b) => b.key === targetKey);
-    if (from === -1 || to === -1) {
-      this.onHomeBlockDragEnd();
-      return;
-    }
-    const [moved] = current.splice(from, 1);
-    const nextIndex = from < to ? to - 1 : to;
-    current.splice(nextIndex, 0, moved);
-    this.homeBlocks = current;
-    this.onHomeBlockDragEnd();
+    this.onBuilderBlockDrop('home', undefined, event, targetKey);
   }
 
   private nextCustomBlockKey(type: string): string {
@@ -18801,194 +12484,63 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   setImageBlockUrl(blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) =>
-      b.key === blockKey ? { ...b, url: value, focal_x: focalX, focal_y: focalY } : b,
-    );
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderImageBlockUrl('home', undefined, blockKey, asset);
   }
 
   addGalleryImage(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: '',
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: 50,
-            focal_y: 50,
-          },
-        ],
-      };
-    });
+    this.addBuilderGalleryImage('home', undefined, blockKey);
   }
 
   addGalleryImageFromAsset(blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      return {
-        ...b,
-        images: [
-          ...b.images,
-          {
-            url: value,
-            alt: this.emptyLocalizedText(),
-            caption: this.emptyLocalizedText(),
-            focal_x: focalX,
-            focal_y: focalY,
-          },
-        ],
-      };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.addBuilderGalleryImageFromAsset('home', undefined, blockKey, asset);
   }
 
   removeGalleryImage(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'gallery') return b;
-      const next = [...b.images];
-      next.splice(idx, 1);
-      return { ...b, images: next };
-    });
+    this.removeBuilderGalleryImage('home', undefined, blockKey, idx);
   }
 
   addHomeColumnsColumn(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length >= 3) return b;
-      cols.push({ title: this.emptyLocalizedText(), body_markdown: this.emptyLocalizedText() });
-      return { ...b, columns: cols };
-    });
+    this.addBuilderColumnsColumn('home', undefined, blockKey);
   }
 
   removeHomeColumnsColumn(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'columns') return b;
-      const cols = [...(b.columns || [])];
-      if (cols.length <= 2) return b;
-      if (idx < 0 || idx >= cols.length) return b;
-      cols.splice(idx, 1);
-      return { ...b, columns: cols };
-    });
+    this.removeBuilderColumnsColumn('home', undefined, blockKey, idx);
   }
 
   addHomeFaqItem(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length >= 20) return b;
-      items.push({
-        question: this.emptyLocalizedText(),
-        answer_markdown: this.emptyLocalizedText(),
-      });
-      return { ...b, faq_items: items };
-    });
+    this.addBuilderFaqItem('home', undefined, blockKey);
   }
 
   removeHomeFaqItem(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'faq') return b;
-      const items = [...(b.faq_items || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, faq_items: items };
-    });
+    this.removeBuilderFaqItem('home', undefined, blockKey, idx);
   }
 
   addHomeTestimonial(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length >= 12) return b;
-      items.push({
-        quote_markdown: this.emptyLocalizedText(),
-        author: this.emptyLocalizedText(),
-        role: this.emptyLocalizedText(),
-      });
-      return { ...b, testimonials: items };
-    });
+    this.addBuilderTestimonial('home', undefined, blockKey);
   }
 
   removeHomeTestimonial(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'testimonials') return b;
-      const items = [...(b.testimonials || [])];
-      if (items.length <= 1) return b;
-      if (idx < 0 || idx >= items.length) return b;
-      items.splice(idx, 1);
-      return { ...b, testimonials: items };
-    });
+    this.removeBuilderTestimonial('home', undefined, blockKey, idx);
   }
 
   setBannerSlideImage(blockKey: string, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'banner') return b;
-      return { ...b, slide: { ...b.slide, image_url: value, focal_x: focalX, focal_y: focalY } };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderBannerSlideImage('home', undefined, blockKey, asset);
   }
 
   addCarouselSlide(blockKey: string): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      return { ...b, slides: [...(b.slides || []), this.emptySlideDraft()] };
-    });
+    this.addBuilderCarouselSlide('home', undefined, blockKey);
   }
 
   removeCarouselSlide(blockKey: string, idx: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const next = [...(b.slides || [])];
-      next.splice(idx, 1);
-      return { ...b, slides: next.length ? next : [this.emptySlideDraft()] };
-    });
+    this.removeBuilderCarouselSlide('home', undefined, blockKey, idx);
   }
 
   moveCarouselSlide(blockKey: string, idx: number, delta: number): void {
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const from = idx;
-      const to = idx + delta;
-      if (from < 0 || from >= slides.length) return b;
-      if (to < 0 || to >= slides.length) return b;
-      const [moved] = slides.splice(from, 1);
-      slides.splice(to, 0, moved);
-      return { ...b, slides };
-    });
+    this.moveBuilderCarouselSlide('home', undefined, blockKey, idx, delta);
   }
 
   setCarouselSlideImage(blockKey: string, idx: number, asset: ContentImageAssetRead): void {
-    const value = (asset?.url || '').trim();
-    if (!value) return;
-    const focalX = this.toFocalValue(asset.focal_x);
-    const focalY = this.toFocalValue(asset.focal_y);
-    this.homeBlocks = this.homeBlocks.map((b) => {
-      if (b.key !== blockKey || b.type !== 'carousel') return b;
-      const slides = [...(b.slides || [])];
-      const target = slides[idx];
-      if (!target) return b;
-      slides[idx] = { ...target, image_url: value, focal_x: focalX, focal_y: focalY };
-      return { ...b, slides };
-    });
-    this.toast.success(this.t('adminUi.site.assets.library.success.selected'));
+    this.setBuilderCarouselSlideImage('home', undefined, blockKey, idx, asset);
   }
 
   loadSections(): void {

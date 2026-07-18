@@ -1,0 +1,1849 @@
+import { DomSanitizer } from '@angular/platform-browser';
+import { ActivatedRoute } from '@angular/router';
+import { Subject, of, throwError } from 'rxjs';
+
+import { AdminComponent } from './admin.component';
+
+/**
+ * Branch-fill behavioural suite for AdminComponent.
+ *
+ * Drives the (very large) admin content component through the remaining
+ * untaken branch paths left by the existing specs. The component is
+ * instantiated directly (same pattern as the sibling specs) so individual
+ * methods can be exercised in isolation with focused service mocks. Every
+ * test asserts real behaviour — returned values, mutated component state,
+ * service calls with concrete arguments, or toast/error side effects — and
+ * targets a specific previously-untaken branch (the "other" side of a
+ * default/guard/ternary), never a no-assert coverage probe.
+ */
+
+type RouteStub = {
+  snapshot: { data: Record<string, unknown>; queryParams: Record<string, unknown> };
+  data: Subject<Record<string, unknown>>;
+  queryParams: Subject<Record<string, unknown>>;
+};
+
+function createRouteStub(section = 'home', query: Record<string, unknown> = {}): RouteStub {
+  return {
+    snapshot: { data: { section }, queryParams: query },
+    data: new Subject<Record<string, unknown>>(),
+    queryParams: new Subject<Record<string, unknown>>(),
+  };
+}
+
+interface Harness {
+  component: AdminComponent;
+  admin: any;
+  adminProducts: any;
+  blog: any;
+  fxAdmin: any;
+  taxesAdmin: any;
+  auth: any;
+  cmsPrefs: any;
+  toast: jasmine.SpyObj<any>;
+  translate: any;
+  markdown: any;
+  sanitizer: any;
+  route: RouteStub;
+}
+
+function makeAdminSpy(): any {
+  const methods = [
+    'products',
+    'coupons',
+    'lowStock',
+    'audit',
+    'getMaintenance',
+    'setMaintenance',
+    'content',
+    'getContent',
+    'createContent',
+    'updateContentBlock',
+    'deleteContent',
+    'getCategories',
+    'createCategory',
+    'updateCategory',
+    'deleteCategory',
+    'getCategoryTranslations',
+    'upsertCategoryTranslation',
+    'deleteCategoryTranslation',
+    'createProduct',
+    'updateProduct',
+    'getProduct',
+    'deleteProduct',
+    'duplicateProduct',
+    'uploadProductImage',
+    'deleteProductImage',
+    'transferOwner',
+    'revokeSessions',
+    'userAliases',
+    'updateUserRole',
+    'updateOrderStatus',
+    'createCoupon',
+    'updateCoupon',
+    'invalidateCouponStripeMappings',
+    'listContentVersions',
+    'getContentVersion',
+    'rollbackContentVersion',
+    'uploadContentImage',
+    'updateContentImageFocalPoint',
+    'listContentPages',
+    'renameContentPage',
+    'updateContentTranslationStatus',
+    'getSitemapPreview',
+    'validateStructuredData',
+    'deleteContentRedirect',
+    'exportContentRedirects',
+    'importContentRedirects',
+    'upsertContentRedirect',
+    'previewFindReplaceContent',
+    'applyFindReplaceContent',
+    'linkCheckContent',
+    'fetchSocialThumbnail',
+    'sendScheduledReport',
+    'createPagePreviewToken',
+    'createHomePreviewToken',
+    'listFeaturedCollections',
+    'createFeaturedCollection',
+    'updateFeaturedCollection',
+    'reorderCategories',
+    'listContentRedirects',
+    'linkCheckContentPreview',
+  ];
+  const spy: any = jasmine.createSpyObj('AdminService', methods);
+  for (const m of methods) spy[m].and.returnValue(of(undefined));
+  spy.products.and.returnValue(of([]));
+  spy.coupons.and.returnValue(of([]));
+  spy.lowStock.and.returnValue(of([]));
+  spy.audit.and.returnValue(of({ products: [], content: [], security: [] }));
+  spy.getMaintenance.and.returnValue(of({ enabled: false }));
+  spy.content.and.returnValue(of([]));
+  spy.getCategories.and.returnValue(of([]));
+  spy.listFeaturedCollections.and.returnValue(of([]));
+  spy.userAliases.and.returnValue(of({ aliases: [] }));
+  return spy;
+}
+
+function makeCmsPrefs(): any {
+  return {
+    mode: jasmine.createSpy('mode').and.returnValue('basic'),
+    previewDevice: jasmine.createSpy('previewDevice').and.returnValue('desktop'),
+    previewLayout: jasmine.createSpy('previewLayout').and.returnValue('stacked'),
+    previewLang: jasmine.createSpy('previewLang').and.returnValue('en'),
+    previewTheme: jasmine.createSpy('previewTheme').and.returnValue('light'),
+    translationLayout: jasmine.createSpy('translationLayout').and.returnValue('tabbed'),
+    setMode: jasmine.createSpy('setMode'),
+    setPreviewDevice: jasmine.createSpy('setPreviewDevice'),
+    setPreviewLayout: jasmine.createSpy('setPreviewLayout'),
+  };
+}
+
+function createComponent(route: RouteStub = createRouteStub()): Harness {
+  const admin = makeAdminSpy();
+  const adminProducts = jasmine.createSpyObj('AdminProductsService', ['search']);
+  adminProducts.search.and.returnValue(of({ items: [], total: 0 }));
+  const blog = jasmine.createSpyObj('BlogService', [
+    'listFlaggedComments',
+    'resolveCommentFlagsAdmin',
+    'hideCommentAdmin',
+    'unhideCommentAdmin',
+    'deleteComment',
+    'createPreviewToken',
+  ]);
+  blog.listFlaggedComments.and.returnValue(of([]));
+  blog.createPreviewToken.and.returnValue(of({ token: 't', expires_at: '' }));
+  const fxAdmin = jasmine.createSpyObj('FxAdminService', [
+    'getStatus',
+    'listOverrideAudit',
+    'restoreOverrideFromAudit',
+    'clearOverride',
+    'setOverride',
+  ]);
+  fxAdmin.getStatus.and.returnValue(of({ override: null }));
+  fxAdmin.listOverrideAudit.and.returnValue(of([]));
+  const taxesAdmin = jasmine.createSpyObj('TaxesAdminService', [
+    'listGroups',
+    'createGroup',
+    'updateGroup',
+    'deleteGroup',
+    'upsertRate',
+    'deleteRate',
+  ]);
+  taxesAdmin.listGroups.and.returnValue(of([]));
+  const auth = {
+    role: jasmine.createSpy('role').and.returnValue('owner'),
+    loadCurrentUser: jasmine.createSpy('loadCurrentUser').and.returnValue(of(null)),
+  };
+  const cmsPrefs = makeCmsPrefs();
+  const toast = jasmine.createSpyObj('ToastService', ['success', 'error', 'info']);
+  const translate = { instant: (k: string, p?: any) => (p ? `${k}:${JSON.stringify(p)}` : k) };
+  const markdown = { render: (v: string) => `<p>${v}</p>` };
+  const sanitizer = {
+    bypassSecurityTrustHtml: (v: string) => v,
+    bypassSecurityTrustResourceUrl: (v: string) => `safe:${v}`,
+  } as unknown as DomSanitizer;
+
+  const component = new AdminComponent(
+    {
+      snapshot: route.snapshot,
+      data: route.data.asObservable(),
+      queryParams: route.queryParams.asObservable(),
+    } as unknown as ActivatedRoute,
+    admin,
+    adminProducts,
+    blog,
+    fxAdmin,
+    taxesAdmin,
+    auth as any,
+    cmsPrefs,
+    toast,
+    translate as any,
+    markdown as any,
+    sanitizer,
+  );
+
+  return {
+    component,
+    admin,
+    adminProducts,
+    blog,
+    fxAdmin,
+    taxesAdmin,
+    auth,
+    cmsPrefs,
+    toast,
+    translate,
+    markdown,
+    sanitizer,
+    route,
+  };
+}
+
+describe('AdminComponent — branch fill', () => {
+  let h: Harness;
+  let c: any;
+
+  beforeEach(() => {
+    try {
+      localStorage.clear();
+    } catch {
+      /* ignore */
+    }
+    h = createComponent();
+    c = h.component as any;
+  });
+
+  describe('parsePageBlocksDraft', () => {
+    it('returns [] for non-array / empty blocks', () => {
+      expect(c.parsePageBlocksDraft(null)).toEqual([]);
+      expect(c.parsePageBlocksDraft({ blocks: 'nope' })).toEqual([]);
+      expect(c.parsePageBlocksDraft({ blocks: [] })).toEqual([]);
+    });
+
+    it('skips non-object entries, unknown types and duplicate keys', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          null,
+          'string-entry',
+          { type: 'unknown_kind' },
+          { type: 'text', key: 'dup', body_markdown: { en: 'A', ro: '' } },
+          { type: 'text', key: 'dup', body_markdown: { en: 'B', ro: '' } },
+        ],
+      });
+      expect(result.length).toBe(1);
+      expect(result[0].key).toBe('dup');
+    });
+
+    it('derives a fallback key from type + index and honours enabled:false', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', enabled: false, body_markdown: { en: 'x', ro: '' } }],
+      });
+      expect(result[0].key).toBe('text_1');
+      expect(result[0].enabled).toBe(false);
+    });
+
+    it('parses columns with breakpoint and a custom 3-column layout', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'columns',
+            key: 'cols',
+            breakpoint: 'lg',
+            columns: [
+              null,
+              { title: { en: 'c1', ro: '' }, body_markdown: { en: 'b1', ro: '' } },
+              { title: { en: 'c2', ro: '' }, body_markdown: { en: 'b2', ro: '' } },
+              { title: { en: 'c3', ro: '' }, body_markdown: { en: 'b3', ro: '' } },
+              { title: { en: 'c4', ro: '' }, body_markdown: { en: 'b4', ro: '' } },
+            ],
+          },
+        ],
+      });
+      expect(result[0].columns.length).toBe(3);
+      expect(result[0].columns_breakpoint).toBe('lg');
+    });
+
+    it('falls back to md breakpoint when invalid and keeps default columns when fewer than 2', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'columns',
+            key: 'cols2',
+            columns_breakpoint: 'xx',
+            columns: [{ title: { en: 'only', ro: '' }, body_markdown: { en: '', ro: '' } }],
+          },
+        ],
+      });
+      expect(result[0].columns_breakpoint).toBe('md');
+      expect(result[0].columns.length).toBe(2);
+    });
+
+    it('parses cta with new-tab flag', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'cta',
+            key: 'cta',
+            cta_url: '  /go  ',
+            cta_new_tab: true,
+            cta_label: { en: 'Go', ro: '' },
+          },
+        ],
+      });
+      expect(result[0].cta_url).toBe('/go');
+      expect(result[0].cta_new_tab).toBe(true);
+    });
+
+    it('parses faq and testimonials items (and ignores invalid item entries)', () => {
+      const faq = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'faq',
+            key: 'faq',
+            items: [null, { question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+          },
+        ],
+      });
+      expect(faq[0].faq_items.length).toBe(1);
+      const test = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'testimonials',
+            key: 't',
+            items: [
+              3,
+              {
+                quote_markdown: { en: 'q', ro: '' },
+                author: { en: 'me', ro: '' },
+                role: { en: 'r', ro: '' },
+              },
+            ],
+          },
+        ],
+      });
+      expect(test[0].testimonials.length).toBe(1);
+    });
+
+    it('parses product_grid with collection source and array slugs', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'product_grid',
+            key: 'pg',
+            source: 'COLLECTION',
+            collection_slug: ' col ',
+            category_slug: ' cat ',
+            product_slugs: ['a', 'a', 'b', 3],
+            limit: 100,
+          },
+        ],
+      });
+      expect(result[0].product_grid_source).toBe('collection');
+      expect(result[0].product_grid_collection_slug).toBe('col');
+      expect(result[0].product_grid_product_slugs).toBe('a\nb');
+      expect(result[0].product_grid_limit).toBe(24);
+    });
+
+    it('parses product_grid with products source and comma/newline string slugs and non-finite limit', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          {
+            type: 'product_grid',
+            key: 'pg2',
+            source: 'products',
+            product_slugs: 'a, b\nc',
+            limit: 'NaN',
+          },
+        ],
+      });
+      expect(result[0].product_grid_source).toBe('products');
+      expect(result[0].product_grid_product_slugs).toBe('a\nb\nc');
+      expect(result[0].product_grid_limit).toBe(6);
+    });
+
+    it('parses form block with newsletter type and support topic', () => {
+      const result = c.parsePageBlocksDraft({
+        blocks: [{ type: 'form', key: 'f', form_type: 'NEWSLETTER', topic: 'support' }],
+      });
+      expect(result[0].form_type).toBe('newsletter');
+      expect(result[0].form_topic).toBe('support');
+    });
+
+    it('parses image, gallery (skipping urlless entries), banner and carousel blocks', () => {
+      const image = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'image', key: 'img', url: ' /u ', link_url: ' /l ', focal_x: 10, focal_y: 20 },
+        ],
+      });
+      expect(image[0].url).toBe('/u');
+      expect(image[0].link_url).toBe('/l');
+
+      const gallery = c.parsePageBlocksDraft({
+        blocks: [{ type: 'gallery', key: 'g', images: [null, { url: '' }, { url: ' /pic ' }] }],
+      });
+      expect(gallery[0].images.length).toBe(1);
+      expect(gallery[0].images[0].url).toBe('/pic');
+
+      const banner = c.parsePageBlocksDraft({ blocks: [{ type: 'banner', key: 'b', slide: {} }] });
+      expect(banner[0].type).toBe('banner');
+
+      const carousel = c.parsePageBlocksDraft({
+        blocks: [{ type: 'carousel', key: 'car', slides: [{}, {}], settings: {} }],
+      });
+      expect(carousel[0].slides.length).toBe(2);
+
+      const carouselEmpty = c.parsePageBlocksDraft({
+        blocks: [{ type: 'carousel', key: 'car2', slides: 'nope' }],
+      });
+      expect(carouselEmpty[0].slides.length).toBe(1);
+    });
+  });
+
+  describe('insertPageMediaFiles', () => {
+    const png = (name = 'My Photo.png') => new File(['x'], name, { type: 'image/png' });
+
+    beforeEach(() => {
+      h.admin.uploadContentImage.and.returnValue(
+        of({ images: [{ url: 'https://cdn/test.png', focal_x: 40, focal_y: 60 }] }),
+      );
+    });
+
+    it('returns early when no valid image files survive normalisation', async () => {
+      await c.insertPageMediaFiles('page.about', 0, [
+        new File(['x'], 'x.txt', { type: 'text/plain' }),
+      ]);
+      expect(h.toast.error).toHaveBeenCalled();
+      expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+    });
+
+    it('inserts a single image block when one file is dropped on an image-capable page', async () => {
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      const blocks = c.pageBlocks['page.about'];
+      expect(blocks.length).toBe(1);
+      expect(blocks[0].type).toBe('image');
+      expect(blocks[0].url).toBe('https://cdn/test.png');
+      expect(blocks[0].alt.en).toBe('My Photo');
+      expect(h.toast.success).toHaveBeenCalled();
+    });
+
+    it('inserts a gallery block when multiple files are dropped and gallery is allowed', async () => {
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      const block = c.pageBlocks['page.about'].find((b: any) => b.type === 'gallery');
+      expect(block).toBeTruthy();
+      expect(block.images.length).toBe(2);
+    });
+
+    it('inserts multiple image blocks when gallery is disallowed but image is allowed', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['image']);
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      const imgs = c.pageBlocks['page.about'].filter((b: any) => b.type === 'image');
+      expect(imgs.length).toBe(2);
+    });
+
+    it('rejects a single file when neither image nor gallery is allowed', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['text']);
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'].length).toBe(0);
+      expect(h.toast.error).toHaveBeenCalledWith(
+        'adminUi.site.pages.builder.errors.blockTypeNotAllowed',
+      );
+    });
+
+    it('rejects multiple files when neither image nor gallery is allowed', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['text']);
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      expect(c.pageBlocks['page.about'].length).toBe(0);
+      expect(h.toast.error).toHaveBeenCalled();
+    });
+
+    it('returns without inserting when uploads all fail to yield an image url', async () => {
+      h.admin.uploadContentImage.and.returnValue(of({ images: [] }));
+      c.pageBlocks['page.about'] = [];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'].length).toBe(0);
+    });
+  });
+
+  describe('insertHomeMediaFiles', () => {
+    const png = (name = 'Home Pic.png') => new File(['x'], name, { type: 'image/png' });
+
+    beforeEach(() => {
+      h.admin.uploadContentImage.and.returnValue(
+        of({ images: [{ url: 'https://cdn/home.png', focal_x: 50, focal_y: 50 }] }),
+      );
+    });
+
+    it('returns early when normalisation removes every file', async () => {
+      await c.insertHomeMediaFiles(0, [new File(['x'], 'x.pdf', { type: 'application/pdf' })]);
+      expect(h.admin.uploadContentImage).not.toHaveBeenCalled();
+    });
+
+    it('inserts a single home image block for one file', async () => {
+      c.homeBlocks = [];
+      await c.insertHomeMediaFiles(0, [png()]);
+      expect(c.homeBlocks.length).toBe(1);
+      expect(c.homeBlocks[0].url).toBe('https://cdn/home.png');
+      expect(c.homeBlocks[0].alt.en).toBe('Home Pic');
+    });
+
+    it('inserts a home gallery block for multiple files', async () => {
+      c.homeBlocks = [];
+      await c.insertHomeMediaFiles(0, [png('a.png'), png('b.png')]);
+      const gallery = c.homeBlocks.find((b: any) => b.type === 'gallery');
+      expect(gallery.images.length).toBe(2);
+    });
+
+    it('returns without inserting when no upload produced a url', async () => {
+      h.admin.uploadContentImage.and.returnValue(of({ images: [] }));
+      c.homeBlocks = [];
+      await c.insertHomeMediaFiles(0, [png()]);
+      expect(c.homeBlocks.length).toBe(0);
+    });
+  });
+
+  describe('drag helpers', () => {
+    function dragEvent(dt: Partial<DataTransfer> | null): DragEvent {
+      return { preventDefault: () => undefined, dataTransfer: dt } as unknown as DragEvent;
+    }
+
+    it('dragEventHasFiles detects files, Files type, and absence', () => {
+      expect(c.dragEventHasFiles(dragEvent(null))).toBe(false);
+      expect(c.dragEventHasFiles(dragEvent({ files: [new File(['x'], 'a.png')] } as any))).toBe(
+        true,
+      );
+      expect(c.dragEventHasFiles(dragEvent({ files: [], types: ['Files'] } as any))).toBe(true);
+      expect(c.dragEventHasFiles(dragEvent({ files: [], types: ['text/plain'] } as any))).toBe(
+        false,
+      );
+    });
+
+    it('dragEventHasFiles swallows errors thrown while reading types', () => {
+      const dt = {
+        files: { length: 0 } as any,
+        get types(): string[] {
+          throw new Error('boom');
+        },
+      };
+      expect(c.dragEventHasFiles(dragEvent(dt as any))).toBe(false);
+    });
+  });
+
+  // A meta payload that yields one populated draft of every block type.
+  function richBlocksMeta(): Record<string, unknown> {
+    return {
+      blocks: [
+        { type: 'text', key: 'text_b', body_markdown: { en: 'B', ro: 'b' } },
+        {
+          type: 'columns',
+          key: 'cols_b',
+          breakpoint: 'sm',
+          columns: [
+            { title: { en: 't1', ro: '' }, body_markdown: { en: 'x1', ro: '' } },
+            { title: { en: 't2', ro: '' }, body_markdown: { en: 'x2', ro: '' } },
+          ],
+        },
+        {
+          type: 'cta',
+          key: 'cta_b',
+          title: { en: 'T', ro: '' },
+          body_markdown: { en: 'B', ro: '' },
+          cta_label: { en: 'L', ro: '' },
+          cta_url: '/u',
+          cta_new_tab: true,
+        },
+        {
+          type: 'faq',
+          key: 'faq_b',
+          items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+        },
+        {
+          type: 'testimonials',
+          key: 'test_b',
+          items: [
+            {
+              quote_markdown: { en: 'q', ro: '' },
+              author: { en: 'me', ro: '' },
+              role: { en: 'r', ro: '' },
+            },
+          ],
+        },
+        { type: 'product_grid', key: 'pg_cat', source: 'category', category_slug: 'cat', limit: 8 },
+        { type: 'product_grid', key: 'pg_col', source: 'collection', collection_slug: 'col' },
+        { type: 'product_grid', key: 'pg_prd', source: 'products', product_slugs: 'a,b,a' },
+        { type: 'form', key: 'form_c', form_type: 'contact', topic: 'support' },
+        { type: 'form', key: 'form_n', form_type: 'newsletter' },
+        {
+          type: 'image',
+          key: 'img_b',
+          url: '/img',
+          alt: { en: 'a', ro: 'r' },
+          caption: { en: 'c', ro: '' },
+          link_url: '/l',
+          focal_x: 10,
+          focal_y: 20,
+        },
+        { type: 'gallery', key: 'gal_b', images: [{ url: '/g', alt: { en: 'a', ro: 'r' } }] },
+        { type: 'banner', key: 'ban_b', slide: { image_url: '/b', alt: { en: 'a', ro: 'r' } } },
+        {
+          type: 'carousel',
+          key: 'car_b',
+          slides: [{ image_url: '/c', alt: { en: 'a', ro: 'r' } }],
+          settings: {},
+        },
+      ],
+    };
+  }
+
+  describe('buildPageBlocksMeta', () => {
+    it('serialises every block type and keeps requires_auth when supported and flagged', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft(richBlocksMeta());
+      c.pageBlocks['page.about'][0].layout = null; // exercise layout default fallback
+      c.pageBlocksRequiresAuth['page.about'] = true;
+      const meta = c.buildPageBlocksMeta('page.about');
+      const blocks = meta['blocks'] as any[];
+      expect(blocks.length).toBe(14);
+      expect(meta['version']).toBe(2);
+      expect(meta['requires_auth']).toBe(true);
+      const pgPrd = blocks.find((b) => b.key === 'pg_prd');
+      expect(pgPrd.product_slugs).toEqual(['a', 'b']);
+      const catB = blocks.find((b) => b.key === 'pg_cat');
+      expect(catB.category_slug).toBe('cat');
+      const colB = blocks.find((b) => b.key === 'pg_col');
+      expect(colB.collection_slug).toBe('col');
+      const formC = blocks.find((b) => b.key === 'form_c');
+      expect(formC.topic).toBe('support');
+    });
+
+    it('drops requires_auth when the flag is unset', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 't', body_markdown: { en: 'x', ro: '' } }],
+      });
+      c.pageBlocksRequiresAuth['page.about'] = false;
+      const meta = c.buildPageBlocksMeta('page.about');
+      expect('requires_auth' in meta).toBe(false);
+    });
+  });
+
+  describe('computePagePublishChecklistLocal', () => {
+    it('flags empty sections and missing translations for every empty block type', () => {
+      c.pageBlocksNeedsTranslationEn['page.about'] = true;
+      c.pageBlocksNeedsTranslationRo['page.about'] = true;
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'text', key: 'text_e' },
+          { type: 'columns', key: 'cols_e' },
+          { type: 'cta', key: 'cta_e' },
+          { type: 'faq', key: 'faq_e' },
+          { type: 'testimonials', key: 'test_e' },
+          { type: 'product_grid', key: 'pg_cat_e', source: 'category' },
+          { type: 'product_grid', key: 'pg_col_e', source: 'collection' },
+          { type: 'product_grid', key: 'pg_prd_e', source: 'products' },
+          { type: 'image', key: 'img_e' },
+          { type: 'gallery', key: 'gal_e' },
+          { type: 'banner', key: 'ban_e' },
+          { type: 'carousel', key: 'car_e' },
+        ],
+      });
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.missingTranslations).toEqual(['en', 'ro']);
+      expect(res.emptySections.length).toBeGreaterThanOrEqual(12);
+    });
+
+    it('reports an all-disabled page as a single empty section', () => {
+      const blocks = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'x', enabled: false, body_markdown: { en: 'hi', ro: '' } }],
+      });
+      c.pageBlocks['page.about'] = blocks;
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.emptySections).toEqual(['adminUi.content.publishChecklist.emptyAllDisabled']);
+    });
+
+    it('flags missing alt text for populated media blocks with blank alt', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'image', key: 'img_a', url: '/i' },
+          { type: 'gallery', key: 'gal_a', images: [{ url: '/g' }] },
+          { type: 'banner', key: 'ban_a', slide: { image_url: '/b' } },
+          { type: 'carousel', key: 'car_a', slides: [{ image_url: '/c' }] },
+          { type: 'form', key: 'form_ok' },
+        ],
+      });
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.missingAlt.length).toBeGreaterThanOrEqual(8);
+      expect(res.emptySections.length).toBe(0);
+    });
+
+    it('treats fully populated content blocks as complete', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft(richBlocksMeta());
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.emptySections.length).toBe(0);
+    });
+  });
+
+  describe('publish checklist modal flow', () => {
+    it('computes a local checklist and merges link issues from the preview endpoint', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(of({ issues: [{ url: '/x', status: 404 }] }));
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }],
+      });
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistOpen).toBe(true);
+      expect(c.pagePublishChecklistLoading).toBe(false);
+      expect(c.pagePublishChecklistResult.linkIssues.length).toBe(1);
+      expect(c.pagePublishChecklistHasIssues()).toBe(true);
+    });
+
+    it('falls back to empty link issues when the preview returns none', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(of({}));
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistResult.linkIssues).toEqual([]);
+    });
+
+    it('surfaces a link-check error detail', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(
+        throwError(() => ({ error: { detail: 'nope' } })),
+      );
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistError).toBe('nope');
+    });
+
+    it('uses the default link-check error when no detail is present', () => {
+      h.admin.linkCheckContentPreview.and.returnValue(throwError(() => ({})));
+      c.openPagePublishChecklist('page.about');
+      expect(c.pagePublishChecklistError).toBe('adminUi.content.publishChecklist.errors.linkCheck');
+    });
+
+    it('hasIssues returns false without a result', () => {
+      c.pagePublishChecklistResult = null;
+      expect(c.pagePublishChecklistHasIssues()).toBe(false);
+    });
+
+    it('confirm saves with the checklist bypass; no-op without a key', () => {
+      const save = spyOn(c, 'savePageBlocks');
+      c.pagePublishChecklistKey = null;
+      c.confirmPagePublishChecklist();
+      expect(save).not.toHaveBeenCalled();
+      c.pagePublishChecklistKey = 'page.about';
+      c.confirmPagePublishChecklist();
+      expect(save).toHaveBeenCalledWith('page.about', { bypassChecklist: true });
+      expect(c.pagePublishChecklistOpen).toBe(false);
+    });
+  });
+
+  describe('savePageBlocks', () => {
+    beforeEach(() => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 't', body_markdown: { en: 'hi', ro: '' } }],
+      });
+    });
+
+    it('opens the publish checklist when publishing without bypass', () => {
+      const open = spyOn(c, 'openPagePublishChecklist');
+      c.pageBlocksStatus['page.about'] = 'published';
+      c.savePageBlocks('page.about');
+      expect(open).toHaveBeenCalledWith('page.about');
+    });
+
+    it('saves a published page (bypassing checklist) with ISO publish window and maps a published response', () => {
+      c.pageBlocksStatus['page.about'] = 'published';
+      c.pageBlocksPublishedAt['page.about'] = '2026-01-01T10:00';
+      c.pageBlocksPublishedUntil['page.about'] = '2026-02-01T10:00';
+      h.admin.updateContentBlock.and.returnValue(
+        of({
+          status: 'published',
+          published_at: '2026-01-01T10:00:00Z',
+          published_until: '2026-02-01T10:00:00Z',
+          meta: { requires_auth: true },
+        }),
+      );
+      c.savePageBlocks('page.about', { bypassChecklist: true });
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.published_at).toContain('2026-01-01');
+      expect(c.pageBlocksStatus['page.about']).toBe('published');
+      expect(c.pageBlocksRequiresAuth['page.about']).toBe(true);
+      expect(c.pageBlocksMessage['page.about']).toBe('adminUi.site.pages.builder.success.save');
+    });
+
+    it('maps a review response and clears the publish window for drafts', () => {
+      c.pageBlocksStatus['page.about'] = 'draft';
+      h.admin.updateContentBlock.and.returnValue(of({ status: 'review', meta: {} }));
+      c.savePageBlocks('page.about');
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.published_at).toBeNull();
+      expect(c.pageBlocksStatus['page.about']).toBe('review');
+    });
+
+    it('maps an unknown response status to draft', () => {
+      c.pageBlocksStatus['page.about'] = 'draft';
+      h.admin.updateContentBlock.and.returnValue(of({ status: 'weird', meta: {} }));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksStatus['page.about']).toBe('draft');
+    });
+
+    it('handles a 409 conflict by surfacing the save error', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+      h.admin.getContent.and.returnValue(of({ status: 'draft', meta: {} }));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksError['page.about']).toBe('adminUi.site.pages.builder.errors.save');
+    });
+
+    it('creates the page on a 404 and maps the created review response', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(
+        of({ status: 'review', meta: { requires_auth: true } }),
+      );
+      c.savePageBlocks('page.about');
+      expect(h.admin.createContent).toHaveBeenCalled();
+      expect(c.pageBlocksStatus['page.about']).toBe('review');
+      expect(c.pageBlocksMessage['page.about']).toBe('adminUi.site.pages.builder.success.save');
+    });
+
+    it('reports an error when the 404 create path also fails', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(throwError(() => ({ status: 500 })));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksError['page.about']).toBe('adminUi.site.pages.builder.errors.save');
+    });
+
+    it('reports a generic save error for other failures', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksError['page.about']).toBe('adminUi.site.pages.builder.errors.save');
+    });
+
+    it('publishes with an empty publish window (null dates) and a null response meta, refreshing a matching preview', () => {
+      c.pageBlocksStatus['page.about'] = 'published';
+      c.pageBlocksPublishedAt['page.about'] = '';
+      c.pageBlocksPublishedUntil['page.about'] = '';
+      c.pagePreviewForSlug = 'about';
+      const refresh = spyOn(c, 'refreshPagePreview');
+      h.admin.updateContentBlock.and.returnValue(of({ status: 'published', meta: null }));
+      c.savePageBlocks('page.about', { bypassChecklist: true });
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.published_at).toBeNull();
+      expect(c.pageBlocksRequiresAuth['page.about']).toBe(false);
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it('maps a created published response with a publish window and refreshes a matching preview', () => {
+      c.pagePreviewForSlug = 'about';
+      const refresh = spyOn(c, 'refreshPagePreview');
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(
+        of({
+          status: 'published',
+          published_at: '2026-01-01T00:00:00Z',
+          published_until: '2026-02-01T00:00:00Z',
+          meta: null,
+        }),
+      );
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksStatus['page.about']).toBe('published');
+      expect(c.pageBlocksPublishedAt['page.about']).toBeTruthy();
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it('maps a created draft response for an unknown status', () => {
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(of({ status: 'mystery', meta: {} }));
+      c.savePageBlocks('page.about');
+      expect(c.pageBlocksStatus['page.about']).toBe('draft');
+    });
+  });
+
+  describe('loadSections', () => {
+    it('parses meta.blocks with built-ins, duplicates, every custom type and key collisions', () => {
+      h.admin.getContent.and.returnValue(
+        of({
+          meta: {
+            blocks: [
+              null,
+              { type: 'story' },
+              { type: 'story' }, // duplicate built-in skipped
+              { type: 'bogus_type' }, // unknown -> skipped
+              { type: 'text', key: 'dup', body_markdown: { en: 'B', ro: '' } },
+              { type: 'text', key: 'dup' }, // key collision -> dup-1
+              {
+                type: 'columns',
+                breakpoint: 'lg',
+                columns: [
+                  { title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } },
+                  { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } },
+                ],
+              },
+              { type: 'cta', cta_url: '/u', cta_new_tab: true },
+              {
+                type: 'faq',
+                items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+              },
+              {
+                type: 'testimonials',
+                items: [
+                  {
+                    quote_markdown: { en: 'q', ro: '' },
+                    author: { en: 'me', ro: '' },
+                    role: { en: 'r', ro: '' },
+                  },
+                ],
+              },
+              { type: 'image', url: '/i', link_url: '/l' },
+              { type: 'gallery', images: [null, { url: '' }, { url: '/g' }] },
+              { type: 'banner', slide: {} },
+              { type: 'carousel', slides: [{}, {}], settings: {} },
+            ],
+          },
+        }),
+      );
+      c.loadSections();
+      const keys = c.homeBlocks.map((b: any) => b.key);
+      expect(keys).toContain('dup');
+      expect(keys).toContain('dup-1');
+      expect(c.homeBlocks.some((b: any) => b.type === 'story')).toBe(true);
+      expect(c.cmsHomeDraft.isReady()).toBe(true);
+    });
+
+    it('derives sections from meta.sections when no blocks are present', () => {
+      h.admin.getContent.and.returnValue(
+        of({ meta: { sections: [null, { id: 'story', enabled: false }, { id: 'collections' }] } }),
+      );
+      c.loadSections();
+      const story = c.homeBlocks.find((b: any) => b.type === 'story');
+      expect(story.enabled).toBe(false);
+      expect(c.homeBlocks.some((b: any) => b.type === 'featured_collections')).toBe(true);
+    });
+
+    it('falls back to legacy meta.order', () => {
+      h.admin.getContent.and.returnValue(of({ meta: { order: ['story', 'new'] } }));
+      c.loadSections();
+      expect(c.homeBlocks.some((b: any) => b.type === 'new_arrivals')).toBe(true);
+    });
+
+    it('uses defaults when meta has no usable layout', () => {
+      h.admin.getContent.and.returnValue(of({ meta: { blocks: ['only-a-string'] } }));
+      c.loadSections();
+      expect(c.homeBlocks.length).toBeGreaterThan(0);
+    });
+
+    it('falls back to defaults and forgets the version on error', () => {
+      c.contentVersions['home.sections'] = { version: 5 };
+      h.admin.getContent.and.returnValue(throwError(() => ({ status: 500 })));
+      c.loadSections();
+      expect(c.contentVersions['home.sections']).toBeUndefined();
+      expect(c.homeBlocks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('saveSections', () => {
+    function populateHomeBlocks(): void {
+      h.admin.getContent.and.returnValue(
+        of({
+          meta: {
+            blocks: [
+              { type: 'story' },
+              { type: 'text', key: 'tx', body_markdown: { en: 'B', ro: '' } },
+              {
+                type: 'columns',
+                key: 'co',
+                columns: [
+                  { title: { en: 'a', ro: '' }, body_markdown: { en: 'x', ro: '' } },
+                  { title: { en: 'b', ro: '' }, body_markdown: { en: 'y', ro: '' } },
+                ],
+              },
+              { type: 'cta', key: 'ct', cta_url: '/u' },
+              {
+                type: 'faq',
+                key: 'fa',
+                items: [{ question: { en: 'q', ro: '' }, answer_markdown: { en: 'a', ro: '' } }],
+              },
+              {
+                type: 'testimonials',
+                key: 'te',
+                items: [
+                  {
+                    quote_markdown: { en: 'q', ro: '' },
+                    author: { en: 'me', ro: '' },
+                    role: { en: 'r', ro: '' },
+                  },
+                ],
+              },
+              { type: 'image', key: 'im', url: '/i' },
+              { type: 'gallery', key: 'ga', images: [{ url: '/g' }] },
+              { type: 'banner', key: 'ba', slide: { image_url: '/b' } },
+              { type: 'carousel', key: 'ca', slides: [{ image_url: '/c' }], settings: {} },
+            ],
+          },
+        }),
+      );
+      c.loadSections();
+    }
+
+    it('serialises every block type and built-in section then persists', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(of({ meta: {} }));
+      const refresh = spyOn(c, 'refreshHomePreview');
+      c.saveSections();
+      const payload = h.admin.updateContentBlock.calls.mostRecent().args[1];
+      expect(payload.meta.version).toBe(2);
+      expect(payload.meta.sections.some((s: any) => s.id === 'story')).toBe(true);
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.success.save');
+      expect(refresh).toHaveBeenCalled();
+    });
+
+    it('surfaces a conflict error', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 409 })));
+      h.admin.getContent.and.returnValue(of({ meta: {} }));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.errors.save');
+    });
+
+    it('creates content on a 404 and reports success', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(of({ meta: {} }));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.success.save');
+    });
+
+    it('reports an error when the 404 create path fails', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 404 })));
+      h.admin.createContent.and.returnValue(throwError(() => ({ status: 500 })));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.errors.save');
+    });
+
+    it('reports a generic error for other failures', () => {
+      populateHomeBlocks();
+      h.admin.updateContentBlock.and.returnValue(throwError(() => ({ status: 500 })));
+      c.saveSections();
+      expect(c.sectionsMessage).toBe('adminUi.home.sections.errors.save');
+    });
+  });
+
+  describe('normalizeHomeSectionId aliases', () => {
+    it('maps legacy aliases to canonical section ids', () => {
+      expect(c.normalizeHomeSectionId('collections')).toBe('featured_collections');
+      expect(c.normalizeHomeSectionId('featured')).toBe('featured_products');
+      expect(c.normalizeHomeSectionId('bestsellers')).toBe('featured_products');
+      expect(c.normalizeHomeSectionId('sales')).toBe('sale_products');
+      expect(c.normalizeHomeSectionId('new')).toBe('new_arrivals');
+      expect(c.normalizeHomeSectionId('recent')).toBe('recently_viewed');
+      expect(c.normalizeHomeSectionId('recentlyViewed')).toBe('recently_viewed');
+      expect(c.normalizeHomeSectionId('totally-unknown')).toBeNull();
+      expect(c.normalizeHomeSectionId(42)).toBeNull();
+      expect(c.normalizeHomeSectionId('   ')).toBeNull();
+    });
+  });
+
+  describe('collections', () => {
+    it('loads collections and resets to empty on error', () => {
+      h.admin.listFeaturedCollections.and.returnValue(of([{ slug: 's', name: 'n' }]));
+      c.loadCollections();
+      expect(c.featuredCollections.length).toBe(1);
+      h.admin.listFeaturedCollections.and.returnValue(throwError(() => ({})));
+      c.loadCollections();
+      expect(c.featuredCollections).toEqual([]);
+    });
+
+    it('editCollection copies a collection into the form with description/product fallbacks', () => {
+      c.editCollection({ slug: 's', name: 'n', description: null, product_ids: null } as any);
+      expect(c.editingCollection).toBe('s');
+      expect(c.collectionForm.description).toBe('');
+      expect(c.collectionForm.product_ids).toEqual([]);
+    });
+
+    it('saveCollection requires a name', () => {
+      c.collectionForm = { name: '', description: '', product_ids: [] };
+      c.saveCollection();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.home.collections.errors.required');
+    });
+
+    it('saveCollection creates a new collection and prepends it', () => {
+      c.editingCollection = null;
+      c.collectionForm = { name: 'New', description: 'd', product_ids: [] };
+      h.admin.createFeaturedCollection.and.returnValue(of({ slug: 'new', name: 'New' }));
+      c.saveCollection();
+      expect(c.featuredCollections[0].slug).toBe('new');
+      expect(c.collectionMessage).toBe('adminUi.home.collections.success.saved');
+    });
+
+    it('saveCollection updates an existing collection in place', () => {
+      c.featuredCollections = [{ slug: 'x', name: 'old' }];
+      c.editingCollection = 'x';
+      c.collectionForm = { name: 'upd', description: '', product_ids: [] };
+      h.admin.updateFeaturedCollection.and.returnValue(of({ slug: 'x', name: 'upd' }));
+      c.saveCollection();
+      expect(c.featuredCollections[0].name).toBe('upd');
+    });
+
+    it('saveCollection reports an error toast on failure', () => {
+      c.editingCollection = null;
+      c.collectionForm = { name: 'New', description: '', product_ids: [] };
+      h.admin.createFeaturedCollection.and.returnValue(throwError(() => ({})));
+      c.saveCollection();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.home.collections.errors.save');
+    });
+  });
+
+  describe('loadCategories', () => {
+    it('sorts categories by sort_order with a default of 0 and resets on error', () => {
+      h.admin.getCategories.and.returnValue(of([{ slug: 'b', sort_order: 2 }, { slug: 'a' }]));
+      c.loadCategories();
+      expect(c.categories[0].slug).toBe('a');
+      expect(c.categories[0].sort_order).toBe(0);
+      h.admin.getCategories.and.returnValue(throwError(() => ({})));
+      c.loadCategories();
+      expect(c.categories).toEqual([]);
+    });
+  });
+
+  describe('parse/serialise edge cases', () => {
+    it('parsePageBlocksDraft handles non-string type/source, limit breaks and empty slugs', () => {
+      const manySlugs = Array.from({ length: 60 }, (_, i) => `s${i}`);
+      const result = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 123 }, // non-string type -> skipped (covers ternary else)
+          {
+            type: 'faq',
+            key: 'faqmax',
+            items: Array.from({ length: 25 }, () => ({
+              question: { en: 'q', ro: '' },
+              answer_markdown: { en: 'a', ro: '' },
+            })),
+          },
+          {
+            type: 'testimonials',
+            key: 'tmax',
+            items: Array.from({ length: 15 }, () => ({
+              quote_markdown: { en: 'q', ro: '' },
+              author: { en: 'a', ro: '' },
+              role: { en: 'r', ro: '' },
+            })),
+          },
+          {
+            type: 'product_grid',
+            key: 'pgnum',
+            source: 5,
+            product_slugs: ['  ', 'ok', ...manySlugs],
+          },
+          {
+            type: 'product_grid',
+            key: 'pgstr',
+            source: 'products',
+            product_slugs: ['x', ...manySlugs].join(','),
+          },
+        ],
+      });
+      expect(result.find((b: any) => b.key === 'faqmax').faq_items.length).toBe(20);
+      expect(result.find((b: any) => b.key === 'tmax').testimonials.length).toBe(12);
+      const pgnum = result.find((b: any) => b.key === 'pgnum');
+      expect(pgnum.product_grid_source).toBe('category'); // non-string source falls through
+      expect(pgnum.product_grid_product_slugs.split('\n').length).toBe(50);
+      expect(
+        result.find((b: any) => b.key === 'pgstr').product_grid_product_slugs.split('\n').length,
+      ).toBe(50);
+    });
+
+    it('buildPageBlocksMeta tolerates blocks with missing array/limit fields', () => {
+      const blocks = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'columns', key: 'co' },
+          { type: 'faq', key: 'fa' },
+          { type: 'testimonials', key: 'te' },
+          { type: 'carousel', key: 'ca' },
+          { type: 'product_grid', key: 'pg', source: 'collection' },
+          { type: 'product_grid', key: 'pg2', source: 'products' },
+        ],
+      });
+      // Null out the array/limit fields to exercise the `|| []` / `|| 6` fallbacks.
+      const co = blocks.find((b: any) => b.key === 'co');
+      co.columns = null;
+      const fa = blocks.find((b: any) => b.key === 'fa');
+      fa.faq_items = null;
+      const te = blocks.find((b: any) => b.key === 'te');
+      te.testimonials = null;
+      const ca = blocks.find((b: any) => b.key === 'ca');
+      ca.slides = null;
+      const pg = blocks.find((b: any) => b.key === 'pg');
+      pg.product_grid_collection_slug = undefined;
+      const pg2 = blocks.find((b: any) => b.key === 'pg2');
+      pg2.product_grid_product_slugs = [
+        '  ',
+        'a',
+        ...Array.from({ length: 60 }, (_, i) => `s${i}`),
+      ].join(',');
+      pg2.product_grid_limit = 'abc';
+      c.pageBlocks['page.about'] = blocks;
+      const meta = c.buildPageBlocksMeta('page.about');
+      const out = meta['blocks'] as any[];
+      expect(out.find((b) => b.key === 'co').columns).toEqual([]);
+      expect(out.find((b) => b.key === 'pg2').product_slugs.length).toBe(50);
+      expect(out.find((b) => b.key === 'pg2').limit).toBe(6);
+    });
+
+    it('computePagePublishChecklistLocal tolerates blocks with null collections', () => {
+      const blocks = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'columns', key: 'co' },
+          { type: 'faq', key: 'fa' },
+          { type: 'testimonials', key: 'te' },
+          { type: 'gallery', key: 'ga' },
+          { type: 'carousel', key: 'ca' },
+        ],
+      });
+      blocks.find((b: any) => b.key === 'co').columns = null;
+      blocks.find((b: any) => b.key === 'fa').faq_items = null;
+      blocks.find((b: any) => b.key === 'te').testimonials = null;
+      blocks.find((b: any) => b.key === 'ga').images = null;
+      blocks.find((b: any) => b.key === 'ca').slides = null;
+      c.pageBlocks['page.about'] = blocks;
+      const res = c.computePagePublishChecklistLocal('page.about');
+      expect(res.emptySections.length).toBe(5);
+    });
+
+    it('loadSections covers limit breaks, non-string fields, null entries and empty carousels', () => {
+      h.admin.getContent.and.returnValue(
+        of({
+          meta: {
+            blocks: [
+              { type: 456 }, // non-string type
+              {
+                type: 'columns',
+                key: 'co4',
+                columns: [
+                  null,
+                  { title: { en: 'a', ro: '' } },
+                  { title: { en: 'b', ro: '' } },
+                  { title: { en: 'c', ro: '' } },
+                  { title: { en: 'd', ro: '' } },
+                ],
+              },
+              { type: 'cta', key: 'cta_n', cta_url: 99 },
+              {
+                type: 'faq',
+                key: 'faq_max',
+                items: [
+                  null,
+                  ...Array.from({ length: 25 }, () => ({ question: { en: 'q', ro: '' } })),
+                ],
+              },
+              {
+                type: 'testimonials',
+                key: 't_max',
+                items: [
+                  3,
+                  ...Array.from({ length: 15 }, () => ({ quote_markdown: { en: 'q', ro: '' } })),
+                ],
+              },
+              { type: 'image', key: 'img_n', url: 12, link_url: 7 },
+              { type: 'gallery', key: 'gal_n', images: [{ url: 5 }] },
+              { type: 'carousel', key: 'car_empty', slides: [] },
+            ],
+          },
+        }),
+      );
+      c.loadSections();
+      expect(c.homeBlocks.find((b: any) => b.key === 'faq_max').faq_items.length).toBe(20);
+      expect(c.homeBlocks.find((b: any) => b.key === 't_max').testimonials.length).toBe(12);
+      expect(c.homeBlocks.find((b: any) => b.key === 'car_empty').slides.length).toBe(1);
+      expect(c.homeBlocks.find((b: any) => b.key === 'co4').columns.length).toBe(3);
+    });
+
+    it('loadSections uses an empty meta when the block has no meta', () => {
+      h.admin.getContent.and.returnValue(of({}));
+      c.loadSections();
+      expect(c.homeBlocks.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('insertPageMediaFiles createdKey + array fallbacks', () => {
+    const png = (n = 'a.png') => new File(['x'], n, { type: 'image/png' });
+    beforeEach(() => {
+      h.admin.uploadContentImage.and.returnValue(
+        of({ images: [{ url: 'https://cdn/x.png', focal_x: 50, focal_y: 50 }] }),
+      );
+    });
+
+    it('aborts single-image insertion when the block could not be created', async () => {
+      spyOn(c, 'insertPageBlockAt').and.returnValue(null);
+      delete c.pageBlocks['page.about'];
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'] || []).toEqual([]);
+    });
+
+    it('aborts gallery insertion when the block could not be created', async () => {
+      spyOn(c, 'insertPageBlockAt').and.returnValue(null);
+      delete c.pageBlocks['page.about'];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      expect(c.pageBlocks['page.about'] || []).toEqual([]);
+    });
+
+    it('stops multi-image insertion as soon as a block cannot be created', async () => {
+      spyOn(c, 'allowedPageBlockTypesForKey').and.returnValue(['image']);
+      spyOn(c, 'insertPageBlockAt').and.returnValue(null);
+      delete c.pageBlocks['page.about'];
+      await c.insertPageMediaFiles('page.about', 0, [png('a.png'), png('b.png')]);
+      expect(c.pageBlocks['page.about'] || []).toEqual([]);
+    });
+
+    it('leaves an unrelated block untouched while inserting a single image', async () => {
+      const existing = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'keep', body_markdown: { en: 'x', ro: '' } }],
+      });
+      c.pageBlocks['page.about'] = existing;
+      await c.insertPageMediaFiles('page.about', 0, [png()]);
+      expect(c.pageBlocks['page.about'].some((b: any) => b.key === 'keep')).toBe(true);
+      expect(c.pageBlocks['page.about'].some((b: any) => b.type === 'image')).toBe(true);
+    });
+  });
+
+  describe('content redirects', () => {
+    it('deleteContentRedirect ignores blanks and respects a cancelled confirm', () => {
+      c.deleteContentRedirect('  ');
+      const confirm = spyOn(window, 'confirm').and.returnValue(false);
+      c.deleteContentRedirect('id1');
+      expect(h.admin.deleteContentRedirect).not.toHaveBeenCalled();
+      confirm.and.returnValue(true);
+      spyOn(c, 'loadContentRedirects');
+      h.admin.deleteContentRedirect.and.returnValue(of({}));
+      c.deleteContentRedirect('id1');
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.deleted');
+    });
+
+    it('deleteContentRedirect surfaces a detail message then a default', () => {
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.deleteContentRedirect.and.returnValue(
+        throwError(() => ({ error: { detail: 'nope' } })),
+      );
+      c.deleteContentRedirect('id1');
+      expect(h.toast.error).toHaveBeenCalledWith('nope');
+      h.admin.deleteContentRedirect.and.returnValue(throwError(() => ({})));
+      c.deleteContentRedirect('id1');
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.delete');
+    });
+
+    it('exportContentRedirects guards re-entry, downloads a csv and handles errors', () => {
+      c.redirectsExporting = true;
+      c.exportContentRedirects();
+      expect(h.admin.exportContentRedirects).not.toHaveBeenCalled();
+      c.redirectsExporting = false;
+      c.redirectsQuery = ' term ';
+      h.admin.exportContentRedirects.and.returnValue(of(new Blob(['a,b'], { type: 'text/csv' })));
+      c.exportContentRedirects();
+      expect(h.admin.exportContentRedirects).toHaveBeenCalledWith({ q: 'term' });
+      expect(c.redirectsExporting).toBe(false);
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.export');
+    });
+
+    it('exportContentRedirects reports an error detail and a default, sending undefined for a blank query', () => {
+      c.redirectsQuery = '';
+      h.admin.exportContentRedirects.and.returnValue(
+        throwError(() => ({ error: { detail: 'x' } })),
+      );
+      c.exportContentRedirects();
+      expect(h.admin.exportContentRedirects).toHaveBeenCalledWith({ q: undefined });
+      expect(h.toast.error).toHaveBeenCalledWith('x');
+      c.redirectsExporting = false;
+      h.admin.exportContentRedirects.and.returnValue(throwError(() => ({})));
+      c.exportContentRedirects();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.export');
+    });
+
+    function importEvent(file?: File): any {
+      return { target: { files: file ? [file] : [], value: 'x' } };
+    }
+
+    it('importContentRedirects ignores empty input and an in-flight import', () => {
+      c.importContentRedirects(importEvent());
+      c.redirectsImporting = true;
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(h.admin.importContentRedirects).not.toHaveBeenCalled();
+    });
+
+    it('importContentRedirects imports a file and falls back to null result', () => {
+      spyOn(c, 'loadContentRedirects');
+      h.admin.importContentRedirects.and.returnValue(of(undefined));
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(c.redirectsImportResult).toBeNull();
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.import');
+    });
+
+    it('importContentRedirects reports an error detail and a default', () => {
+      h.admin.importContentRedirects.and.returnValue(
+        throwError(() => ({ error: { detail: 'bad' } })),
+      );
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(h.toast.error).toHaveBeenCalledWith('bad');
+      h.admin.importContentRedirects.and.returnValue(throwError(() => ({})));
+      c.importContentRedirects(importEvent(new File(['a'], 'r.csv')));
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.import');
+    });
+
+    it('createContentRedirect guards re-entry and missing fields, then creates', () => {
+      c.redirectCreateSaving = true;
+      c.createContentRedirect();
+      expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
+      c.redirectCreateSaving = false;
+      c.redirectCreateFrom = 'a';
+      c.redirectCreateTo = '';
+      c.createContentRedirect();
+      expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
+      c.redirectCreateFrom = 'from';
+      c.redirectCreateTo = 'to';
+      spyOn(c, 'loadContentRedirects');
+      h.admin.upsertContentRedirect.and.returnValue(of({}));
+      c.createContentRedirect();
+      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({
+        from_key: 'from',
+        to_key: 'to',
+      });
+      expect(c.redirectCreateFrom).toBe('');
+    });
+
+    it('createContentRedirect reports an error detail and a default', () => {
+      c.redirectCreateFrom = 'from';
+      c.redirectCreateTo = 'to';
+      h.admin.upsertContentRedirect.and.returnValue(
+        throwError(() => ({ error: { detail: 'oops' } })),
+      );
+      c.createContentRedirect();
+      expect(h.toast.error).toHaveBeenCalledWith('oops');
+      c.redirectCreateFrom = 'from';
+      c.redirectCreateTo = 'to';
+      h.admin.upsertContentRedirect.and.returnValue(throwError(() => ({})));
+      c.createContentRedirect();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.redirects.errors.create');
+    });
+  });
+
+  describe('find & replace', () => {
+    it('previewFindReplace guards, validates and derives the key prefix per scope', () => {
+      c.findReplaceLoading = true;
+      c.previewFindReplace();
+      expect(h.admin.previewFindReplaceContent).not.toHaveBeenCalled();
+      c.findReplaceLoading = false;
+      c.findReplaceFind = '   ';
+      c.previewFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.findRequired');
+
+      const scopes: Array<[string, string | undefined]> = [
+        ['blog', 'blog.'],
+        ['home', 'home.'],
+        ['site', 'site.'],
+        ['pages', 'page.'],
+        ['all', undefined],
+      ];
+      h.admin.previewFindReplaceContent.and.returnValue(of({ total_items: 1, total_matches: 2 }));
+      for (const [scope, prefix] of scopes) {
+        c.findReplaceFind = 'foo';
+        c.findReplaceScope = scope;
+        c.previewFindReplace();
+        expect(h.admin.previewFindReplaceContent.calls.mostRecent().args[0].key_prefix).toBe(
+          prefix,
+        );
+      }
+      expect(c.findReplacePreviewKey).toBeTruthy();
+    });
+
+    it('previewFindReplace reports an error detail and a default', () => {
+      c.findReplaceFind = 'foo';
+      c.findReplaceScope = 'all';
+      h.admin.previewFindReplaceContent.and.returnValue(
+        throwError(() => ({ error: { detail: 'pe' } })),
+      );
+      c.previewFindReplace();
+      expect(c.findReplaceError).toBe('pe');
+      h.admin.previewFindReplaceContent.and.returnValue(throwError(() => ({})));
+      c.previewFindReplace();
+      expect(c.findReplaceError).toBe('adminUi.content.findReplace.errors.preview');
+    });
+
+    it('applyFindReplace requires a find term and a matching preview first', () => {
+      c.findReplaceApplying = true;
+      c.applyFindReplace();
+      expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
+      c.findReplaceApplying = false;
+      c.findReplaceFind = '';
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.findRequired');
+      c.findReplaceFind = 'foo';
+      c.findReplacePreview = null;
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.previewFirst');
+    });
+
+    it('applyFindReplace respects a cancelled confirm', () => {
+      c.findReplaceFind = 'foo';
+      c.findReplaceScope = 'all';
+      c.findReplaceReplace = 'bar';
+      c.findReplaceCaseSensitive = false;
+      c.findReplacePreview = { total_items: 1, total_matches: 1 };
+      c.findReplacePreviewKey = c.findReplacePayloadKey({
+        find: 'foo',
+        replace: 'bar',
+        key_prefix: null,
+        case_sensitive: false,
+      });
+      spyOn(window, 'confirm').and.returnValue(false);
+      c.applyFindReplace();
+      expect(h.admin.applyFindReplaceContent).not.toHaveBeenCalled();
+    });
+
+    function primeApply(): void {
+      c.findReplaceApplying = false;
+      c.findReplaceLoading = false;
+      c.findReplaceFind = 'foo';
+      c.findReplaceScope = 'all';
+      c.findReplaceReplace = 'bar';
+      c.findReplaceCaseSensitive = false;
+      c.findReplacePreview = { total_items: 1, total_matches: 1 };
+      c.findReplacePreviewKey = c.findReplacePayloadKey({
+        find: 'foo',
+        replace: 'bar',
+        key_prefix: null,
+        case_sensitive: false,
+      });
+    }
+
+    it('applyFindReplace applies with default counts on a null response', () => {
+      primeApply();
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.applyFindReplaceContent.and.returnValue(of(null));
+      c.applyFindReplace();
+      expect(c.findReplaceApplyResult).toBeNull();
+      expect(h.toast.success).toHaveBeenCalled();
+    });
+
+    it('applyFindReplace surfaces an error detail', () => {
+      primeApply();
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.applyFindReplaceContent.and.returnValue(
+        throwError(() => ({ error: { detail: 'ae' } })),
+      );
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('ae');
+      expect(c.findReplaceApplying).toBe(false);
+    });
+
+    it('applyFindReplace surfaces the default error message', () => {
+      primeApply();
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.applyFindReplaceContent.and.returnValue(throwError(() => ({})));
+      c.applyFindReplace();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.content.findReplace.errors.apply');
+    });
+  });
+
+  describe('runLinkCheck', () => {
+    it('ignores a blank key, uses an override, and stores issues', () => {
+      c.linkCheckKey = '';
+      c.runLinkCheck();
+      expect(h.admin.linkCheckContent).not.toHaveBeenCalled();
+      h.admin.linkCheckContent.and.returnValue(of({ issues: [{ url: '/a' }] }));
+      c.runLinkCheck(' page.about ');
+      expect(c.linkCheckKey).toBe('page.about');
+      expect(c.linkCheckIssues.length).toBe(1);
+      h.admin.linkCheckContent.and.returnValue(of({}));
+      c.runLinkCheck('page.about');
+      expect(c.linkCheckIssues).toEqual([]);
+    });
+
+    it('reports an error detail and a default', () => {
+      h.admin.linkCheckContent.and.returnValue(throwError(() => ({ error: { detail: 'lc' } })));
+      c.runLinkCheck('page.about');
+      expect(c.linkCheckError).toBe('lc');
+      h.admin.linkCheckContent.and.returnValue(throwError(() => ({})));
+      c.runLinkCheck('page.about');
+      expect(c.linkCheckError).toBe('adminUi.content.linkCheck.errors.load');
+    });
+  });
+
+  describe('page block drop handlers', () => {
+    function blockPayloadEvent(payload: unknown, files: File[] = []): any {
+      return {
+        preventDefault: () => undefined,
+        dataTransfer: {
+          files,
+          types: files.length ? ['Files'] : ['text/plain'],
+          getData: () => (payload === undefined ? '' : JSON.stringify(payload)),
+        },
+      };
+    }
+
+    it('onPageBlockDrop inserts dropped media files', () => {
+      const insert = spyOn(c, 'insertPageMediaFiles').and.returnValue(Promise.resolve());
+      c.pageBlocks['page.about'] = [];
+      const png = new File(['x'], 'a.png', { type: 'image/png' });
+      c.onPageBlockDrop(blockPayloadEvent(undefined, [png]), 'page.about', 'targetKey');
+      expect(insert).toHaveBeenCalled();
+      expect(c.pageInsertDragActive).toBe(false);
+    });
+
+    it('onPageBlockDrop inserts a library block at the target index', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'k1', body_markdown: { en: 'a', ro: '' } }],
+      });
+      const insertAt = spyOn(c, 'insertPageBlockAt').and.returnValue('new');
+      c.onPageBlockDrop(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }),
+        'page.about',
+        'k1',
+      );
+      expect(insertAt).toHaveBeenCalledWith('page.about', 'cta', 0, 'blank');
+    });
+
+    it('onPageBlockDrop does not insert a library block when the target is missing', () => {
+      c.pageBlocks['page.about'] = [];
+      const insertAt = spyOn(c, 'insertPageBlockAt');
+      c.onPageBlockDrop(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'cta', template: 'blank' }),
+        'page.about',
+        'nope',
+      );
+      expect(insertAt).not.toHaveBeenCalled();
+    });
+
+    it('onPageBlockDrop reorders an existing block onto a target', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } },
+          { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } },
+          { type: 'text', key: 'c', body_markdown: { en: '3', ro: '' } },
+        ],
+      });
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'c');
+      expect(c.pageBlocks['page.about'].map((b: any) => b.key)).toEqual(['b', 'a', 'c']);
+    });
+
+    it('onPageBlockDrop ignores reorders with missing drag context, mismatched page or identical key', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [{ type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } }],
+      });
+      c.draggingPageBlocksKey = null;
+      c.draggingPageBlockKey = null;
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'a');
+      c.draggingPageBlocksKey = 'page.other';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'a');
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDrop(blockPayloadEvent(undefined), 'page.about', 'a');
+      expect(c.pageBlocks['page.about'].length).toBe(1);
+    });
+
+    it('onPageBlockDropZone reorders to a zone index and ends the drag', () => {
+      c.pageBlocks['page.about'] = c.parsePageBlocksDraft({
+        blocks: [
+          { type: 'text', key: 'a', body_markdown: { en: '1', ro: '' } },
+          { type: 'text', key: 'b', body_markdown: { en: '2', ro: '' } },
+        ],
+      });
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'a';
+      c.onPageBlockDropZone(blockPayloadEvent(undefined), 'page.about', 2);
+      expect(c.pageBlocks['page.about'].map((b: any) => b.key)).toEqual(['b', 'a']);
+    });
+
+    it('onPageBlockDropZone ends the drag when the dragged block is gone', () => {
+      c.pageBlocks['page.about'] = [];
+      c.draggingPageBlocksKey = 'page.about';
+      c.draggingPageBlockKey = 'ghost';
+      const end = spyOn(c, 'onPageBlockDragEnd');
+      c.onPageBlockDropZone(blockPayloadEvent(undefined), 'page.about', 0);
+      expect(end).toHaveBeenCalled();
+    });
+
+    it('onPageBlockDropZone inserts a library block and resets the active flag', () => {
+      c.pageBlocks['page.about'] = [];
+      const insertAt = spyOn(c, 'insertPageBlockAt').and.returnValue('k');
+      c.onPageBlockDropZone(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'page', type: 'image', template: 'starter' }),
+        'page.about',
+        0,
+      );
+      expect(insertAt).toHaveBeenCalledWith('page.about', 'image', 0, 'starter');
+      expect(c.pageInsertDragActive).toBe(false);
+    });
+
+    it('onPageBlockDropZone ends the drag for a non-page payload', () => {
+      c.pageBlocks['page.about'] = [];
+      const end = spyOn(c, 'onPageBlockDragEnd');
+      c.onPageBlockDropZone(
+        blockPayloadEvent({ kind: 'cms-block', scope: 'home', type: 'text' }),
+        'page.about',
+        0,
+      );
+      expect(end).toHaveBeenCalled();
+    });
+  });
+
+  describe('renameCustomPageUrl', () => {
+    beforeEach(() => {
+      c.pageBlocksKey = 'page.custom';
+    });
+
+    it('returns when the key cannot be renamed', () => {
+      c.pageBlocksKey = 'page.about';
+      c.renameCustomPageUrl();
+      expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+    });
+
+    it('returns when the prompt is cancelled', () => {
+      spyOn(window, 'prompt').and.returnValue(null);
+      c.renameCustomPageUrl();
+      expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unchanged or empty slug', () => {
+      spyOn(window, 'prompt').and.returnValue('custom');
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.rename');
+    });
+
+    it('rejects a reserved slug', () => {
+      spyOn(window, 'prompt').and.returnValue('about');
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith(
+        'adminUi.site.pages.errors.reservedTitle',
+        'adminUi.site.pages.errors.reservedCopy',
+      );
+    });
+
+    it('returns when the change confirm is declined', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(false);
+      c.renameCustomPageUrl();
+      expect(h.admin.renameContentPage).not.toHaveBeenCalled();
+    });
+
+    it('renames the page and creates a redirect when confirmed', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(true);
+      spyOn(c, 'loadContentPages');
+      spyOn(c, 'loadPageBlocks');
+      spyOn(c, 'loadContentRedirects');
+      h.admin.renameContentPage.and.returnValue(
+        of({ new_key: 'page.renamed', old_key: 'page.custom' }),
+      );
+      h.admin.upsertContentRedirect.and.returnValue(of({}));
+      c.renameCustomPageUrl();
+      expect(c.pageBlocksKey).toBe('page.renamed');
+      expect(h.admin.upsertContentRedirect).toHaveBeenCalledWith({
+        from_key: 'page.custom',
+        to_key: 'page.renamed',
+      });
+      expect(h.toast.success).toHaveBeenCalledWith('adminUi.site.pages.redirects.success.created');
+    });
+
+    it('renames without a redirect when the redirect confirm is declined and tolerates redirect errors', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      const confirm = spyOn(window, 'confirm').and.returnValues(true, false);
+      spyOn(c, 'loadContentPages');
+      spyOn(c, 'loadPageBlocks');
+      h.admin.renameContentPage.and.returnValue(
+        of({ new_key: 'page.renamed', old_key: 'page.custom' }),
+      );
+      c.renameCustomPageUrl();
+      expect(h.admin.upsertContentRedirect).not.toHaveBeenCalled();
+      expect(confirm).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports a redirect creation error after a successful rename', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(true);
+      spyOn(c, 'loadContentPages');
+      spyOn(c, 'loadPageBlocks');
+      spyOn(c, 'loadContentRedirects');
+      h.admin.renameContentPage.and.returnValue(
+        of({ new_key: 'page.renamed', old_key: 'page.custom' }),
+      );
+      h.admin.upsertContentRedirect.and.returnValue(
+        throwError(() => ({ error: { detail: 'rdr' } })),
+      );
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('rdr');
+    });
+
+    it('reports a rename error detail and a default', () => {
+      spyOn(window, 'prompt').and.returnValue('renamed');
+      spyOn(window, 'confirm').and.returnValue(true);
+      h.admin.renameContentPage.and.returnValue(throwError(() => ({ error: { detail: 'rn' } })));
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('rn');
+      c.pageBlocksKey = 'page.custom';
+      h.admin.renameContentPage.and.returnValue(throwError(() => ({})));
+      c.renameCustomPageUrl();
+      expect(h.toast.error).toHaveBeenCalledWith('adminUi.site.pages.builder.errors.rename');
+    });
+  });
+
+  describe('onNavigationDrop', () => {
+    function link(id: string): any {
+      return { id, url: `/u/${id}`, label: { en: id, ro: id } };
+    }
+    beforeEach(() => {
+      c.navigationForm = {
+        header_links: [link('h1'), link('h2'), link('h3')],
+        footer_handcrafted_links: [link('f1'), link('f2')],
+        footer_legal_links: [link('l1'), link('l2')],
+      };
+    });
+
+    it('clears drag state for invalid drops', () => {
+      c.draggingNavList = null;
+      c.draggingNavId = 'h1';
+      c.onNavigationDrop('header', 'h2');
+      expect(c.draggingNavId).toBeNull();
+      c.draggingNavList = 'header';
+      c.draggingNavId = 'ghost';
+      c.onNavigationDrop('header', 'h2');
+      expect(c.navigationForm.header_links.map((l: any) => l.id)).toEqual(['h1', 'h2', 'h3']);
+    });
+
+    it('reorders within the header, handcrafted and legal lists', () => {
+      c.draggingNavList = 'header';
+      c.draggingNavId = 'h1';
+      c.onNavigationDrop('header', 'h3');
+      expect(c.navigationForm.header_links.map((l: any) => l.id)).toEqual(['h2', 'h3', 'h1']);
+
+      c.draggingNavList = 'footer_handcrafted';
+      c.draggingNavId = 'f2';
+      c.onNavigationDrop('footer_handcrafted', 'f1');
+      expect(c.navigationForm.footer_handcrafted_links.map((l: any) => l.id)).toEqual(['f2', 'f1']);
+
+      c.draggingNavList = 'footer_legal';
+      c.draggingNavId = 'l2';
+      c.onNavigationDrop('footer_legal', 'l1');
+      expect(c.navigationForm.footer_legal_links.map((l: any) => l.id)).toEqual(['l2', 'l1']);
+    });
+  });
+
+});

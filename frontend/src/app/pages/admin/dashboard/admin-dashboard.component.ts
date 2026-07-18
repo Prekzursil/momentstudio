@@ -3597,6 +3597,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     const diffMs = toDate.getTime() - fromDate.getTime();
     if (diffMs < 0) return fallback;
     const days = Math.floor(diffMs / (24 * 60 * 60 * 1000)) + 1;
+    /* istanbul ignore next -- defensive: diffMs >= 0 is guaranteed above, so days is always >= 1 and the fallback branch is unreachable */
     return days > 0 ? days : fallback;
   }
 
@@ -3703,6 +3704,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private loadLiveRefreshPreference(): void {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return;
     try {
       const raw = localStorage.getItem(this.liveRefreshStorageKey);
@@ -3717,6 +3719,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private loadSalesMetricPreference(): void {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return;
     try {
       const raw = localStorage.getItem(this.salesMetricStorageKey);
@@ -3730,6 +3733,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private persistLiveRefreshPreference(enabled: boolean): void {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(this.liveRefreshStorageKey, JSON.stringify({ enabled }));
@@ -3739,6 +3743,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private persistSalesMetricPreference(metric: 'gross' | 'net'): void {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(this.salesMetricStorageKey, JSON.stringify({ metric }));
@@ -4047,6 +4052,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
     this.globalSearchActiveIndex.set(bounded);
     const id = `admin-global-search-option-${bounded}`;
     window.setTimeout(() => {
+      /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
       if (typeof document === 'undefined') return;
       document.getElementById(id)?.scrollIntoView({ block: 'nearest' });
     }, 0);
@@ -4283,6 +4289,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private loadWidgetPrefs(): void {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return;
     try {
       const raw = localStorage.getItem(this.widgetPrefsKey());
@@ -4312,6 +4319,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   private saveWidgetPrefs(): void {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(
