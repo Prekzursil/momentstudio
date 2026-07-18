@@ -28,6 +28,7 @@ from app.services import account_deletion_scheduler
 from app.services import media_usage_reconcile_scheduler
 from app.services import order_expiration_scheduler
 from app.services import sameday_easybox_sync_scheduler
+from app.services.theme_service import seed_default_theme_on_startup
 from app.core.startup_checks import validate_production_settings
 from app.core import redis_client
 
@@ -53,6 +54,7 @@ def get_application() -> FastAPI:
         order_expiration_scheduler.start(app)
         media_usage_reconcile_scheduler.start(app)
         sameday_easybox_sync_scheduler.start(app)
+        await seed_default_theme_on_startup()
         yield
         await fx_refresh.stop(app)
         await admin_report_scheduler.stop(app)

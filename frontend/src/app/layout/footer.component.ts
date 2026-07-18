@@ -41,33 +41,24 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgIf, NgForOf, NgClass, RouterLink, TranslateModule, ImgFallbackDirective],
   template: `
-    <footer class="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <footer class="border-t border-border bg-background">
       <div
-        class="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 lg:grid-cols-4 text-sm text-slate-600 dark:text-slate-300"
+        class="max-w-6xl mx-auto px-4 sm:px-6 py-10 grid gap-10 lg:grid-cols-4 text-sm text-text-secondary"
       >
         <section class="grid gap-4" aria-labelledby="footer-brand-heading">
           <div class="grid gap-1">
-            <h2
-              id="footer-brand-heading"
-              class="text-lg font-semibold text-slate-900 dark:text-slate-100"
-            >
+            <h2 id="footer-brand-heading" class="text-lg font-semibold text-text-heading">
               {{ 'app.name' | translate }}
             </h2>
-            <p class="text-slate-600 dark:text-slate-300">{{ 'app.tagline' | translate }}</p>
+            <p class="text-text-secondary">{{ 'app.tagline' | translate }}</p>
           </div>
 
           <div class="min-h-[2.5rem]">
             <ng-container *ngIf="socialLoading; else socialLinksReady">
               <div class="flex flex-wrap items-center gap-3" data-footer-social-loading="true">
-                <span
-                  class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"
-                ></span>
-                <span
-                  class="h-5 w-24 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"
-                ></span>
-                <span
-                  class="h-5 w-16 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse"
-                ></span>
+                <span class="h-5 w-24 rounded-full bg-surface-raised animate-pulse"></span>
+                <span class="h-5 w-24 rounded-full bg-surface-raised animate-pulse"></span>
+                <span class="h-5 w-16 rounded-full bg-surface-raised animate-pulse"></span>
               </div>
             </ng-container>
             <ng-template #socialLinksReady>
@@ -75,22 +66,22 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 <div class="relative" data-footer-dropdown>
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1 font-medium hover:text-slate-900 dark:hover:text-white"
+                    class="inline-flex items-center gap-1 font-medium hover:text-text-heading"
                     (click)="toggleMenu('instagram')"
                     [attr.aria-expanded]="openMenu === 'instagram'"
                     aria-haspopup="menu"
                   >
                     {{ 'footer.instagram' | translate }}
-                    <span class="text-xs text-slate-500 dark:text-slate-400">▴</span>
+                    <span class="text-xs text-text-muted">▴</span>
                   </button>
                   <div
                     *ngIf="openMenu === 'instagram'"
-                    class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden dark:border-slate-700 dark:bg-slate-900"
+                    class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-border-muted bg-background shadow-xl overflow-hidden"
                     role="menu"
                   >
                     <a
                       *ngFor="let page of instagramPages"
-                      class="flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                      class="flex items-center gap-3 px-3 py-2 text-sm text-text hover:bg-surface-muted hover:text-text-heading"
                       [href]="page.url"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -101,14 +92,14 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                         <img
                           [src]="page.thumbnailUrl"
                           [alt]="page.label"
-                          class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                          class="h-8 w-8 rounded-full border border-border-muted object-cover"
                           appImgFallback="assets/placeholder/avatar-placeholder.svg"
                           loading="lazy"
                         />
                       </ng-container>
                       <ng-template #instagramAvatar>
                         <span
-                          class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white"
+                          class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-onmedia"
                           [ngClass]="page.avatarClass"
                         >
                           {{ page.initials }}
@@ -122,22 +113,22 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 <div class="relative" data-footer-dropdown>
                   <button
                     type="button"
-                    class="inline-flex items-center gap-1 font-medium hover:text-slate-900 dark:hover:text-white"
+                    class="inline-flex items-center gap-1 font-medium hover:text-text-heading"
                     (click)="toggleMenu('facebook')"
                     [attr.aria-expanded]="openMenu === 'facebook'"
                     aria-haspopup="menu"
                   >
                     {{ 'footer.facebook' | translate }}
-                    <span class="text-xs text-slate-500 dark:text-slate-400">▴</span>
+                    <span class="text-xs text-text-muted">▴</span>
                   </button>
                   <div
                     *ngIf="openMenu === 'facebook'"
-                    class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden dark:border-slate-700 dark:bg-slate-900"
+                    class="absolute bottom-full left-0 mb-2 w-72 rounded-2xl border border-border-muted bg-background shadow-xl overflow-hidden"
                     role="menu"
                   >
                     <a
                       *ngFor="let page of facebookPages"
-                      class="flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                      class="flex items-center gap-3 px-3 py-2 text-sm text-text hover:bg-surface-muted hover:text-text-heading"
                       [href]="page.url"
                       target="_blank"
                       rel="noopener noreferrer"
@@ -148,14 +139,14 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                         <img
                           [src]="page.thumbnailUrl"
                           [alt]="page.label"
-                          class="h-8 w-8 rounded-full border border-slate-200 object-cover dark:border-slate-700"
+                          class="h-8 w-8 rounded-full border border-border-muted object-cover"
                           appImgFallback="assets/placeholder/avatar-placeholder.svg"
                           loading="lazy"
                         />
                       </ng-container>
                       <ng-template #facebookAvatar>
                         <span
-                          class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-white"
+                          class="h-8 w-8 rounded-full grid place-items-center text-xs font-semibold text-onmedia"
                           [ngClass]="page.avatarClass"
                         >
                           {{ page.initials }}
@@ -166,11 +157,9 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                   </div>
                 </div>
 
-                <a
-                  class="font-medium hover:text-slate-900 dark:hover:text-white"
-                  routerLink="/contact"
-                  >{{ 'footer.contact' | translate }}</a
-                >
+                <a class="font-medium hover:text-text-heading" routerLink="/contact">{{
+                  'footer.contact' | translate
+                }}</a>
               </nav>
             </ng-template>
           </div>
@@ -181,20 +170,17 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
           data-footer-nav-shell="handcrafted"
           aria-labelledby="footer-handcrafted-heading"
         >
-          <h2
-            id="footer-handcrafted-heading"
-            class="font-semibold text-slate-900 dark:text-slate-100"
-          >
+          <h2 id="footer-handcrafted-heading" class="font-semibold text-text-heading">
             {{ 'footer.handcraftedArt' | translate }}
           </h2>
           <ng-container *ngIf="navLoading; else handcraftedLinksReady">
             <span
-              class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"
+              class="h-4 w-28 rounded bg-surface-raised animate-pulse"
               data-footer-nav-loading="handcrafted"
             ></span>
-            <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-            <span class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-            <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-24 rounded bg-surface-raised animate-pulse"></span>
+            <span class="h-4 w-24 rounded bg-surface-raised animate-pulse"></span>
+            <span class="h-4 w-28 rounded bg-surface-raised animate-pulse"></span>
           </ng-container>
           <ng-template #handcraftedLinksReady>
             <nav class="grid gap-2" aria-labelledby="footer-handcrafted-heading">
@@ -204,14 +190,14 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 >
                   <a
                     *ngIf="!isExternalLink(link.url)"
-                    class="hover:text-slate-900 dark:hover:text-white"
+                    class="hover:text-text-heading"
                     [routerLink]="link.url"
                   >
                     {{ navLabel(link) }}
                   </a>
                   <a
                     *ngIf="isExternalLink(link.url)"
-                    class="hover:text-slate-900 dark:hover:text-white"
+                    class="hover:text-text-heading"
                     [href]="link.url"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -221,16 +207,16 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 </ng-container>
               </ng-container>
               <ng-template #defaultHandcraftedLinks>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/shop">{{
+                <a class="hover:text-text-heading" routerLink="/shop">{{
                   'nav.shop' | translate
                 }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/about">{{
+                <a class="hover:text-text-heading" routerLink="/about">{{
                   'nav.about' | translate
                 }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/contact">{{
+                <a class="hover:text-text-heading" routerLink="/contact">{{
                   'nav.contact' | translate
                 }}</a>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{
+                <a class="hover:text-text-heading" routerLink="/pages/terms">{{
                   'nav.terms' | translate
                 }}</a>
               </ng-template>
@@ -243,16 +229,16 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
           data-footer-nav-shell="legal"
           aria-labelledby="footer-legal-heading"
         >
-          <h2 id="footer-legal-heading" class="font-semibold text-slate-900 dark:text-slate-100">
+          <h2 id="footer-legal-heading" class="font-semibold text-text-heading">
             {{ 'footer.legal' | translate }}
           </h2>
           <ng-container *ngIf="navLoading; else legalLinksReady">
             <span
-              class="h-4 w-24 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"
+              class="h-4 w-24 rounded bg-surface-raised animate-pulse"
               data-footer-nav-loading="legal"
             ></span>
-            <span class="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-            <span class="h-4 w-20 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-36 rounded bg-surface-raised animate-pulse"></span>
+            <span class="h-4 w-20 rounded bg-surface-raised animate-pulse"></span>
           </ng-container>
           <ng-template #legalLinksReady>
             <nav class="grid gap-2" aria-labelledby="footer-legal-heading">
@@ -260,14 +246,14 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 <ng-container *ngFor="let link of footerLegalLinks; trackBy: trackSiteNavLink">
                   <a
                     *ngIf="!isExternalLink(link.url)"
-                    class="hover:text-slate-900 dark:hover:text-white"
+                    class="hover:text-text-heading"
                     [routerLink]="link.url"
                   >
                     {{ navLabel(link) }}
                   </a>
                   <a
                     *ngIf="isExternalLink(link.url)"
-                    class="hover:text-slate-900 dark:hover:text-white"
+                    class="hover:text-text-heading"
                     [href]="link.url"
                     target="_blank"
                     rel="noopener noreferrer"
@@ -277,15 +263,13 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
                 </ng-container>
               </ng-container>
               <ng-template #defaultLegalLinks>
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/terms">{{
+                <a class="hover:text-text-heading" routerLink="/pages/terms">{{
                   'nav.terms' | translate
                 }}</a>
-                <a
-                  class="hover:text-slate-900 dark:hover:text-white"
-                  routerLink="/pages/privacy-policy"
-                  >{{ 'footer.privacyPolicy' | translate }}</a
-                >
-                <a class="hover:text-slate-900 dark:hover:text-white" routerLink="/pages/anpc">{{
+                <a class="hover:text-text-heading" routerLink="/pages/privacy-policy">{{
+                  'footer.privacyPolicy' | translate
+                }}</a>
+                <a class="hover:text-text-heading" routerLink="/pages/anpc">{{
                   'footer.anpc' | translate
                 }}</a>
               </ng-template>
@@ -298,22 +282,22 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
           data-footer-company-shell
           aria-labelledby="footer-company-heading"
         >
-          <h2 id="footer-company-heading" class="font-semibold text-slate-900 dark:text-slate-100">
+          <h2 id="footer-company-heading" class="font-semibold text-text-heading">
             {{ 'footer.companyInfo' | translate }}
           </h2>
           <ng-container *ngIf="companyLoading; else companyInfoReady">
             <span
-              class="h-4 w-48 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"
+              class="h-4 w-48 rounded bg-surface-raised animate-pulse"
               data-footer-company-loading="true"
             ></span>
-            <span class="h-4 w-36 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-            <span class="h-4 w-28 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-            <span class="h-4 w-56 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-            <span class="h-4 w-32 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
-            <span class="h-4 w-40 rounded bg-slate-200 dark:bg-slate-800 animate-pulse"></span>
+            <span class="h-4 w-36 rounded bg-surface-raised animate-pulse"></span>
+            <span class="h-4 w-28 rounded bg-surface-raised animate-pulse"></span>
+            <span class="h-4 w-56 rounded bg-surface-raised animate-pulse"></span>
+            <span class="h-4 w-32 rounded bg-surface-raised animate-pulse"></span>
+            <span class="h-4 w-40 rounded bg-surface-raised animate-pulse"></span>
           </ng-container>
           <ng-template #companyInfoReady>
-            <p *ngIf="companyInfo.name" class="font-medium text-slate-800 dark:text-slate-100">
+            <p *ngIf="companyInfo.name" class="font-medium text-text-strong">
               {{ companyInfo.name }}
             </p>
             <p *ngIf="companyInfo.registrationNumber">
@@ -333,19 +317,17 @@ const DEFAULT_FACEBOOK_PAGES: SiteSocialLink[] = [
         </section>
 
         <section
-          class="lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-200 pt-6 dark:border-slate-800"
+          class="lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-6"
           aria-labelledby="footer-payments-heading"
         >
           <div class="flex flex-col sm:flex-row items-center gap-4">
             <h2
               id="footer-payments-heading"
-              class="text-xs uppercase tracking-[0.2em] text-slate-600 dark:text-slate-300"
+              class="text-xs uppercase tracking-[0.2em] text-text-secondary"
             >
               {{ 'footer.paymentsAccepted' | translate }}
             </h2>
-            <div
-              class="rounded-xl bg-white px-3 py-2 shadow-sm ring-1 ring-slate-200 dark:bg-slate-50 dark:ring-slate-200"
-            >
+            <div class="rounded-xl bg-background px-3 py-2 shadow-sm ring-1 ring-border">
               <img
                 src="assets/payments/netopia-visa-mastercard.png"
                 [alt]="'footer.paymentsAcceptedAlt' | translate"

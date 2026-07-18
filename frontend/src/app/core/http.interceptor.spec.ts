@@ -1,6 +1,10 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { HttpClient, HttpHeaders, provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import {
+  provideHttpClientTesting,
+  HttpTestingController,
+  TestRequest,
+} from '@angular/common/http/testing';
 import { of, throwError } from 'rxjs';
 
 import { authAndErrorInterceptor } from './http.interceptor';
@@ -198,11 +202,20 @@ describe('authAndErrorInterceptor', () => {
           new Blob([JSON.stringify({ code: 'step_up_required' })], { type: 'application/json' }),
           { status: 403, statusText: 'Forbidden' },
         );
-      // Blob.text() resolves on a real microtask queue; wait for it.
-      await new Promise<void>((resolve) => setTimeout(resolve, 10));
-      const retry = httpMock.expectOne('/api/v1/newsletter/admin/export');
-      expect(retry.request.headers.get('X-Admin-Step-Up')).toBe('stepBLOB');
-      retry.flush(new Blob(['ok']));
+      // Blob.text() resolves on a real microtask queue outside fakeAsync/Zone
+      // control, so poll for the dispatched retry request instead of racing a
+      // fixed timeout (which is flaky on a loaded CI runner). Capture the request
+      // from match() so we never do a second, consuming lookup.
+      let retry: TestRequest | undefined;
+      for (let i = 0; i < 100 && !retry; i++) {
+        retry = httpMock.match('/api/v1/newsletter/admin/export')[0];
+        if (!retry) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+      }
+      expect(retry).toBeDefined();
+      expect(retry!.request.headers.get('X-Admin-Step-Up')).toBe('stepBLOB');
+      retry!.flush(new Blob(['ok']));
     });
 
     it('reads the step-up code from an ArrayBuffer body', fakeAsync(() => {

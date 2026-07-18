@@ -335,7 +335,7 @@ describe('HeaderComponent', () => {
       expect(cmp.bannerText()).toBeNull();
       expect(cmp.bannerLinkUrl()).toBeNull();
       expect(cmp.bannerLinkLabel()).toBeNull();
-      expect(cmp.bannerClasses()).toContain('indigo');
+      expect(cmp.bannerClasses()).toContain('accent');
     });
 
     it('prefers the language-specific copy and falls back', () => {

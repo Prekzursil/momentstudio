@@ -133,7 +133,7 @@
         "prerender": {
           "builder": "@angular-devkit/build-angular:prerender",
           "options": {
-            "routes": ["/"]
+            "routes": []
           },
           "configurations": {
             "production": {
