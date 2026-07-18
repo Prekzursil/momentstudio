@@ -550,6 +550,8 @@ def _build_deterministic_findings(
                 ):
                     return True
             except Exception:
+                # Best-effort classification: an unparseable request URL
+                # cannot be confirmed as ORB noise, so treat it as a real error.
                 pass
 
         return False
