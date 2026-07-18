@@ -212,8 +212,7 @@ describe('ModalComponent behavior', () => {
     const ioCallbacks: IntersectionObserverCallback[] = [];
     const moCallbacks: MutationCallback[] = [];
     const fakeIO = class {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- arity-only param: the real component calls `new IntersectionObserver(cb, options)` with 2 args; this fake (assigned to window.IntersectionObserver below) must declare the 2nd param so CodeQL resolves that call to a 2-arg constructor and stops flagging js/superfluous-trailing-arguments (alert #1081).
-      constructor(cb: IntersectionObserverCallback, _options?: IntersectionObserverInit) {
+      constructor(cb: IntersectionObserverCallback) {
         ioCallbacks.push(cb);
       }
       observe() {}
