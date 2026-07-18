@@ -46,11 +46,11 @@ import { Subscription } from 'rxjs';
   ],
   template: `
     <header
-      class="sticky top-0 z-[100] isolate border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70"
+      class="sticky top-0 z-[100] isolate border-b border-border bg-background/80 backdrop-blur"
     >
       <div
         *ngIf="bannerText() as bannerMessage"
-        class="border-b border-slate-200 dark:border-slate-800"
+        class="border-b border-border"
         [ngClass]="bannerClasses()"
       >
         <div
@@ -81,9 +81,7 @@ import { Subscription } from 'rxjs';
               [alt]="'app.brandMarkAlt' | translate"
               loading="eager"
             />
-            <span
-              class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 truncate"
-            >
+            <span class="text-xl sm:text-2xl font-semibold text-text-heading truncate">
               {{ 'app.name' | translate }}
             </span>
           </a>
@@ -96,13 +94,13 @@ import { Subscription } from 'rxjs';
                 id="header-search-input"
                 name="q"
                 type="search"
-                class="w-full h-10 rounded-full border border-slate-200 bg-white px-4 pr-10 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+                class="w-full h-10 rounded-full border border-border-muted bg-field px-4 pr-10 text-sm text-text-heading shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
                 [placeholder]="'shop.searchPlaceholder' | translate"
                 [(ngModel)]="searchQuery"
               />
               <button
                 type="submit"
-                class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 grid place-items-center rounded-full text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                class="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 grid place-items-center rounded-full text-text-muted hover:text-text-heading"
                 aria-label="Search"
               >
                 <span aria-hidden="true">🔎</span>
@@ -113,7 +111,7 @@ import { Subscription } from 'rxjs';
           <div class="flex items-center gap-3 justify-end">
             <button
               type="button"
-              class="lg:hidden text-slate-700 hover:text-slate-900 dark:text-slate-200 dark:hover:text-white"
+              class="lg:hidden text-text hover:text-text-heading"
               (click)="toggleDrawer()"
               aria-label="Open navigation"
               [attr.aria-expanded]="drawerOpen"
@@ -123,7 +121,7 @@ import { Subscription } from 'rxjs';
             </button>
             <button
               type="button"
-              class="lg:hidden inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+              class="lg:hidden inline-flex items-center justify-center h-10 w-10 rounded-full bg-surface text-text-strong"
               aria-label="Search"
               (click)="openSearch()"
             >
@@ -132,14 +130,14 @@ import { Subscription } from 'rxjs';
             </button>
             <a
               routerLink="/cart"
-              class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+              class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-surface text-text-strong"
               [attr.aria-label]="'Cart with ' + cartCount() + ' items'"
             >
               <span aria-hidden="true">🛒</span>
               <span class="sr-only">Cart</span>
               <span
                 *ngIf="cartCount() > 0"
-                class="absolute -top-1 -right-1 min-w-[20px] rounded-full bg-slate-900 px-1 text-[11px] font-semibold text-white text-center dark:bg-slate-50 dark:text-slate-900"
+                class="absolute -top-1 -right-1 min-w-[20px] rounded-full bg-surface-inverse px-1 text-[11px] font-semibold text-inverse text-center"
               >
                 {{ cartCount() }}
               </span>
@@ -156,30 +154,30 @@ import { Subscription } from 'rxjs';
             <a
               *ngIf="!isAuthenticated()"
               routerLink="/login"
-              class="text-sm font-medium text-slate-700 hover:text-slate-900 hidden sm:inline dark:text-slate-200 dark:hover:text-white"
+              class="text-sm font-medium text-text hover:text-text-heading hidden sm:inline"
             >
               {{ 'nav.signIn' | translate }}
             </a>
             <div *ngIf="isAuthenticated()" class="relative hidden sm:block">
               <button
                 type="button"
-                class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:text-white"
+                class="inline-flex items-center gap-2 rounded-full border border-border-muted bg-background/70 px-3 py-2 text-sm font-medium text-text shadow-sm hover:text-text-heading focus:outline-none focus:ring-2 focus:ring-accent/40"
                 (click)="toggleUserMenu()"
                 aria-haspopup="menu"
                 [attr.aria-expanded]="userMenuOpen"
               >
                 <span class="truncate max-w-[160px]">{{ currentUser()?.username }}</span>
-                <span class="text-slate-500 dark:text-slate-300">▾</span>
+                <span class="text-text-muted">▾</span>
               </button>
               <div
                 *ngIf="userMenuOpen"
-                class="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-900 z-[110]"
+                class="absolute right-0 mt-2 w-56 rounded-xl border border-border-muted bg-background p-1 shadow-xl z-[110]"
                 role="menu"
               >
                 <a
                   routerLink="/account/profile"
                   role="menuitem"
-                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  class="block rounded-lg px-3 py-2 text-sm text-text hover:bg-surface hover:text-text-heading"
                   (click)="closeUserMenu()"
                 >
                   {{ 'nav.myProfile' | translate }}
@@ -187,7 +185,7 @@ import { Subscription } from 'rxjs';
                 <a
                   routerLink="/account/orders"
                   role="menuitem"
-                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  class="block rounded-lg px-3 py-2 text-sm text-text hover:bg-surface hover:text-text-heading"
                   (click)="closeUserMenu()"
                 >
                   {{ 'nav.myOrders' | translate }}
@@ -195,7 +193,7 @@ import { Subscription } from 'rxjs';
                 <a
                   routerLink="/account/wishlist"
                   role="menuitem"
-                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  class="block rounded-lg px-3 py-2 text-sm text-text hover:bg-surface hover:text-text-heading"
                   (click)="closeUserMenu()"
                 >
                   {{ 'nav.myWishlist' | translate }}
@@ -203,7 +201,7 @@ import { Subscription } from 'rxjs';
                 <a
                   routerLink="/account/coupons"
                   role="menuitem"
-                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  class="block rounded-lg px-3 py-2 text-sm text-text hover:bg-surface hover:text-text-heading"
                   (click)="closeUserMenu()"
                 >
                   {{ 'nav.myCoupons' | translate }}
@@ -211,16 +209,16 @@ import { Subscription } from 'rxjs';
                 <a
                   routerLink="/tickets"
                   role="menuitem"
-                  class="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  class="block rounded-lg px-3 py-2 text-sm text-text hover:bg-surface hover:text-text-heading"
                   (click)="closeUserMenu()"
                 >
                   {{ 'nav.helpCenter' | translate }}
                 </a>
-                <div class="my-1 border-t border-slate-200 dark:border-slate-800"></div>
+                <div class="my-1 border-t border-border"></div>
                 <button
                   type="button"
                   role="menuitem"
-                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white"
+                  class="w-full text-left rounded-lg px-3 py-2 text-sm text-text hover:bg-surface hover:text-text-heading"
                   (click)="signOut()"
                 >
                   {{ (isImpersonating() ? 'nav.exitImpersonation' : 'nav.signOut') | translate }}
@@ -230,7 +228,7 @@ import { Subscription } from 'rxjs';
             <div *ngIf="isAuthenticated()" class="relative">
               <button
                 type="button"
-                class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
+                class="relative inline-flex items-center justify-center h-10 w-10 rounded-full bg-surface text-text-strong"
                 [attr.aria-label]="'notifications.title' | translate"
                 aria-haspopup="menu"
                 [attr.aria-expanded]="notificationsOpen"
@@ -240,25 +238,23 @@ import { Subscription } from 'rxjs';
                 <span class="sr-only">{{ 'notifications.title' | translate }}</span>
                 <span
                   *ngIf="unreadCount() > 0"
-                  class="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white grid place-items-center"
+                  class="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-red-600 px-1 text-[10px] font-semibold text-onmedia grid place-items-center"
                 >
                   {{ unreadBadge() }}
                 </span>
               </button>
               <div
                 *ngIf="notificationsOpen"
-                class="absolute right-0 mt-2 w-[min(92vw,360px)] rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 z-50 overflow-hidden"
+                class="absolute right-0 mt-2 w-[min(92vw,360px)] rounded-2xl border border-border-muted bg-background shadow-xl z-50 overflow-hidden"
                 role="menu"
               >
-                <div
-                  class="px-4 py-3 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between"
-                >
-                  <p class="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                <div class="px-4 py-3 border-b border-border/60 flex items-center justify-between">
+                  <p class="text-sm font-semibold text-text-heading">
                     {{ 'notifications.title' | translate }}
                   </p>
                   <button
                     type="button"
-                    class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    class="text-sm text-text-secondary hover:text-text-heading"
                     (click)="closeNotifications()"
                     aria-label="Close"
                   >
@@ -266,28 +262,25 @@ import { Subscription } from 'rxjs';
                   </button>
                 </div>
                 <div class="max-h-[360px] overflow-auto">
-                  <div
-                    *ngIf="notificationsLoading()"
-                    class="p-4 text-sm text-slate-600 dark:text-slate-300"
-                  >
+                  <div *ngIf="notificationsLoading()" class="p-4 text-sm text-text-secondary">
                     {{ 'notifications.loading' | translate }}
                   </div>
                   <div
                     *ngIf="!notificationsLoading() && notifications().length === 0"
-                    class="p-4 text-sm text-slate-600 dark:text-slate-300"
+                    class="p-4 text-sm text-text-secondary"
                   >
                     {{ 'notifications.empty' | translate }}
                   </div>
                   <ul
                     *ngIf="!notificationsLoading() && notifications().length"
-                    class="divide-y divide-slate-200/60 dark:divide-slate-800/60"
+                    class="divide-y divide-border/60"
                   >
                     <li *ngFor="let n of notifications()" class="p-4">
                       <div
-                        class="rounded-xl p-3 border border-slate-200 dark:border-slate-800"
+                        class="rounded-xl p-3 border border-border"
                         [ngClass]="
                           n.read_at || n.dismissed_at
-                            ? 'bg-white dark:bg-slate-900'
+                            ? 'bg-background'
                             : 'bg-amber-50/70 dark:bg-amber-950/25'
                         "
                       >
@@ -298,19 +291,14 @@ import { Subscription } from 'rxjs';
                         >
                           <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
-                              <p
-                                class="text-sm font-semibold text-slate-900 dark:text-slate-50 truncate"
-                              >
+                              <p class="text-sm font-semibold text-text-heading truncate">
                                 {{ n.title }}
                               </p>
-                              <p
-                                *ngIf="n.body"
-                                class="mt-1 text-sm text-slate-700 dark:text-slate-200 break-words"
-                              >
+                              <p *ngIf="n.body" class="mt-1 text-sm text-text break-words">
                                 {{ n.body }}
                               </p>
                             </div>
-                            <p class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                            <p class="shrink-0 text-xs text-text-muted">
                               {{ n.created_at | date: 'short' }}
                             </p>
                           </div>
@@ -319,14 +307,14 @@ import { Subscription } from 'rxjs';
                           <button
                             *ngIf="!n.read_at && !n.dismissed_at"
                             type="button"
-                            class="h-8 px-3 rounded-full text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            class="h-8 px-3 rounded-full text-xs font-medium border border-border-muted text-text hover:bg-surface"
                             (click)="markRead(n); $event.stopPropagation()"
                           >
                             {{ 'notifications.markRead' | translate }}
                           </button>
                           <button
                             type="button"
-                            class="h-8 px-3 rounded-full text-xs font-medium border border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            class="h-8 px-3 rounded-full text-xs font-medium border border-border-muted text-text hover:bg-surface"
                             (click)="dismiss(n); $event.stopPropagation()"
                           >
                             {{ 'notifications.dismiss' | translate }}
@@ -337,18 +325,18 @@ import { Subscription } from 'rxjs';
                   </ul>
                 </div>
                 <div
-                  class="px-4 py-3 border-t border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-3"
+                  class="px-4 py-3 border-t border-border/60 flex items-center justify-between gap-3"
                 >
                   <a
                     routerLink="/account/notifications"
-                    class="text-sm font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+                    class="text-sm font-medium text-accent hover:text-accent-strong"
                     (click)="closeNotifications()"
                   >
                     {{ 'notifications.viewAll' | translate }}
                   </a>
                   <a
                     routerLink="/account/notifications/settings"
-                    class="text-sm text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    class="text-sm text-text-secondary hover:text-text-heading"
                     (click)="closeNotifications()"
                   >
                     {{ 'notifications.settings' | translate }}
@@ -357,7 +345,7 @@ import { Subscription } from 'rxjs';
               </div>
             </div>
             <div
-              class="hidden lg:flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/70"
+              class="hidden lg:flex items-center gap-2 rounded-full border border-border-muted bg-background/70 px-2 py-1 shadow-sm"
             >
               <app-theme-segmented-control
                 [preference]="themePreference"
@@ -367,41 +355,31 @@ import { Subscription } from 'rxjs';
                 [variant]="'embedded'"
                 [ariaLabel]="'nav.theme' | translate"
               ></app-theme-segmented-control>
-              <div class="h-6 w-px bg-slate-200 dark:bg-slate-700"></div>
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+              <div class="h-6 w-px bg-surface-raised"></div>
+              <label class="flex items-center gap-2 text-sm text-text">
                 <span class="sr-only">{{ 'nav.language' | translate }}</span>
                 <select
-                  class="h-9 rounded-full bg-transparent px-2 text-sm text-slate-900 focus:outline-none [color-scheme:light] dark:text-slate-100 dark:[color-scheme:dark]"
+                  class="h-9 rounded-full bg-transparent px-2 text-sm text-text-heading focus:outline-none [color-scheme:light] dark:[color-scheme:dark]"
                   [ngModel]="language"
                   (ngModelChange)="onLanguageChange($event)"
                   [attr.aria-label]="'nav.language' | translate"
                 >
-                  <option
-                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-                    value="en"
-                  >
-                    EN
-                  </option>
-                  <option
-                    class="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100"
-                    value="ro"
-                  >
-                    RO
-                  </option>
+                  <option class="bg-background text-text-heading" value="en">EN</option>
+                  <option class="bg-background text-text-heading" value="ro">RO</option>
                 </select>
               </label>
             </div>
           </div>
         </nav>
         <nav
-          class="hidden lg:flex items-center gap-6 border-t border-slate-200/60 py-2 text-sm font-medium text-slate-700 dark:border-slate-800/60 dark:text-slate-200 overflow-x-auto whitespace-nowrap"
+          class="hidden lg:flex items-center gap-6 border-t border-border/60 py-2 text-sm font-medium text-text overflow-x-auto whitespace-nowrap"
           aria-label="Primary storefront navigation"
         >
           <ng-container *ngFor="let link of storefrontLinks(); trackBy: trackNavLink">
             <a
               *ngIf="!link.external; else externalStorefrontLink"
               [routerLink]="link.path"
-              class="hover:text-slate-900 dark:hover:text-white"
+              class="hover:text-text-heading"
             >
               {{ link.translate === false ? link.label : (link.label | translate) }}
             </a>
@@ -410,7 +388,7 @@ import { Subscription } from 'rxjs';
                 [href]="link.path"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="hover:text-slate-900 dark:hover:text-white"
+                class="hover:text-text-heading"
               >
                 {{ link.translate === false ? link.label : (link.label | translate) }}
               </a>
@@ -423,18 +401,14 @@ import { Subscription } from 'rxjs';
             [ngClass]="
               storefrontEditMode()
                 ? 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-100'
-                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'
+                : 'border-border-muted bg-background text-text hover:bg-surface-muted'
             "
             (click)="toggleStorefrontEditMode()"
             [attr.aria-pressed]="storefrontEditMode()"
           >
             {{ 'nav.editMode' | translate }}
           </button>
-          <a
-            *ngIf="isStaff()"
-            routerLink="/admin"
-            class="hover:text-slate-900 dark:hover:text-white"
-          >
+          <a *ngIf="isStaff()" routerLink="/admin" class="hover:text-text-heading">
             {{ 'nav.viewAdmin' | translate }}
           </a>
         </nav>
@@ -446,9 +420,9 @@ import { Subscription } from 'rxjs';
       (click)="closeOverlays()"
     ></div>
     <div *ngIf="searchOpen" class="fixed inset-0 z-50" (click)="closeSearch()">
-      <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm dark:bg-black/60"></div>
+      <div class="absolute inset-0 bg-overlay/50 backdrop-blur-sm"></div>
       <div
-        class="absolute top-20 left-1/2 -translate-x-1/2 w-[min(92vw,560px)] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+        class="absolute top-20 left-1/2 -translate-x-1/2 w-[min(92vw,560px)] rounded-2xl border border-border-muted bg-background p-4 shadow-xl"
         (click)="$event.stopPropagation()"
         role="dialog"
         aria-modal="true"
@@ -461,14 +435,14 @@ import { Subscription } from 'rxjs';
             id="mobile-search-input"
             name="q"
             type="search"
-            class="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-400"
+            class="w-full h-10 rounded-xl border border-border-muted bg-field px-3 text-sm text-text-heading shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
             [placeholder]="'shop.searchPlaceholder' | translate"
             [(ngModel)]="searchQuery"
             (keydown.escape)="closeSearch()"
           />
           <button
             type="submit"
-            class="h-10 px-4 rounded-xl bg-slate-900 text-white text-sm font-medium dark:bg-slate-50 dark:text-slate-900"
+            class="h-10 px-4 rounded-xl bg-surface-inverse text-inverse text-sm font-medium"
           >
             {{ 'shop.search' | translate }}
           </button>
@@ -719,7 +693,7 @@ export class HeaderComponent implements OnDestroy {
     if (level === 'promo') {
       return 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100';
     }
-    return 'bg-indigo-50 text-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-100';
+    return 'bg-accent-subtle text-accent-strong';
   }
 
   trackNavLink(_: number, link: NavLink): string {

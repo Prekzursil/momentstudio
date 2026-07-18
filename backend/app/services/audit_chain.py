@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models.audit import AuditChainState
 from app.models.catalog import ProductAuditLog
 from app.models.content import ContentAuditLog
+from app.models.theme import ThemeAuditLog
 from app.models.user import AdminAuditLog
 
 
@@ -120,6 +121,40 @@ async def add_content_audit_log(
                 "action": audit.action,
                 "user_id": str(audit.user_id) if audit.user_id else None,
                 "content_block_id": str(audit.content_block_id),
+                "version": audit.version,
+            },
+        )
+        audit.chain_prev_hash = prev
+        audit.chain_hash = digest
+    session.add(audit)
+    return audit
+
+
+async def add_theme_audit_log(
+    session: AsyncSession,
+    *,
+    theme_version_id: UUID,
+    action: str,
+    version: int,
+    user_id: UUID | None,
+) -> ThemeAuditLog:
+    audit = ThemeAuditLog(
+        theme_version_id=theme_version_id,
+        action=action,
+        version=version,
+        user_id=user_id,
+    )
+    if hash_chain_enabled():
+        audit.created_at = datetime.now(timezone.utc)
+        prev, digest = await _apply_hash_chain(
+            session,
+            "theme",
+            {
+                "id": str(audit.id),
+                "created_at": audit.created_at.isoformat(),
+                "action": audit.action,
+                "user_id": str(audit.user_id) if audit.user_id else None,
+                "theme_version_id": str(audit.theme_version_id),
                 "version": audit.version,
             },
         )

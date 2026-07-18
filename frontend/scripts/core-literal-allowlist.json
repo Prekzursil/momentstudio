@@ -1,0 +1,18 @@
+{
+  "_comment": "Reviewed, documented NON-CORE / baked exceptions for the P1a WU5 core-literal sweep (check-core-literals.mjs). Every entry is an explicit WU0 §1A out-of-core surface, NOT a themeable-core token. Adding here requires review.",
+  "_styles_css_hljs_syntax_theme": "styles.css @layer components .hljs-* code-syntax highlight palette (WU0 §1A: syntax theme, not core storefront palette).",
+  "_styles_css_print_reset": "styles.css @media print forces #fff/#000 (WU0 §1A: print-only reset, not a runtime themeable surface).",
+  "_index_html_theme_color_meta": "index.html <meta name=theme-color> browser-chrome hints (#f8fafc light / #0f172a dark). The browser reads these at parse time; they CANNOT be CSS-var driven, so they stay static. Out of the runtime themeable CSS surface.",
+  "allow": [
+    "#94a3b8",
+    "#c084fc",
+    "#86efac",
+    "#fbbf24",
+    "#a5b4fc",
+    "#7dd3fc",
+    "#fff",
+    "#000",
+    "#f8fafc",
+    "#0f172a"
+  ]
+}

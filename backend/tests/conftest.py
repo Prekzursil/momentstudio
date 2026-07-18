@@ -51,6 +51,28 @@ def make_memory_session_factory() -> async_sessionmaker:
     return session_factory
 
 
+@pytest.fixture
+def seeded_theme_factory() -> async_sessionmaker:
+    """In-memory SQLite session factory with the default theme already seeded.
+
+    Shared by the theme WUs (WU1 model/seed tests; WU4a resolve/read, WU6 SSR,
+    WU12 preview later) so each obtains the published default row by calling
+    ``ensure_default_theme`` — NOT by asserting a migration INSERT, which the
+    ``create_all`` test path never executes.
+    """
+    from app.services.theme_service import ensure_default_theme
+
+    factory = make_memory_session_factory()
+
+    async def _seed() -> None:
+        async with factory() as session:
+            await ensure_default_theme(session)
+            await session.commit()
+
+    asyncio.run(_seed())
+    return factory
+
+
 @pytest.fixture(autouse=True)
 def _dispose_tracked_async_engines() -> Generator[None, None, None]:
     start_index = len(_TRACKED_ENGINES)

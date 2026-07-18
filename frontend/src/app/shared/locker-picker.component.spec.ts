@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { TranslateModule } from '@ngx-translate/core';
+import * as L from 'leaflet';
 import { of, throwError } from 'rxjs';
 
 import { LazyStylesService } from '../core/lazy-styles.service';
@@ -15,6 +16,7 @@ type Private = {
   mapHost?: { nativeElement: HTMLDivElement };
   searchTimer: number | null;
   searchAbort: AbortController | null;
+  loadLeaflet: () => Promise<typeof import('leaflet')>;
   fetchLocations: (q: string, opts?: { applyFirst?: boolean }) => Promise<void>;
   loadLockers: (lat: number, lng: number) => Promise<void>;
   refreshMirrorSnapshot: () => Promise<void>;
@@ -551,6 +553,10 @@ describe('LockerPickerComponent', () => {
   it('builds a real map and reacts to its events and markers', async () => {
     const fixture = make();
     const cmp = fixture.componentInstance;
+    // Feed the eagerly-bundled Leaflet module through the import seam so this
+    // integration test drives a real map without performing a network-backed
+    // lazy chunk fetch (the source of the intermittent ChunkLoadError).
+    spyOn(priv(fixture), 'loadLeaflet').and.returnValue(Promise.resolve(L));
     const host = document.createElement('div');
     host.style.width = '300px';
     host.style.height = '200px';
@@ -604,5 +610,14 @@ describe('LockerPickerComponent', () => {
     priv(fixture).mapHost = undefined;
     await cmp.initMap();
     expect(priv(fixture).map).toBeNull();
+  });
+
+  it('loadLeaflet resolves the Leaflet module through the import seam', async () => {
+    const fixture = make();
+    // Exercises the real seam body. Because the spec statically imports Leaflet,
+    // webpack bundles it eagerly, so this dynamic import resolves from the test
+    // bundle rather than fetching a lazy runtime chunk over HTTP.
+    const mod = await priv(fixture).loadLeaflet();
+    expect(mod.map).toBe(L.map);
   });
 });

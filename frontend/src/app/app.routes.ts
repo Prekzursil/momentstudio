@@ -362,6 +362,14 @@ export const routes: Routes = [
         title: 'meta.titles.admin',
       },
       {
+        path: 'theme',
+        loadComponent: () =>
+          import('./pages/admin/theme/admin-theme.component').then((m) => m.AdminThemeComponent),
+        canActivate: [adminSectionGuard('theme')],
+        canDeactivate: [unsavedChangesGuard],
+        title: 'meta.titles.admin_theme',
+      },
+      {
         path: 'content',
         canActivate: [adminSectionGuard('content')],
         loadComponent: () =>

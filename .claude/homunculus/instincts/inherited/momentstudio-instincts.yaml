@@ -1,0 +1,625 @@
+# Instincts generated from https://github.com/Prekzursil/momentstudio
+# Generated: 2026-07-03T15:16:49.491Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: momentstudio-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Commit Length
+
+## Action
+
+Write moderate-length commit messages (~70 characters)
+
+## Evidence
+
+- Average commit message length: 70 chars
+- Based on 100 commits
+
+---
+id: momentstudio-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Naming Files
+
+## Action
+
+Use kebab-case naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: kebab-case
+
+---
+id: momentstudio-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: momentstudio-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: momentstudio-test-framework
+trigger: "when writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Test Framework
+
+## Action
+
+Use jest as the test framework
+
+## Evidence
+
+- Test framework detected: jest
+- File pattern: *.spec.ts
+
+---
+id: momentstudio-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Test Naming
+
+## Action
+
+Name test files using the pattern: *.spec.ts
+
+## Evidence
+
+- File pattern: *.spec.ts
+- Consistent across test files
+
+---
+id: momentstudio-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Test Types
+
+## Action
+
+Write unit, integration tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration
+- Coverage config: yes
+
+---
+id: momentstudio-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~13x per month
+- Files: frontend/src/app/pages/admin/orders/*, frontend/src/app/pages/admin/users/*, frontend/src/app/pages/admin/*
+
+---
+id: momentstudio-workflow-add-100-percent-behavioral-test-coverage-for-component
+trigger: "when doing add 100 percent behavioral test coverage for component"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Workflow Add 100 Percent Behavioral Test Coverage For Component
+
+## Action
+
+Follow the add-100-percent-behavioral-test-coverage-for-component workflow:
+1. Write or update the component's .spec.ts file with comprehensive behavioral tests covering all logic branches, methods, and error paths.
+2. Annotate any genuinely unreachable code (e.g., SSR guards) with 'istanbul ignore next' or similar repo-standard comments.
+3. Run coverage tools to verify 100% line/branch/function/statement coverage for the component.
+4. Commit both the .spec.ts and (if needed) the component .ts file with coverage annotations.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~10x per month
+- Files: frontend/src/app/pages/**/[a-z0-9-]*.component.spec.ts, frontend/src/app/pages/**/[a-z0-9-]*.component.ts
+
+---
+id: momentstudio-workflow-add-100-percent-behavioral-test-coverage-for-service
+trigger: "when doing add 100 percent behavioral test coverage for service"
+confidence: 0.85
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Workflow Add 100 Percent Behavioral Test Coverage For Service
+
+## Action
+
+Follow the add-100-percent-behavioral-test-coverage-for-service workflow:
+1. Write or update the service's .spec.ts file with behavioral tests covering all public methods and code branches.
+2. Assert correct HTTP verb, URL, params, and observable emissions for each method.
+3. Annotate any unreachable SSR or defensive code with 'istanbul ignore next' if needed.
+4. Run coverage tools to verify 100% line/branch/function/statement coverage for the service.
+5. Commit the .spec.ts file (and .ts if annotations are added).
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~7x per month
+- Files: frontend/src/app/core/[a-z0-9-]*.service.spec.ts, frontend/src/app/core/[a-z0-9-]*.service.ts
+
+---
+id: momentstudio-workflow-add-100-percent-behavioral-test-coverage-for-utility-or-guard
+trigger: "when doing add 100 percent behavioral test coverage for utility or guard"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Workflow Add 100 Percent Behavioral Test Coverage For Utility Or Guard
+
+## Action
+
+Follow the add-100-percent-behavioral-test-coverage-for-utility-or-guard workflow:
+1. Write or update the .spec.ts file for the utility/guard/handler, covering all logic branches and error paths.
+2. Annotate any unreachable code (e.g., SSR-only logic) with 'istanbul ignore' as per repo convention.
+3. Run coverage tools to verify 100% line/branch/function/statement coverage.
+4. Commit the .spec.ts file (and .ts if annotations are added).
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: frontend/src/app/core/*.spec.ts, frontend/src/app/core/*.ts
+
+---
+id: momentstudio-workflow-add-istanbul-ignore-directives-for-unreachable-branches
+trigger: "when doing add istanbul ignore directives for unreachable branches"
+confidence: 0.75
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Workflow Add Istanbul Ignore Directives For Unreachable Branches
+
+## Action
+
+Follow the add-istanbul-ignore-directives-for-unreachable-branches workflow:
+1. Identify the unreachable branch (e.g., SSR-only code, defensive fallback).
+2. Annotate the branch with a reasoned 'istanbul ignore next' or 'istanbul ignore file' directive, matching repo conventions.
+3. Document the reasoning in a comment for future maintainers.
+4. Commit the updated file.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~5x per month
+- Files: frontend/src/app/pages/**/*.ts, frontend/src/app/core/**/*.ts
+
+---
+id: momentstudio-workflow-merge-feature-coverage-branch-into-main-coverage-branch
+trigger: "when doing merge feature coverage branch into main coverage branch"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/Prekzursil/momentstudio
+---
+
+# Momentstudio Workflow Merge Feature Coverage Branch Into Main Coverage Branch
+
+## Action
+
+Follow the merge-feature-coverage-branch-into-main-coverage-branch workflow:
+1. Open a merge request from the feature coverage branch to the main coverage branch.
+2. Resolve any conflicts (usually in .ts or .spec.ts files).
+3. Complete the merge, ensuring the main branch now includes the new/updated spec and source files.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~10x per month
+- Files: frontend/src/app/pages/**/*.spec.ts, frontend/src/app/pages/**/*.ts, frontend/src/app/core/**/*.spec.ts
+
+---
+id: momentstudio-instinct-file-naming
+trigger: "When creating a new file (component, service, utility, etc.)"
+confidence: 0.95
+domain: code-style
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct File Naming
+
+## Action
+
+Name the file using kebab-case (e.g., admin-orders.component.ts)
+
+## Evidence
+
+- Pattern in namingConventions.files: kebab-case
+- Examples: admin-orders.component.spec.ts
+
+---
+id: momentstudio-instinct-function-naming
+trigger: "When defining a function"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Function Naming
+
+## Action
+
+Name the function using camelCase (e.g., getOrderList)
+
+## Evidence
+
+- Pattern in namingConventions.functions: camelCase
+
+---
+id: momentstudio-instinct-class-naming
+trigger: "When defining a class"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Class Naming
+
+## Action
+
+Name the class using PascalCase (e.g., AdminOrdersComponent)
+
+## Evidence
+
+- Pattern in namingConventions.classes: PascalCase
+- Examples: AdminUsersComponent
+
+---
+id: momentstudio-instinct-constant-naming
+trigger: "When defining a constant"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Constant Naming
+
+## Action
+
+Name the constant using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Pattern in namingConventions.constants: SCREAMING_SNAKE_CASE
+
+---
+id: momentstudio-instinct-import-style
+trigger: "When importing modules or files"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in importStyle: relative
+
+---
+id: momentstudio-instinct-export-style
+trigger: "When exporting functions, classes, or constants"
+confidence: 0.9
+domain: code-style
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in exportStyle: named
+
+---
+id: momentstudio-instinct-test-file-pattern
+trigger: "When creating a test file"
+confidence: 0.95
+domain: testing
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Test File Pattern
+
+## Action
+
+Name the file with a .spec.ts suffix (e.g., admin-orders.component.spec.ts)
+
+## Evidence
+
+- Pattern in testing.filePattern: *.spec.ts
+- Examples: admin-orders.component.spec.ts
+
+---
+id: momentstudio-instinct-test-framework
+trigger: "When writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Test Framework
+
+## Action
+
+Use Jest as the testing framework
+
+## Evidence
+
+- Pattern in testing.framework: jest
+
+---
+id: momentstudio-instinct-test-coverage
+trigger: "When writing or updating tests for a file"
+confidence: 0.92
+domain: testing
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Test Coverage
+
+## Action
+
+Ensure 100% line, branch, function, and statement coverage; annotate unreachable code with 'istanbul ignore' directives as needed
+
+## Evidence
+
+- Workflow: add-100-percent-behavioral-test-coverage-for-component
+- Examples: test(admin-support): cover admin-support.component to 100% line+branch
+
+---
+id: momentstudio-instinct-test-types
+trigger: "When designing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Test Types
+
+## Action
+
+Include both unit and integration tests as appropriate
+
+## Evidence
+
+- Pattern in testing.testTypes: unit, integration
+
+---
+id: momentstudio-instinct-git-commit-prefix
+trigger: "When making a commit for test coverage or merging"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Git Commit Prefix
+
+## Action
+
+Prefix the commit message with 'test' for test-related changes or 'merge' for branch merges
+
+## Evidence
+
+- Examples: test(admin-support): cover admin-support.component to 100% line+branch
+- merge: cov/ms/frontend-src-app-app-config-server-ts into cov/frontend-100 (batch 0)
+
+---
+id: momentstudio-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Git Commit Format
+
+## Action
+
+Use the format: <prefix>(<scope>): <description> (e.g., test(admin-orders): cover admin-order-detail.component to 100%)
+
+## Evidence
+
+- Examples: test(admin-orders): cover admin-order-detail.component to 100%
+
+---
+id: momentstudio-instinct-add-component-coverage
+trigger: "When someone wants to ensure a component is fully tested and meets strict coverage gates"
+confidence: 0.98
+domain: workflow
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Add Component Coverage
+
+## Action
+
+Write or update the component's .spec.ts file with comprehensive behavioral tests, annotate unreachable code with 'istanbul ignore', run coverage tools to verify 100%, and commit both .spec.ts and .ts files if needed
+
+## Evidence
+
+- Workflow: add-100-percent-behavioral-test-coverage-for-component
+- Examples: test(shop): cover shop.component to 100% line+branch
+
+---
+id: momentstudio-instinct-add-service-coverage
+trigger: "When someone wants to ensure a service is fully tested and meets strict coverage gates"
+confidence: 0.97
+domain: workflow
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Add Service Coverage
+
+## Action
+
+Write or update the service's .spec.ts file with behavioral tests for all public methods and branches, assert HTTP calls and observable emissions, annotate unreachable code, run coverage tools to verify 100%, and commit .spec.ts (and .ts if annotated)
+
+## Evidence
+
+- Workflow: add-100-percent-behavioral-test-coverage-for-service
+
+---
+id: momentstudio-instinct-add-utility-coverage
+trigger: "When someone wants to fully test a utility, guard, or handler file for correctness and coverage compliance"
+confidence: 0.92
+domain: workflow
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Add Utility Coverage
+
+## Action
+
+Write or update the .spec.ts file for the utility/guard/handler, covering all logic branches and error paths, annotate unreachable code, run coverage tools to verify 100%, and commit .spec.ts (and .ts if annotated)
+
+## Evidence
+
+- Workflow: add-100-percent-behavioral-test-coverage-for-utility-or-guard
+
+---
+id: momentstudio-instinct-add-istanbul-ignore
+trigger: "When someone encounters a code branch that cannot be covered in unit tests due to environment constraints or provable logic"
+confidence: 0.88
+domain: workflow
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Add Istanbul Ignore
+
+## Action
+
+Annotate the branch with a reasoned 'istanbul ignore next' or 'istanbul ignore file' directive, document the reasoning in a comment, and commit the updated file
+
+## Evidence
+
+- Workflow: add-istanbul-ignore-directives-for-unreachable-branches
+
+---
+id: momentstudio-instinct-merge-coverage-branch
+trigger: "When a coverage feature branch is ready to be integrated into the main coverage branch"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: Prekzursil/momentstudio
+---
+
+# Momentstudio Instinct Merge Coverage Branch
+
+## Action
+
+Open a merge request from the feature coverage branch to the main coverage branch, resolve any conflicts, and complete the merge to include new/updated spec and source files
+
+## Evidence
+
+- Workflow: merge-feature-coverage-branch-into-main-coverage-branch
+- Examples: merge: cov/ms/frontend-src-app-app-config-server-ts into cov/frontend-100 (batch 0)
+

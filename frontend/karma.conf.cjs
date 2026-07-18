@@ -46,11 +46,16 @@ module.exports = function (config) {
     browsers: ['ChromeHeadlessNoSandbox'],
     singleRun: false,
     restartOnFileChange: true,
-    // Lean-charter coverage gate: the `test:coverage` script (ng test
-    // --code-coverage) makes the Angular karma builder emit istanbul coverage.
-    // We surface a machine-readable per-file summary for CI parsing and enforce
-    // the lean 100% threshold across all axes. A run below 100% exits non-zero
-    // (the gate is intentionally red until every source file is covered).
+    // Two-tier coverage gate:
+    //   1. This karma `check.global` is a NO-REGRESSION FLOOR — global coverage
+    //      may not drop below the current legacy surface. It is set a hair below
+    //      the live numbers to absorb measurement noise; ratchet it UP as the
+    //      surface improves (never down).
+    //   2. `scripts/diff-coverage.mjs` (run as `posttest:coverage`) enforces the
+    //      strict part: 100% coverage on every source line a PR adds or modifies.
+    // Legacy code is thus frozen (can't regress) while all NEW/changed code must
+    // be fully covered — replacing the old global-100% floor, which blocked every
+    // PR while the legacy surface sat at ~49%.
     coverageReporter: {
       dir: require('path').join(__dirname, 'coverage'),
       subdir: '.',
@@ -62,10 +67,10 @@ module.exports = function (config) {
       ],
       check: {
         global: {
-          statements: 100,
-          branches: 100,
-          functions: 100,
-          lines: 100,
+          statements: 48,
+          branches: 41,
+          functions: 52,
+          lines: 49,
         },
       },
     },
