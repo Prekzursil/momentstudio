@@ -28,9 +28,9 @@ import { CartStore } from '../core/cart.store';
   ],
   template: `
     <article
-      class="group grid gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:bg-slate-900 dark:border-slate-800 dark:shadow-none"
+      class="group grid gap-3 rounded-2xl border border-border bg-background p-3 shadow-sm hover:-translate-y-1 hover:shadow-md transition dark:shadow-none"
     >
-      <div class="block overflow-hidden rounded-xl bg-slate-50 relative dark:bg-slate-800">
+      <div class="block overflow-hidden rounded-xl bg-surface-muted relative">
         <a
           [routerLink]="['/products', product.slug]"
           class="block"
@@ -50,7 +50,7 @@ import { CartStore } from '../core/cart.store';
         </a>
         <button
           type="button"
-          class="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+          class="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-border-muted bg-background/90 text-text shadow-sm transition hover:bg-background"
           [class.border-rose-200]="wishlisted"
           [class.text-rose-600]="wishlisted"
           [attr.aria-label]="
@@ -75,21 +75,21 @@ import { CartStore } from '../core/cart.store';
         </button>
         <span
           *ngIf="badge"
-          class="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow dark:bg-slate-900/90 dark:text-slate-100"
+          class="absolute left-3 top-3 rounded-full bg-background/90 px-3 py-1 text-xs font-semibold text-text-strong shadow"
         >
           {{ badge }}
         </span>
         <button
           *ngIf="showStorefrontEdit()"
           type="button"
-          class="absolute left-3 bottom-3 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-800 shadow-sm transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+          class="absolute left-3 bottom-3 rounded-full border border-border-muted bg-background/90 px-3 py-1 text-xs font-semibold text-text-strong shadow-sm transition hover:bg-background"
           (click)="openAdminEdit($event)"
         >
           {{ 'adminUi.common.edit' | translate }}
         </button>
         <select
           *ngIf="showStorefrontEdit()"
-          class="absolute right-3 bottom-3 h-8 rounded-full border border-slate-200 bg-white/90 px-3 text-xs font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 dark:border-slate-700 dark:bg-slate-900/90 dark:text-slate-100"
+          class="absolute right-3 bottom-3 h-8 rounded-full border border-border-muted bg-background/90 px-3 text-xs font-semibold text-text-strong shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
           [disabled]="statusSaving"
           [value]="product.status ?? 'published'"
           (change)="onStatusChange($event)"
@@ -103,25 +103,22 @@ import { CartStore } from '../core/cart.store';
         <div class="flex items-center justify-between gap-2">
           <a
             [routerLink]="['/products', product.slug]"
-            class="font-semibold text-slate-900 line-clamp-1 dark:text-slate-50"
+            class="font-semibold text-text-heading line-clamp-1"
             (click)="onPrimaryClick($event)"
           >
             {{ product.name }}
           </a>
-          <span class="text-sm text-slate-500 dark:text-slate-300">{{ product.currency }}</span>
+          <span class="text-sm text-text-muted">{{ product.currency }}</span>
         </div>
         <div class="flex items-baseline gap-2">
-          <p class="text-lg font-semibold text-slate-900 dark:text-slate-50">
+          <p class="text-lg font-semibold text-text-heading">
             {{ displayPrice | localizedCurrency: product.currency }}
           </p>
-          <p *ngIf="isOnSale" class="text-sm text-slate-500 line-through dark:text-slate-300">
+          <p *ngIf="isOnSale" class="text-sm text-text-muted line-through">
             {{ product.base_price | localizedCurrency: product.currency }}
           </p>
         </div>
-        <p
-          *ngIf="product.short_description"
-          class="text-sm text-slate-600 line-clamp-2 dark:text-slate-300"
-        >
+        <p *ngIf="product.short_description" class="text-sm text-text-secondary line-clamp-2">
           {{ product.short_description }}
         </p>
         <div
@@ -134,31 +131,31 @@ import { CartStore } from '../core/cart.store';
       </div>
       <div
         *ngIf="showStorefrontEdit()"
-        class="grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/40"
+        class="grid gap-2 rounded-xl border border-border bg-surface-muted p-3"
         (click)="$event.stopPropagation()"
       >
         <div class="grid grid-cols-2 gap-2">
-          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+          <label class="grid gap-1 text-xs font-semibold text-text">
             <span>{{ 'adminUi.products.table.price' | translate }}</span>
             <input
               type="number"
               inputmode="decimal"
               step="0.01"
               min="0"
-              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              class="h-9 w-full rounded-lg border border-border-muted bg-background px-3 text-sm font-normal text-text-heading shadow-sm focus:border-border-strong focus:outline-none disabled:opacity-60"
               [disabled]="inlineSaving"
               [value]="inlinePrice"
               (input)="inlinePrice = $any($event.target).value"
             />
           </label>
-          <label class="grid gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
+          <label class="grid gap-1 text-xs font-semibold text-text">
             <span>{{ 'adminUi.products.table.stock' | translate }}</span>
             <input
               type="number"
               inputmode="numeric"
               step="1"
               min="0"
-              class="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-normal text-slate-900 shadow-sm focus:border-slate-400 focus:outline-none disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              class="h-9 w-full rounded-lg border border-border-muted bg-background px-3 text-sm font-normal text-text-heading shadow-sm focus:border-border-strong focus:outline-none disabled:opacity-60"
               [disabled]="inlineSaving"
               [value]="inlineStock"
               (input)="inlineStock = $any($event.target).value"

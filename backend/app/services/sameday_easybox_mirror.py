@@ -266,8 +266,11 @@ def _normalize_row(row: dict[str, Any]) -> _NormalizedLocker | None:
     )
 
     if not external_id:
+        # Non-security deterministic locker identity from name+coords (dedup key
+        # for the Easybox mirror), not a security/auth digest -> usedforsecurity=False.
         external_id = hashlib.sha1(
-            f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8")
+            f"{name or ''}|{lat:.6f}|{lng:.6f}".encode("utf-8"),
+            usedforsecurity=False,
         ).hexdigest()[:40]
     if not name:
         name = f"Easybox {external_id[:8]}"

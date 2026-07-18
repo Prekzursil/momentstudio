@@ -37,7 +37,7 @@ import { ClarityService } from './core/clarity.service';
       >Skip to main content</a
     >
     <div
-      class="min-h-screen flex flex-col bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-slate-950 dark:to-slate-900 dark:text-slate-50 transition-colors"
+      class="min-h-screen flex flex-col bg-gradient-to-b from-background-subtle to-background text-text-heading transition-colors"
     >
       <app-header
         [themePreference]="preference()"
