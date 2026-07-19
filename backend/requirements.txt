@@ -1,4 +1,4 @@
-fastapi==0.139.0
+fastapi==0.139.2
 jinja2==3.1.6
 uvicorn[standard]==0.51.0
 pydantic-settings==2.14.2
@@ -19,7 +19,7 @@ stripe==14.4.1
 Pillow==12.3.0
 defusedxml==0.7.1
 reportlab==4.5.1
-sentry-sdk==2.64.0
+sentry-sdk==2.66.0
 webauthn==2.8.0
 
 # Transitive-dependency CVE pins for the osv-scanner deps gate (upgrade-to-clear
