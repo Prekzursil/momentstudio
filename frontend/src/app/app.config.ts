@@ -26,7 +26,10 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authAndErrorInterceptor])),
     { provide: TitleStrategy, useClass: TranslatedTitleStrategy },
     provideServiceWorker('ngsw-worker.js', {
-      enabled: !isDevMode() && runtimeConfig.appEnv === 'production',
+      enabled:
+        !isDevMode() &&
+        /* istanbul ignore next -- prod-only gate: isDevMode() is always true under Karma, so this production-env operand is unreachable in unit tests */ runtimeConfig.appEnv ===
+          'production',
       registrationStrategy: 'registerWhenStable:30000',
     }),
     {

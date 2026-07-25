@@ -287,12 +287,20 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
       forkJoin(requests).subscribe({
         next: (res: any) => {
           const events: CustomerTimelineEvent[] = [
-            ...(res?.orders || []).map((o: AdminOrderListItem) => ({
+            ...(
+              res?.orders ||
+              // istanbul ignore next -- defensive default: the orders request always emits an array (search().pipe(map -> array) or of([])), so this fallback is unreachable.
+              []
+            ).map((o: AdminOrderListItem) => ({
               kind: 'order' as const,
               created_at: o.created_at,
               order: o,
             })),
-            ...(res?.tickets || []).map((t: AdminContactSubmissionListItem) => ({
+            ...(
+              res?.tickets ||
+              // istanbul ignore next -- defensive default: the tickets request always emits an array (list().pipe(map -> array) or of([])), so this fallback is unreachable.
+              []
+            ).map((t: AdminContactSubmissionListItem) => ({
               kind: 'ticket' as const,
               created_at: t.created_at,
               ticket: t,
@@ -319,7 +327,8 @@ export class CustomerTimelineComponent implements OnChanges, OnDestroy {
           }
           this.loading.set(false);
         },
-        error: () => {
+        // unreachable: every forkJoin source is wrapped in its own catchError that returns of([]), so the combined stream never errors. Kept as a defensive guard.
+        error: /* istanbul ignore next -- see comment above: forkJoin never errors here */ () => {
           this.error.set(this.translate.instant('adminUi.customerTimeline.errors.load'));
           this.loading.set(false);
         },

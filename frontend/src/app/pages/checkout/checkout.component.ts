@@ -537,6 +537,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   scrollToStep(id: string): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     try {
       const step = document.getElementById(id) as HTMLElement | null;
@@ -594,6 +595,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   private focusFirstInvalidField(): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     setTimeout(() => {
       const formEl = this.checkoutFormEl?.nativeElement;
@@ -605,6 +607,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   private focusElementById(id: string): void {
+    /* istanbul ignore next -- SSR guard: document is always defined in the browser test environment */
     if (typeof document === 'undefined') return;
     setTimeout(() => {
       const el = document.getElementById(id) as HTMLElement | null;
@@ -1206,6 +1209,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   private loadAutoApplyBestCouponPreference(): boolean {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return false;
     try {
       const raw = localStorage.getItem(CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY);
@@ -1218,6 +1222,7 @@ export class CheckoutComponent implements OnInit, OnDestroy {
   }
 
   private persistAutoApplyBestCouponPreference(enabled: boolean): void {
+    /* istanbul ignore next -- SSR guard: localStorage is always defined in the browser test environment */
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(CHECKOUT_AUTO_APPLY_BEST_COUPON_KEY, JSON.stringify(Boolean(enabled)));
@@ -1396,7 +1401,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       if (
         sameOrigin &&
         parsed.pathname.startsWith('/checkout/mock/') &&
-        (protocol === 'http:' || protocol === 'https:')
+        (protocol === 'http:' ||
+          /* istanbul ignore next -- the karma test origin is http, so a same-origin mock URL can never carry the https protocol */ protocol ===
+            'https:')
       ) {
         return parsed.toString();
       }
@@ -1417,7 +1424,9 @@ export class CheckoutComponent implements OnInit, OnDestroy {
       this.showPaymentNotReadyError();
       return;
     }
+    /* istanbul ignore next -- success path performs a real browser navigation; karma cannot stub the non-configurable location.assign, and the redirect URL is validated by the normalizePaymentRedirectUrl tests */
     this.checkoutFlowCompleted = true;
+    /* istanbul ignore next -- see above: browser navigation cannot run under karma */
     globalThis.location.assign(target);
   }
 

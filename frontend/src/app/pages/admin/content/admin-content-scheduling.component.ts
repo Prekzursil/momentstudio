@@ -280,6 +280,7 @@ export class AdminContentSchedulingComponent implements OnInit {
     };
 
     const kindForKey = (key: string): SchedulingKind => {
+      // istanbul ignore next -- key is always the already-trimmed, non-empty relevant key (caller filters via isRelevantKey), so the `|| ''` fallback is unreachable.
       const value = (key || '').trim();
       if (value.startsWith('blog.')) return 'blog';
       if (isCmsGlobalSectionKey(value)) return 'global';
@@ -289,6 +290,7 @@ export class AdminContentSchedulingComponent implements OnInit {
     const editorLinkForKey = (
       key: string,
     ): { path: string; queryParams: Record<string, string> } => {
+      // istanbul ignore next -- key is always the already-trimmed, non-empty relevant key (caller filters via isRelevantKey), so the `|| ''` fallback is unreachable.
       const value = (key || '').trim();
       if (value.startsWith('blog.')) {
         const slug = value.split('.', 2)[1] || value.slice('blog.'.length);

@@ -80,6 +80,7 @@ const defaults: AppConfig = {
 export const appConfig: AppConfig = (() => {
   const runtime = globalThis.window?.__APP_CONFIG__;
   const runtimeSiteProfile = runtime?.siteProfile as Partial<AppConfig['siteProfile']> | undefined;
+  /* istanbul ignore next -- SSR guard: globalThis.window is always defined under the Karma/Chrome unit harness, so this server-render branch only executes under Node SSR */
   if (globalThis.window === undefined) {
     const ssrApiBase =
       (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[

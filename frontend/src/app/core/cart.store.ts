@@ -100,12 +100,9 @@ export class CartStore {
             price: Number(res.unit_price_at_add ?? payload.price ?? 0),
             currency: res.currency ?? payload.currency ?? 'RON',
             quantity: res.quantity,
-            // max_quantity is non-null in the else-arm, so the ?? fallbacks are unreachable.
-            // prettier-ignore
-            stock:
-              res.max_quantity == null
-                ? UNLIMITED_CART_STOCK
-                : Number(res.max_quantity ?? /* istanbul ignore next */ payload.stock ?? 99),
+            // The else-arm only runs when res.max_quantity != null, so a `?? payload.stock ?? 99`
+            // chain here would be dead code; read the (narrowed, non-null) value directly.
+            stock: res.max_quantity == null ? UNLIMITED_CART_STOCK : Number(res.max_quantity),
             image: res.image_url ?? payload.image ?? '',
           }),
         ),

@@ -15,7 +15,7 @@ const NOINDEX_ROBOTS = 'noindex,nofollow';
 
 const mockCheckoutRoutes: Routes =
   appConfig.appEnv === 'production'
-    ? []
+    ? /* istanbul ignore next -- production-only empty branch: appConfig.appEnv is resolved once at module-evaluation time and Karma/Jasmine cannot re-import this module with a different env in a single run, so the production path is structurally unreachable under unit test */ []
     : [
         {
           path: 'checkout/mock/paypal',

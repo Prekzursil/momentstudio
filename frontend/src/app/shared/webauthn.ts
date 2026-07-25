@@ -5,6 +5,7 @@ function padBase64(base64: string): string {
 }
 
 export function isWebAuthnSupported(): boolean {
+  /* istanbul ignore next -- SSR-only guard: under Karma the spec runs in a real browser where `window` is a non-configurable global, so the server-side `typeof window === 'undefined'` branch is unreachable from tests. */
   if (typeof window === 'undefined') return false;
   if (!window.isSecureContext) return false;
   return (
