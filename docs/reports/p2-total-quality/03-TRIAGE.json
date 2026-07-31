@@ -1,0 +1,2521 @@
+{
+  "gated_coverage": {
+    "gated_cells": 228,
+    "gated_captured_authenticated": 228,
+    "gated_auth_failed": 0,
+    "gated_routes_covered": 38,
+    "anon_cells": 324
+  },
+  "totals": {
+    "cells": 552,
+    "ok": 552,
+    "failed": 0,
+    "routes": 92,
+    "axe_violation_instances": 107,
+    "distinct_axe_rules": 6,
+    "cells_without_axe_scan": 0
+  },
+  "axe_by_rule": {
+    "select-name": 66,
+    "color-contrast": 18,
+    "scrollable-region-focusable": 10,
+    "label": 6,
+    "link-in-text-block": 6,
+    "aria-prohibited-attr": 1
+  },
+  "axe_by_impact": {
+    "critical": 72,
+    "serious": 35
+  },
+  "axe_examples": {
+    "select-name": {
+      "help": "Select element must have an accessible name",
+      "impact": "critical",
+      "route": "/account",
+      "viewport": "mobile",
+      "theme": "dark",
+      "target": [
+        "div[aria-label=\"Account section selector\"] > select"
+      ],
+      "html": "<select class=\"w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-s"
+    },
+    "aria-prohibited-attr": {
+      "help": "Elements must only use permitted ARIA attributes",
+      "impact": "serious",
+      "route": "/account",
+      "viewport": "tablet",
+      "theme": "dark",
+      "target": [
+        ".bg-slate-50.dark\\:bg-slate-950\\/40.rounded-2xl:nth-child(6)"
+      ],
+      "html": "<div class=\"rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40\" aria-label=\"Support tickets summary loadin"
+    },
+    "scrollable-region-focusable": {
+      "help": "Scrollable region must have keyboard access",
+      "impact": "serious",
+      "route": "/admin",
+      "viewport": "desktop",
+      "theme": "dark",
+      "target": [
+        ".overflow-x-auto.mt-3"
+      ],
+      "html": "<div class=\"mt-3 overflow-x-auto\">"
+    },
+    "color-contrast": {
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "impact": "serious",
+      "route": "/admin/content/media",
+      "viewport": "desktop",
+      "theme": "dark",
+      "target": [
+        ".border-slate-300.py-1\\.5.text-slate-700:nth-child(2)"
+      ],
+      "html": "<button type=\"button\" class=\"rounded-full border px-3 py-1.5 text-xs font-semibold border-slate-300 text-slate-700\"> Review queue </button>"
+    },
+    "label": {
+      "help": "Form elements must have labels",
+      "impact": "critical",
+      "route": "/admin/content/pages",
+      "viewport": "desktop",
+      "theme": "dark",
+      "target": [
+        ".toastui-editor-toolbar-group:nth-child(6) > .toastui-editor-toolbar-item-wrapper > .scroll-sync.active > input[type=\"checkbox\"]"
+      ],
+      "html": "<input type=\"checkbox\">"
+    },
+    "link-in-text-block": {
+      "help": "Links must be distinguishable without relying on color",
+      "impact": "serious",
+      "route": "/blog/white-cup",
+      "viewport": "desktop",
+      "theme": "dark",
+      "target": [
+        ".text-indigo-600"
+      ],
+      "html": "<a routerlink=\"/login\" class=\"text-indigo-600 dark:text-indigo-300 hover:underline\" href=\"/login\" jsaction=\"click:;\">Sign in</a>"
+    }
+  },
+  "routes_with_page_errors": {},
+  "routes_with_console_errors": {
+    "/account/privacy": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "/admin/content/pages": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "/admin/content/settings": [
+      "Failed to load resource: the server responded with a status of 403 ()",
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "/admin/orders/1": [
+      "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)"
+    ],
+    "/blog/white-cup": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "/contact?lang=ro": [
+      "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+    ],
+    "/pages/white-cup": [
+      "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    ],
+    "/receipt/white-cup": [
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ]
+  },
+  "failed_requests_by_route": {
+    "/account/privacy": [
+      "404 http://localhost:4202/api/v1/auth/me/export/jobs/latest"
+    ],
+    "/admin": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/content": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/content/blog": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/content/home": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/content/media": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/content/pages": [
+      "404 http://localhost:4202/api/v1/content/admin/cms.snippets",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/content/scheduling": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/content/settings": [
+      "403 https://scontent.cdninstagram.com/v/t51.2885-19/18444162_1923764237836500_5339930760352628736_a.jpg?stp=dst-jp",
+      "403 https://scontent.cdninstagram.com/v/t51.2885-19/491737685_1404380280564762_4553794314336734014_n.jpg?stp=dst-j",
+      "403 https://scontent.fotp3-3.fna.fbcdn.net/v/t39.30808-1/464863122_122181436856162857_8128354325909289505_n.jpg?st",
+      "403 https://scontent.fotp3-3.fna.fbcdn.net/v/t39.30808-1/528299650_122135861786841687_5365101171661479697_n.jpg?st",
+      "404 http://localhost:4202/api/v1/content/admin/site.assets",
+      "404 http://localhost:4202/api/v1/content/admin/site.assets/versions",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/coupons": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/dashboard": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/inventory": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/ip-bypass": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/ops": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/orders/1": [
+      "422 http://localhost:4202/api/v1/orders/admin/1?include_pii=true",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/orders": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/orders/exports": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/products": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/returns": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/support": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/theme": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/users": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/users/gdpr": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/admin/users/segments": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/blog/white-cup": [
+      "404 http://localhost:4202/api/v1/blog/posts/white-cup?lang=en"
+    ],
+    "/contact?lang=ro": [
+      "429 http://localhost:4202/api/v1/auth/refresh"
+    ],
+    "/?lang=ro": [
+      "net::ERR_ABORTED http://localhost:4202/assets/home/banner_image-640.avif",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/pages/terms?lang=ro": [
+      "net::ERR_ABORTED http://localhost:4202/api/v1/content/pages/anpc?lang=en",
+      "net::ERR_ABORTED http://localhost:4202/api/v1/content/pages/privacy-policy?lang=en",
+      "net::ERR_ABORTED http://localhost:4202/api/v1/content/pages/terms-and-conditions?lang=en"
+    ],
+    "/pages/white-cup": [
+      "404 http://localhost:4202/api/v1/content/pages/white-cup?lang=en"
+    ],
+    "/products/blue-bowl": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg"
+    ],
+    "/products/blue-bowl?lang=ro": [
+      "net::ERR_ABORTED http://localhost:4202/api/v1/catalog/products/blue-bowl?lang=en",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg"
+    ],
+    "/products/white-cup": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-2.jpg"
+    ],
+    "/products/white-cup?lang=ro": [
+      "net::ERR_ABORTED http://localhost:4202/api/v1/catalog/products/white-cup?lang=en",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-2.jpg"
+    ],
+    "/receipt/white-cup": [
+      "403 http://localhost:4202/api/v1/orders/receipt/white-cup"
+    ],
+    "/": [
+      "net::ERR_ABORTED http://localhost:4202/assets/home/banner_image-640.avif",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/shop": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg",
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/shop/bowls": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg"
+    ],
+    "/shop/bowls?lang=ro": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/blue-bowl-1.jpg"
+    ],
+    "/shop/cups": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ],
+    "/shop/cups?lang=ro": [
+      "net::ERR_BLOCKED_BY_ORB https://example.com/images/white-cup-1.jpg"
+    ]
+  },
+  "horizontal_overflow": [
+    {
+      "route": "/account/security",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 456,
+      "samples": [
+        {
+          "tag": "app-account-security",
+          "sel": "",
+          "right": 831,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "section",
+          "sel": "grid",
+          "right": 831,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 814,
+          "text": "Security  Manage password, emails, and c"
+        }
+      ]
+    },
+    {
+      "route": "/account/security",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 456,
+      "samples": [
+        {
+          "tag": "app-account-security",
+          "sel": "",
+          "right": 831,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "section",
+          "sel": "grid",
+          "right": 831,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 814,
+          "text": "Security  Manage password, emails, and c"
+        }
+      ]
+    },
+    {
+      "route": "/account/security",
+      "viewport": "tablet",
+      "theme": "dark",
+      "overflowX": 157,
+      "samples": [
+        {
+          "tag": "app-account-security",
+          "sel": "",
+          "right": 925,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "section",
+          "sel": "grid",
+          "right": 925,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 906,
+          "text": "Security  Manage password, emails, and c"
+        }
+      ]
+    },
+    {
+      "route": "/account/security",
+      "viewport": "tablet",
+      "theme": "light",
+      "overflowX": 157,
+      "samples": [
+        {
+          "tag": "app-account-security",
+          "sel": "",
+          "right": 925,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "section",
+          "sel": "grid",
+          "right": 925,
+          "text": "Security  Manage password, emails, and c"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 906,
+          "text": "Security  Manage password, emails, and c"
+        }
+      ]
+    },
+    {
+      "route": "/admin",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 368,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 743,
+          "text": "Dashboard"
+        }
+      ]
+    },
+    {
+      "route": "/admin",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 368,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 743,
+          "text": "Dashboard"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 45,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 45,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content/home",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 45,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content/home",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 45,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 420,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 420,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content/pages",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 624,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 957,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 957,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 957,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content/pages",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 624,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 957,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 957,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 957,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content/pages",
+      "viewport": "tablet",
+      "theme": "dark",
+      "overflowX": 255,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 1023,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 1023,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1023,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/content/pages",
+      "viewport": "tablet",
+      "theme": "light",
+      "overflowX": 255,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 1023,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 1023,
+          "text": "Home/Admin/Content Content  Edit the hom"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1023,
+          "text": "Home/Admin/Content"
+        }
+      ]
+    },
+    {
+      "route": "/admin/dashboard",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 368,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 743,
+          "text": "Dashboard"
+        }
+      ]
+    },
+    {
+      "route": "/admin/dashboard",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 368,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 743,
+          "text": "Dashboard"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 743,
+          "text": "Dashboard"
+        }
+      ]
+    },
+    {
+      "route": "/admin/orders",
+      "viewport": "desktop",
+      "theme": "dark",
+      "overflowX": 270,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1710,
+          "text": "Home/Admin/Orders"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1710,
+          "text": "Home/Admin/Orders"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1710,
+          "text": "Home/Admin/Orders"
+        }
+      ]
+    },
+    {
+      "route": "/admin/orders",
+      "viewport": "desktop",
+      "theme": "light",
+      "overflowX": 270,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1710,
+          "text": "Home/Admin/Orders"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1710,
+          "text": "Home/Admin/Orders"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1710,
+          "text": "Home/Admin/Orders"
+        }
+      ]
+    },
+    {
+      "route": "/blog",
+      "viewport": "tablet",
+      "theme": "dark",
+      "overflowX": 296,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1064,
+          "text": "Home/Blog"
+        }
+      ]
+    },
+    {
+      "route": "/blog",
+      "viewport": "tablet",
+      "theme": "light",
+      "overflowX": 296,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1064,
+          "text": "Home/Blog"
+        }
+      ]
+    },
+    {
+      "route": "/blog?lang=ro",
+      "viewport": "tablet",
+      "theme": "dark",
+      "overflowX": 330,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1098,
+          "text": "Acas\u0103/Blog"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1098,
+          "text": "Acas\u0103/Blog"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1098,
+          "text": "Acas\u0103/Blog"
+        }
+      ]
+    },
+    {
+      "route": "/blog?lang=ro",
+      "viewport": "tablet",
+      "theme": "light",
+      "overflowX": 330,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1098,
+          "text": "Acas\u0103/Blog"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1098,
+          "text": "Acas\u0103/Blog"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1098,
+          "text": "Acas\u0103/Blog"
+        }
+      ]
+    },
+    {
+      "route": "/blog/series/white-cup",
+      "viewport": "tablet",
+      "theme": "dark",
+      "overflowX": 296,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/White cup"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/White cup"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1064,
+          "text": "Home/Blog/White cup"
+        }
+      ]
+    },
+    {
+      "route": "/blog/series/white-cup",
+      "viewport": "tablet",
+      "theme": "light",
+      "overflowX": 296,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/White cup"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/White cup"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1064,
+          "text": "Home/Blog/White cup"
+        }
+      ]
+    },
+    {
+      "route": "/blog/tag/white-cup",
+      "viewport": "tablet",
+      "theme": "dark",
+      "overflowX": 296,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/#white cup"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/#white cup"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1064,
+          "text": "Home/Blog/#white cup"
+        }
+      ]
+    },
+    {
+      "route": "/blog/tag/white-cup",
+      "viewport": "tablet",
+      "theme": "light",
+      "overflowX": 296,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/#white cup"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 1064,
+          "text": "Home/Blog/#white cup"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 1064,
+          "text": "Home/Blog/#white cup"
+        }
+      ]
+    },
+    {
+      "route": "/pages/anpc",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 14,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 389,
+          "text": "Home/ANPC / Consumer information"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 389,
+          "text": "Home/ANPC / Consumer information"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 389,
+          "text": "Home/ANPC / Consumer information"
+        }
+      ]
+    },
+    {
+      "route": "/pages/anpc",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 14,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 389,
+          "text": "Home/ANPC / Consumer information"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 389,
+          "text": "Home/ANPC / Consumer information"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 389,
+          "text": "Home/ANPC / Consumer information"
+        }
+      ]
+    },
+    {
+      "route": "/pages/anpc?lang=ro",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 14,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 389,
+          "text": "Acas\u0103/ANPC / Informa\u021bii pentru consumato"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 389,
+          "text": "Acas\u0103/ANPC / Informa\u021bii pentru consumato"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 389,
+          "text": "Acas\u0103/ANPC / Informa\u021bii pentru consumato"
+        }
+      ]
+    },
+    {
+      "route": "/pages/anpc?lang=ro",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 14,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 389,
+          "text": "Acas\u0103/ANPC / Informa\u021bii pentru consumato"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 389,
+          "text": "Acas\u0103/ANPC / Informa\u021bii pentru consumato"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 389,
+          "text": "Acas\u0103/ANPC / Informa\u021bii pentru consumato"
+        }
+      ]
+    },
+    {
+      "route": "/pages/terms-and-conditions",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 21,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 396,
+          "text": "Home/Terms & Conditions"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 396,
+          "text": "Home/Terms & Conditions"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 396,
+          "text": "Home/Terms & Conditions"
+        }
+      ]
+    },
+    {
+      "route": "/pages/terms-and-conditions",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 21,
+      "samples": [
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 396,
+          "text": "Home/Terms & Conditions"
+        },
+        {
+          "tag": "nav",
+          "sel": "",
+          "right": 396,
+          "text": "Home/Terms & Conditions"
+        },
+        {
+          "tag": "ol",
+          "sel": "flex",
+          "right": 396,
+          "text": "Home/Terms & Conditions"
+        }
+      ]
+    },
+    {
+      "route": "/shop",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop"
+        }
+      ]
+    },
+    {
+      "route": "/shop",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop"
+        }
+      ]
+    },
+    {
+      "route": "/shop/bowls",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Bowls Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop/Bowls Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Bowls"
+        }
+      ]
+    },
+    {
+      "route": "/shop/bowls",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Bowls Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop/Bowls Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Bowls"
+        }
+      ]
+    },
+    {
+      "route": "/shop/bowls?lang=ro",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Bowls Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Bowls Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Bowls"
+        }
+      ]
+    },
+    {
+      "route": "/shop/bowls?lang=ro",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Bowls Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Bowls Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Bowls"
+        }
+      ]
+    },
+    {
+      "route": "/shop/cups",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Cups & Mugs Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop/Cups & Mugs Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Cups & Mugs"
+        }
+      ]
+    },
+    {
+      "route": "/shop/cups",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Cups & Mugs Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop/Cups & Mugs Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Cups & Mugs"
+        }
+      ]
+    },
+    {
+      "route": "/shop/cups?lang=ro",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Cups & Mugs Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Cups & Mugs Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Cups & Mugs"
+        }
+      ]
+    },
+    {
+      "route": "/shop/cups?lang=ro",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Cups & Mugs Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Cups & Mugs Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Cups & Mugs"
+        }
+      ]
+    },
+    {
+      "route": "/shop?lang=ro",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin"
+        }
+      ]
+    },
+    {
+      "route": "/shop?lang=ro",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin"
+        }
+      ]
+    },
+    {
+      "route": "/shop/plates",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Plates Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop/Plates Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Plates"
+        }
+      ]
+    },
+    {
+      "route": "/shop/plates",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 3,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Plates Shop"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 378,
+          "text": "Home/Shop/Plates Shop"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 378,
+          "text": "Home/Shop/Plates"
+        }
+      ]
+    },
+    {
+      "route": "/shop/plates?lang=ro",
+      "viewport": "mobile",
+      "theme": "dark",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Plates Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Plates Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Plates"
+        }
+      ]
+    },
+    {
+      "route": "/shop/plates?lang=ro",
+      "viewport": "mobile",
+      "theme": "light",
+      "overflowX": 10,
+      "samples": [
+        {
+          "tag": "app-page-header",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Plates Magazin"
+        },
+        {
+          "tag": "div",
+          "sel": "grid",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Plates Magazin"
+        },
+        {
+          "tag": "app-breadcrumb",
+          "sel": "",
+          "right": 385,
+          "text": "Acas\u0103/Magazin/Plates"
+        }
+      ]
+    }
+  ],
+  "small_tap_targets": {
+    "/admin/content/settings": 45,
+    "/admin/content": 31,
+    "/admin/content/home": 31,
+    "/admin": 29,
+    "/admin/dashboard": 29,
+    "/shop/bowls": 29,
+    "/shop/bowls?lang=ro": 29,
+    "/shop/cups": 29,
+    "/shop/cups?lang=ro": 29,
+    "/shop/plates": 29,
+    "/shop/plates?lang=ro": 29,
+    "/admin/users": 28,
+    "/admin/content/pages": 27,
+    "/admin/coupons": 27,
+    "/shop": 27,
+    "/shop?lang=ro": 27,
+    "/admin/products": 25,
+    "/account/notifications/settings": 24,
+    "/admin/content/blog": 24,
+    "/admin/inventory": 23,
+    "/admin/ops": 23,
+    "/admin/orders/1": 23,
+    "/admin/orders/exports": 23,
+    "/admin/users/gdpr": 23,
+    "/admin/users/segments": 23,
+    "/products/blue-bowl": 23,
+    "/products/blue-bowl?lang=ro": 23,
+    "/products/white-cup": 23,
+    "/products/white-cup?lang=ro": 23,
+    "/admin/content/media": 22,
+    "/admin/content/scheduling": 22,
+    "/admin/orders": 22,
+    "/admin/returns": 22,
+    "/admin/support": 22,
+    "/auth/google/callback": 22,
+    "/blog": 22,
+    "/blog?lang=ro": 22,
+    "/login/2fa": 22,
+    "/login": 22,
+    "/pages/anpc": 22
+  },
+  "small_tap_target_examples": {
+    "/about": [
+      {
+        "tag": "a",
+        "w": 49,
+        "h": 23,
+        "text": "Sign in",
+        "sel": ".text-sm.font-medium"
+      },
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/about?lang=ro": [
+      {
+        "tag": "a",
+        "w": 92,
+        "h": 23,
+        "text": "Autentificare",
+        "sel": ".text-sm.font-medium"
+      },
+      {
+        "tag": "a",
+        "w": 41,
+        "h": 23,
+        "text": "Acas\u0103",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 61,
+        "h": 23,
+        "text": "Magazin",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/addresses": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/comments": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/coupons": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/notifications": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/notifications/settings": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/orders": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/overview": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/password": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/privacy": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/profile": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/security": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ],
+    "/account/wishlist": [
+      {
+        "tag": "a",
+        "w": 43,
+        "h": 23,
+        "text": "Home",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 33,
+        "h": 23,
+        "text": "Blog",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 37,
+        "h": 23,
+        "text": "Shop",
+        "sel": ".hover:text-text-heading"
+      },
+      {
+        "tag": "a",
+        "w": 68,
+        "h": 23,
+        "text": "Our story",
+        "sel": ".hover:text-text-heading"
+      }
+    ]
+  },
+  "images_missing_alt": {},
+  "images_missing_dimensions": {
+    "/admin/content/settings": 10,
+    "/contact": 8,
+    "/contact?lang=ro": 8,
+    "/account/profile": 7,
+    "/admin/content": 6,
+    "/admin/content/home": 6,
+    "/admin/orders": 6,
+    "/admin/products": 6,
+    "/admin/users": 6,
+    "/?lang=ro": 6,
+    "/": 6,
+    "/account": 5,
+    "/account/addresses": 5,
+    "/account/comments": 5,
+    "/account/coupons": 5,
+    "/account/notifications": 5,
+    "/account/notifications/settings": 5,
+    "/account/orders": 5,
+    "/account/overview": 5,
+    "/account/password": 5,
+    "/account/privacy": 5,
+    "/account/security": 5,
+    "/account/wishlist": 5,
+    "/admin": 5,
+    "/admin/content/blog": 5,
+    "/admin/content/media": 5,
+    "/admin/content/pages": 5,
+    "/admin/content/scheduling": 5,
+    "/admin/coupons": 5,
+    "/admin/dashboard": 5
+  },
+  "routes_without_h1": [
+    "/admin/ip-bypass",
+    "/admin/orders/1"
+  ],
+  "routes_multiple_h1": [
+    "/account/password",
+    "/admin",
+    "/admin/dashboard"
+  ],
+  "seo_missing_meta_description": [],
+  "seo_suspicious_canonical": {
+    "/about": "http://localhost:4202/about",
+    "/about?lang=ro": "http://localhost:4202/about?lang=ro",
+    "/admin": "http://localhost/",
+    "/admin/content": "http://localhost/",
+    "/admin/content/blog": "http://localhost/",
+    "/admin/content/home": "http://localhost/",
+    "/admin/content/media": "http://localhost/",
+    "/admin/content/pages": "http://localhost/",
+    "/admin/content/scheduling": "http://localhost/",
+    "/admin/content/settings": "http://localhost/",
+    "/admin/coupons": "http://localhost/",
+    "/admin/dashboard": "http://localhost/",
+    "/admin/inventory": "http://localhost/",
+    "/admin/ip-bypass": "http://localhost/",
+    "/admin/ops": "http://localhost/",
+    "/admin/orders/1": "http://localhost/",
+    "/admin/orders": "http://localhost/",
+    "/admin/orders/exports": "http://localhost/",
+    "/admin/products": "http://localhost/",
+    "/admin/returns": "http://localhost/",
+    "/admin/support": "http://localhost/",
+    "/admin/theme": "http://localhost/",
+    "/admin/users": "http://localhost/",
+    "/admin/users/gdpr": "http://localhost/",
+    "/admin/users/segments": "http://localhost/",
+    "/blog": "http://localhost:4202/blog",
+    "/blog?lang=ro": "http://localhost:4202/blog?lang=ro",
+    "/blog/series/white-cup": "http://localhost:4202/blog/series/white-cup",
+    "/blog/tag/white-cup": "http://localhost:4202/blog/tag/white-cup",
+    "/blog/white-cup": "http://localhost:4202/blog/white-cup",
+    "/contact": "http://localhost:4202/contact",
+    "/contact?lang=ro": "http://localhost:4202/contact?lang=ro",
+    "/?lang=ro": "http://localhost:4202/?lang=ro",
+    "/pages/anpc": "http://localhost:4202/pages/anpc",
+    "/pages/anpc?lang=ro": "http://localhost:4202/pages/anpc?lang=ro",
+    "/pages/care": "http://localhost:4202/pages/care",
+    "/pages/care?lang=ro": "http://localhost:4202/pages/care?lang=ro",
+    "/pages/privacy-policy": "http://localhost:4202/pages/privacy-policy",
+    "/pages/privacy-policy?lang=ro": "http://localhost:4202/pages/privacy-policy?lang=ro",
+    "/pages/terms": "http://localhost:4202/pages/terms",
+    "/pages/terms-and-conditions": "http://localhost:4202/pages/terms-and-conditions",
+    "/pages/terms-and-conditions?lang=ro": "http://localhost:4202/pages/terms-and-conditions?lang=ro",
+    "/pages/terms?lang=ro": "http://localhost:4202/pages/terms?lang=ro",
+    "/pages/white-cup": "http://localhost:4202/pages/white-cup",
+    "/products/blue-bowl": "http://localhost:4202/products/blue-bowl",
+    "/products/blue-bowl?lang=ro": "http://localhost:4202/products/blue-bowl?lang=ro",
+    "/products/white-cup": "http://localhost:4202/products/white-cup",
+    "/products/white-cup?lang=ro": "http://localhost:4202/products/white-cup?lang=ro",
+    "/": "http://localhost:4202/",
+    "/shop": "http://localhost:4202/shop",
+    "/shop/bowls": "http://localhost:4202/shop/bowls",
+    "/shop/bowls?lang=ro": "http://localhost:4202/shop/bowls?lang=ro",
+    "/shop/cups": "http://localhost:4202/shop/cups",
+    "/shop/cups?lang=ro": "http://localhost:4202/shop/cups?lang=ro",
+    "/shop?lang=ro": "http://localhost:4202/shop?lang=ro",
+    "/shop/plates": "http://localhost:4202/shop/plates",
+    "/shop/plates?lang=ro": "http://localhost:4202/shop/plates?lang=ro"
+  },
+  "slow_first_paint": [
+    {
+      "route": "/admin/coupons",
+      "viewport": "tablet",
+      "theme": "light",
+      "fcp": 12260,
+      "dcl": 12506
+    },
+    {
+      "route": "/admin/coupons",
+      "viewport": "tablet",
+      "theme": "dark",
+      "fcp": 11300,
+      "dcl": 11554
+    },
+    {
+      "route": "/admin/coupons",
+      "viewport": "desktop",
+      "theme": "light",
+      "fcp": 11072,
+      "dcl": 11253
+    },
+    {
+      "route": "/admin/content/scheduling",
+      "viewport": "desktop",
+      "theme": "dark",
+      "fcp": 8748,
+      "dcl": 8962
+    },
+    {
+      "route": "/admin/orders",
+      "viewport": "desktop",
+      "theme": "dark",
+      "fcp": 7048,
+      "dcl": 7289
+    },
+    {
+      "route": "/admin/orders/1",
+      "viewport": "mobile",
+      "theme": "light",
+      "fcp": 6984,
+      "dcl": 7267
+    },
+    {
+      "route": "/admin/users/segments",
+      "viewport": "mobile",
+      "theme": "light",
+      "fcp": 6660,
+      "dcl": 6930
+    },
+    {
+      "route": "/admin/products",
+      "viewport": "tablet",
+      "theme": "light",
+      "fcp": 6504,
+      "dcl": 6749
+    },
+    {
+      "route": "/products/white-cup?lang=ro",
+      "viewport": "mobile",
+      "theme": "dark",
+      "fcp": 6340,
+      "dcl": 6985
+    },
+    {
+      "route": "/account/wishlist",
+      "viewport": "mobile",
+      "theme": "light",
+      "fcp": 6276,
+      "dcl": 6574
+    },
+    {
+      "route": "/products/white-cup?lang=ro",
+      "viewport": "tablet",
+      "theme": "light",
+      "fcp": 5888,
+      "dcl": 6524
+    },
+    {
+      "route": "/admin/users/segments",
+      "viewport": "mobile",
+      "theme": "dark",
+      "fcp": 5792,
+      "dcl": 6092
+    },
+    {
+      "route": "/admin/users/segments",
+      "viewport": "tablet",
+      "theme": "dark",
+      "fcp": 5740,
+      "dcl": 6002
+    },
+    {
+      "route": "/admin/users/gdpr",
+      "viewport": "mobile",
+      "theme": "dark",
+      "fcp": 5596,
+      "dcl": 5775
+    },
+    {
+      "route": "/admin/users/segments",
+      "viewport": "tablet",
+      "theme": "light",
+      "fcp": 5488,
+      "dcl": 5740
+    },
+    {
+      "route": "/admin/products",
+      "viewport": "mobile",
+      "theme": "light",
+      "fcp": 5420,
+      "dcl": 5759
+    },
+    {
+      "route": "/admin/returns",
+      "viewport": "desktop",
+      "theme": "dark",
+      "fcp": 5356,
+      "dcl": 5604
+    },
+    {
+      "route": "/admin/content",
+      "viewport": "desktop",
+      "theme": "dark",
+      "fcp": 5324,
+      "dcl": 5574
+    },
+    {
+      "route": "/admin/content/scheduling",
+      "viewport": "tablet",
+      "theme": "light",
+      "fcp": 5296,
+      "dcl": 5557
+    },
+    {
+      "route": "/admin/inventory",
+      "viewport": "tablet",
+      "theme": "light",
+      "fcp": 5288,
+      "dcl": 5532
+    },
+    {
+      "route": "/admin/orders/1",
+      "viewport": "desktop",
+      "theme": "light",
+      "fcp": 5256,
+      "dcl": 5530
+    },
+    {
+      "route": "/account",
+      "viewport": "desktop",
+      "theme": "dark",
+      "fcp": 5248,
+      "dcl": 5441
+    },
+    {
+      "route": "/products/blue-bowl?lang=ro",
+      "viewport": "tablet",
+      "theme": "dark",
+      "fcp": 5168,
+      "dcl": 5459
+    },
+    {
+      "route": "/admin/orders/exports",
+      "viewport": "mobile",
+      "theme": "light",
+      "fcp": 5048,
+      "dcl": 5370
+    },
+    {
+      "route": "/admin/orders/exports",
+      "viewport": "tablet",
+      "theme": "dark",
+      "fcp": 5044,
+      "dcl": 5205
+    },
+    {
+      "route": "/admin/orders/exports",
+      "viewport": "mobile",
+      "theme": "dark",
+      "fcp": 4936,
+      "dcl": 5254
+    },
+    {
+      "route": "/admin/returns",
+      "viewport": "tablet",
+      "theme": "light",
+      "fcp": 4936,
+      "dcl": 5175
+    },
+    {
+      "route": "/admin/orders/1",
+      "viewport": "mobile",
+      "theme": "dark",
+      "fcp": 4924,
+      "dcl": 5260
+    },
+    {
+      "route": "/admin/content/blog",
+      "viewport": "mobile",
+      "theme": "light",
+      "fcp": 4872,
+      "dcl": 5140
+    },
+    {
+      "route": "/shop/cups",
+      "viewport": "desktop",
+      "theme": "dark",
+      "fcp": 4792,
+      "dcl": 5043
+    }
+  ],
+  "redirects": {
+    "/account": "/account/overview",
+    "/admin": "/admin/dashboard",
+    "/admin/content": "/admin/content/home",
+    "/auth/google/callback": "/login",
+    "/checkout": "/cart?from=checkout",
+    "/login/2fa": "/login"
+  },
+  "routes_missing_theme_style": [],
+  "near_empty_renders": [],
+  "route_severity_ranking": [
+    {
+      "route": "/admin/content/pages",
+      "score": 105
+    },
+    {
+      "route": "/account/security",
+      "score": 50
+    },
+    {
+      "route": "/admin/content/settings",
+      "score": 48
+    },
+    {
+      "route": "/admin",
+      "score": 45
+    },
+    {
+      "route": "/admin/dashboard",
+      "score": 45
+    },
+    {
+      "route": "/admin/products",
+      "score": 43
+    },
+    {
+      "route": "/blog/white-cup",
+      "score": 43
+    },
+    {
+      "route": "/admin/content",
+      "score": 41
+    },
+    {
+      "route": "/admin/content/home",
+      "score": 41
+    },
+    {
+      "route": "/tickets",
+      "score": 39
+    },
+    {
+      "route": "/shop/bowls",
+      "score": 39
+    },
+    {
+      "route": "/shop/bowls?lang=ro",
+      "score": 39
+    },
+    {
+      "route": "/shop/cups",
+      "score": 39
+    },
+    {
+      "route": "/shop/cups?lang=ro",
+      "score": 39
+    },
+    {
+      "route": "/shop/plates",
+      "score": 39
+    },
+    {
+      "route": "/shop/plates?lang=ro",
+      "score": 39
+    },
+    {
+      "route": "/admin/theme",
+      "score": 38
+    },
+    {
+      "route": "/shop",
+      "score": 37
+    },
+    {
+      "route": "/shop?lang=ro",
+      "score": 37
+    },
+    {
+      "route": "/account/notifications/settings",
+      "score": 36
+    },
+    {
+      "route": "/account/profile",
+      "score": 36
+    },
+    {
+      "route": "/account/privacy",
+      "score": 35
+    },
+    {
+      "route": "/account",
+      "score": 33
+    },
+    {
+      "route": "/account/orders",
+      "score": 32
+    },
+    {
+      "route": "/admin/orders",
+      "score": 32
+    },
+    {
+      "route": "/blog",
+      "score": 32
+    },
+    {
+      "route": "/blog?lang=ro",
+      "score": 32
+    },
+    {
+      "route": "/pages/anpc",
+      "score": 32
+    },
+    {
+      "route": "/pages/anpc?lang=ro",
+      "score": 32
+    },
+    {
+      "route": "/pages/terms-and-conditions",
+      "score": 32
+    },
+    {
+      "route": "/account/comments",
+      "score": 31
+    },
+    {
+      "route": "/account/password",
+      "score": 31
+    },
+    {
+      "route": "/account/wishlist",
+      "score": 31
+    },
+    {
+      "route": "/admin/content/media",
+      "score": 31
+    },
+    {
+      "route": "/account/addresses",
+      "score": 30
+    },
+    {
+      "route": "/account/coupons",
+      "score": 30
+    },
+    {
+      "route": "/account/notifications",
+      "score": 30
+    },
+    {
+      "route": "/account/overview",
+      "score": 30
+    },
+    {
+      "route": "/admin/orders/1",
+      "score": 30
+    },
+    {
+      "route": "/blog/series/white-cup",
+      "score": 30
+    }
+  ],
+  "failed_cells": []
+}

@@ -1,0 +1,904 @@
+# momentstudio P2 — consolidated fix backlog
+
+Raw findings merged: **218** → deduped items: **218**  
+By severity: {'P0': 3, 'P1': 46, 'P2': 103, 'P3': 66}  
+Corroborated by 2+ independent sources: **0**  
+Verdict mix: {'SURVIVED': 0, 'OVERCLAIM': 0, 'UNVERIFIED': 0, 'UNCHALLENGED': 218}
+
+> NOTHING is auto-merged. Two signals are reported separately: (a) identical normalised title token-sets, and (b) shared file:line anchors, which are grouped into `fix_clusters`. Shared anchor does NOT imply the same defect — one line can carry a contrast failure and a missing-ARIA failure independently — so a cluster is a FIX UNIT to satisfy in full, not a duplicate to collapse. Severity disagreements inside a cluster are flagged, not resolved.
+
+## P0 — 3 items
+
+- **Every SSR canonical, og:url and hreflang alternate emits the origin http://localhost (seo-head-links.service.ts:71-82 reads document.defaultView.location.origin; publicBaseUrl fallback is dead code marked istanbul-ignore-unreachable)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: almost-certain (90-99%) — reproduced on /, /shop, /about, /products/white-cup, /admin/products
+- **Guest checkout hard-gated on an emailed verification LINK: no in-page token field (endpoint + binding already exist), no status re-poll on tab return, and no persistence of the typed address — the round trip discards every entered field (WCAG 2.2 SC 3.3.7 Redundant Entry + Baymard 26% forced-account-equivalent friction)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R2-ux-conversion
+  - confidence: almost-certain (90-99%) — code-confirmed at checkout.component.ts:698,1755-1760,1964; checkout-prefs.service.ts:18-42; email.py:890-894
+- **No Angular ErrorHandler registered: uncaught errors are console-only — invisible to users, to Sentry, and to the backend logger; ErrorHandlerService is orphaned dead code and the /error route is never navigated to**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: almost-certain (90-99%) — structural, exhaustive greps: no `provide: ErrorHandler` anywhere, @sentry/angular not a dependency, zone.js in use so window.onerror never fires
+
+## P1 — 46 items
+
+- **Scheduling screen silently drops every site.* block outside a 3-key whitelist (events counted but never rendered)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: likely (55-80%)
+  - anchors: admin-content-scheduling.component.ts:277, backend/app/api/v1/content.py:426, backend/app/schemas/content.py:15, content.py:906, shared/cms-global-sections.ts:3
+  - fix: Make one side authoritative: either widen isRelevantKey to all site.* keys (with kindForKey falling back to 'global'), or narrow the backend key_filter to the 3 whitelisted global-section keys so count and rows agree.
+- **Whole homepage body renders twice after hydration; the visible top copy is orphaned dead DOM**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%) on the defect; likely (55-80%) on the exact hydration mechanism
+  - anchors: home.component.ts:194, home.component.ts:746, language.service.ts:34
+  - fix: Add trackBy keyed on block.key to the *ngFor at home.component.ts:194; make the client's first blocks() value identical to the server's (TransferState / reuse the transfer-cached /content/home.sections response); and stop the double load() by skipping the bootstrap onLangChange emission or applying 
+- **Silent load-failure blanks the Site assets form and the enabled Save button then overwrites live site config with empty values (version guard deleted)** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: likely (55-80%)
+  - anchors: admin.component.ts:14157, admin.component.ts:14538
+  - fix: In every load*() error branch set the section's *Error signal (they already exist and are rendered) and mark the form as 'not loaded' so Save is disabled until a successful GET or explicit user override; distinguish 404 (genuinely unset -> safe empty form) from 5xx/network (unknown -> do not offer S
+- **Upload (the media library's primary action) is unreachable by keyboard and screen readers**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: almost-certain (90-99%)
+  - anchors: dam-asset-library.component.ts:160
+  - fix: Replace `class="hidden"` with an sr-only-but-focusable input (`class="sr-only"` / `absolute h-0 w-0 opacity-0`) so it stays in the tab order, and add a visible focus style on the label via `focus-within:ring-2`; or convert to a real `<button type="button" (click)="fileInput.click()">` plus an aria-h
+- **Mobile 375 viewport: whole dashboard overflows 368px horizontally (WCAG 1.4.10 Reflow failure) because the header action row cannot wrap**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/dashboard
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:99
+  - fix: Add `flex-wrap` (and `justify-end`/`w-full sm:w-auto`) to the action row at admin-dashboard.component.ts:99, or collapse the secondary actions (Setup tour, Customize widgets, Net/Gross) into an overflow menu below the `lg` breakpoint. Regression guard: assert `document.scrollingElement.scrollWidth <
+- **Two-pane toastui editor with a non-wrapping toolbar forces 624px horizontal page overflow at 375px, tearing the whole admin page chrome**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/pages
+  - confidence: almost-certain (90-99%)
+  - anchors: frontend/src/app/shared/rich-editor.component.ts:59
+  - fix: In rich-editor.component.ts make previewStyle responsive ('tab' below the md breakpoint, 'vertical' at md and up) and add min-w-0 plus overflow-x-auto to the host div at :20-24 so the toolbar scrolls inside the editor instead of expanding the grid. Add flex-wrap:wrap to .toastui-editor-defaultUI-too
+- **Mobile /admin is 198% of the viewport wide: a non-wrapping header action row forces 368px of horizontal page overflow and pushes every right-aligned metric off-screen**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:99
+  - fix: Add flex-wrap (e.g. class="flex flex-wrap items-center justify-end gap-2") to admin-dashboard.component.ts:99, or collapse the last-updated span + Net/Gross toggle into a second row below md. Re-measure scrollWidth at 375 after the change (must equal 375).
+- **Mobile 375: overflow-hidden clips the Expires + Actions columns, making the row Download button unreachable by touch**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-order-exports.component.ts:70
+  - fix: Change line 70 `overflow-hidden` to `overflow-x-auto` AND, in the same edit, add `tabindex="0" role="region" [attr.aria-label]="'adminUi.orders.exports.title' | translate"` to the wrapper so the fix does not create a new instance of the app-wide scrollable-region-focusable violation (10 nodes / 58 s
+- **List-view row selection is mouse-only — keyboard/AT admins cannot open any return request (WCAG 2.2 SC 2.1.1, Level A)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-returns.component.ts:174
+  - fix: Make the row a real control: add `tabindex="0" role="button" [attr.aria-pressed]="row.id === selectedId()" (keydown.enter)="select(row.id)" (keydown.space)="$event.preventDefault(); select(row.id)"` on the `<tr>`, or (preferred, keeps table semantics) put a focusable `<button>`/`<a>` in the first ce
+- **Auth rate limiters are GLOBAL not per-identifier — 20 req/min from one client DoSes login for every user (core/rate_limit.py:91-101, api/v1/auth.py:106-114)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **HttpOnly refresh cookie negated: the same refresh_token is returned in the login/refresh JSON body, so XSS gets a 7-day token (api/v1/auth.py:1279,1293,1317)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **Admin IP allowlist skipped on refund/capture/void/maintenance — require_admin omits _require_admin_ip_access that require_admin_section enforces (core/dependencies.py:345-356 vs 367-386)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **SENTRY_SEND_DEFAULT_PII defaults to True with no before_send scrubber, and a DSN is mandatory in production (core/config.py:210, core/sentry.py:35-45, startup_checks.py:48)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: likely (55-80%) for the cookie/credential half — UNVERIFIED whether the default EventScrubber strips Cookie; almost-certain that IP+body PII ships
+- **Audit middleware logs unredacted checkout PII — line1/line2/region/date_of_birth/invoice_vat_id/name match no redaction fragment (middleware/security.py:15-52 vs schemas/checkout.py:45-59)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **LCP hero preloads JPEG (288KB) while <picture> renders AVIF (121KB), and the preload fires on all 92 routes from the static shell**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%)
+- **Shop/Home/About/Contact/Error/NotFound are statically imported in app.routes.ts and land in the initial main.js (~404KB dev), while 66 other routes are lazy**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%)
+- **marked + dompurify (167.6KB raw dev in vendor.js) ship on every page load via root-provided MarkdownService static imports**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%)
+- **78 of 85 <img> tags lack width+height (CLS), including the hero, header logo, home grid and shop grid**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%)
+- **Product and BreadcrumbList JSON-LD are absent from server-rendered HTML (product.component.ts:882-883 early-returns on typeof document === 'undefined'; :917-919 uses bare window.location) — merchant rich results depend entirely on Googlebot's second-wave render**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: almost-certain (90-99%) — product SSR HTML contains only the 2 static index.html blocks
+- **Legacy :browser + :server builders and CommonEngine (deprecated since v22) leave no app.routes.server.ts / RenderMode surface; prerender.routes is [] so all 92 routes pay request-time SSR**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: almost-certain (90-99%) — angular.json builders read directly, CommonEngine @deprecated JSDoc read from angular-cli source
+- **/shop?page=2 cross-canonicalizes to /shop (shop.component.ts:2516-2518 drops the page param), which Google explicitly says causes pages 2+ to not be indexed**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: almost-certain (90-99%) — reproduced via curl; corroborated by Google Search Central pagination doc
+- **/robots.txt returns HTTP 200 text/html (the Angular app shell) — no crawl directives and no Sitemap: line; distinct from the already-known /sitemap.xml defect**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: almost-certain (90-99%) — measured status=200 type=text/html size=56559; no robots.txt in src/assets
+- **/404 and error routes render hardcoded English — neither component imports TranslateModule (no key exists to fall back to)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — reproduced live via SSR curl
+- **SSR emits <html lang="en"> on the very URL it declares as hreflang="ro"; applyDocumentLanguage early-returns on the absent SSR `document` global (WCAG 3.1.1 fail)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — reproduced + root cause read at language.service.ts:60-63
+- **Returning customers with an existing account are hard-blocked out of guest checkout by a 400 'Email already registered; please sign in to checkout' raised mid-checkout with no inline recovery**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R2-ux-conversion
+  - confidence: almost-certain — backend/app/api/v1/orders.py:2234-2238
+- **Product detail page carries zero cost/trust information (no shipping cost, no lead time, no 14-day withdrawal, no returns, no payment badges) — the 48% extra-costs abandonment cause is unmitigated at the decision point**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R2-ux-conversion
+  - confidence: almost-certain — OBSERVED in rendered SSR HTML of /products/white-cup
+- **HTML5 drag-only reordering with no single-pointer or keyboard alternative on storefront and admin lists (WCAG 2.2 SC 2.5.7 + SC 2.1.1); the correct moveUp/moveDown pattern already exists elsewhere in the same codebase**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R2-ux-conversion
+  - confidence: almost-certain — shop.component.ts:181-188,893-894; cms-block-library.component.ts:83-84; vs admin.component.ts:2575-2598
+- **require_admin and require_owner skip _require_admin_ip_access, so the admin IP allow/denylist is unenforced on 34 routes (role change, owner transfer, whole-DB export, GDPR download, refunds, maintenance, tax/fx writes) while require_admin_section enforces it on 271**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) - CONFIRMED by execution: allowlist 10.10.10.0/24, caller 203.0.113.9 -> section guard 403 'Admin access is restricted to approved IP addresses', require_admin 200, require_owner 200
+- **auth login / 2FA / refresh / password-reset-request / password-reset-confirm / step-up all use the GLOBAL limiter bucket (identifier="global"), so 21 requests/min from one IP locks every user and admin out of authentication site-wide**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) - CONFIRMED by execution: attacker exhausts 20-request bucket, a DIFFERENT client immediately gets 429; per-IP control route returns 200 for the second client
+- **Initial JS is 314 KiB gz (2.1x the <150 KiB landing target) while the angular.json initial budget sits 2.4% below its warning threshold, so the gate is both far too loose and about to fire**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%) - measured production bytes over the wire from :4202
+- **Hero LCP preload in index.html fetches banner_image.jpeg (288,557 B) at fetchpriority=high but the rendered <picture> paints banner_image-960.avif (73,606 B); URL and sizes both mismatch, and SSR emits the preload on every route including /shop and /cart**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%) - preload attrs and rendered <source>/<img> compared on live SSR output
+- **SSR runtime (server.ts express.static maxAge:'1y') serves unhashed /assets/app-config.js and /assets/i18n/*.json with Cache-Control max-age=31536000, so runtime config and translations cannot be busted after a deploy; prod Caddy passes the header through**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%) - live response headers on :4202 plus server.ts:47-51 and Caddyfile:44-56
+- **Six routes are eager (component: not loadComponent) and marked+dompurify are pinned into main.js via a root-provided MarkdownService injected by eager pages**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%) - app.routes.ts:2-7 static imports, sourcemap attribution, and Marked/DOMPurify fingerprints found in the served prod main.js
+- **404 (** catch-all) and /error pages are 100% hardcoded English on a bilingual EN/RO storefront**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: almost-certain (90-99%) — `grep -c translate` returns 0 on both components; pwa.* keys prove the pattern exists elsewhere
+- **/tickets renders the 'you have no tickets' empty state when the load FAILS (error handler never sets an error flag)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: almost-certain (90-99%) — tickets.component.ts:336-340 vs template branch :73; account-coupons.component.ts:38-48 shows the correct 3-way pattern
+- **Wishlist add/remove fail silently (no error callback, no service catchError, interceptor bus only surfaces status 0 and 5xx); bulk remove swallows per-item errors then toasts success and mutates local state**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: almost-certain (90-99%) — product.component.ts:833/845, product-card.component.ts:342/354, account-wishlist.component.ts:242-255
+- **Backend 422 returns `detail` as an array (reproduced live); ~180 sites do `err?.error?.detail || fallback` so the array bypasses the fallback and renders as [object Object]; `setErrors(` appears zero times so no server validation is ever mapped to a form field**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: likely (55-80%) that a real user hits a rendering of the array — the array shape itself is CONFIRMED by live curl against localhost:4202
+- **Three storefront routes (/404, /error, /receipt/:token) have ZERO i18n wiring — 41 hardcoded English literals, no notFound/error/receipt namespace exists in either locale file**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — grep -c translate = 0 in each file; reproduced live in SSR HTML via curl
+- **All 8 RO SEO meta descriptions are diacritic-stripped (Descopera/Citeste/si/informatii) — the exact string Google prints in the RO SERP snippet**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — high-precision marker scan matches exactly 12 strings in the whole 4634-key file: these 8 plus the 4 exploreMore keys; zero admin matches, so it is an authoring island not a file convention
+- **LOCALE_ID never set to 'ro' — 143 `| date:` + 81 `| number` render en-US; RO blog page shows `Jul 26, 2026`**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: almost-certain (90-99%) — reproduced live via curl on the SSR origin; `grep -rn "LOCALE_ID|registerLocaleData" frontend/src` returns 0 hits
+- **RON prices bypass Intl entirely (`localized-currency.pipe.ts:16-19`) — RO UI shows `24.00 RON` instead of `24,00 RON`, and no thousands grouping in either language**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: almost-certain (90-99%) — reproduced live; Intl('ro-RO') comparison executed in node
+- **SSR ships `<html lang="en">` on fully-Romanian pages (global-`document` guard no-ops server-side) — WCAG 3.1.1 failure contradicting the page's own hreflang="ro"**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: almost-certain (90-99%) — reproduced live
+- **Storefront product search matches only base English columns, never ProductTranslation, so RO shoppers cannot find products by the name shown on the card**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: likely (55-80%) — code-confirmed at catalog.py:2220-2222; not executed (no RO seed rows exist)
+- **Auth rate limits (/auth/login, /login/2fa, /refresh, /step-up, /password-reset/*) share ONE GLOBAL bucket (rate_limit.py:95 identifier="global") — 21 bad logins/min from any client locks every customer AND every admin out site-wide**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) — CONFIRMED by execution: 401x21 then 429, then valid owner login 429 and valid unrelated customer login 429
+- **Privilege inversion: a `support`-role user can lock out and force-password-reset `admin` accounts via PATCH /admin/dashboard/users/{id}/security (admin_dashboard.py:4553-4557 excludes only `owner`, section "users" admits support)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) — CONFIRMED by execution: PATCH 200, target admin login then 403 'Account temporarily locked'; owner control 400
+- **require_admin and require_owner skip _require_admin_ip_access (single call site at dependencies.py:382 inside require_admin_section only) — 34 routes incl. whole-DB /admin/dashboard/export, users/{id}/role, owner/transfer, order refund/capture/void bypass the admin IP allow/denylist**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) — CONFIRMED by code (one definition, one call, no branch); NOT executed live (running instance has no allowlist configured; would require restarting a shared service)
+
+## P2 — 103 items
+
+- **/admin/ops has no sidebar entry in the default admin state and cannot be found via the admin search**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ops
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-layout.component.ts:847, admin-layout.component.ts:871, admin-ui-prefs.service.ts:9, auth.service.ts:215
+  - fix: Run the search filter over the full `navItems` list (not `visibleBaseItems`), and force the section of the currently-active route into the visible nav list so the page you are on is always represented.
+- **Export CSV can silently no-op on non-Chromium while still firing a success toast**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: likely (55-80%)
+  - anchors: admin-inventory.component.ts:806, pages/account/account.state.ts:1024, pages/admin/admin.component.ts:16309
+  - fix: document.body.appendChild(a) before a.click(), a.remove() after, and defer URL.revokeObjectURL(url) (setTimeout 0 / next macrotask); move the success toast into that same deferred step.
+- **Mobile 375 viewport has a hard 45px horizontal overflow on the primary admin content editor (both themes)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/home
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-layout.component.ts:449, admin-layout.component.ts:72, app.component.ts:55
+  - fix: First isolate the widest descendant: at 375 run `[...document.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>375).pop()` (the captured 12-entry list appears capped, so the true culprit may not be in it). UNVERIFIED which node forces the min-content width — do not blind-fix. Then ei
+- **Desktop 1440 gains 270px of horizontal document scroll and pushes 2-3 admin toolbar actions outside the viewport**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders
+  - confidence: almost-certain (90-99%) OBSERVED for the overflow itself; likely (55-80%) CODE for the exact CSS attribution
+  - anchors: admin-orders.component.ts:233, frontend/src/app/pages/admin/admin-layout.component.ts:449, frontend/src/app/pages/admin/orders/admin-orders.component.ts:233
+  - fix: Make the filter row intrinsically shrinkable instead of fixed: replace `lg:grid-cols-[1fr_220px_220px_220px_220px_auto]` at admin-orders.component.ts:233 with an auto-fitting track list (e.g. `lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]`) or move the 6-up layout to `2xl:` and add `min-w-0` to 
+- **Route h1 is painted with a 2px accent focus ring on fresh load and reads as the missing search input**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders
+  - confidence: almost-certain (90-99%) OBSERVED for the ring; likely (55-80%) INFERRED for the misread-as-input harm
+  - anchors: admin-orders.component.ts:234, frontend/src/app/core/route-heading-focus.service.ts:18, frontend/src/app/pages/admin/shared/admin-page-header.component.ts:12
+  - fix: Skip the heading focus on the very first NavigationEnd (only move focus on subsequent in-app navigations) in route-heading-focus.service.ts, and/or scope the outline so a programmatically focused heading gets a subtler treatment (e.g. `[data-route-heading]:focus-visible{outline-offset:4px; outline-s
+- **The ?order_id deep-link filter is applied invisibly, with no indicator and no way to clear it**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:3130, admin-order-detail.component.ts:1195, admin-returns.component.ts:576
+  - fix: Render a removable filter chip when `orderIdFilter` is set (order reference + an X that clears `orderIdFilter` and re-runs the load), and drop `order_id` from the URL when cleared. Minimum viable: show the active order filter as text next to the Status select.
+- **/admin/inventory is absent from the admin sidebar in the default nav mode - the user stands on a page the nav denies exists**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:3067, admin-layout.component.ts:563
+  - fix: Either add 'inventory' to ownerBasicSections (admin-layout.component.ts:563-571) or force-include the currently active route's nav item inside recomputeNavViews() (:872-875) so location is always represented.
+- **Dark theme: selected state of all 5 Content-workspace segmented controls is invisible (identical pixels to unselected + card)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:58, admin-content-layout.component.ts:61
+  - fix: Give the selected chip a dark-theme counterpart, e.g. add [class.dark:bg-slate-100] + [class.dark:text-slate-900] alongside each [class.bg-slate-900]/[class.text-white] binding (5 groups x 2-3 buttons in admin-content-layout.component.ts:58-219), and raise the container border to dark:border-slate-7
+- **Every entry to /admin/content/settings fires the entire settings dataset 2-3 times**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: almost-certain (90-99%)
+  - anchors: admin.component.ts:11020, admin.component.ts:11080
+  - fix: Guard applySection's unchanged-section path so it does not re-run loadForSection, and drive loading from a single distinctUntilChanged() stream over (section, relevant query params) instead of calling applySection imperatively in ngOnInit and again from the combineLatest subscription.
+- **Unauthenticated SSR of the admin URL returns 200 with the full storefront homepage and no noindex**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: almost-certain (90-99%)
+  - anchors: app.routes.ts:342, auth.guard.ts:35
+  - fix: In the SSR path, make the guard's redirect emit a real redirect: return a 302/307 to `/login?next=…` (or `/`) from the server so the admin URL never returns 200 with foreign content, and/or apply NOINDEX_ROBOTS to any response served at an /admin/** path regardless of guard outcome. Fixing F-007 (re
+- **Anonymous GET /admin returns 200 with the full homepage and robots index,follow - the route's NOINDEX is discarded and no redirect status is emitted**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: almost-certain (90-99%)
+  - anchors: app.routes.ts:342, auth.guard.ts:36
+  - fix: Return a RedirectCommand (Angular >= 18) instead of a bare UrlTree from adminGuard/authGuard so SSR emits a real 302, and/or keep NOINDEX_ROBOTS on whatever is rendered at the /admin URL. Verify with curl -i that /admin answers 302 (or 200 + noindex) for an anonymous request.
+- **"Ends at" datetime input overflows its grid column and its calendar-picker button is covered by the Message (RO) textarea at >=1024px**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ops
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-ops.component.ts:743, admin-ops.component.ts:773
+  - fix: Add `w-full min-w-0` to both datetime-local inputs and `min-w-0` to their label wrappers in admin-ops.component.ts:773-788.
+- **Maintenance-banners left-column labels are detached ~60px from their controls at >=1024px**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ops
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-ops.component.ts:743, admin-ops.component.ts:744
+  - fix: Add `content-start` to the two column wrappers (admin-ops.component.ts:744 and the right-hand `div.grid.gap-3`), or `self-start` on each label.
+- **Focus is stolen to the <h1> on first paint: visible UA focus ring and header/sidebar dropped from forward Tab order**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-page-header.component.ts:14, route-heading-focus.service.ts:17
+  - fix: Skip the first NavigationEnd (only move focus on in-app navigations), or focus only when the navigation was user-initiated; and style the target's :focus-visible ring instead of leaving the UA default on a block-level heading.
+- **Header brand wordmark truncates to a single glyph at 375px (visible on this route's mobile cells)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: frontend/src/app/layout/header.component.ts:84, header.component.ts:84
+  - fix: Hide the wordmark below the breakpoint where it fits instead of truncating it: `class="hidden sm:inline text-xl sm:text-2xl ..."` at header.component.ts:84 (the logo mark alone carries the brand at 375px), or shrink/collapse the mobile action cluster. Do not rely on `truncate` for a 12-character bra
+- **Hero LCP preload cannot match the rendered <picture> (no type, JPEG-only srcset, wrong imagesizes)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%) on the mismatch; likely (55-80%) on the double-fetch magnitude
+  - anchors: banner-block.component.ts:48, frontend/src/index.html:6
+  - fix: Emit the preload from the same source of truth as the banner block (matching type="image/avif" and imagesizes = splitSizes()), or drop the static preload entirely and rely on the fetchpriority="high" already set on the <img>.
+- **Admin IP-bypass token is typed into a cleartext text input (no type="password")**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ip-bypass
+  - confidence: almost-certain (90-99%)
+  - anchors: frontend/src/app/pages/admin/ip-bypass/admin-ip-bypass.component.ts:33
+  - fix: Add `type="password"` to the input (component:33) and, if operators need to verify a pasted token, add an explicit show/hide toggle button that switches type between password and text. Keep `autocomplete="off"`.
+- **Unauthenticated GET /admin/ip-bypass returns HTTP 200 with the home page markup and robots index,follow**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ip-bypass
+  - confidence: almost-certain (90-99%)
+  - anchors: app.routes.ts:337
+  - fix: Make the SSR layer surface guard redirects as real HTTP redirects (Angular SSR: set res.redirect(302, '/') when the router returns a UrlTree for a server-side navigation, or map RESPONSE/REQUEST tokens in the express handler) and, as belt-and-braces, keep NOINDEX_ROBOTS applied for any URL whose pat
+- **Critical low-stock rows become unreadable in dark theme (bg-rose-50 with no dark: counterpart)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-inventory.component.ts:260
+  - fix: Add a dark counterpart to the conditional background, e.g. [class.dark:bg-rose-950/30]="row.is_critical" alongside line 260, or move the critical-row state onto a light/dark token pair like the error blocks already do at :180. Separately, extend the light-only-bg detector to Angular [class.x] bindin
+- **Inventory table's editable columns are keyboard-unreachable (overflow-x-auto with no tabindex)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-inventory.component.ts:208
+  - fix: Add tabindex="0" plus an accessible name (role="region" + aria-label) to the overflow-x-auto wrappers at lines 208, 454 and 500, or render a stacked card layout below lg.
+- **'Desired qty' silently coerces invalid input to null, erasing the stored value while reporting success**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-inventory.component.ts:346
+  - fix: Validate before submitting in saveNote() (mirror the deltaInvalid guard at :660-665), surface a field-level error, and/or switch the input to type="number" min="0" step="1".
+- **Segmented controls expose no toggle semantics: no aria-pressed/role=radio, no role=group tying the visible label to the buttons**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:51
+  - fix: Wrap each group in role="group" with [attr.aria-labelledby] pointing at the existing label span (give it an id), and add [attr.aria-pressed]="prefs.mode()==='simple'" (etc.) to every button — or use role="radiogroup"/role="radio"+[attr.aria-checked] since the options are mutually exclusive.
+- **45px whole-page horizontal overflow at 375: the shell's grid column has no minmax(0,1fr), so a wide routed child drags breadcrumb + page header off-viewport**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content
+  - confidence: almost-certain (90-99%) that the overflow exists; likely (55-80%) on the stated root cause
+  - anchors: admin-content-layout.component.ts:27
+  - fix: Change admin-content-layout.component.ts:27 to <div class="grid grid-cols-[minmax(0,1fr)] gap-6"> (or add min-w-0 to the grid children). That contains the overflow to the child that actually causes it instead of letting it push the page chrome, then fix the child's own min-content width separately i
+- **Social & contact thumbnails are hotlinked to expiring Meta CDN URLs and 403 — 8 broken previews per load despite an existing server-side thumbnail endpoint**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: almost-certain (90-99%)
+  - anchors: backend/app/api/v1/content.py:379
+  - fix: Persist thumbnails through the existing /admin/social/thumbnail endpoint (store a local/proxied asset URL rather than the signed CDN URL), and render a neutral avatar placeholder on image error instead of a broken glyph.
+- **SSR-served HTML for /admin/content/home is robots=index,follow with storefront canonical/og/JSON-LD; noindex is client-only**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/home
+  - confidence: almost-certain (90-99%)
+  - anchors: app.routes.ts:387
+  - fix: Emit `noindex,nofollow` for `/admin/**` in the SSR/server layer (Express middleware or an SSR-time route-data resolver) rather than from a client-side effect, and suppress the storefront Organization/WebSite JSON-LD + the `canonical=/` + hreflang alternates on admin routes so an /admin URL never cla
+- **Route <h1> is programmatically focused on INITIAL page load: full-width focus outline artifact in every cell, and first Tab skips the skip-link and header**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/home
+  - confidence: almost-certain (90-99%)
+  - anchors: core/route-heading-focus.service.ts:17
+  - fix: Focus the route heading only on SUBSEQUENT navigations, not the initial one — skip the first NavigationEnd (e.g. `skip(1)` on the events stream, or gate on a `hasNavigatedOnce` flag) in route-heading-focus.service.ts. Keep the pattern for real route changes. Additionally give the heading a deliberat
+- **Dark theme: 4 inactive tab pills fail colour contrast and read as disabled**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: almost-certain (90-99%)
+  - anchors: dam-asset-library.component.ts:60
+  - fix: Add dark variants at line 60-64, e.g. `[class]="tab()===t.id ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'border-slate-300 text-slate-700 dark:border-slate-600 dark:text-slate-200'"`. Same treatment for any other class binding in this file that set
+- **Media library tabs expose no selected state to assistive tech (colour-only state)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: almost-certain (90-99%)
+  - anchors: dam-asset-library.component.ts:56
+  - fix: Wrap the pills in `role="tablist"`, give each `role="tab"` + `[attr.aria-selected]="tab()===t.id"` + `[attr.tabindex]`, and add a non-colour indicator (underline/weight or a checkmark). Alternatively keep buttons and add `[attr.aria-current]="tab()===t.id ? 'page' : null"`.
+- **Entire media library surface is hardcoded English — no i18n on a bilingual app**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-media.component.ts:15
+  - fix: Import TranslateModule into the component and move every literal to `adminUi.media.*` keys in en.json/ro.json (including the option labels and the prompt copy, which should become a dialog per the window.prompt finding). Add an i18n lint/test that fails on literal text inside admin templates.
+- **SSR renders the storefront HOME page for /admin/dashboard, so first paint is the wrong page and it is fully replaced at hydration (also fires 2 blocked example.com image requests)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/dashboard
+  - confidence: almost-certain (90-99%)
+  - anchors: auth.guard.ts:55
+  - fix: Make the server honour the guard result as a real HTTP redirect: in the SSR handler, detect the RedirectCommand/UrlTree from the router and respond 302 to '/' (unauthenticated) — Angular SSR exposes this via `REQUEST`/`RESPONSE_INIT` or an `renderApplication` post-check. Separately, make `ensureAuth
+- **Payments-health "By provider" table is a horizontally scrollable region with no keyboard access (axe scrollable-region-focusable, serious)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/dashboard
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:1523
+  - fix: Add `tabindex="0"` plus an accessible name (`role="region"` + `aria-label`) to the wrapper at :1523 (and the sibling wrappers at :1660, :1719 that render when shipping data exists), or drop `min-w-[640px]` in favour of a responsive/stacked table below the breakpoint where it clips.
+- **Unauthenticated GET /admin/orders returns 200 with the storefront homepage and robots index,follow; no login redirect and the destination is lost**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders
+  - confidence: almost-certain (90-99%) OBSERVED (curl) + CODE (guard)
+  - anchors: frontend/src/app/core/auth.guard.ts:53
+  - fix: In frontend/src/app/core/auth.guard.ts:53-55 split the two cases: when unauthenticated return `router.parseUrl('/login?returnUrl=' + encodeURIComponent(state.url))` (as authGuard:17 does) and keep `/` only for authenticated-but-not-staff. That also fixes the crawler problem because the login route e
+- **Workspace segmented controls expose selected state by colour only (no aria-pressed/role=group)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:61
+  - fix: Add role="group"/role="radiogroup" plus aria-labelledby on each wrapper, and [attr.aria-pressed] (or role=radio + [attr.aria-checked]) on each button.
+- **Active content-section tab is not programmatically current (aria-current absent)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:39
+  - fix: Add ariaCurrentWhenActive="page" alongside routerLinkActive on the nav anchors.
+- **Dark theme: active segmented-toggle option has the same background as its wrapper, so the selected editor mode / preview size / layout / EN-RO language / theme is invisible**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/pages
+  - confidence: almost-certain (90-99%)
+  - anchors: frontend/src/app/pages/admin/content/admin-content-layout.component.ts:56
+  - fix: Give the active option a theme-aware surface, e.g. replace [class.bg-slate-900] with a pair like 'bg-slate-900 dark:bg-slate-100 dark:text-slate-900' (or a semantic token such as bg-surface-inverse), and add aria-pressed / role=radio + aria-checked so the state is exposed non-visually. Apply to all 
+- **Every load of /admin/content/pages fires all eight of its section data requests twice**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/pages
+  - confidence: almost-certain (90-99%)
+  - anchors: frontend/src/app/pages/admin/admin.component.ts:11020
+  - fix: Drop the manual applySection/applyContentEditQuery pair at :11022-11023 and rely solely on the combineLatest subscription (which emits synchronously on subscribe), or guard applySection so the same section value is not reloaded. Note the underlying cms.snippets 404 is handled correctly at :15798-158
+- **All five axe violations on this route come from the vendored toastui editor, and the two color-contrast nodes fail in light theme as well as dark**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/pages
+  - confidence: almost-certain (90-99%)
+  - anchors: rich-editor.component.ts:112
+  - fix: Add a project override stylesheet for toastui raising .toastui-editor-mode-switch .tab-item colour to >=4.5:1 in both themes, and extend rich-editor.component.ts's post-init DOM pass (it already sets aria-label at :117-123) to add aria-label to the scroll-sync checkboxes and tabindex="0" plus role="
+- **/admin is never server-rendered as admin: SSR renders and paints the storefront homepage, fetches its external seed images, then discards it for a client-side admin render (worst FCP of all sampled routes)** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: almost-certain (90-99%)
+  - anchors: auth.guard.ts:31
+  - fix: Either forward the incoming request cookies on the SSR HTTP hop so adminGuard can authenticate server-side, or declare /admin/** as RenderMode.Client in the Angular server route config so the server stops rendering and shipping a homepage that is immediately thrown away. Experiment to settle the coo
+- **Payments-health horizontally scrolling table region has no keyboard access (axe scrollable-region-focusable, serious) - confirms the app-wide pattern with a route node**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:1523
+  - fix: Add tabindex="0" plus role="region" and an accessible name to admin-dashboard.component.ts:1523 (the same treatment is needed at :1392, :1660, :1719, :1824, :1956, :2339 on this route's template).
+- **Four overflow-x-auto scroll containers have no tabindex="0", so keyboard-only users cannot scroll the coupon/bulk/analytics tables** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: likely (55-80%)
+  - anchors: admin-coupons.component.ts:760
+  - fix: Add `tabindex="0"` (plus an accessible name, e.g. `role="region" [attr.aria-label]` from the section heading) to each of the 4 `overflow-x-auto` wrappers, or make the tables responsive so they do not need horizontal scroll at small widths.
+- **Unauthenticated /admin/content/blog returns HTTP 200 with robots index,follow (soft-403, indexable admin URL)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - anchors: app.routes.ts:374
+  - fix: Have the anonymous SSR path answer 302 -> /login (or 403) for /admin/**, and make the anonymous fallback render inherit robots noindex,nofollow instead of the storefront home meta.
+- **Dark theme: selected state of all 5 segmented controls is invisible (bg-slate-900 pill on a slate-900 surface)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:57
+  - fix: Add a dark variant to the active pill (e.g. dark:bg-white dark:text-slate-900, or dark:bg-indigo-500) and a non-colour cue (ring/underline) so the state survives both themes.
+- **Mobile 375: shared header wordmark "momentstudio" truncates to a single glyph**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: almost-certain (90-99%)
+  - anchors: frontend/src/app/layout/header.component.ts:84
+  - fix: Hide the wordmark below `sm` (`hidden sm:inline`) so the logo mark carries the brand at 375, or drop `truncate` and let the control cluster shrink instead. Shared-shell change — coordinate, since every route at 375 shows this.
+- **On a failed load the error card and the "No return requests found." empty state render at the same time**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-returns.component.ts:135
+  - fix: Add the missing guard: `*ngIf="!loading() && !error() && !items().length"` at :144, mirroring the board branch at :256.
+- **Saving a status change while in Board view refreshes the list signal, not the board — the card stays in its old column**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-returns.component.ts:790
+  - fix: Replace `this.load(false)` at :801 with the existing branch, e.g. `if (this.viewMode() === 'board') { this.loadBoard(); } else { this.load(false); }` — or reuse `retryLoad()`'s shape. Apply the same refresh to the return-label mutations if column contents can depend on them.
+- **List/Board segmented control exposes its selected state by colour only — no aria-pressed / tab semantics**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-returns.component.ts:98
+  - fix: Add `[attr.aria-pressed]="viewMode() === 'list'"` / `'board'` to the two buttons at :98 and :110 (or convert to `role="tablist"` + `role="tab"` + `aria-selected` since it swaps rendered panels), and add a non-colour cue (icon or a bolder border/weight) for the active option in dark theme.
+- **Return-label file input is display:none, making the upload control keyboard-unreachable**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-returns.component.ts:442
+  - fix: Swap `class="hidden"` for `class="sr-only"` (or `absolute h-px w-px opacity-0`) at :445 so the input stays focusable, and add a visible focus style on the label via `focus-within:ring-2`. Verify the label still forwards activation on Enter/Space.
+- **product-placeholder.svg is hardcoded light-only, so the image fallback is a near-white tile in dark theme**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%)
+  - anchors: product-card.component.ts:48
+  - fix: Drive the SVG fill/ink from currentColor or CSS variables, or ship a dark twin and swap with the `dark:hidden` / `hidden dark:block` pattern already used for the footer 'made by' marks.
+- **Mobile (375px) header brand wordmark truncates to 'mo…' despite ~90px of free space beside it**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%) on the visual; likely (55-80%) on the grid-track cause
+  - anchors: header.component.ts:74
+  - fix: Keep the actions cluster in an `auto` track and the flexible track where the (hidden) search sits, or remove `truncate` from the brand below the `lg` breakpoint.
+- **Ownership guard on /orders/stripe/confirm and /orders/paypal/capture is tautological — the elif branch can never deny (api/v1/orders.py:1327-1342, 1142-1162)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **No amount/currency assertion on any fulfilment path (services/webhook_handlers.py:60-299, orders.py:1265-1437)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain that the check is absent; likely (55-80%) that it is currently unexploitable — no live underpayment path observed, labelled a hypothesis
+- **No refresh-token reuse/replay detection — a detected replay 401s but does not revoke the session family (RFC 9700 §4.14.2; api/v1/auth.py:1241-1283)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **Rate-limit key is the client-supplied X-Session-Id header and the in-memory bucket map never evicts (payments.py:50-60, rate_limit.py:121)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **Netopia IPN acks internal errors as permanent (errorType 2) so paid confirmations are lost, plus no idempotency row and a 24h replay window (api/v1/payments.py:561-569, config.py:90)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R3-payments-security
+  - confidence: almost-certain (90-99%) — CONFIRMED by code
+- **Production budget initial maximumError=1300kb raw is ~4x too loose; no gzip budget, no Lighthouse/CWV job in any of 32 workflows, and @codecov/bundle-analyzer is installed but unwired**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%)
+- **No preconnect/dns-prefetch for clarity.ms or challenges.cloudflare.com; self-hosted Cinzel woff2 is not preloaded (one round-trip late, FOUT)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: likely (55-80%)
+- **<html lang> stays "en" on Romanian pages (/shop?lang=ro renders RO title inside lang="en"); no og:locale or og:locale:alternate**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: almost-certain (90-99%) — reproduced
+- **23 admin routes return HTTP 200 with index,follow and home-page content — adminGuard denies activation server-side so app.routes.ts:342 robots: NOINDEX_ROBOTS never applies and RouteRobotsService falls back to the index,follow default**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: likely (55-80%) on the mechanism, almost-certain on the observation; control: /cart /checkout /login correctly emit noindex,nofollow
+- **Home hero image preloaded with fetchpriority=high on every route from index.html:6-13, contending with the real LCP element on /shop, /products/*, /admin/***
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R1-ssr-seo
+  - confidence: almost-certain (90-99%) — preload tag confirmed present in /shop SSR HTML where the image never renders
+- **adminUi.site.pages.errors/success declared twice in the same object in BOTH en.json and ro.json; JSON.parse silently drops the first block, so the legal-page editor shows the wrong save/load message**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — object_pairs_hook parse of both files + live consumers at admin.component.ts:15461/15555
+- **All 8 public RO SEO meta descriptions are diacritic-stripped (Descopera/Exploreaza/Citeste/Contacteaza) while 87% of the rest of ro.json is correct**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — 8/8 measured, rendered value confirmed live
+- **Header ships English accessible names sitewide (aria-label/sr-only Search, Open navigation, Cart, Skip to main content) despite 33 translate uses; keys already exist**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%)
+- **Empty cart renders 'Shipping 20.00 RON' and 'Estimated total 20.00 RON' beside 'Your cart is empty'**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R2-ux-conversion
+  - confidence: almost-certain — OBSERVED in SSR HTML of /checkout
+- **SC 2.4.11 Focus Not Obscured risk: sticky top-0 z-[100] header plus fixed/sticky bottom bars with no global scroll-padding-top (only per-container scroll-mt-24, never on fields)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R2-ux-conversion
+  - confidence: likely (55-80%) — HYPOTHESIS, not reproduced; settling experiment named in the report
+- **aria-invalid / inline-error semantics exist only inside checkout (16 occurrences total, zero on login, register, contact, tickets, admin); no error summary anywhere and role=alert in only 4 templates**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R2-ux-conversion
+  - confidence: almost-certain — repo-wide grep
+- **step_up.require_step_up() is a `return None` stub and has_step_up() always returns True, disabling the step-up second factor at all 21 call sites including PII reveal and the whole-DB export, while POST /auth/step-up still mints step-up tokens nobody validates**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) - CONFIRMED by execution against localhost:4202: GET /admin/dashboard/users?include_pii=true -> 200 cleartext emails, GET /admin/dashboard/export -> 200 / 3693 bytes, both with only a bearer token
+- **dashboard section (admits content+fulfillment) back-doors the users section on GET /admin/dashboard/users, and _require_admin_mfa returns early for non-admin/owner roles so content/support/fulfillment staff reach admin sections with no MFA**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) - CONFIRMED by execution: role=content 2fa=False -> dashboard=200 products=200 content=200 users=403; role=admin 2fa=False -> 403 everywhere
+- **assets/i18n/en.json is 229,994 B fetched client-side on first load with 67% of it (125,335 B) being adminUi strings, and it is absent from the 6,719 B SSR transfer state**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%) - JSON key-size analysis plus ng-state payload measurement
+- **ngsw-config.json prefetches /*.js so the service worker pulls all 75 chunks (5,708,412 B) including the 1.24 MB admin bundle for anonymous shoppers**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: likely (55-80%) on real-world impact; the config itself is confirmed
+- **CLS: 27 img sites have neither intrinsic dimensions nor a CSS aspect ratio (corrects the prior pass's overstated 78/85); only 7 of 85 use NgOptimizedImage**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: likely (55-80%) - regex scan with Tailwind aspect-/h-N class exclusion
+- **PWA: ngsw-config has no dataGroups (zero API caching) and no SwUpdate consumer exists (no update prompt, no ChunkLoadError recovery); /offline reachable only via a header badge**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: almost-certain (90-99%) for the config facts; likely (55-80%) for the post-deploy stale-chunk impact
+- **SSR emits <html lang="en"> even when the body it renders is Romanian, contradicting its own hreflang="ro" — WCAG 2.2 SC 3.1.1 failure**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — reproduced (?lang=ro returns Magazin x5 with lang="en"); root cause read at language.service.ts:60-63 where applyDocumentLanguage early-returns on the absent global document under platform-server
+- **Confirmation sentinels are locale-coupled: placeholder is translated but the guard compares to hardcoded 'DELETE'/'PURGE'/'TRANSFER' — translating the RO value permanently bricks account deletion and audit purge**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) static; likely (55-80%) that it breaks the day a translator touches those five keys — currently safe ONLY because the RO values are byte-identical to EN
+- **MissingTranslationHandler humanises the key leaf into a plausible English label instead of a detectable marker, so missing RO keys are invisible to QA and to any browser sweep**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — core/missing-translation.handler.ts:33-39 plus 18 hardcoded English fallbacks at :4-21
+- **Duplicate sibling keys (adminUi.site.pages.success/.errors declared twice in both locale files) are silently collapsed by JSON.parse; check-i18n.mjs cannot see them because it parses first**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — reproduced with object_pairs_hook; en.json:3135-3136 dead vs :3243/:3245 served; raw 4636 keys parse to 4634
+- **Checkout H1 and six RO <title>s still read "Checkout" — contradicted by ro.json's own register (checkout.checkoutFailed = "Finalizarea comenzii a esuat.")**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — checkout.component.ts:164 binds titleKey to checkout.title, which is identical in both locales
+- **Romanian's three-form plural (one/few/other + the ≥20 "de" rule) modelled as an en-style binary — live output `Pagina 1 din 1 · 1 postări`**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: almost-certain (90-99%) — reproduced live; Intl.PluralRules('ro-RO') categories verified in node
+- **Admin search is not diacritic-folded while the storefront is — `cana` misses `Cană ceramică`, `Ionita` misses `Ioniță`; zero `unaccent` usage repo-wide**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: almost-certain (90-99%) — code-confirmed, asymmetry between two named code paths
+- **14 Romanian strings shipped without diacritics, including the live `<meta name="description">` ("Descopera arta ceramica lucrata manual…")**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: almost-certain (90-99%) — reproduced live in SSR HTML
+- **Hardcoded English inside the RO UI (Skip to main content / Search / Open navigation / Cart) plus a 2526-line admin component with 62 hardcoded strings and zero `| translate` calls**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:R4-i18n-ro
+  - confidence: almost-certain (90-99%) — all four chrome strings observed verbatim in the RO SSR body
+- **16 /admin/dashboard/* routes use section `dashboard` (all five staff roles) while every sibling on the same resource is narrower — a `content` editor reads the user list (usernames+roles unmasked → admin enumeration), order values, and revenue/funnel/refund analytics**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) — CONFIRMED by execution: 200 on 7 dashboard endpoints, 403 on /users/search, /orders/admin, /admin/dashboard/export; PII masked (services/pii.py:17-38) which bounds severity
+- **Shared secrets compared with ==/!= instead of hmac.compare_digest: admin IP-bypass token (dependencies.py:118), CONTENT_PREVIEW_TOKEN (content.py:2343), MAINTENANCE_BYPASS_TOKEN (backpressure.py:87) — same codebase does it correctly at media_dam.py:485**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: CONFIRMED as a deviation (almost-certain); remote timing exploitability likely (55-80%)
+- **Repo's own edge config infra/ssr-edge.conf:19 uses $proxy_add_x_forwarded_for (appends), while _extract_admin_client_ip takes raw.split(",",1)[0] (dependencies.py:107-109) — with ADMIN_IP_HEADER=x-forwarded-for the allowlist is bypassed by a client-supplied header; docs/PRODUCTION.md:167 assumes the proxy strips it**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) — CONFIRMED by code; extends R3-payments-security.md:132 by showing the shipped config makes the misconfiguration the default
+- **Route has no h1 — the page heading is a styled <div>, not a heading element**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ip-bypass
+  - confidence: almost-certain (90-99%)
+  - fix: Change the div at component:23 to `<h1 class="text-lg font-semibold …">` (visual styling is unchanged since the size comes from the utility classes, not the tag).
+- **Token cannot be submitted with Enter — no <form> and no keyboard submit handler** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ip-bypass
+  - confidence: likely (55-80%)
+  - fix: Wrap the field + buttons in `<form (ngSubmit)="submit()">` and give the primary app-button `type="submit"` (or add `(keyup.enter)="submit()"` to the input at component:33). While there, add an inline `aria-live` error region bound to the failed-submit message instead of relying on the toast alone.
+- **No empty/error state for the settings cards: 4 unhandled 4xx per load, and 'not configured' is indistinguishable from 'failed to load'**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: almost-certain (90-99%)
+  - fix: Render an explicit 'not configured yet' empty state for a 404 and an error+retry state for other failures; suppress the /versions request when the block does not exist.
+- **WCAG 2.2 AA 2.5.8 target-size failures on real controls (17px-tall Remove/Add and reorder buttons)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: likely (55-80%)
+  - fix: Give these controls `min-h-[24px] min-w-[24px]` with real padding (e.g. px-2 py-1) or wrap them in a 24px hit area; verify with axe's target-size rule explicitly enabled.
+- **Monolithic settings page: 12,436px desktop / 17,907px mobile single scroll, 425 controls, 13 cards — 4 of which duplicate other admin routes**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: likely (55-80%)
+  - fix: Split the settings surface into sub-tabs/child routes (assets, social, navigation, company, checkout, reports, taxonomy) and drop the Coupons/FX/Audit/Low-stock cards that already have dedicated routes; load each sub-surface's data on demand. This one is partly a design preference — the measured def
+- **Empty media library renders no empty state — the screen reads as broken/stuck loading**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: almost-certain (90-99%)
+  - fix: Add an empty-state block next to the grid, mirroring the Jobs tab pattern: `<div *ngIf="!loading() && !error() && assets().length === 0">` with a localized message and a primary Upload CTA. Cover Library, Review queue and Trash (the tab() !== 'collections' && tab() !== 'queue' branch at line 964).
+- **Unauthenticated GET /admin/dashboard answers 200 with an indexable duplicate of the home page (robots index,follow; noindex only lands after hydration)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/dashboard
+  - confidence: almost-certain (90-99%)
+  - fix: Return 302 -> /login (or 401/403) for unauthenticated /admin/** at the SSR layer (see previous finding), and emit `noindex,nofollow` in the SSR head for any /admin/** URL regardless of which component ends up rendering — e.g. set the robots meta from the request path in the server entry, not from th
+- **Mobile 375 on the authenticated admin surface clips the brand wordmark to a single unreadable glyph fragment**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders
+  - confidence: almost-certain (90-99%) OBSERVED for the rendering; likely (55-80%) INFERRED for the extra-control cause
+  - fix: Hide the wordmark instead of shredding it below the width where it can show a readable prefix — e.g. add `hidden xs:inline`/`sr-only sm:not-sr-only` to the brand span (logo alone already links home and carries the alt text), or give the span `min-w-[6ch]` plus `flex-shrink` ordering so the header co
+- **SSR serves the full public homepage, marked index,follow, under this admin URL** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: almost-certain (90-99%)
+  - fix: Emit noindex,nofollow plus the route title server-side for the admin route tree, and have the server-side admin guard return a redirect or an empty shell instead of rendering app-home under the admin path.
+- **A clipped off-canvas panel bleeds into the left edge of the page at 375px** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/pages
+  - confidence: likely (55-80%)
+  - fix: UNVERIFIED premise (drawer translate vs 999px document): first fix F-P-1 so the document is no wider than the viewport, then re-capture the mobile cells - if the bleed persists, add overflow-x:hidden (or clip) to the off-canvas drawer's positioning ancestor and assert no element has a negative left 
+- **Ops page renders 8 sections with zero heading elements; 6 buttons share the accessible name "Refresh"**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ops
+  - confidence: almost-certain (90-99%)
+  - fix: Render each card title as an <h2> (nested tile labels as <h3>), or give each card role="region" + aria-labelledby pointing at its title; give each Refresh button a specific accessible name (e.g. aria-label="Refresh webhook monitor").
+- **Unauthenticated SSR of /admin/coupons returns 200 with the full homepage body and robots: index,follow**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: almost-certain (90-99%)
+  - fix: Make the server-side admin guard return a real authz outcome instead of falling through to the homepage shell: either 302 to /login (preferred) or render the Not-Found/403 shell — and in every unauthenticated branch emit `noindex,nofollow` before the response is flushed. Add a regression test assert
+- **17 checkboxes render 20x20 CSS px, below the WCAG 2.2 SC 2.5.8 (AA) 24x24 minimum**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: almost-certain (90-99%)
+  - fix: Bump the control to `h-6 w-6` (24px), or keep `h-5 w-5` and give the wrapping label `min-h-6 min-w-6 p-0.5 cursor-pointer` so the hit target (not just the paint) reaches 24x24. Applies to all 17 sites in this component.
+- **Async error/status banners have no role="alert"/aria-live — zero aria-* or role attributes in the whole 3809-line component**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: almost-certain (90-99%)
+  - fix: Add `role="alert"` (or `role="status" aria-live="polite"` for non-error updates) to each `*ngIf`-revealed message container in this component, starting at :124-128, and keep the container in the DOM with `aria-live` if the message can change while visible. Also confirm the shared ToastService host h
+- **"Create promotion" and "Create coupon" are not <form> elements: no Enter-to-submit, no native validation**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: almost-certain (90-99%)
+  - fix: Wrap each creation panel in `<form (ngSubmit)="saveCoupon()">` with the primary button as `type="submit"`, move the promotion/code checks to `required` + Angular validators, and render field-level `aria-describedby` errors instead of (or in addition to) toasts.
+- **Zero-promotion dead end: the required Promotion select renders zero options while the whole Create-coupon form and its submit stay enabled**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: almost-certain (90-99%)
+  - fix: Gate the coupon panel on `promotions().length` — replace it with an empty state that links to "New promotion" — and/or add a disabled placeholder `<option value="" disabled selected>` plus `[disabled]="!promotions().length"` on the select and the submit button. Give the promotions empty state a prim
+- **Seven Content-workspace preview controls are inert on this route (Preview size, Preview language, Preview theme)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - fix: Hide (or disable with a tooltip) the preview device/language/theme groups when the active content section does not consume them — e.g. gate the group on a per-section capability flag in CmsEditorPrefsService, or move them into the blog editor where a preview actually exists.
+- **Segmented 'toggle' pills expose no state to assistive tech (no aria-pressed / radiogroup, group label not associated)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - fix: Add aria-pressed bound to the active predicate on each pill (or convert each group to role="radiogroup" with role="radio" + aria-checked), and wrap each group in role="group" aria-labelledby pointing at its caption span.
+- **Mobile 375px: header wordmark 'momentstudio' clipped to a single unreadable glyph**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - fix: Hide the wordmark below sm (hidden sm:inline) or give the brand column layout priority (apply min-w-0 to the search/action column instead of the brand link), so the brand either renders fully or not at all.
+- **Primary mobile nav toggle is a 15x25 CSS-px unpadded glyph**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%) on the measurement; the WCAG 2.5.8 spacing exception likely exempts it from a hard AA failure
+  - fix: Give the toggle `h-9 w-9 grid place-items-center` (or equivalent padding) to match the 36px search and cart controls beside it.
+
+## P3 — 66 items
+
+- **Two duplicated breadcrumb trails, and the inner Content crumb navigates to a sibling section instead of a parent**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/pages
+  - confidence: almost-certain (90-99%)
+  - anchors: admin.component.ts:522, frontend/src/app/app.routes.ts:380, frontend/src/app/pages/admin/admin.component.ts:522, frontend/src/app/pages/admin/content/admin-content-layout.component.ts:241
+  - fix: Delete the child breadcrumb at admin.component.ts:522 and instead feed the active section into the layout's crumbs so a single trail reads Home / Admin / Content / Pages, with the 'Content' crumb either non-linked or pointing at a real overview page.
+- **Duplicate <title> element in the hydrated head — inline SEO bootstrap script runs above <title>, and its querySelector guards silently no-op**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/home
+  - confidence: almost-certain (90-99%)
+  - anchors: core/translated-title.strategy.ts:20, src/index.html:32, src/index.html:73
+  - fix: Move the inline bootstrap IIFE in src/index.html BELOW the `<title>` and the meta/link/JSON-LD tags it mutates (or defer it to DOMContentLoaded). That single move both stops the duplicate title AND makes lines 33-44 actually take effect — so verify the resulting meta values against the Angular SEO s
+- **Hardcoded English aria-label on the content-sections nav, and no aria-current on the active tab**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:39, layout/header.component.ts:149
+  - fix: Add adminUi.content.nav.aria (EN + RO) and use [attr.aria-label]="'adminUi.content.nav.aria' | translate" on line 39; add [attr.aria-current]="rla.isActive ? 'page' : null" using a routerLinkActive template ref on the *ngFor link.
+- **Blog editor deep-link truncates any slug containing a dot (split limit misuse)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: almost-certain (90-99%) as a code defect; unlikely (20-45%) to be hit with today's slugs
+  - anchors: admin-content-scheduling.component.ts:294, backend/app/schemas/blog.py:10
+  - fix: Replace the expression with value.slice('blog.'.length).
+- **Window end-date label is one day short when the window crosses a DST fall-back** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: likely (55-80%)
+  - anchors: admin-content-scheduling.component.ts:256, content.py:423
+  - fix: Add days on the local calendar instead of in milliseconds: new Date(y, m, d + windowDays()).
+- **Duplicate 'Breadcrumb' nav landmarks, h1 never names the section, empty state has no CTA**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:122, admin.component.ts:7831
+  - fix: Give the child breadcrumb a distinct label or drop it and extend the parent trail to include the active section; bind the h1 to the active section title; add a primary-styled 'New post' CTA into the empty state.
+- **No loading state: 'No blog posts yet.' renders while the section fetch is still in flight** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: likely (55-80%)
+  - anchors: admin.component.ts:11156, admin.component.ts:12282
+  - fix: Track a per-section loading flag in loadForSection() (admin.component.ts:11156) and render a skeleton/spinner while it is true, showing the empty message only after the request resolves.
+- **Pager renders "1 / 1" with both buttons disabled on an empty list**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-order-exports.component.ts:143, backend/app/api/v1/orders.py:1996
+  - fix: Gate the pager on `meta()!.total_items > 0` (or `total_pages > 1`) in the template; leaving the backend max(1, ...) alone is fine.
+- **Product card prints the currency twice ('RON' beside the title, again inside '24.00 RON')**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%)
+  - anchors: localized-currency.pipe.ts:18, product-card.component.ts:111
+  - fix: Delete the bare-currency span at product-card.component.ts:111, or render it only when the formatted price omits the currency code (non-RON currencies formatted by Intl already include it).
+- **EUR/USD price approximation lands after first paint and appeared in only 1 of 6 identical captures** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%) on the 1-of-6 observation; likely (55-80%) on the post-paint price-row shift
+  - anchors: fx-rates.service.ts:38, localized-currency.pipe.ts:56
+  - fix: Convert FxRatesService's state to signals so the update is deterministic, and reserve the suffix's space (or move it onto its own line) so its arrival cannot shift the price row.
+- **IP-denied gate renders the entire admin sidebar, admin search and a breadcrumb that all bounce back to this page** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ip-bypass
+  - confidence: likely (55-80%)
+  - anchors: auth.guard.ts:80
+  - fix: In admin-layout, suppress (or visually disable) the section nav + admin search while the active child is ip-bypass, drop the /admin/dashboard crumb link to plain text, and surface adminUi.ipBypass.restricted as inline copy on the card so the user learns the remedy without a transient toast.
+- **Bulk-adjust errors are never announced and the pagination summary is an unlabelled untranslated number triple**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-inventory.component.ts:178
+  - fix: Add role="alert" (or aria-live="assertive") to the error div at :178, and replace the raw triple at :393 with a translated string such as adminUi.pagination.summary ('Page {{page}} of {{pages}} · {{total}} items').
+- **Filter checkbox is stacked under its own label and misaligns the filter row**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-inventory.component.ts:76
+  - fix: Change the checkbox label at :76 from 'grid gap-1' to 'flex items-center gap-2' (text after the input) so it reads as one control and both filter groups share a baseline.
+- **Page title renders inside a permanent indigo focus box on every admin navigation** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: likely (55-80%)
+  - anchors: admin-page-header.component.ts:12
+  - fix: Scope the ring to genuine keyboard interaction - e.g. add a focus:outline-none/outline-hidden override on [data-route-heading] and announce the route change through an sr-only aria-live region instead of a visible outline on the h1. Shared component: blast radius is every /admin/* route, so fix once
+- **Route-local consequence of F-005: canonical, og:url and hreflang on /admin/content all point at the site root, and the og/meta copy is the storefront homepage's**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content
+  - confidence: almost-certain (90-99%)
+  - anchors: frontend/src/index.html:31
+  - fix: Fix once at the source: have index.html's bootstrap use origin + location.pathname + a normalized query (or simply not emit a canonical) and let core/seo-head-links.service.ts own the canonical for every route; suppress og:*/JSON-LD on noindex admin routes so admin pages stop advertising storefront 
+- **Mobile asset-library subtree measures 40px past the 375px viewport** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: even (~50%)
+  - anchors: asset-library.component.ts:58
+  - fix: Cheap and safe either way: add `min-w-0` to the four `<label class="grid gap-1 …">` filter items and `min-w-0` to the `app-asset-library` root grid (asset-library.component.ts:58-110). Separately, teach the layout probe to skip subtrees under a closed <details>/content-visibility:hidden so the aggre
+- **Per-section 'Enabled' checkboxes are 13x13 CSS px — below the 24x24 WCAG 2.2 target-size floor and hard to hit on a phone**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/home
+  - confidence: almost-certain (90-99%)
+  - anchors: admin.component.ts:2212
+  - fix: Add `h-5 w-5` (or `h-4 w-4` plus label padding to reach a 24px hit area) to the section-toggle checkboxes, or wrap each in a `min-h-[24px] min-w-[24px] inline-flex items-center justify-center` label so the clickable label region meets 24x24. Doing it once in a shared checkbox class is preferable to 
+- **Asset card <label> swallows the checkbox accessible name and packs ~10 sub-24px action buttons** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: likely (55-80%)
+  - anchors: dam-asset-library.component.ts:968
+  - fix: Change the card wrapper from <label> to a <div>/<article>, give the checkbox its own `aria-label="Select {{asset.original_filename}}"`, and give the action row real button padding (min-h-[24px] px-2 py-1) or collapse the 10 actions into an overflow menu.
+- **"What's new" card renders a developer maintenance note and a second page <h1> from an EN-only markdown asset**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/dashboard
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:198
+  - fix: Strip the leading `# What’s new` and the deploy instruction from src/assets/whats-new.md (or demote injected headings to h3+ when rendering), and resolve the asset per locale (`assets/whats-new.${lang}.md` with an EN fallback), re-fetching on language change.
+- **Zero-orders state is reported as a filter miss: "No orders match these filters." with no filters applied**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders
+  - confidence: almost-certain (90-99%) OBSERVED + CODE
+  - anchors: admin-orders.component.ts:586
+  - fix: Branch on whether any filter differs from its default: when the dataset is empty show a real zero-state (headline + one-line explanation + a primary action), and keep `adminUi.orders.empty` for the genuine filter-miss case. Add both strings to en.json and ro.json.
+- **Four horizontally/vertically scrollable regions in this component have no tabindex, so keyboard-only users cannot scroll them**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders
+  - confidence: likely (55-80%) CODE — not observable in the captured empty state
+  - anchors: admin-orders.component.ts:468
+  - fix: Add `tabindex="0"` plus `role="region"` and an `[attr.aria-label]` (e.g. 'adminUi.orders.table.regionLabel' | translate) to the containers at admin-orders.component.ts:468, 814, 1148, 1414, then re-run axe with orders seeded and confirm scrollable-region-focusable stays at 0.
+- **'Simple mode hides SEO and scheduling' is printed directly above a fully visible Scheduling panel**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-content-layout.component.ts:225
+  - fix: Either scope the copy ('hides the SEO and scheduling fields in the editor') or disable/hide the Scheduling nav item while prefs.mode() === 'simple'. Which one is intended is a product decision, not inferable from the code.
+- **Spurious focus rectangle painted around the page <h1> on initial load**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/scheduling
+  - confidence: almost-certain (90-99%)
+  - anchors: core/route-heading-focus.service.ts:16
+  - fix: Skip the first NavigationEnd (e.g. gate on router.navigated / skip(1)) so focus only moves on in-app navigation, and/or restrict the ring to :focus-visible.
+- **Two <h1> elements on the page: the What's-new markdown asset injects '# What's new' as an h1 into a mid-page card**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:198
+  - fix: Demote the heading in frontend/src/assets/whats-new.md to '## What's new' (or strip a leading h1 in the markdown renderer for embedded content), so the page keeps exactly one h1 ('Admin dashboard').
+- **app-card renders its title as a styled <div>, so the KPI tiles and the What's-new card are absent from the heading outline while 10 sibling widgets use real <h2>**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: likely (55-80%)
+  - anchors: shared/card.component.ts:21
+  - fix: Give shared/card.component.ts a headingLevel input (default h2/h3) and render the title in that element, or wrap the KPI tile titles in <h2> at their call sites so the outline is consistent with the 10 sections that already use headings.
+- **Duplicate <title> element inside <head> - on /admin the stale second one is the storefront title**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: almost-certain (90-99%)
+  - anchors: translated-title.strategy.ts:25
+  - fix: Make the SSR title strategy replace the index.html <title> rather than append a second one (translated-title.strategy.ts:25 / the SSR head handling), then assert document.querySelectorAll('title').length === 1 in an e2e check.
+- **Two in-route checkboxes render at 17x17 CSS px, below the WCAG 2.2 AA 24x24 target-size minimum** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin
+  - confidence: likely (55-80%)
+  - anchors: admin-dashboard.component.ts:2147
+  - fix: Bump the controls to h-5 w-5 plus py-1 on the wrapping label (>= 24px effective target), or add explicit spacing so the 2.5.8 spacing exception clearly applies. Settle the exception by measuring the vertical distance from these labels to the nearest adjacent interactive element.
+- **"Run sync now" button collapses to three lines at 375px in the Sameday Easybox card header**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ops
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-ops.component.ts:283
+  - fix: Add `flex-wrap` to the header row at admin-ops.component.ts:283 and `whitespace-nowrap` to both buttons.
+- **The page H1 renders inside a persistent focus box, making the title look like an empty text input** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: likely (55-80%)
+  - anchors: frontend/src/app/pages/admin/shared/admin-page-header.component.ts:12
+  - fix: Style the programmatic focus deliberately on the route heading: `focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2` (so the ring appears for keyboard-initiated focus only), or move the `tabindex="-1"` focus target to a visually-hidden skip anchor above t
+- **Full bulk-action toolbar renders with zero posts and its action <select> stays enabled**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - anchors: admin.component.ts:7847
+  - fix: Wrap the whole bulk panel in *ngIf="blogPosts().length > 0" (or disable the entire fieldset when the list is empty).
+- **Filename cell truncates at max-w-[340px] with no title attribute or any other way to read the full name**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-order-exports.component.ts:112
+  - fix: Add `[title]="item.filename"` on line 112 (and/or render the tail with `direction: rtl` text-overflow so the discriminating suffix survives).
+- **Pagination is not URL state - deep link, refresh and Back all land on page 1**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-order-exports.component.ts:176
+  - fix: Read `page` from `ActivatedRoute.queryParamMap` in ngOnInit and have `goTo()` call `router.navigate([], {queryParams: {page: next}, queryParamsHandling: 'merge'})`, reloading off the param stream.
+- **Three different names for one screen: title "Order exports", H1/breadcrumb "Order documents", nav "Documents"**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: almost-certain (90-99%)
+  - anchors: app.routes.ts:445
+  - fix: Pick one user-facing name and make `meta.titles.admin_order_exports` agree with `adminUi.orders.exports.title` in both en.json and ro.json (nav may stay short).
+- **H1 receives programmatic route focus with no design-system focus style, drawing a raw UA rectangle around the heading in both themes**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: likely (55-80%)
+  - anchors: admin-page-header.component.ts:11
+  - fix: Give the heading the system ring on the shared component: `focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:focus-visible:outline-slate-100` (and `focus:outline-none` for the non-keyboard case), rather than removing the programmatic fo
+- **Loading swap (table to skeleton) is silent to assistive tech - no aria-busy or role=status**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/orders/exports
+  - confidence: likely (55-80%)
+  - anchors: admin-order-exports.component.ts:53
+  - fix: Put `[attr.aria-busy]="loading()"` on the persistent container and give the skeleton wrapper `role="status"` with a visually-hidden translated "Loading documents" label; announce row count on completion.
+- **Results table is a horizontally scrollable region with no keyboard access to the scroll** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: likely (55-80%)
+  - anchors: admin-returns.component.ts:150
+  - fix: Add `tabindex="0"` plus an accessible name (`role="region" [attr.aria-label]="'adminUi.returns.title' | translate"`) to the wrapper at :151, and/or fix finding 1 so row focus drives the scroll naturally.
+- **Filter and view state are read from the URL but never written back — filters are not shareable, bookmarkable, or restorable by Back**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - anchors: admin-dashboard.component.ts:3130
+  - fix: On applyFilters/setView/openStatusList/prev/next, `router.navigate([], { relativeTo: route, queryParams: { q, status, view, page }, queryParamsHandling: 'merge', replaceUrl: true })` and let the existing queryParamMap subscription be the single source of truth (add a `view` param read at :578).
+- **Pagination controls disappear when a page returns zero rows, stranding the admin on an empty page**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: likely (55-80%)
+  - anchors: admin-returns.component.ts:208
+  - fix: Render the pager whenever `meta().total_pages > 1` rather than when `items().length`, and clamp in `load()`'s next handler: if `resp.items` is empty and `this.page > 1`, set `this.page = Math.min(this.page, resp.meta.total_pages || 1)` and reload once.
+- **Board view packs 4 columns into the residual width beside a fixed 440px detail rail** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: even (~50%)
+  - anchors: admin-returns.component.ts:256
+  - fix: If confirmed: collapse the detail rail to a slide-over in board mode (or drop to `lg:grid-cols-1` for the board branch) so the four columns get the full content width, and/or lower the board breakpoint to `lg:grid-cols-2 2xl:grid-cols-4`.
+- **Empty 'On sale' and 'Featured collections' rails still render a 'View all' CTA into a guaranteed-empty listing**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/
+  - confidence: almost-certain (90-99%)
+  - anchors: home.component.ts:276
+  - fix: Wrap the 'View all' app-button in the same `!saleLoading() && !saleError() && saleProducts.length` condition as the grid, or hide the whole rail when empty.
+- **Inter is declared in styles.css and tailwind.config.cjs but has no @font-face anywhere - body text renders in system-ui on every visitor**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S4-perf-bundle
+  - confidence: almost-certain (90-99%)
+- **dam-asset-library.component.ts is a wholly untranslated admin surface — 75 literals, zero translate wiring**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%)
+- **Offline page is mixed-language: RO prose with two hardcoded English buttons (nav.shop/nav.blog keys already exist)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%)
+- **check-i18n.mjs is structurally blind to all of the above — JSON.parse collapses duplicates, and there is no template-literal reverse scan**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — read at scripts/check-i18n.mjs:54
+- **POST /cart/promo/validate is public with no rate limiter and returns a distinguishable 404 vs 200-with-discount-value, making it a coupon enumeration oracle**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) - CONFIRMED by execution: 40 consecutive unauthenticated POSTs to localhost:4202 returned 40x 404 with zero 429
+- **Non-constant-time == / != comparisons on the content preview token and the admin IP bypass secret (content.py:2344, auth.py:1362, dependencies.py:118)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: likely (55-80%) - PLAUSIBLE only; no timing delta measured over HTTP, labelled a hypothesis with the settling experiment named
+- **Storefront JS errors never reach the backend client-error log (AdminClientErrorLoggerService gated to /admin URLs plus staff roles)**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: almost-certain (90-99%) — admin-client-error-logger.service.ts:39,44-51
+- **FormMessagesService is dead code with hardcoded English; receipt.component.ts loading/error strings untranslated**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: almost-certain (90-99%) — grep finds no injection site
+- **No HTTP timeout outside the checkout/payment-return paths — a hung upstream spins a loader forever**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S3-error-resilience
+  - confidence: likely (55-80%) — only 4 timeout() call sites, all payment-related
+- **SSR can never see a returning user's chosen locale — the choice persists to localStorage only, no lang cookie is written anywhere, and no Accept-Language is read, so every cold load first-paints English**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) mechanism (curl -H Accept-Language and curl -b lang=ro both return Magazin x0); likely (55-80%) that the post-hydration flip is perceptible
+- **257 hardcoded template literals concentrated in five components — dam-asset-library.component.ts alone has 165 with zero translate wiring; /offline mixes translated and untranslated buttons in one row**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — quote-aware tokenizer over 234 .ts + 2 .html files; naive tag-regex inflates this by ~40%, so the count is the conservative one
+- **Accessible names are English-only sitewide (skip link, header sr-only Search/Cart/Open navigation, concatenated unpluralisable 'Cart with N items')**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S2-i18n-parity
+  - confidence: almost-certain (90-99%) — header.component.ts:75,104-137,376 and app.component.ts:35,37; the skip link is additionally VISIBLE on keyboard focus
+- **require_staff (dependencies.py:359-364) and _STAFF_ROLES are dead code — used by 0 of 468 routes**
+  - verdict: UNCHALLENGED · reports: 1 · sources: lane:S1-authz-matrix
+  - confidence: almost-certain (90-99%) — CONFIRMED by full AST enumeration
+- **Header brand wordmark clipped to a single partial glyph at 375 px**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ip-bypass
+  - confidence: almost-certain (90-99%)
+  - fix: Hide the wordmark below `sm` (`hidden sm:inline`) so the flower logo stands alone on small screens, or give the brand column a min-width and move the mobile search button into the drawer. Shared header (layout/header.component) — dedupe with other routes' reports.
+- **Brand wordmark truncates to a single unreadable glyph at 375px** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/inventory
+  - confidence: almost-certain (90-99%)
+  - fix: Hide the wordmark below sm (e.g. 'hidden sm:inline') so the logo alone represents the brand at 375px, or shrink it to a text-base logotype and drop one icon control into the mobile nav sheet. Shared header chrome: dedupe across route units.
+- **Header brand wordmark is clipped to a single character at 375px**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: likely (55-80%)
+  - fix: Hide the wordmark below `sm` (`hidden sm:inline`) rather than truncating it, or give the logo link a `flex-1 min-w-0` with the control cluster allowed to shrink.
+- **Persistent full-width focus ring drawn around the route h1 in all 6 cells**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/settings
+  - confidence: almost-certain (90-99%)
+  - fix: Keep the programmatic focus (it is the correct a11y behaviour) but scope the ring: give the heading `focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2` and/or `w-fit`, so keyboard users still see a tight ring and route-focus does not paint a full-width box.
+- **Six images render with no width/height (CLS) and two product images point at https://example.com and fail to load**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/home
+  - confidence: likely (55-80%)
+  - fix: Set explicit width/height (or an aspect-ratio box) on the admin preview and thumbnail `<img>` elements to remove CLS. Separately, repoint the seeded product image URLs off `https://example.com` to a local placeholder asset so the admin never shows dead thumbnails and the network panel stays clean.
+- **Admin mutations are driven by window.prompt, which Chrome can suppress into silent no-ops**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/media
+  - confidence: likely (55-80%)
+  - fix: Replace the prompt() flows with the app's existing modal/dialog + reactive-form pattern so the values can be validated, translated and announced; at minimum show a toast when a mutation is cancelled so a suppressed dialog is not indistinguishable from success.
+- **Route inherits the homepage canonical, meta description and og:title instead of setting its own**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/pages
+  - confidence: almost-certain (90-99%)
+  - fix: Impact is bounded to near-zero by robots noindex,nofollow, so treat as hygiene: have the admin route (or the shared meta service) either emit a self-referential canonical or suppress canonical/og entirely on noindex routes so stale homepage metadata cannot leak into a future indexable admin surface.
+- **Duplicate <title> and homepage-default canonical/og/description served on /admin/ops**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ops
+  - confidence: almost-certain (90-99%)
+  - fix: Have the meta service set (or strip) canonical/og:url/og:title/description for admin routes, and remove the static <title> from the SSR shell once Angular's Title service has run.
+- **Two blocked cross-origin image requests to example.com on every /admin/ops load** ⚠UNVERIFIED
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/ops
+  - confidence: likely (55-80%)
+  - fix: Point the seed/demo product image_url values at local assets (or a placeholder service) and guard the preload path against non-app origins.
+- **Card header row never wraps: at 375px the title column is squeezed to ~50% and "New promotion" wraps to 2 lines inside a pill**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: almost-certain (90-99%)
+  - fix: Add `flex-wrap` (or `flex-col sm:flex-row`) to the header rows at :99 and the sibling Coupons/Scheduling headers, and add `whitespace-nowrap` to the action pills so a rounded-full button never wraps its label.
+- **Route-level canonical, og:title and meta description are the homepage's, not the route's**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/coupons
+  - confidence: almost-certain (90-99%)
+  - fix: Have the admin route's meta resolver set canonical/og:url/og:title/description from the active route (or, for a noindex admin surface, omit canonical/og and the storefront JSON-LD entirely rather than inheriting the homepage's).
+- **Storefront hero image preloaded at fetchpriority=high on this admin route and never rendered**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/content/blog
+  - confidence: almost-certain (90-99%)
+  - fix: Emit the hero preload only for routes that render the hero (move it out of the global index.html into the home route's SSR head, or drop fetchpriority for non-home routes).
+- **og:title / og:description / canonical stay storefront-level on this route; SSR title is the storefront title**
+  - verdict: UNCHALLENGED · reports: 1 · sources: route:/admin/returns
+  - confidence: almost-certain (90-99%)
+  - fix: Have the admin route's title strategy also set og:title/og:description and a self-referential canonical (or, cleaner for admin surfaces, omit canonical/og entirely when robots is noindex,nofollow). Fold into the F-005 fix rather than patching per route.
+

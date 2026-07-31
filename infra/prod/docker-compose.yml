@@ -159,6 +159,11 @@ services:
     environment:
       APP_VERSION: ${APP_VERSION:-}
       SSR_API_BASE_URL: ${SSR_API_BASE_URL:-http://backend:8000/api/v1}
+      # Angular SSR rejects any request whose Host is not allowlisted. Left unset,
+      # CommonEngine silently falls back to client-side rendering (no SSR content,
+      # no SEO) — and a future Angular major turns that into a 400. MUST list every
+      # public hostname this site is served on.
+      SSR_ALLOWED_HOSTS: ${SSR_ALLOWED_HOSTS:-momentstudio.ro,www.momentstudio.ro}
       APP_ENV: ${APP_ENV:-production}
       API_BASE_URL: ${API_BASE_URL:-/api/v1}
       SENTRY_DSN: ${SENTRY_DSN:-}

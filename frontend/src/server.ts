@@ -16,7 +16,29 @@ export function app(): express.Express {
     ? join(distFolder, 'index.original.html')
     : join(distFolder, 'index.html');
 
-  const commonEngine = new CommonEngine();
+  // Angular SSR validates the request Host against an allowlist (SSRF guard). With
+  // no `allowedHosts`, EVERY request is rejected and CommonEngine silently
+  // "Falling back to client side rendering" — so SSR produced an empty shell for
+  // all routes (no SEO content, no server-rendered markup), and Angular warns this
+  // becomes a hard 400 Bad Request in a future major. Configure it explicitly:
+  // SSR_ALLOWED_HOSTS is a comma-separated list (the public domain(s) in prod);
+  // local/dev origins are always permitted so compose + healthchecks render too.
+  const allowedHosts = Array.from(
+    new Set(
+      [
+        ...(process.env['SSR_ALLOWED_HOSTS'] ?? '')
+          .split(',')
+          .map((h) => h.trim())
+          .filter(Boolean),
+        'localhost',
+        '127.0.0.1',
+        '[::1]',
+        'frontend-ssr',
+      ].map((h) => h.toLowerCase()),
+    ),
+  );
+
+  const commonEngine = new CommonEngine({ allowedHosts });
 
   server.set('view engine', 'html');
   server.set('views', distFolder);
