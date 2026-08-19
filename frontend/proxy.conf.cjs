@@ -6,14 +6,14 @@
  *
  * Override the backend with DEV_API_TARGET (start.sh sets this).
  */
-const target = process.env.DEV_API_TARGET || "http://127.0.0.1:8000";
+const target = process.env.DEV_API_TARGET || 'http://127.0.0.1:8000';
 
 module.exports = [
   {
-    context: ["/api", "/media"],
+    context: ['/api', '/media'],
     target,
     secure: false,
     changeOrigin: true,
-    logLevel: "warn",
+    logLevel: 'warn',
   },
 ];
