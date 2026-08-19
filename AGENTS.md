@@ -110,3 +110,9 @@ aware of it, but never mutate it without explicit human sanction.
   run migrations against prod, or change payment/auth/DNS/secrets. Verification against
   prod must stay read-only (public health endpoints / `infra/prod/verify-live.sh`).
   Never commit VPS credentials, IPs, or panel logins to the repo.
+## Local Dev (truth as of 2026-08-19)
+- **Node 24** is required (`/.nvmrc`). Node 22 breaks `npm ci` against `frontend/package-lock.json`. Put Node 24 ahead of any `/exec-daemon/node` shim.
+- **Postgres is required** for the app and Alembic. Migrations use Postgres-only SQL (`ALTER COLUMN ... DROP DEFAULT`). SQLite is a pytest engine only (`sqlite+aiosqlite:///:memory:`), not a supported app/migrate path.
+- `./start.sh` / `make dev` / `start.bat` start FastAPI (`127.0.0.1:8000`) and `ng serve` with `frontend/proxy.conf.cjs`. `/api` and `/media` proxy to `DEV_API_TARGET` (default `http://127.0.0.1:8000`). Do not skip the proxy or point the browser at the API origin.
+- Open the app as **http://localhost:4200** (not `http://127.0.0.1:4200`) so CORS/`FRONTEND_ORIGIN` match.
+- `http-proxy-middleware` is not pinned to v3 in `overrides`. webpack-dev-server 5 ships HPM 2; forcing HPM 3 produced `Missing target` on `ng serve --proxy-config`.

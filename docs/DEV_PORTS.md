@@ -13,7 +13,7 @@ make env-dev
 - Frontend (Angular dev server): `http://localhost:4200` (default)
 - Backend (uvicorn): `http://127.0.0.1:8000` (default)
 
-`start.sh` generates an Angular proxy config so the browser can call the API via the same origin:
+`start.sh` / `npm start` use `frontend/proxy.conf.cjs` (explicit `target`, array form) so `/api` and `/media` proxy to `DEV_API_TARGET` (default `http://127.0.0.1:8000`). This is HPM3-safe; do not use an empty temp proxy file.
 
 - Browser → `http://localhost:4200/api/v1/*` → proxy → backend `http://127.0.0.1:8000/api/v1/*`
 
