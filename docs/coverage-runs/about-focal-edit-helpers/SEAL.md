@@ -38,3 +38,8 @@ Tip-recon at 2026-09-06T22:41:29Z (BE+quality hung ≥20m/~19.97m; FE+compose SU
 - 2026-09-06T13:21:38Z: tip-recon after hung BE+quality (~21.28m/~21.01m; FE+compose SUCCESS on 5939af10d)
 - 2026-09-06T13:42:53Z: tip-recon after hung quality (~20.84m; FE+BE+compose SUCCESS on 3ec5b9a97)
 - 2026-09-06T14:04:07Z: tip-recon after hung quality (~20.80m; FE+BE+compose SUCCESS on a761a69ed)
+
+## Tip-recon 2026-09-06T23:02:33Z
+- old head: `58e2bb442bf0`
+- BE age: 20.88m / quality age: 20.61m
+- FE green; BE/quality hung ≥20m
