@@ -1,7 +1,8 @@
 SEALED
-Tip-recon at 2026-09-07T10:36:21Z (quality hung ~20.15m; FE+BE+compose SUCCESS on dc9f45806)
+Tip-recon at 2026-09-07T10:57:01Z (quality ~19.94m on 38c30cb9e52e)
 
 ## Tip-recon log
+- 2026-09-07T10:57:01Z: tip-recon after hung quality (~19.94m; FE+compose SUCCESS; BE ~20.22m/IN_PROGRESS on 38c30cb9e52e)
 - 2026-09-07T10:36:21Z: tip-recon after hung quality (~20.15m; FE+BE+compose SUCCESS on dc9f45806)
 - 2026-09-07T10:15:44Z: tip-recon after hung quality (~20.26m; FE+compose SUCCESS; BE ~20.54m/IN_PROGRESS on fd2a0ada4437)
 - 2026-09-07T09:54:44Z: tip-recon after hung quality (~20.10m; FE+BE+compose SUCCESS on f9a9d6f8a)
