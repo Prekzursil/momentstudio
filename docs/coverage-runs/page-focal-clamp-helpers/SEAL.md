@@ -1,0 +1,1 @@
+# SEAL — page-focal-clamp-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/page/page.focal-clamp.helpers.spec.ts`\n## Methods\nfocalPosition\n## Tip\nTip-only golden WU orphan (2026-09-07T07:33:27Z); push-only, no PR.\n
