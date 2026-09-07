@@ -1,0 +1,9 @@
+# SEAL — svc-storefront-admin-mode-exists-tip1062-helpers
+
+## Status
+SEALED
+
+## Spec
+`frontend/src/app/core/storefront-admin-mode.exists-tip1062.helpers.spec.ts`
+
+Spec-only tip golden WU; INNER deferred to CI.
