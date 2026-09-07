@@ -94,3 +94,7 @@ Tip-recon at 2026-09-06T22:41:29Z (BE+quality hung ≥20m/~19.97m; FE+compose SU
 - Prior FE FAILURE: setup-chrome read ECONNRESET (not code)
 - Nudge retrigger after tip-recon SEAL on hung BE/quality
 
+## Tip-recon 2026-09-07T02:33:58Z
+- old head: `cc2db0323584`
+- BE age: 21.15m / quality age: 20.88m
+- FE green; BE/quality hung ≥20m
