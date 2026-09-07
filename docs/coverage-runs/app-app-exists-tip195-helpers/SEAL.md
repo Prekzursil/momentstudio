@@ -1,0 +1,9 @@
+# SEAL — app-app-exists-tip195-helpers
+
+## Status
+SEALED
+
+## Spec
+`frontend/src/app/app.exists-tip195.helpers.spec.ts`
+
+Spec-only tip golden WU; INNER deferred to CI.
