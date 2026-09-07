@@ -1,0 +1,1 @@
+# SEAL — tickets-order-key-label-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/tickets/tickets.order-key-label.helpers.spec.ts`\n## Methods\norderKey, orderLabel\n## Tip\nTip-only golden WU orphan (2026-09-07T07:35:41Z); push-only, no PR.\n
