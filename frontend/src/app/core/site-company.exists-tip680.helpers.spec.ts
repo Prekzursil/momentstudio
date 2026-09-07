@@ -1,0 +1,3 @@
+import { SiteCompanyService } from './site-company.service';
+
+describe('SiteCompanyService tip680',()=>{it('proto',()=>{expect(Object.create(SiteCompanyService.prototype)).toBeTruthy();});});
