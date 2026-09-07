@@ -1,0 +1,1 @@
+# SEAL — error-should-reload-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/error/error.should-reload.helpers.spec.ts`\n## Methods\nshouldReloadOnRetry\n## Tip\nTip-only golden WU orphan (2026-09-07T07:35:41Z); push-only, no PR.\n
