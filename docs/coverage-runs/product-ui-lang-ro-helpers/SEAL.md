@@ -1,0 +1,1 @@
+# SEAL — product-ui-lang-ro-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/product/product.ui-lang-ro.helpers.spec.ts`\n## Methods\nuiLang\n## Tip\nTip-only golden WU orphan (2026-09-07T07:33:27Z); push-only, no PR.\n
