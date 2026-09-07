@@ -1,6 +1,6 @@
 import { AboutComponent } from './about.component';
 
-/** Golden WU tip-recon #708 — focalPosition + canEditPage (2026-09-07T08:31:33Z). */
+/** Golden WU tip-recon #708 — focalPosition + canEditPage (2026-09-07T08:52:20Z). */
 describe('AboutComponent focalPosition / canEditPage (golden WU)', () => {
   function bare(overrides: Record<string, unknown> = {}): AboutComponent {
     const cmp = Object.create(AboutComponent.prototype) as AboutComponent;
