@@ -1,7 +1,8 @@
 SEALED
-Tip-recon at 2026-09-07T14:30:43Z (quality ~20.76m on 380b7ec13808)
+Tip-recon at 2026-09-07T14:51:51Z (quality ~20.27m on ad1007efc0c8)
 
 ## Tip-recon log
+- 2026-09-07T14:51:51Z: tip-recon after hung quality (~20.27m; FE+compose SUCCESS; BE ~20.75m/COMPLETED on ad1007efc0c8)
 - 2026-09-07T14:30:43Z: tip-recon after hung quality (~20.76m; FE+compose SUCCESS; BE ~20.78m/COMPLETED on 380b7ec13808)
 - 2026-09-07T14:09:17Z: tip-recon after quality FAILURE flake (retry; head c93408e3b9)
 - 2026-09-07T14:08:02Z: tip-recon after quality FAILURE (flake path; FE may still be running) on e0efbf562e6b
