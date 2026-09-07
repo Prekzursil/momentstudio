@@ -1,0 +1,1 @@
+Target: ProductComponent.openPreview / closePreview
