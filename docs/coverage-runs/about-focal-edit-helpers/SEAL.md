@@ -1,7 +1,8 @@
 SEALED
-Tip-recon at 2026-09-07T14:01:44Z (quality ~19.76m on 46bacd21f45a)
+Tip-recon at 2026-09-07T14:06:23Z (quality FAILURE flake opengrep 504; FE+compose SUCCESS on 487395f278)
 
 ## Tip-recon log
+- 2026-09-07T14:06:23Z: tip-recon after quality FAILURE (opengrep install HTTP 504 flake; FE+compose SUCCESS on 487395f278)
 - 2026-09-07T14:01:44Z: tip-recon after hung quality (~19.76m; FE+compose SUCCESS; BE ~20.01m/IN_PROGRESS on 46bacd21f45a)
 - 2026-09-07T13:41:27Z: tip-recon after hung quality (~20.08m; FE+compose SUCCESS; BE ~20.36m/COMPLETED on df68a91e2b25)
 - 2026-09-07T13:20:49Z: tip-recon after hung quality (~19.39m; FE+compose SUCCESS; BE ~20.04m/IN_PROGRESS on b1b42f54e23e)
