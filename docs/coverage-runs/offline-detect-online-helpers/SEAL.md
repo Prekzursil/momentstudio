@@ -1,0 +1,1 @@
+# SEAL — offline-detect-online-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/offline/offline.detect-online.helpers.spec.ts`\n## Methods\ndetectBrowserOnline\n## Tip\nTip-only golden WU orphan (2026-09-07T07:35:41Z); push-only, no PR.\n

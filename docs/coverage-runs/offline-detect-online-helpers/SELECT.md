@@ -1,0 +1,1 @@
+# SELECT — offline-detect-online-helpers\n## Status\nSELECTED\n## Focus\ndetectBrowserOnline navigator fallback\n
