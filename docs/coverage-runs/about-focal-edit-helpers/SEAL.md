@@ -1,7 +1,8 @@
 SEALED
-Tip-recon at 2026-09-07T14:08:02Z (quality FAILURE flake on e0efbf562e6b)
+Tip-recon at 2026-09-07T14:09:17Z (quality FAILURE flake again; FE pending on c93408e3b9)
 
 ## Tip-recon log
+- 2026-09-07T14:09:17Z: tip-recon after quality FAILURE flake (retry; head c93408e3b9)
 - 2026-09-07T14:08:02Z: tip-recon after quality FAILURE (flake path; FE may still be running) on e0efbf562e6b
 - 2026-09-07T14:06:23Z: tip-recon after quality FAILURE (opengrep install HTTP 504 flake; FE+compose SUCCESS on 487395f278)
 - 2026-09-07T14:01:44Z: tip-recon after hung quality (~19.76m; FE+compose SUCCESS; BE ~20.01m/IN_PROGRESS on 46bacd21f45a)
