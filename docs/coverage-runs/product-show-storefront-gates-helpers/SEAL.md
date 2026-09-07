@@ -1,0 +1,1 @@
+# SEAL — product-show-storefront-gates-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/product/product.show-storefront-gates.helpers.spec.ts`\n## Methods\nshowStorefrontEdit\n## Tip\nTip-only golden WU orphan (2026-09-07T07:33:27Z); push-only, no PR.\n
