@@ -1,0 +1,1 @@
+Target: ReceiptComponent.paymentMethodLabel
