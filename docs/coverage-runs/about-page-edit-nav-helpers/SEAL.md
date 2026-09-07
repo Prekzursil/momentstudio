@@ -1,0 +1,1 @@
+# SEAL — about-page-edit-nav-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/about/about.page-edit-nav.helpers.spec.ts`\n## Methods\neditPage\n## Tip\nTip-only golden WU orphan (2026-09-07T07:33:27Z); push-only, no PR.\n
