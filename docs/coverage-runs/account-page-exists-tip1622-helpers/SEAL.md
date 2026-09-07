@@ -1,0 +1,9 @@
+# SEAL — account-page-exists-tip1622-helpers
+
+## Status
+SEALED
+
+## Spec
+`frontend/src/app/pages/account/account.exists-tip1622.helpers.spec.ts`
+
+Spec-only tip golden WU; INNER deferred to CI.
