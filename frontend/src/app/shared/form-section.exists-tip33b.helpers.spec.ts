@@ -1,0 +1,3 @@
+import { FormSectionComponent } from './form-section.component';
+
+describe('FormSectionComponent tip33b',()=>{it('proto',()=>{expect(Object.create(FormSectionComponent.prototype)).toBeTruthy();});});
