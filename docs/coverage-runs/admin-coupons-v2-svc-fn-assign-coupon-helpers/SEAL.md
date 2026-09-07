@@ -1,0 +1,9 @@
+# SEAL — admin-coupons-v2-svc-fn-assign-coupon-helpers
+
+## Status
+SEALED
+
+## Spec
+`frontend/src/app/core/admin-coupons-v2-svc.fn-assign-coupon.helpers.spec.ts`
+
+Spec-only tip golden WU; INNER deferred to CI.
