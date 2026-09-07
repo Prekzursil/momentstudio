@@ -1,0 +1,1 @@
+# SELECT — contact-avatar-initials-helpers\n## Status\nSELECTED\n## Focus\nContactComponent initialsForLabel\n
