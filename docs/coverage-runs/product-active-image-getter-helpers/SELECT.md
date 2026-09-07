@@ -1,0 +1,1 @@
+Target: ProductComponent.activeImage getter
