@@ -79,3 +79,8 @@ Tip-recon at 2026-09-06T22:41:29Z (BE+quality hung ≥20m/~19.97m; FE+compose SU
 - BE age: 20.44m / quality age: 20.19m
 - FE green; BE/quality hung ≥20m
 
+## Tip-recon 2026-09-07T01:48:50Z
+- old head: `9b09e04a769b`
+- BE age: 20.34m / quality age: 20.09m
+- FE green; BE/quality hung ≥20m
+
