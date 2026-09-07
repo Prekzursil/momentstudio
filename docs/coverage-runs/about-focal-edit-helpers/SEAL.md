@@ -89,3 +89,8 @@ Tip-recon at 2026-09-06T22:41:29Z (BE+quality hung ≥20m/~19.97m; FE+compose SU
 - BE age: 20.26m / quality age: 20.23m
 - FE green; BE/quality hung ≥20m
 
+## Tip-recon 2026-09-07T02:12:40Z (FE infra retry)
+- old head: `09c0684a11df`
+- Prior FE FAILURE: setup-chrome read ECONNRESET (not code)
+- Nudge retrigger after tip-recon SEAL on hung BE/quality
+
