@@ -1,0 +1,1 @@
+Target: AboutComponent.canEditPage
