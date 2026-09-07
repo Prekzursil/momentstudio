@@ -1,0 +1,1 @@
+# SEAL — shared-initials-from-identity-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/shared/user-identity.initials.helpers.spec.ts`\n## Methods\ninitialsFromIdentity\n## Tip\nTip-only golden WU orphan (2026-09-07T07:35:41Z); push-only, no PR.\n
