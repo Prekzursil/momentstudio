@@ -1,0 +1,9 @@
+# SEAL — admin-content-revisions-exists-tip1322-helpers
+
+## Status
+SEALED
+
+## Spec
+`frontend/src/app/pages/admin/shared/content-revisions.exists-tip1322.helpers.spec.ts`
+
+Spec-only tip golden WU; INNER deferred to CI.
