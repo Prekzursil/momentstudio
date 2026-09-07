@@ -1,0 +1,1 @@
+# SEAL — product-select-image-helpers\n## Status\nSEALED\n## Spec\n`frontend/src/app/pages/product/product.select-image.helpers.spec.ts`\n## Methods\nsetActiveImage\n## Tip\nTip-only golden WU orphan (2026-09-07T07:33:27Z); push-only, no PR.\n
