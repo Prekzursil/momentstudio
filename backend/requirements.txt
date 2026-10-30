@@ -25,5 +25,5 @@ webauthn==2.8.0
 # Transitive-dependency CVE pins for the osv-scanner deps gate (upgrade-to-clear
 # per osv-scanner.toml policy). Pulled in transitively; pinned to the fixed versions.
 idna==3.18
-mako==1.3.12
+mako==1.4.2
 pygments==2.20.0
