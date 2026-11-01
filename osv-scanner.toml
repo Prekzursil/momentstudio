@@ -26,27 +26,51 @@
 # like these, never in extra keys. `ignoreUntil` is a bare TOML date, not a
 # quoted string.
 #
-# ── ENTRY 1/2: GHSA-5p2g-fcmc-qvqq + GHSA-w3rx-r6r6-pgpr (image-size DoS) ───
+# ── ENTRY 1: GHSA-mrhx-c7xc-m3w5 (zod memory exhaustion) ────────────────────
 # WHY IT EXISTS:
-#   * Advisories cover infinite-loop DoS in JXL/HEIF and ICNS parsers.
-#   * DEV + OPTIONAL ONLY. Lock row is image-size 0.5.5 under less (~0.5.0
-#     optionalDependencies); osv-scanner labels it (dev).
-#   * NO FIX EXISTS upstream. Both advisories list last_affected: 2.0.2, and
-#     2.0.2 is the newest published release on npm — there is no patched version
-#     to override to. Forcing a bump cannot clear the gate.
-#   * Not reachable in production: less's optional image-size is a build/CSS
-#     toolchain helper, not shipped to browsers or SSR request paths.
+#   * Advisory: "Zod can exhaust memory while validating oversized constrained
+#     collections"; fixed ONLY in 4.6.6 (affected range: introduced 0, fixed
+#     4.6.6). No fixed 3.x release exists and none is coming — 3.25.76 is the
+#     final 3.x line.
+#   * The lock row is the zod 3.25.76 copy under @codecov/bundler-plugin-core
+#     (^3.22.4, devDependency used for CI coverage upload). The root zod and
+#     every range-flexible consumer were UPGRADED to 4.6.6 in this same change
+#     (frontend/package.json overrides: "zod@^4": "4.6.6").
+#   * Forcing the remaining ^3.22.4 consumer to zod 4 is a breaking major for
+#     bundler-plugin-core internals; per the policy above this is the
+#     "no non-breaking upgrade" case, not a blanket mute.
+#   * Dev-scope only: coverage-upload tooling, not shipped to browsers or SSR
+#     request paths, and does not validate attacker-supplied input.
 #
-# RE-CHECK ON EXPIRY: has image-size published >2.0.2 with a fix range, or has
-# less dropped the optional image-size@~0.5.0 dependency? If either is true,
-# DELETE these entries rather than extending the date.
+# RE-CHECK ON EXPIRY: has @codecov/bundler-plugin-core shipped a release that
+# accepts zod ^4 (then DELETE this entry and let the override cover it), or
+# been dropped from devDependencies? If either is true, DELETE, do not extend.
 
 [[IgnoredVulns]]
-id = "GHSA-5p2g-fcmc-qvqq"
-ignoreUntil = 2026-12-05
-reason = "image-size JXL/HEIF infinite-loop DoS, unfixable: advisories list last_affected 2.0.2 and 2.0.2 is the newest npm release (no fixed version). Lock row is optional/dev-only via less (~0.5.0 optionalDependencies); not on production request paths. Time-boxed to 2026-12-05; re-check for a patched release or less dropping the optional dep."
+id = "GHSA-mrhx-c7xc-m3w5"
+ignoreUntil = 2027-01-31
+reason = "zod memory-exhaustion while validating oversized constrained collections, fixed only in 4.6.6 (no fixed 3.x exists). Remaining row is the dev-only @codecov/bundler-plugin-core (^3.22.4) copy; every flexible consumer was upgraded to 4.6.6 in this change. Time-boxed to 2027-01-31; re-check for a zod-4-compatible codecov plugin."
+
+# ── ENTRY 2: GHSA-g3hv-75wg-m249 (minimatch globparts amplification DoS) ────
+# WHY IT EXISTS:
+#   * Advisory: "minimatch has potential denial of service via globparts
+#     amplification"; fixed ONLY in 11.0.1 (affected range: introduced 0,
+#     fixed 11.0.1). No backport to 3.x or 10.x exists.
+#   * Lock rows: minimatch 3.1.5 (pinned ^3 by eslint/eslintrc, karma,
+#     resp-modifier and glob@7) and minimatch 10.2.5/10.2.6 (pinned ^10 by
+#     glob@13-14 internals). All are devDependencies (lint/test tooling).
+#   * Overriding every consumer to minimatch 11 is a double breaking major
+#     (3 -> 11 for eslint 8 / karma) and risks silently changing glob-matching
+#     semantics inside those tools; per the policy above this is the
+#     "no non-breaking upgrade" case.
+#   * Dev-scope only: lint/test-time pattern matching on first-party code, no
+#     attacker-controlled patterns.
+#
+# RE-CHECK ON EXPIRY: have eslint/karma been replaced or shipped minimatch >=11
+# pins (then DELETE this entry), or can the toolchain move to minimatch 11
+# without a major migration? If yes, DELETE rather than extend.
 
 [[IgnoredVulns]]
-id = "GHSA-w3rx-r6r6-pgpr"
-ignoreUntil = 2026-12-05
-reason = "image-size ICNS infinite-loop DoS, unfixable: advisories list last_affected 2.0.2 and 2.0.2 is the newest npm release (no fixed version). Lock row is optional/dev-only via less (~0.5.0 optionalDependencies); not on production request paths. Time-boxed to 2026-12-05; re-check for a patched release or less dropping the optional dep."
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = 2027-01-31
+reason = "minimatch DoS via globparts amplification, fixed only in 11.0.1 (no 3.x/10.x backport). Rows are dev-only minimatch 3.1.5 (eslint 8/karma/resp-modifier) and 10.2.x (glob internals); forcing 11 on those is a breaking major migration. Time-boxed to 2027-01-31; re-check when eslint/karma toolchain moves to minimatch >=11."
