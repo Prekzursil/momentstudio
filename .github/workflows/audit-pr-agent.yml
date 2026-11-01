@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Ensure audit agent labels exist
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const labels = [
@@ -47,7 +47,7 @@ jobs:
 
       - name: Resolve PR context and guard conditions
         id: guard
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const { owner, repo } = context.repo;
@@ -214,7 +214,7 @@ jobs:
       - name: Create or update PR audit agent issue
         if: steps.guard.outputs.should_run == 'true'
         id: issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -264,7 +264,7 @@ jobs:
 
       - name: Assign to Copilot when safe
         if: steps.guard.outputs.should_run == 'true' && steps.guard.outputs.is_fork != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ISSUE_NUMBER: ${{ steps.issue.outputs.issue_number }}
         with:
