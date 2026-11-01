@@ -60,7 +60,7 @@
     "@angular-devkit/build-angular": "^21.2.26",
     "@angular/cli": "^21.2.26",
     "@angular/compiler-cli": "21.2.25",
-    "@applitools/eyes-playwright": "^1.50.1",
+    "@applitools/eyes-playwright": "^1.51.5",
     "@chromatic-com/playwright": "^0.15.0",
     "@codecov/bundle-analyzer": "^1.9.1",
     "@eslint/js": "^9.39.5",
@@ -70,7 +70,7 @@
     "@types/leaflet": "^1.9.22",
     "@types/node": "^24.19.2",
     "@types/uuid": "^9.0.7",
-    "autoprefixer": "^10.6.1",
+    "autoprefixer": "^10.6.2",
     "browser-sync": "^3.0.0",
     "chokidar": "^3.6.0",
     "chromatic": "^13.3.2",
@@ -84,12 +84,12 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.3.0",
     "karma-junit-reporter": "^2.0.1",
-    "postcss": "^8.5.30",
+    "postcss": "^8.5.32",
     "prettier": "^3.9.10",
     "readdirp": "^3.6.0",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.72.1"
   },
   "//overrides": [
     "Transitive-dependency CVE pins for the osv-scanner deps gate (upgrade-to-clear",
