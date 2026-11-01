@@ -2,9 +2,10 @@ ruff==0.15.21
 mypy==1.20.2
 pip-audit==2.10.1
 types-simplejson==3.20.0.20260518
-coverage==7.15.0
+coverage==7.17.0
 
 # Transitive-dependency CVE pins for the osv-scanner deps gate (CI tooling deps).
-filelock==3.29.7
-pip==26.2
-idna==3.18
+filelock==4.2.1
+pip==26.2.2
+idna==3.20
+certifi==2026.10.18
