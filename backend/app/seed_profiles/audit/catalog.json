@@ -1,0 +1,4874 @@
+{
+  "categories": [
+    {
+      "slug": "cups",
+      "name": "Cups & Mugs",
+      "description": "Handmade cups and mugs."
+    },
+    {
+      "slug": "bowls",
+      "name": "Bowls",
+      "description": "Wheel-thrown stoneware bowls."
+    },
+    {
+      "slug": "plates",
+      "name": "Plates",
+      "description": "Dinner and side plates."
+    },
+    {
+      "slug": "vases",
+      "name": "Vases",
+      "description": "Sculptural and functional vases."
+    },
+    {
+      "slug": "gifts",
+      "name": "Gift Sets",
+      "description": "Curated gift sets."
+    },
+    {
+      "slug": "archive",
+      "name": "Archive",
+      "description": "Retired pieces. Intentionally empty."
+    }
+  ],
+  "products": [
+    {
+      "slug": "edge-long-name",
+      "name": "Extraordinarily Long Product Name For Truncation Testing — Hand-Thrown Stoneware Vessel With An Unreasonably Descriptive Title That Should Wrap Or Ellipsize Rather Than Break The Grid",
+      "category_slug": "cups",
+      "short_description": "A name long enough to break naive layouts.",
+      "long_description": "Checks truncation, wrapping and table column behaviour.",
+      "base_price": "42.00",
+      "currency": "RON",
+      "stock_quantity": 4,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Long-named cup",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-diacritics",
+      "name": "Ceașcă cu Farfurioară — Glazură Îmbrăcată în Cenușă",
+      "category_slug": "cups",
+      "short_description": "Ceașcă din gresie, glazurată manual, cu accente de cenușă.",
+      "long_description": "Verifică redarea diacriticelor românești (ă â î ș ț Ă Â Î Ș Ț) și expansiunea textului RO față de EN.",
+      "base_price": "38.50",
+      "currency": "RON",
+      "stock_quantity": 7,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ceașcă cu farfurioară",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Mică",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 3
+        },
+        {
+          "name": "Mare",
+          "additional_price_delta": "6.50",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "edge-unicode",
+      "name": "陶器 Teacup ✿ 茶碗 — mixed-script title",
+      "category_slug": "cups",
+      "short_description": "CJK + symbol + Latin in one string.",
+      "long_description": "Checks font fallback, line-height and any byte-vs-char length logic.",
+      "base_price": "55.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "陶器 teacup",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-zero-stock",
+      "name": "Sold Out Ash Bowl",
+      "category_slug": "bowls",
+      "short_description": "Out of stock on purpose.",
+      "long_description": "Add-to-cart must be disabled and clearly labelled, not silently fail.",
+      "base_price": "64.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Sold out bowl",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-zero-stock-variant",
+      "name": "Partly Sold Out Plate Set",
+      "category_slug": "plates",
+      "short_description": "In stock overall, one variant exhausted.",
+      "long_description": "The variant picker must disable the exhausted option only.",
+      "base_price": "88.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Plate set",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Set of 2",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 3
+        },
+        {
+          "name": "Set of 4",
+          "additional_price_delta": "70.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "edge-no-image",
+      "name": "Piece With No Photograph",
+      "category_slug": "vases",
+      "short_description": "Deliberately has zero images.",
+      "long_description": "The card must show a real placeholder, not a broken box or 0-height gap.",
+      "base_price": "120.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [],
+      "variants": []
+    },
+    {
+      "slug": "edge-broken-image",
+      "name": "Piece With A Broken Image URL",
+      "category_slug": "vases",
+      "short_description": "Image URL deliberately 404s.",
+      "long_description": "Exercises the <img> error path: alt text must remain readable.",
+      "base_price": "132.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/this-image-does-not-exist-on-purpose.webp",
+          "alt_text": "Intentionally missing photograph",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-price-minimum",
+      "name": "One Bani Test Piece",
+      "category_slug": "gifts",
+      "short_description": "Smallest representable price.",
+      "long_description": "Checks currency formatting and rounding at the low bound.",
+      "base_price": "0.01",
+      "currency": "RON",
+      "stock_quantity": 9,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Tiny price piece",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-price-maximum",
+      "name": "Museum Commission",
+      "category_slug": "gifts",
+      "short_description": "Very large price.",
+      "long_description": "Checks thousands separators and column width at the high bound.",
+      "base_price": "99999.99",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Museum commission",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-html-in-name",
+      "name": "Escaping Test <script>alert(1)</script> & <b>bold</b>",
+      "category_slug": "gifts",
+      "short_description": "Angle brackets and ampersands in a product name.",
+      "long_description": "Must render as literal text everywhere: card, detail, cart, admin table, order email.",
+      "base_price": "31.00",
+      "currency": "RON",
+      "stock_quantity": 6,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Escaping test piece",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-long-description",
+      "name": "Verbose Provenance Vase",
+      "category_slug": "vases",
+      "short_description": "Short description is short; the long one is very long.",
+      "long_description": "Paragraph 1: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 2: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 3: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 4: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 5: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 6: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 7: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 8: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 9: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 10: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 11: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 12: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 13: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 14: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 15: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 16: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 17: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 18: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 19: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 20: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 21: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 22: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 23: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 24: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 25: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 26: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 27: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 28: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 29: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 30: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 31: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 32: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 33: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 34: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 35: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 36: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 37: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 38: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 39: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder. Paragraph 40: wheel-thrown stoneware, reduction-fired, with a layered glaze that shifts from oxide-rich rust to pale celadon across the shoulder.",
+      "base_price": "210.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Verbose vase",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-many-variants",
+      "name": "Twelve Glaze Sampler",
+      "category_slug": "bowls",
+      "short_description": "Twelve variants — stresses the variant picker.",
+      "long_description": "A picker that renders 12 options must stay usable at 375px wide.",
+      "base_price": "45.00",
+      "currency": "RON",
+      "stock_quantity": 24,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Glaze sampler",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Matte White 1",
+          "additional_price_delta": "2.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Celadon 2",
+          "additional_price_delta": "4.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Ash 3",
+          "additional_price_delta": "6.00",
+          "stock_quantity": 3
+        },
+        {
+          "name": "Cobalt 4",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Oxblood 5",
+          "additional_price_delta": "10.00",
+          "stock_quantity": 5
+        },
+        {
+          "name": "Sand 6",
+          "additional_price_delta": "12.00",
+          "stock_quantity": 6
+        },
+        {
+          "name": "Ink 7",
+          "additional_price_delta": "14.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Moss 8",
+          "additional_price_delta": "16.00",
+          "stock_quantity": 8
+        },
+        {
+          "name": "Matte White 9",
+          "additional_price_delta": "18.00",
+          "stock_quantity": 9
+        },
+        {
+          "name": "Celadon 10",
+          "additional_price_delta": "20.00",
+          "stock_quantity": 10
+        },
+        {
+          "name": "Ash 11",
+          "additional_price_delta": "22.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Cobalt 12",
+          "additional_price_delta": "24.00",
+          "stock_quantity": 12
+        }
+      ]
+    },
+    {
+      "slug": "edge-single-char-name",
+      "name": "Ω",
+      "category_slug": "bowls",
+      "short_description": "One-character name.",
+      "long_description": "Checks minimum-width layout and any name-initial avatar logic.",
+      "base_price": "19.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Omega bowl",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "edge-many-images",
+      "name": "Gallery Piece With Ten Images",
+      "category_slug": "plates",
+      "short_description": "Ten images — stresses the gallery/thumbnail strip.",
+      "long_description": "Checks thumbnail overflow, keyboard navigation and lazy-loading.",
+      "base_price": "76.00",
+      "currency": "RON",
+      "stock_quantity": 4,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Gallery view 1",
+          "sort_order": 1
+        },
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Gallery view 2",
+          "sort_order": 2
+        },
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Gallery view 3",
+          "sort_order": 3
+        },
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Gallery view 4",
+          "sort_order": 4
+        },
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Gallery view 5",
+          "sort_order": 5
+        },
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Gallery view 6",
+          "sort_order": 6
+        },
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Gallery view 7",
+          "sort_order": 7
+        },
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Gallery view 8",
+          "sort_order": 8
+        },
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Gallery view 9",
+          "sort_order": 9
+        },
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Gallery view 10",
+          "sort_order": 10
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-001-matte-white-cup",
+      "name": "Matte White Cup No. 1",
+      "category_slug": "cups",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 1 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "18.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Matte White Cup No. 1",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-002-celadon-mug",
+      "name": "Celadon Mug No. 2",
+      "category_slug": "bowls",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 2 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "21.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Celadon Mug No. 2",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-003-ash-bowl",
+      "name": "Ash Bowl No. 3",
+      "category_slug": "plates",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 3 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "25.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ash Bowl No. 3",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-004-cobalt-plate",
+      "name": "Cobalt Plate No. 4",
+      "category_slug": "vases",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 4 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "28.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Cobalt Plate No. 4",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-005-oxblood-vase",
+      "name": "Oxblood Vase No. 5",
+      "category_slug": "gifts",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 5 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "32.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Oxblood Vase No. 5",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-006-sand-tumbler",
+      "name": "Sand Tumbler No. 6",
+      "category_slug": "cups",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 6 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "35.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Sand Tumbler No. 6",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-007-ink-beaker",
+      "name": "Ink Beaker No. 7",
+      "category_slug": "bowls",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 7 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "39.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ink Beaker No. 7",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-008-moss-dish",
+      "name": "Moss Dish No. 8",
+      "category_slug": "plates",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 8 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "42.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Moss Dish No. 8",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-009-matte-white-cup",
+      "name": "Matte White Cup No. 9",
+      "category_slug": "vases",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 9 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "46.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Matte White Cup No. 9",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-010-celadon-mug",
+      "name": "Celadon Mug No. 10",
+      "category_slug": "gifts",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 10 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "49.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Celadon Mug No. 10",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-011-ash-bowl",
+      "name": "Ash Bowl No. 11",
+      "category_slug": "cups",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 11 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "53.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ash Bowl No. 11",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-012-cobalt-plate",
+      "name": "Cobalt Plate No. 12",
+      "category_slug": "bowls",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 12 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "56.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Cobalt Plate No. 12",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-013-oxblood-vase",
+      "name": "Oxblood Vase No. 13",
+      "category_slug": "plates",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 13 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "60.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Oxblood Vase No. 13",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-014-sand-tumbler",
+      "name": "Sand Tumbler No. 14",
+      "category_slug": "vases",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 14 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "63.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Sand Tumbler No. 14",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-015-ink-beaker",
+      "name": "Ink Beaker No. 15",
+      "category_slug": "gifts",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 15 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "67.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ink Beaker No. 15",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-016-moss-dish",
+      "name": "Moss Dish No. 16",
+      "category_slug": "cups",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 16 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "70.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Moss Dish No. 16",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-017-matte-white-cup",
+      "name": "Matte White Cup No. 17",
+      "category_slug": "bowls",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 17 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "74.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Matte White Cup No. 17",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-018-celadon-mug",
+      "name": "Celadon Mug No. 18",
+      "category_slug": "plates",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 18 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "77.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Celadon Mug No. 18",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-019-ash-bowl",
+      "name": "Ash Bowl No. 19",
+      "category_slug": "vases",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 19 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "81.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ash Bowl No. 19",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-020-cobalt-plate",
+      "name": "Cobalt Plate No. 20",
+      "category_slug": "gifts",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 20 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "84.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Cobalt Plate No. 20",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-021-oxblood-vase",
+      "name": "Oxblood Vase No. 21",
+      "category_slug": "cups",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 21 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "88.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Oxblood Vase No. 21",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-022-sand-tumbler",
+      "name": "Sand Tumbler No. 22",
+      "category_slug": "bowls",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 22 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "91.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Sand Tumbler No. 22",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-023-ink-beaker",
+      "name": "Ink Beaker No. 23",
+      "category_slug": "plates",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 23 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "95.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ink Beaker No. 23",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-024-moss-dish",
+      "name": "Moss Dish No. 24",
+      "category_slug": "vases",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 24 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "98.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Moss Dish No. 24",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-025-matte-white-cup",
+      "name": "Matte White Cup No. 25",
+      "category_slug": "gifts",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 25 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "102.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Matte White Cup No. 25",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-026-celadon-mug",
+      "name": "Celadon Mug No. 26",
+      "category_slug": "cups",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 26 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "105.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Celadon Mug No. 26",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-027-ash-bowl",
+      "name": "Ash Bowl No. 27",
+      "category_slug": "bowls",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 27 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "109.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ash Bowl No. 27",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-028-cobalt-plate",
+      "name": "Cobalt Plate No. 28",
+      "category_slug": "plates",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 28 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "112.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Cobalt Plate No. 28",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-029-oxblood-vase",
+      "name": "Oxblood Vase No. 29",
+      "category_slug": "vases",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 29 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "116.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Oxblood Vase No. 29",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-030-sand-tumbler",
+      "name": "Sand Tumbler No. 30",
+      "category_slug": "gifts",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 30 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "119.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Sand Tumbler No. 30",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-031-ink-beaker",
+      "name": "Ink Beaker No. 31",
+      "category_slug": "cups",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 31 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "123.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ink Beaker No. 31",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-032-moss-dish",
+      "name": "Moss Dish No. 32",
+      "category_slug": "bowls",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 32 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "126.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Moss Dish No. 32",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-033-matte-white-cup",
+      "name": "Matte White Cup No. 33",
+      "category_slug": "plates",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 33 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "130.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Matte White Cup No. 33",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-034-celadon-mug",
+      "name": "Celadon Mug No. 34",
+      "category_slug": "vases",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 34 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "133.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Celadon Mug No. 34",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-035-ash-bowl",
+      "name": "Ash Bowl No. 35",
+      "category_slug": "gifts",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 35 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "137.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ash Bowl No. 35",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-036-cobalt-plate",
+      "name": "Cobalt Plate No. 36",
+      "category_slug": "cups",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 36 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "140.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Cobalt Plate No. 36",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-037-oxblood-vase",
+      "name": "Oxblood Vase No. 37",
+      "category_slug": "bowls",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 37 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "144.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Oxblood Vase No. 37",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-038-sand-tumbler",
+      "name": "Sand Tumbler No. 38",
+      "category_slug": "plates",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 38 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "147.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Sand Tumbler No. 38",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-039-ink-beaker",
+      "name": "Ink Beaker No. 39",
+      "category_slug": "vases",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 39 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "151.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ink Beaker No. 39",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-040-moss-dish",
+      "name": "Moss Dish No. 40",
+      "category_slug": "gifts",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 40 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "154.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Moss Dish No. 40",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-041-matte-white-cup",
+      "name": "Matte White Cup No. 41",
+      "category_slug": "cups",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 41 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "158.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Matte White Cup No. 41",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-042-celadon-mug",
+      "name": "Celadon Mug No. 42",
+      "category_slug": "bowls",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 42 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "161.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Celadon Mug No. 42",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-043-ash-bowl",
+      "name": "Ash Bowl No. 43",
+      "category_slug": "plates",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 43 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "165.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ash Bowl No. 43",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-044-cobalt-plate",
+      "name": "Cobalt Plate No. 44",
+      "category_slug": "vases",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 44 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "168.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Cobalt Plate No. 44",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-045-oxblood-vase",
+      "name": "Oxblood Vase No. 45",
+      "category_slug": "gifts",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 45 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "172.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Oxblood Vase No. 45",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-046-sand-tumbler",
+      "name": "Sand Tumbler No. 46",
+      "category_slug": "cups",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 46 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "175.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Sand Tumbler No. 46",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-047-ink-beaker",
+      "name": "Ink Beaker No. 47",
+      "category_slug": "bowls",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 47 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "179.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ink Beaker No. 47",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-048-moss-dish",
+      "name": "Moss Dish No. 48",
+      "category_slug": "plates",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 48 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "18.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Moss Dish No. 48",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-049-matte-white-cup",
+      "name": "Matte White Cup No. 49",
+      "category_slug": "vases",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 49 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "21.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Matte White Cup No. 49",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-050-celadon-mug",
+      "name": "Celadon Mug No. 50",
+      "category_slug": "gifts",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 50 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "25.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Celadon Mug No. 50",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-051-ash-bowl",
+      "name": "Ash Bowl No. 51",
+      "category_slug": "cups",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 51 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "28.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ash Bowl No. 51",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-052-cobalt-plate",
+      "name": "Cobalt Plate No. 52",
+      "category_slug": "bowls",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 52 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "32.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Cobalt Plate No. 52",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-053-oxblood-vase",
+      "name": "Oxblood Vase No. 53",
+      "category_slug": "plates",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 53 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "35.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Oxblood Vase No. 53",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-054-sand-tumbler",
+      "name": "Sand Tumbler No. 54",
+      "category_slug": "vases",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 54 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "39.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Sand Tumbler No. 54",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-055-ink-beaker",
+      "name": "Ink Beaker No. 55",
+      "category_slug": "gifts",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 55 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "42.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ink Beaker No. 55",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-056-moss-dish",
+      "name": "Moss Dish No. 56",
+      "category_slug": "cups",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 56 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "46.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Moss Dish No. 56",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-057-matte-white-cup",
+      "name": "Matte White Cup No. 57",
+      "category_slug": "bowls",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 57 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "49.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Matte White Cup No. 57",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-058-celadon-mug",
+      "name": "Celadon Mug No. 58",
+      "category_slug": "plates",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 58 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "53.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Celadon Mug No. 58",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-059-ash-bowl",
+      "name": "Ash Bowl No. 59",
+      "category_slug": "vases",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 59 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "56.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ash Bowl No. 59",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-060-cobalt-plate",
+      "name": "Cobalt Plate No. 60",
+      "category_slug": "gifts",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 60 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "60.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Cobalt Plate No. 60",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-061-oxblood-vase",
+      "name": "Oxblood Vase No. 61",
+      "category_slug": "cups",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 61 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "63.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Oxblood Vase No. 61",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-062-sand-tumbler",
+      "name": "Sand Tumbler No. 62",
+      "category_slug": "bowls",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 62 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "67.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Sand Tumbler No. 62",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-063-ink-beaker",
+      "name": "Ink Beaker No. 63",
+      "category_slug": "plates",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 63 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "70.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ink Beaker No. 63",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-064-moss-dish",
+      "name": "Moss Dish No. 64",
+      "category_slug": "vases",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 64 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "74.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Moss Dish No. 64",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-065-matte-white-cup",
+      "name": "Matte White Cup No. 65",
+      "category_slug": "gifts",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 65 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "77.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Matte White Cup No. 65",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-066-celadon-mug",
+      "name": "Celadon Mug No. 66",
+      "category_slug": "cups",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 66 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "81.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Celadon Mug No. 66",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-067-ash-bowl",
+      "name": "Ash Bowl No. 67",
+      "category_slug": "bowls",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 67 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "84.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ash Bowl No. 67",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-068-cobalt-plate",
+      "name": "Cobalt Plate No. 68",
+      "category_slug": "plates",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 68 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "88.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Cobalt Plate No. 68",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-069-oxblood-vase",
+      "name": "Oxblood Vase No. 69",
+      "category_slug": "vases",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 69 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "91.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Oxblood Vase No. 69",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-070-sand-tumbler",
+      "name": "Sand Tumbler No. 70",
+      "category_slug": "gifts",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 70 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "95.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Sand Tumbler No. 70",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-071-ink-beaker",
+      "name": "Ink Beaker No. 71",
+      "category_slug": "cups",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 71 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "98.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ink Beaker No. 71",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-072-moss-dish",
+      "name": "Moss Dish No. 72",
+      "category_slug": "bowls",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 72 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "102.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Moss Dish No. 72",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-073-matte-white-cup",
+      "name": "Matte White Cup No. 73",
+      "category_slug": "plates",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 73 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "105.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Matte White Cup No. 73",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-074-celadon-mug",
+      "name": "Celadon Mug No. 74",
+      "category_slug": "vases",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 74 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "109.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Celadon Mug No. 74",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-075-ash-bowl",
+      "name": "Ash Bowl No. 75",
+      "category_slug": "gifts",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 75 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "112.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ash Bowl No. 75",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-076-cobalt-plate",
+      "name": "Cobalt Plate No. 76",
+      "category_slug": "cups",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 76 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "116.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Cobalt Plate No. 76",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-077-oxblood-vase",
+      "name": "Oxblood Vase No. 77",
+      "category_slug": "bowls",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 77 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "119.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Oxblood Vase No. 77",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-078-sand-tumbler",
+      "name": "Sand Tumbler No. 78",
+      "category_slug": "plates",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 78 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "123.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Sand Tumbler No. 78",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-079-ink-beaker",
+      "name": "Ink Beaker No. 79",
+      "category_slug": "vases",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 79 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "126.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ink Beaker No. 79",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-080-moss-dish",
+      "name": "Moss Dish No. 80",
+      "category_slug": "gifts",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 80 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "130.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Moss Dish No. 80",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-081-matte-white-cup",
+      "name": "Matte White Cup No. 81",
+      "category_slug": "cups",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 81 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "133.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Matte White Cup No. 81",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-082-celadon-mug",
+      "name": "Celadon Mug No. 82",
+      "category_slug": "bowls",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 82 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "137.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Celadon Mug No. 82",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-083-ash-bowl",
+      "name": "Ash Bowl No. 83",
+      "category_slug": "plates",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 83 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "140.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ash Bowl No. 83",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-084-cobalt-plate",
+      "name": "Cobalt Plate No. 84",
+      "category_slug": "vases",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 84 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "144.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Cobalt Plate No. 84",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-085-oxblood-vase",
+      "name": "Oxblood Vase No. 85",
+      "category_slug": "gifts",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 85 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "147.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Oxblood Vase No. 85",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-086-sand-tumbler",
+      "name": "Sand Tumbler No. 86",
+      "category_slug": "cups",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 86 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "151.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Sand Tumbler No. 86",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-087-ink-beaker",
+      "name": "Ink Beaker No. 87",
+      "category_slug": "bowls",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 87 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "154.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ink Beaker No. 87",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-088-moss-dish",
+      "name": "Moss Dish No. 88",
+      "category_slug": "plates",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 88 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "158.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Moss Dish No. 88",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-089-matte-white-cup",
+      "name": "Matte White Cup No. 89",
+      "category_slug": "vases",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 89 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "161.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Matte White Cup No. 89",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-090-celadon-mug",
+      "name": "Celadon Mug No. 90",
+      "category_slug": "gifts",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 90 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "165.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Celadon Mug No. 90",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-091-ash-bowl",
+      "name": "Ash Bowl No. 91",
+      "category_slug": "cups",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 91 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "168.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ash Bowl No. 91",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-092-cobalt-plate",
+      "name": "Cobalt Plate No. 92",
+      "category_slug": "bowls",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 92 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "172.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Cobalt Plate No. 92",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-093-oxblood-vase",
+      "name": "Oxblood Vase No. 93",
+      "category_slug": "plates",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 93 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "175.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Oxblood Vase No. 93",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-094-sand-tumbler",
+      "name": "Sand Tumbler No. 94",
+      "category_slug": "vases",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 94 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "179.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Sand Tumbler No. 94",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-095-ink-beaker",
+      "name": "Ink Beaker No. 95",
+      "category_slug": "gifts",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 95 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "18.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ink Beaker No. 95",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-096-moss-dish",
+      "name": "Moss Dish No. 96",
+      "category_slug": "cups",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 96 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "21.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Moss Dish No. 96",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-097-matte-white-cup",
+      "name": "Matte White Cup No. 97",
+      "category_slug": "bowls",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 97 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "25.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Matte White Cup No. 97",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-098-celadon-mug",
+      "name": "Celadon Mug No. 98",
+      "category_slug": "plates",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 98 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "28.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Celadon Mug No. 98",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-099-ash-bowl",
+      "name": "Ash Bowl No. 99",
+      "category_slug": "vases",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 99 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "32.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ash Bowl No. 99",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-100-cobalt-plate",
+      "name": "Cobalt Plate No. 100",
+      "category_slug": "gifts",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 100 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "35.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Cobalt Plate No. 100",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-101-oxblood-vase",
+      "name": "Oxblood Vase No. 101",
+      "category_slug": "cups",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 101 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "39.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Oxblood Vase No. 101",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-102-sand-tumbler",
+      "name": "Sand Tumbler No. 102",
+      "category_slug": "bowls",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 102 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "42.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Sand Tumbler No. 102",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-103-ink-beaker",
+      "name": "Ink Beaker No. 103",
+      "category_slug": "plates",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 103 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "46.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ink Beaker No. 103",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-104-moss-dish",
+      "name": "Moss Dish No. 104",
+      "category_slug": "vases",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 104 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "49.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Moss Dish No. 104",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-105-matte-white-cup",
+      "name": "Matte White Cup No. 105",
+      "category_slug": "gifts",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 105 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "53.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Matte White Cup No. 105",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-106-celadon-mug",
+      "name": "Celadon Mug No. 106",
+      "category_slug": "cups",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 106 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "56.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Celadon Mug No. 106",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-107-ash-bowl",
+      "name": "Ash Bowl No. 107",
+      "category_slug": "bowls",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 107 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "60.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ash Bowl No. 107",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-108-cobalt-plate",
+      "name": "Cobalt Plate No. 108",
+      "category_slug": "plates",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 108 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "63.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Cobalt Plate No. 108",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-109-oxblood-vase",
+      "name": "Oxblood Vase No. 109",
+      "category_slug": "vases",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 109 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "67.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Oxblood Vase No. 109",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-110-sand-tumbler",
+      "name": "Sand Tumbler No. 110",
+      "category_slug": "gifts",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 110 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "70.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Sand Tumbler No. 110",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-111-ink-beaker",
+      "name": "Ink Beaker No. 111",
+      "category_slug": "cups",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 111 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "74.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ink Beaker No. 111",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-112-moss-dish",
+      "name": "Moss Dish No. 112",
+      "category_slug": "bowls",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 112 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "77.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Moss Dish No. 112",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-113-matte-white-cup",
+      "name": "Matte White Cup No. 113",
+      "category_slug": "plates",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 113 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "81.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Matte White Cup No. 113",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-114-celadon-mug",
+      "name": "Celadon Mug No. 114",
+      "category_slug": "vases",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 114 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "84.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Celadon Mug No. 114",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-115-ash-bowl",
+      "name": "Ash Bowl No. 115",
+      "category_slug": "gifts",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 115 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "88.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ash Bowl No. 115",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-116-cobalt-plate",
+      "name": "Cobalt Plate No. 116",
+      "category_slug": "cups",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 116 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "91.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Cobalt Plate No. 116",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-117-oxblood-vase",
+      "name": "Oxblood Vase No. 117",
+      "category_slug": "bowls",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 117 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "95.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Oxblood Vase No. 117",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-118-sand-tumbler",
+      "name": "Sand Tumbler No. 118",
+      "category_slug": "plates",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 118 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "98.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Sand Tumbler No. 118",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-119-ink-beaker",
+      "name": "Ink Beaker No. 119",
+      "category_slug": "vases",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 119 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "102.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ink Beaker No. 119",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-120-moss-dish",
+      "name": "Moss Dish No. 120",
+      "category_slug": "gifts",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 120 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "105.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Moss Dish No. 120",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-121-matte-white-cup",
+      "name": "Matte White Cup No. 121",
+      "category_slug": "cups",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 121 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "109.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Matte White Cup No. 121",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-122-celadon-mug",
+      "name": "Celadon Mug No. 122",
+      "category_slug": "bowls",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 122 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "112.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Celadon Mug No. 122",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-123-ash-bowl",
+      "name": "Ash Bowl No. 123",
+      "category_slug": "plates",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 123 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "116.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ash Bowl No. 123",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-124-cobalt-plate",
+      "name": "Cobalt Plate No. 124",
+      "category_slug": "vases",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 124 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "119.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Cobalt Plate No. 124",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-125-oxblood-vase",
+      "name": "Oxblood Vase No. 125",
+      "category_slug": "gifts",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 125 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "123.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Oxblood Vase No. 125",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-126-sand-tumbler",
+      "name": "Sand Tumbler No. 126",
+      "category_slug": "cups",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 126 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "126.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Sand Tumbler No. 126",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-127-ink-beaker",
+      "name": "Ink Beaker No. 127",
+      "category_slug": "bowls",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 127 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "130.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ink Beaker No. 127",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-128-moss-dish",
+      "name": "Moss Dish No. 128",
+      "category_slug": "plates",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 128 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "133.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Moss Dish No. 128",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-129-matte-white-cup",
+      "name": "Matte White Cup No. 129",
+      "category_slug": "vases",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 129 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "137.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Matte White Cup No. 129",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-130-celadon-mug",
+      "name": "Celadon Mug No. 130",
+      "category_slug": "gifts",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 130 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "140.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Celadon Mug No. 130",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-131-ash-bowl",
+      "name": "Ash Bowl No. 131",
+      "category_slug": "cups",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 131 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "144.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ash Bowl No. 131",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-132-cobalt-plate",
+      "name": "Cobalt Plate No. 132",
+      "category_slug": "bowls",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 132 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "147.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Cobalt Plate No. 132",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-133-oxblood-vase",
+      "name": "Oxblood Vase No. 133",
+      "category_slug": "plates",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 133 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "151.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Oxblood Vase No. 133",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-134-sand-tumbler",
+      "name": "Sand Tumbler No. 134",
+      "category_slug": "vases",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 134 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "154.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Sand Tumbler No. 134",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-135-ink-beaker",
+      "name": "Ink Beaker No. 135",
+      "category_slug": "gifts",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 135 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "158.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ink Beaker No. 135",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-136-moss-dish",
+      "name": "Moss Dish No. 136",
+      "category_slug": "cups",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 136 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "161.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Moss Dish No. 136",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-137-matte-white-cup",
+      "name": "Matte White Cup No. 137",
+      "category_slug": "bowls",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 137 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "165.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Matte White Cup No. 137",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-138-celadon-mug",
+      "name": "Celadon Mug No. 138",
+      "category_slug": "plates",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 138 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "168.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Celadon Mug No. 138",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-139-ash-bowl",
+      "name": "Ash Bowl No. 139",
+      "category_slug": "vases",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 139 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "172.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ash Bowl No. 139",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-140-cobalt-plate",
+      "name": "Cobalt Plate No. 140",
+      "category_slug": "gifts",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 140 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "175.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Cobalt Plate No. 140",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-141-oxblood-vase",
+      "name": "Oxblood Vase No. 141",
+      "category_slug": "cups",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 141 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "179.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Oxblood Vase No. 141",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-142-sand-tumbler",
+      "name": "Sand Tumbler No. 142",
+      "category_slug": "bowls",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 142 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "18.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Sand Tumbler No. 142",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-143-ink-beaker",
+      "name": "Ink Beaker No. 143",
+      "category_slug": "plates",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 143 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "21.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ink Beaker No. 143",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-144-moss-dish",
+      "name": "Moss Dish No. 144",
+      "category_slug": "vases",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 144 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "25.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Moss Dish No. 144",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-145-matte-white-cup",
+      "name": "Matte White Cup No. 145",
+      "category_slug": "gifts",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 145 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "28.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Matte White Cup No. 145",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-146-celadon-mug",
+      "name": "Celadon Mug No. 146",
+      "category_slug": "cups",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 146 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "32.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Celadon Mug No. 146",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-147-ash-bowl",
+      "name": "Ash Bowl No. 147",
+      "category_slug": "bowls",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 147 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "35.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ash Bowl No. 147",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-148-cobalt-plate",
+      "name": "Cobalt Plate No. 148",
+      "category_slug": "plates",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 148 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "39.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Cobalt Plate No. 148",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-149-oxblood-vase",
+      "name": "Oxblood Vase No. 149",
+      "category_slug": "vases",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 149 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "42.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Oxblood Vase No. 149",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-150-sand-tumbler",
+      "name": "Sand Tumbler No. 150",
+      "category_slug": "gifts",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 150 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "46.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Sand Tumbler No. 150",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-151-ink-beaker",
+      "name": "Ink Beaker No. 151",
+      "category_slug": "cups",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 151 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "49.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ink Beaker No. 151",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-152-moss-dish",
+      "name": "Moss Dish No. 152",
+      "category_slug": "bowls",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 152 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "53.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Moss Dish No. 152",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-153-matte-white-cup",
+      "name": "Matte White Cup No. 153",
+      "category_slug": "plates",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 153 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "56.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Matte White Cup No. 153",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-154-celadon-mug",
+      "name": "Celadon Mug No. 154",
+      "category_slug": "vases",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 154 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "60.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Celadon Mug No. 154",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-155-ash-bowl",
+      "name": "Ash Bowl No. 155",
+      "category_slug": "gifts",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 155 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "63.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ash Bowl No. 155",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-156-cobalt-plate",
+      "name": "Cobalt Plate No. 156",
+      "category_slug": "cups",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 156 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "67.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Cobalt Plate No. 156",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-157-oxblood-vase",
+      "name": "Oxblood Vase No. 157",
+      "category_slug": "bowls",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 157 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "70.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Oxblood Vase No. 157",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-158-sand-tumbler",
+      "name": "Sand Tumbler No. 158",
+      "category_slug": "plates",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 158 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "74.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Sand Tumbler No. 158",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-159-ink-beaker",
+      "name": "Ink Beaker No. 159",
+      "category_slug": "vases",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 159 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "77.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ink Beaker No. 159",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-160-moss-dish",
+      "name": "Moss Dish No. 160",
+      "category_slug": "gifts",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 160 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "81.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Moss Dish No. 160",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-161-matte-white-cup",
+      "name": "Matte White Cup No. 161",
+      "category_slug": "cups",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 161 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "84.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Matte White Cup No. 161",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-162-celadon-mug",
+      "name": "Celadon Mug No. 162",
+      "category_slug": "bowls",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 162 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "88.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Celadon Mug No. 162",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-163-ash-bowl",
+      "name": "Ash Bowl No. 163",
+      "category_slug": "plates",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 163 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "91.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ash Bowl No. 163",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-164-cobalt-plate",
+      "name": "Cobalt Plate No. 164",
+      "category_slug": "vases",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 164 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "95.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Cobalt Plate No. 164",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-165-oxblood-vase",
+      "name": "Oxblood Vase No. 165",
+      "category_slug": "gifts",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 165 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "98.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Oxblood Vase No. 165",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-166-sand-tumbler",
+      "name": "Sand Tumbler No. 166",
+      "category_slug": "cups",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 166 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "102.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Sand Tumbler No. 166",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-167-ink-beaker",
+      "name": "Ink Beaker No. 167",
+      "category_slug": "bowls",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 167 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "105.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ink Beaker No. 167",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-168-moss-dish",
+      "name": "Moss Dish No. 168",
+      "category_slug": "plates",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 168 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "109.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Moss Dish No. 168",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-169-matte-white-cup",
+      "name": "Matte White Cup No. 169",
+      "category_slug": "vases",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 169 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "112.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Matte White Cup No. 169",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-170-celadon-mug",
+      "name": "Celadon Mug No. 170",
+      "category_slug": "gifts",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 170 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "116.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Celadon Mug No. 170",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-171-ash-bowl",
+      "name": "Ash Bowl No. 171",
+      "category_slug": "cups",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 171 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "119.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ash Bowl No. 171",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-172-cobalt-plate",
+      "name": "Cobalt Plate No. 172",
+      "category_slug": "bowls",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 172 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "123.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Cobalt Plate No. 172",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-173-oxblood-vase",
+      "name": "Oxblood Vase No. 173",
+      "category_slug": "plates",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 173 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "126.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Oxblood Vase No. 173",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-174-sand-tumbler",
+      "name": "Sand Tumbler No. 174",
+      "category_slug": "vases",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 174 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "130.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Sand Tumbler No. 174",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-175-ink-beaker",
+      "name": "Ink Beaker No. 175",
+      "category_slug": "gifts",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 175 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "133.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ink Beaker No. 175",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 11
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 6
+        }
+      ]
+    },
+    {
+      "slug": "catalog-176-moss-dish",
+      "name": "Moss Dish No. 176",
+      "category_slug": "cups",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 176 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "137.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Moss Dish No. 176",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-177-matte-white-cup",
+      "name": "Matte White Cup No. 177",
+      "category_slug": "bowls",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 177 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "140.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Matte White Cup No. 177",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-178-celadon-mug",
+      "name": "Celadon Mug No. 178",
+      "category_slug": "plates",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 178 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "144.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Celadon Mug No. 178",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-179-ash-bowl",
+      "name": "Ash Bowl No. 179",
+      "category_slug": "vases",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 179 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "147.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Ash Bowl No. 179",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-180-cobalt-plate",
+      "name": "Cobalt Plate No. 180",
+      "category_slug": "gifts",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 180 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "151.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Cobalt Plate No. 180",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-181-oxblood-vase",
+      "name": "Oxblood Vase No. 181",
+      "category_slug": "cups",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 181 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "154.50",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Oxblood Vase No. 181",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 4
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 2
+        }
+      ]
+    },
+    {
+      "slug": "catalog-182-sand-tumbler",
+      "name": "Sand Tumbler No. 182",
+      "category_slug": "bowls",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 182 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "158.00",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Sand Tumbler No. 182",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-183-ink-beaker",
+      "name": "Ink Beaker No. 183",
+      "category_slug": "plates",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 183 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "161.50",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Ink Beaker No. 183",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-184-moss-dish",
+      "name": "Moss Dish No. 184",
+      "category_slug": "vases",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 184 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "165.00",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Moss Dish No. 184",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 19
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 10
+        }
+      ]
+    },
+    {
+      "slug": "catalog-185-matte-white-cup",
+      "name": "Matte White Cup No. 185",
+      "category_slug": "gifts",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 185 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "168.50",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Matte White Cup No. 185",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-186-celadon-mug",
+      "name": "Celadon Mug No. 186",
+      "category_slug": "cups",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 186 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "172.00",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": true,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Celadon Mug No. 186",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-187-ash-bowl",
+      "name": "Ash Bowl No. 187",
+      "category_slug": "bowls",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 187 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "175.50",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Ash Bowl No. 187",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 1
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    },
+    {
+      "slug": "catalog-188-cobalt-plate",
+      "name": "Cobalt Plate No. 188",
+      "category_slug": "plates",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 188 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "179.00",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Cobalt Plate No. 188",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-189-oxblood-vase",
+      "name": "Oxblood Vase No. 189",
+      "category_slug": "vases",
+      "short_description": "Oxblood glaze on a wheel-thrown vase.",
+      "long_description": "Piece 189 of the audit catalogue. Oxblood glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "18.00",
+      "currency": "RON",
+      "stock_quantity": 5,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Oxblood Vase No. 189",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-190-sand-tumbler",
+      "name": "Sand Tumbler No. 190",
+      "category_slug": "gifts",
+      "short_description": "Sand glaze on a wheel-thrown tumbler.",
+      "long_description": "Piece 190 of the audit catalogue. Sand glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "21.50",
+      "currency": "RON",
+      "stock_quantity": 8,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Sand Tumbler No. 190",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 7
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 4
+        }
+      ]
+    },
+    {
+      "slug": "catalog-191-ink-beaker",
+      "name": "Ink Beaker No. 191",
+      "category_slug": "cups",
+      "short_description": "Ink glaze on a wheel-thrown beaker.",
+      "long_description": "Piece 191 of the audit catalogue. Ink glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "25.00",
+      "currency": "RON",
+      "stock_quantity": 12,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Ink Beaker No. 191",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-192-moss-dish",
+      "name": "Moss Dish No. 192",
+      "category_slug": "bowls",
+      "short_description": "Moss glaze on a wheel-thrown dish.",
+      "long_description": "Piece 192 of the audit catalogue. Moss glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "28.50",
+      "currency": "RON",
+      "stock_quantity": 20,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-960.webp",
+          "alt_text": "Moss Dish No. 192",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-193-matte-white-cup",
+      "name": "Matte White Cup No. 193",
+      "category_slug": "plates",
+      "short_description": "Matte White glaze on a wheel-thrown cup.",
+      "long_description": "Piece 193 of the audit catalogue. Matte White glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "32.00",
+      "currency": "RON",
+      "stock_quantity": 0,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-1280.webp",
+          "alt_text": "Matte White Cup No. 193",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 0
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 0
+        }
+      ]
+    },
+    {
+      "slug": "catalog-194-celadon-mug",
+      "name": "Celadon Mug No. 194",
+      "category_slug": "vases",
+      "short_description": "Celadon glaze on a wheel-thrown mug.",
+      "long_description": "Piece 194 of the audit catalogue. Celadon glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "35.50",
+      "currency": "RON",
+      "stock_quantity": 1,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.jpg",
+          "alt_text": "Celadon Mug No. 194",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-195-ash-bowl",
+      "name": "Ash Bowl No. 195",
+      "category_slug": "gifts",
+      "short_description": "Ash glaze on a wheel-thrown bowl.",
+      "long_description": "Piece 195 of the audit catalogue. Ash glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "39.00",
+      "currency": "RON",
+      "stock_quantity": 2,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/brand/momentstudio-flower.png",
+          "alt_text": "Ash Bowl No. 195",
+          "sort_order": 1
+        }
+      ],
+      "variants": []
+    },
+    {
+      "slug": "catalog-196-cobalt-plate",
+      "name": "Cobalt Plate No. 196",
+      "category_slug": "cups",
+      "short_description": "Cobalt glaze on a wheel-thrown plate.",
+      "long_description": "Piece 196 of the audit catalogue. Cobalt glaze, reduction-fired, finished by hand. Included so list, grid and table surfaces are exercised at realistic depth.",
+      "base_price": "42.50",
+      "currency": "RON",
+      "stock_quantity": 3,
+      "is_featured": false,
+      "images": [
+        {
+          "url": "/assets/home/banner_image-640.webp",
+          "alt_text": "Cobalt Plate No. 196",
+          "sort_order": 1
+        }
+      ],
+      "variants": [
+        {
+          "name": "Small",
+          "additional_price_delta": "0.00",
+          "stock_quantity": 2
+        },
+        {
+          "name": "Large",
+          "additional_price_delta": "8.00",
+          "stock_quantity": 1
+        }
+      ]
+    }
+  ]
+}

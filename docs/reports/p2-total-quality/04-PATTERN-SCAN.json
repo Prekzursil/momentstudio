@@ -1,0 +1,1487 @@
+{
+  "repo": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix",
+  "files_scanned": 236,
+  "totals": {
+    "scroll-container-no-tabindex": 58,
+    "link-colour-only": 51,
+    "img-no-dimensions": 24,
+    "light-only-text": 22,
+    "aria-label-on-generic": 19,
+    "light-only-border": 2,
+    "light-only-bg": 1,
+    "img-no-alt": 1
+  },
+  "files_affected": {
+    "aria-label-on-generic": 6,
+    "light-only-text": 13,
+    "scroll-container-no-tabindex": 21,
+    "img-no-dimensions": 11,
+    "link-colour-only": 26,
+    "light-only-border": 2,
+    "light-only-bg": 1,
+    "img-no-alt": 1
+  },
+  "detector_control": {
+    "witnesses": {
+      "aria-label-on-generic": [
+        "account/account.component.ts",
+        114
+      ],
+      "scroll-container-no-tabindex": [
+        "overflow-x-auto",
+        null
+      ],
+      "light-only-text": [
+        "text-slate-",
+        null
+      ],
+      "link-colour-only": [
+        "text-indigo-",
+        null
+      ]
+    },
+    "problems": []
+  },
+  "hits": {
+    "aria-label-on-generic": [
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/theme/admin-theme.component.html",
+        "line": 1,
+        "tag": "section",
+        "detail": "aria-label='(dynamic)' on <section> with no role",
+        "snippet": "class=\"mx-auto max-w-6xl px-4 py-6 sm:px-6\" aria-labelledby=\"theme-editor-title\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/theme/admin-theme.component.html",
+        "line": 176,
+        "tag": "section",
+        "detail": "aria-label='(dynamic)' on <section> with no role",
+        "snippet": "class=\"rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900\" aria-labelledby=\"theme-history-title\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/layout/footer.component.ts",
+        "line": 48,
+        "tag": "section",
+        "detail": "aria-label='(dynamic)' on <section> with no role",
+        "snippet": "class=\"grid gap-4\" aria-labelledby=\"footer-brand-heading\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/layout/footer.component.ts",
+        "line": 168,
+        "tag": "section",
+        "detail": "aria-label='(dynamic)' on <section> with no role",
+        "snippet": "class=\"grid gap-2 content-start min-h-[9rem]\" data-footer-nav-shell=\"handcrafted\" aria-labelledby=\"footer-handcrafted-heading\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/layout/footer.component.ts",
+        "line": 227,
+        "tag": "section",
+        "detail": "aria-label='(dynamic)' on <section> with no role",
+        "snippet": "class=\"grid gap-2 content-start min-h-[9rem]\" data-footer-nav-shell=\"legal\" aria-labelledby=\"footer-legal-heading\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/layout/footer.component.ts",
+        "line": 280,
+        "tag": "section",
+        "detail": "aria-label='(dynamic)' on <section> with no role",
+        "snippet": "class=\"grid gap-2 content-start min-h-[10.5rem]\" data-footer-company-shell aria-labelledby=\"footer-company-heading\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/layout/footer.component.ts",
+        "line": 319,
+        "tag": "section",
+        "detail": "aria-label='(dynamic)' on <section> with no role",
+        "snippet": "class=\"lg:col-span-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border pt-6\" aria-labelledby=\"footer-payments-heading\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-overview.component.ts",
+        "line": 14,
+        "tag": "section",
+        "detail": "aria-label=\"(bound) 'account.overview.aria.overview' | translate\" on <section> with no role",
+        "snippet": "class=\"grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900\" [attr.aria-label]=\"'account.overview.aria.overview' | translate\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-overview.component.ts",
+        "line": 28,
+        "tag": "div",
+        "detail": "aria-label=\"(bound) 'account.overview.aria.ordersLoading' | translate\" on <div> with no role",
+        "snippet": "class=\"rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40\" [attr.aria-label]=\"'account.overview.aria.ordersLoading' | translat"
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-overview.component.ts",
+        "line": 57,
+        "tag": "div",
+        "detail": "aria-label=\"(bound) 'account.overview.aria.addressesLoading' | translate\" on <div> with no role",
+        "snippet": "class=\"rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40\" [attr.aria-label]=\"'account.overview.aria.addressesLoading' | trans"
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-overview.component.ts",
+        "line": 86,
+        "tag": "div",
+        "detail": "aria-label=\"(bound) 'account.overview.aria.wishlistLoading' | translate\" on <div> with no role",
+        "snippet": "class=\"rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40\" [attr.aria-label]=\"'account.overview.aria.wishlistLoading' | transl"
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-overview.component.ts",
+        "line": 115,
+        "tag": "div",
+        "detail": "aria-label=\"(bound) 'account.overview.aria.notificationsLoading' | translate\" on <div> with no role",
+        "snippet": "class=\"rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40\" [attr.aria-label]=\"'account.overview.aria.notificationsLoading' | t"
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-overview.component.ts",
+        "line": 144,
+        "tag": "div",
+        "detail": "aria-label=\"(bound) 'account.overview.aria.securityLoading' | translate\" on <div> with no role",
+        "snippet": "class=\"rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40\" [attr.aria-label]=\"'account.overview.aria.securityLoading' | transl"
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-overview.component.ts",
+        "line": 173,
+        "tag": "div",
+        "detail": "aria-label=\"(bound) 'account.overview.aria.supportLoading' | translate\" on <div> with no role",
+        "snippet": "class=\"rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40\" [attr.aria-label]=\"'account.overview.aria.supportLoading' | transla"
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account.component.ts",
+        "line": 114,
+        "tag": "div",
+        "detail": "aria-label=\"(bound) 'account.aria.sectionSelect' | translate\" on <div> with no role",
+        "snippet": "class=\"lg:hidden rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 grid gap-2\" [attr.aria-label]=\"'account.aria.sectionSelect' | translate\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 833,
+        "tag": "span",
+        "detail": "aria-label='Drag' on <span> with no role",
+        "snippet": "class=\"cursor-move select-none text-slate-400 dark:text-slate-500\" draggable=\"true\" (dragstart)=\"onNavigationDragStart('header', link.id)\" aria-label=\"Drag\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 919,
+        "tag": "span",
+        "detail": "aria-label='Drag' on <span> with no role",
+        "snippet": "class=\"cursor-move select-none text-slate-400 dark:text-slate-500\" draggable=\"true\" (dragstart)=\"onNavigationDragStart('footer_handcrafted', link.id)\" aria-label=\"Drag\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 1005,
+        "tag": "span",
+        "detail": "aria-label='Drag' on <span> with no role",
+        "snippet": "class=\"cursor-move select-none text-slate-400 dark:text-slate-500\" draggable=\"true\" (dragstart)=\"onNavigationDragStart('footer_legal', link.id)\" aria-label=\"Drag\""
+      },
+      {
+        "pattern": "aria-label-on-generic",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/nav-drawer.component.ts",
+        "line": 43,
+        "tag": "aside",
+        "detail": "aria-label='(dynamic)' on <aside> with no role",
+        "snippet": "class=\"fixed inset-y-0 left-0 z-50 w-72 overflow-x-hidden bg-white shadow-xl border-r border-slate-200 transform transition-transform dark:bg-slate-900 dark:border-slate-700\" [ngCl"
+      }
+    ],
+    "light-only-text": [
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/theme/admin-theme.component.html",
+        "line": 253,
+        "tag": "button",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "type=\"button\" class=\"w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus-visible:outline focus-visible:outli"
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-wishlist.component.ts",
+        "line": 116,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"stockChange(item) === 'back'\" class=\"rounded-full bg-emerald-600/90 px-3 py-1 text-xs font-semibold text-white shadow\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-wishlist.component.ts",
+        "line": 122,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"stockChange(item) === 'out'\" class=\"rounded-full bg-slate-900/90 px-3 py-1 text-xs font-semibold text-white shadow dark:bg-slate-800/90\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-wishlist.component.ts",
+        "line": 128,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"priceChange(item) as p\" class=\"rounded-full bg-indigo-600/90 px-3 py-1 text-xs font-semibold text-white shadow\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account.component.ts",
+        "line": 200,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"couponsCountLoaded() && couponsCount() > 0\" class=\"inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-w"
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account.component.ts",
+        "line": 212,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"unreadNotificationsCount() > 0\" class=\"inline-flex min-w-[1.5rem] items-center justify-center rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-semibold text-white dark:bg"
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin-layout.component.ts",
+        "line": 146,
+        "tag": "span",
+        "detail": "text-slate-400 with no dark:text-* counterpart",
+        "snippet": "aria-hidden=\"true\" class=\"text-slate-400 transition group-open:rotate-90\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+        "line": 485,
+        "tag": "span",
+        "detail": "text-slate-400 with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"(order()!.tags || []).length === 0\" class=\"text-xs text-slate-400\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+        "line": 1471,
+        "tag": "span",
+        "detail": "text-slate-400 with no dark:text-* counterpart",
+        "snippet": "class=\"text-slate-400\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-orders.component.ts",
+        "line": 961,
+        "tag": "span",
+        "detail": "text-slate-400 with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"(order.tags || []).length === 0\" class=\"text-xs text-slate-400\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/products/admin-products.component.ts",
+        "line": 524,
+        "tag": "span",
+        "detail": "text-slate-400 with no dark:text-* counterpart",
+        "snippet": "class=\"text-slate-400\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/asset-library.component.ts",
+        "line": 699,
+        "tag": "button",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "type=\"button\" class=\"rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50\" [disabled]=\"focalSaving()\" (click)=\"save"
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/asset-library.component.ts",
+        "line": 833,
+        "tag": "button",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "type=\"button\" class=\"rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50\" [disabled]=\"editSaving()\" (click)=\"creat"
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/dam-asset-library.component.ts",
+        "line": 267,
+        "tag": "span",
+        "detail": "text-slate-500 with no dark:text-* counterpart",
+        "snippet": "class=\"text-xs text-slate-500\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/dam-asset-library.component.ts",
+        "line": 730,
+        "tag": "button",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "type=\"button\" class=\"rounded border border-indigo-400 bg-indigo-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-60\" [disabled]=\"retryPolicyRollbackApplying()\" (clic"
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-post.component.ts",
+        "line": 963,
+        "tag": "button",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "type=\"button\" class=\"h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/55\" (click)=\"prevLightbox($event)\" [attr.aria-label]=\"'blog.post.lightbox.previous' | translate\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-post.component.ts",
+        "line": 971,
+        "tag": "button",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "type=\"button\" class=\"h-10 w-10 rounded-full bg-black/40 text-white hover:bg-black/55\" (click)=\"nextLightbox($event)\" [attr.aria-label]=\"'blog.post.lightbox.next' | translate\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/checkout/checkout-payment-step.component.ts",
+        "line": 99,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "class=\"inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#003087] text-xs font-bold text-white\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/checkout/checkout-payment-step.component.ts",
+        "line": 118,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "class=\"inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#635BFF] text-xs font-bold text-white\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/contact/contact.component.ts",
+        "line": 156,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "class=\"h-8 w-8 rounded-full bg-gradient-to-br from-fuchsia-500 to-rose-500 grid place-items-center text-xs font-semibold text-white\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/contact/contact.component.ts",
+        "line": 191,
+        "tag": "span",
+        "detail": "text-white with no dark:text-* counterpart",
+        "snippet": "class=\"h-8 w-8 rounded-full bg-gradient-to-br from-blue-600 to-sky-500 grid place-items-center text-xs font-semibold text-white\""
+      },
+      {
+        "pattern": "light-only-text",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/spinner.component.ts",
+        "line": 13,
+        "tag": "span",
+        "detail": "text-slate-600 with no dark:text-* counterpart",
+        "snippet": "*ngIf=\"label\" class=\"text-sm text-slate-600\""
+      }
+    ],
+    "scroll-container-no-tabindex": [
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/layout/header.component.ts",
+        "line": 264,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"max-h-[360px] overflow-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/layout/header.component.ts",
+        "line": 374,
+        "tag": "nav",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"hidden lg:flex items-center gap-6 border-t border-border/60 py-2 text-sm font-medium text-text overflow-x-auto whitespace-nowrap\" aria-label=\"Primary storefront navigation\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 2377,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"pagePreviewIframeSrc(previewSlug) as iframeSrc; else pagePreviewHint\" class=\"mt-3 overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 5124,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"homePreviewIframeSrc() as iframeSrc; else homePreviewHint\" class=\"mt-3 overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 6694,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"overflow-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 7425,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"group.rates?.length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 7528,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"fxAudit().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 8784,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "#blogPreview class=\"markdown rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-800 shadow-sm max-h-[520px] overflow-auto dark:border-slate-700 dark:bg-slate-900 d"
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9536,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "#contentPreview class=\"markdown rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-800 shadow-sm max-h-[520px] overflow-auto dark:border-slate-700 dark:bg-slate-90"
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/coupons/admin-coupons.component.ts",
+        "line": 758,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"coupons().length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/coupons/admin-coupons.component.ts",
+        "line": 1115,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"analytics()!.daily.length\" class=\"rounded-xl border border-slate-200 overflow-x-auto dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/coupons/admin-coupons.component.ts",
+        "line": 1152,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"analytics()!.top_products.length\" class=\"rounded-xl border border-slate-200 overflow-x-auto dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/coupons/admin-coupons.component.ts",
+        "line": 2092,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"!assignmentsLoading() && assignments().length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 236,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "id=\"admin-global-search-listbox\" role=\"listbox\" class=\"max-h-72 overflow-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 1392,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 1523,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"mt-3 overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 1660,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"(perf.time_to_ship || []).length\" class=\"mt-3 overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 1719,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"(perf.delivery_time || []).length\" class=\"mt-3 overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 1822,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"(impact.items || []).length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 1954,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"(attribution.channels || []).length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/dashboard/admin-dashboard.component.ts",
+        "line": 2339,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"overflow-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/inventory/admin-inventory.component.ts",
+        "line": 208,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"rows().length\" class=\"overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/inventory/admin-inventory.component.ts",
+        "line": 454,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"reservationsCarts().length > 0\" class=\"overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/inventory/admin-inventory.component.ts",
+        "line": 500,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"reservationsOrders().length > 0\" class=\"overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+        "line": 416,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"samedaySyncRuns().length\" class=\"overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+        "line": 1062,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"simResult()!.methods?.length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+        "line": 1182,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"!emailFailuresLoading() && emailFailures().length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+        "line": 1254,
+        "tag": "pre",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"selectedEmailFailure()!.error_message\" class=\"mt-3 max-h-[220px] overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950/30 dark:text-slate-200\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+        "line": 1305,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"!webhooksLoading() && webhooks().length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/ops/admin-ops.component.ts",
+        "line": 1405,
+        "tag": "pre",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"mt-3 max-h-[320px] overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-950/30 dark:text-slate-200\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+        "line": 1071,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-orders.component.ts",
+        "line": 468,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"kanbanTotalCards() > 0\" class=\"overflow-x-auto pb-2\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-orders.component.ts",
+        "line": 812,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"orders().length > 0\" class=\"hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-orders.component.ts",
+        "line": 1146,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"shippingLabelsUploads.length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-orders.component.ts",
+        "line": 1410,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\" !tagManagerLoading() && !tagManagerError() && filteredTagManagerRows().length \" class=\"overflow-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/products/admin-products.component.ts",
+        "line": 1032,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "id=\"admin-products-search-listbox\" role=\"listbox\" class=\"max-h-72 overflow-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/products/admin-products.component.ts",
+        "line": 1429,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"products().length > 0\" class=\"hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/products/admin-products.component.ts",
+        "line": 2723,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"variants().length > 0\" class=\"overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/products/admin-products.component.ts",
+        "line": 2928,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"priceHistoryChanges().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/products/admin-products.component.ts",
+        "line": 3034,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"auditEntries().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/products/admin-products.component.ts",
+        "line": 3277,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"stockAdjustments().length > 0\" class=\"overflow-x-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/returns/admin-returns.component.ts",
+        "line": 150,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"items().length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/dam-asset-library.component.ts",
+        "line": 1258,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"jobEvents().length\" class=\"mt-3 max-h-[55vh] space-y-2 overflow-auto pr-1\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/dam-asset-library.component.ts",
+        "line": 1272,
+        "tag": "pre",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"evt.meta_json\" class=\"mt-1 overflow-auto rounded border border-slate-200 bg-white p-2 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/support/admin-support.component.ts",
+        "line": 264,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"items().length\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/users/admin-gdpr.component.ts",
+        "line": 128,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"exports().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/users/admin-gdpr.component.ts",
+        "line": 286,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"deletions().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/users/admin-segments.component.ts",
+        "line": 100,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"repeatItems().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/users/admin-segments.component.ts",
+        "line": 221,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"aovItems().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/users/admin-users.component.ts",
+        "line": 241,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"users().length > 0\" class=\"overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/product/product.component.ts",
+        "line": 298,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"flex gap-4 overflow-x-auto pb-2\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/product/product.component.ts",
+        "line": 344,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"flex gap-4 overflow-x-auto pb-2\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/product/product.component.ts",
+        "line": 390,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"flex gap-4 overflow-x-auto pb-2\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/receipt/receipt.component.ts",
+        "line": 209,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"mt-3 overflow-auto\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/shop/shop.component.ts",
+        "line": 113,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"space-y-2 max-h-48 overflow-auto pr-1\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/locker-picker.component.ts",
+        "line": 190,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "class=\"max-h-48 overflow-auto rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/modal.component.ts",
+        "line": 55,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "#bodyRef class=\"min-h-0 overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-4 sm:pb-6 text-sm text-slate-700 dark:text-slate-200\" (scroll)=\"emitBodyScroll()\""
+      },
+      {
+        "pattern": "scroll-container-no-tabindex",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/product-quick-view-modal.component.ts",
+        "line": 79,
+        "tag": "div",
+        "detail": "scrollable container without tabindex (keyboard users cannot scroll it)",
+        "snippet": "*ngIf=\"(product.images?.length ?? 0) > 1\" class=\"flex gap-2 overflow-x-auto pb-1\""
+      }
+    ],
+    "img-no-dimensions": [
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/about/about.component.ts",
+        "line": 87,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "*ngIf=\"block()!.images?.length\" [src]=\"block()!.images[0].url\" [alt]=\"block()!.images[0].alt_text || block()!.title\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 o"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-profile.component.ts",
+        "line": 483,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "*ngIf=\"avatarCropUrl\" [src]=\"avatarCropUrl\" [attr.alt]=\"'account.profile.avatar.previewAlt' | translate\" class=\"absolute left-1/2 top-1/2 max-w-none select-none\" [style.transform]="
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9123,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "*ngIf=\"blogPreviewToken || blogForm.status === 'published'\" [src]=\"blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)\" [alt]=\"'adminUi.blog.social.ogAlt' | translate\" cla"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9214,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "*ngIf=\"blogPreviewToken || blogForm.status === 'published'\" [src]=\"blogPreviewOgImageUrl(lang) || blogPublishedOgImageUrl(lang)\" [alt]=\"'adminUi.blog.social.ogAlt' | translate\" cla"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/home/home.component.ts",
+        "line": 492,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "class=\"w-full rounded-2xl object-cover\" [src]=\"img.url\" [alt]=\"img.alt || img.title || ''\" [style.object-position]=\"focalPosition(img.focal_x, img.focal_y)\" loading=\"lazy\" /"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/home/home.component.ts",
+        "line": 501,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "class=\"w-full rounded-2xl object-cover\" [src]=\"img.url\" [alt]=\"img.alt || img.title || ''\" [style.object-position]=\"focalPosition(img.focal_x, img.focal_y)\" loading=\"lazy\" /"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/home/home.component.ts",
+        "line": 525,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "class=\"w-full rounded-2xl object-cover\" [src]=\"image.url\" [alt]=\"image.alt || gal.title || ''\" [style.object-position]=\"focalPosition(image.focal_x, image.focal_y)\" loading=\"lazy\" "
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/page/page.component.ts",
+        "line": 115,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "*ngIf=\"block()!.images?.length\" [src]=\"block()!.images[0].url\" [alt]=\"block()!.images[0].alt_text || block()!.title\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 o"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/banner-block.component.ts",
+        "line": 60,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[ngClass]=\"imageClass()\" [src]=\"imageUrl()\" [attr.srcset]=\"optimizedSrcset('jpg')\" [attr.sizes]=\"splitSizes()\" [alt]=\"slide.alt || slide.headline || ''\" [style.object-position]=\"fo"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/banner-block.component.ts",
+        "line": 74,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[ngClass]=\"imageClass()\" [src]=\"imageUrl()\" [alt]=\"slide.alt || slide.headline || ''\" [style.object-position]=\"focalPosition()\" [attr.loading]=\"tagline ? 'eager' : 'lazy'\" [attr.fe"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/banner-block.component.ts",
+        "line": 114,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[ngClass]=\"fullImageClass()\" [src]=\"imageUrl()\" [attr.srcset]=\"optimizedSrcset('jpg')\" [attr.sizes]=\"fullSizes()\" [alt]=\"slide.alt || slide.headline || ''\" [style.object-position]="
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/banner-block.component.ts",
+        "line": 128,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[ngClass]=\"fullImageClass()\" [src]=\"imageUrl()\" [alt]=\"slide.alt || slide.headline || ''\" [style.object-position]=\"focalPosition()\" [attr.loading]=\"tagline ? 'eager' : 'lazy'\" [att"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/cms-global-section-blocks.component.ts",
+        "line": 85,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"b.url\" [alt]=\"b.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-posit"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/cms-global-section-blocks.component.ts",
+        "line": 94,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"b.url\" [alt]=\"b.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-posit"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/cms-global-section-blocks.component.ts",
+        "line": 116,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"img.url\" [alt]=\"img.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-p"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/cms-page-blocks.component.ts",
+        "line": 136,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"b.url\" [alt]=\"b.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-posit"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/cms-page-blocks.component.ts",
+        "line": 145,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"b.url\" [alt]=\"b.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-posit"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/cms-page-blocks.component.ts",
+        "line": 164,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"img.url\" [alt]=\"img.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-p"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/help-panel.component.ts",
+        "line": 23,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"mediaSrc\" [alt]=\"mediaAltKey ? (mediaAltKey | translate) : ''\" class=\"w-full max-w-2xl rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900\" l"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/legal-consent-modal.component.ts",
+        "line": 102,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"b.url\" [alt]=\"b.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-posit"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/legal-consent-modal.component.ts",
+        "line": 111,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"b.url\" [alt]=\"b.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-posit"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/legal-consent-modal.component.ts",
+        "line": 133,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "[src]=\"img.url\" [alt]=\"img.alt || b.title || ''\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" [style.object-p"
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/legal-consent-modal.component.ts",
+        "line": 153,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": "*ngIf=\"firstImageUrl()\" [src]=\"firstImageUrl()!\" [alt]=\"title\" class=\"w-full rounded-2xl border border-slate-200 bg-slate-50 object-cover dark:border-slate-800 dark:bg-slate-800\" ["
+      },
+      {
+        "pattern": "img-no-dimensions",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/modal.component.ts",
+        "line": 313,
+        "tag": "img",
+        "detail": "<img> missing width+height and no fixed CSS box (layout shift)",
+        "snippet": ""
+      }
+    ],
+    "link-colour-only": [
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-comments.component.ts",
+        "line": 46,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/blog\" class=\"text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-orders.component.ts",
+        "line": 32,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/shop\" class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-orders.component.ts",
+        "line": 147,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/shop\" class=\"text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-orders.component.ts",
+        "line": 268,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "*ngIf=\"order.tracking_number\" class=\"text-indigo-600 dark:text-indigo-300 font-medium\" [href]=\"account.trackingUrl(order.tracking_number)\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-security.component.ts",
+        "line": 1100,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-indigo-600 dark:text-indigo-300 cursor-pointer\" (click)=\"account.signOut()\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account-wishlist.component.ts",
+        "line": 42,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/shop\" class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/account.component.ts",
+        "line": 141,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/tickets\" class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/account/change-password.component.ts",
+        "line": 106,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/account\" class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 1620,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "*ngFor=\"let url of sitemapPreviewByLang['en'] || []\" [href]=\"url\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"truncate text-indigo-600 hover:underline dark:text-indigo-300\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 1638,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "*ngFor=\"let url of sitemapPreviewByLang['ro'] || []\" [href]=\"url\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"truncate text-indigo-600 hover:underline dark:text-indigo-300\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 1713,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"font-mono text-indigo-600 hover:underline dark:text-indigo-300\" [href]=\"structuredDataIssueUrl(issue)\" target=\"_blank\" rel=\"noopener noreferrer\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 8036,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200\" [attr.href]=\"'/blog/' + extractBlogSlug(post.key)\" target=\"_blank\" rel=\"noopen"
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 8875,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"text-indigo-600 dark:text-indigo-300 hover:underline truncate\" [href]=\"issue.url\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 8906,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"text-xs text-indigo-600 dark:text-indigo-300 hover:underline truncate\" [href]=\"img.url\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9042,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200\" [attr.href]=\"blogPublicUrl(lang)\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9197,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200\" [attr.href]=\"blogPublicUrl(lang)\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9408,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-xs text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200\" [attr.href]=\"'/blog/' + c.post_slug\" target=\"_blank\" rel=\"noopener\" (click)=\"$"
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9946,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-indigo-600 dark:text-indigo-300\" href=\"/sitemap.xml\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9953,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-indigo-600 dark:text-indigo-300\" href=\"/robots.txt\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/admin.component.ts",
+        "line": 9960,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-indigo-600 dark:text-indigo-300\" href=\"/api/v1/feeds/products.json\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+        "line": 157,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "routerLink=\"/admin/orders\" class=\"text-sm text-indigo-600 hover:underline dark:text-indigo-300\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+        "line": 271,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-300 break-all\" [href]=\"order()!.tracking_url!\" target=\"_blank\" rel=\"noopener noreferrer\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+        "line": 1030,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "*ngIf=\"s.tracking_url\" class=\"text-xs text-indigo-600 hover:underline dark:text-indigo-300\" [href]=\"s.tracking_url\" target=\"_blank\" rel=\"noopener\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/orders/admin-order-detail.component.ts",
+        "line": 1195,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"mt-2 inline-flex text-xs text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/admin/returns']\" [queryParams]=\"{ order_id: rr.order_id }\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/returns/admin-returns.component.ts",
+        "line": 357,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "[routerLink]=\"['/admin/orders', selected()!.order_id]\" class=\"text-indigo-600 hover:underline dark:text-indigo-300\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/customer-timeline.component.ts",
+        "line": 81,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "*ngSwitchCase=\"'order'\" class=\"min-w-0 truncate font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/admin/orders', ev.order.id]\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/shared/customer-timeline.component.ts",
+        "line": 88,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "*ngSwitchCase=\"'ticket'\" class=\"min-w-0 truncate font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/admin/support']\" [queryParams]=\"{ ticket: ev.tic"
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/support/admin-support.component.ts",
+        "line": 404,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"text-indigo-600 hover:underline dark:text-indigo-300\" [href]=\"'mailto:' + selected()!.email\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/users/admin-users.component.ts",
+        "line": 1122,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "[routerLink]=\"['/admin/orders', order.id]\" class=\"font-medium text-indigo-700 hover:underline dark:text-indigo-200\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/auth/login.component.ts",
+        "line": 94,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/password-reset\" class=\"text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/auth/password-reset-request.component.ts",
+        "line": 50,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/login\" class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/auth/password-reset.component.ts",
+        "line": 97,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/login\" class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/auth/register.component.ts",
+        "line": 225,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/login\" class=\"text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/auth/register.component.ts",
+        "line": 347,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/pages/terms-and-conditions\" class=\"text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/auth/register.component.ts",
+        "line": 375,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/pages/privacy-policy\" class=\"text-indigo-600 dark:text-indigo-300 font-medium\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-list.component.ts",
+        "line": 210,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/shop']\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-list.component.ts",
+        "line": 216,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/about']\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-list.component.ts",
+        "line": 222,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/contact']\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-post.component.ts",
+        "line": 336,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/blog\" class=\"text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-300 dark:hover:text-indigo-200\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-post.component.ts",
+        "line": 865,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "routerLink=\"/login\" class=\"text-indigo-600 dark:text-indigo-300 hover:underline\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/cart/cart.component.ts",
+        "line": 367,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "*ngFor=\"let p of suggestedAddOns()\" [routerLink]=\"['/products', p.slug]\" class=\"text-xs text-indigo-700 hover:underline dark:text-indigo-300\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/checkout/checkout-payment-step.component.ts",
+        "line": 219,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "routerLink=\"/pages/terms-and-conditions\" class=\"text-indigo-600 dark:text-indigo-300 font-medium hover:underline\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/checkout/checkout-payment-step.component.ts",
+        "line": 238,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "routerLink=\"/pages/privacy-policy\" class=\"text-indigo-600 dark:text-indigo-300 font-medium hover:underline\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/checkout/checkout-shipping-step.component.ts",
+        "line": 430,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/account/addresses\" class=\"text-xs text-indigo-600 dark:text-indigo-300\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/error/error.component.ts",
+        "line": 30,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\" [href]=\"contactHref()\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/not-found/not-found.component.ts",
+        "line": 29,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "class=\"text-sm text-indigo-600 dark:text-indigo-300 font-medium\" [href]=\"contactHref()\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/page/page.component.ts",
+        "line": 166,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/shop']\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/page/page.component.ts",
+        "line": 172,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/blog']\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/page/page.component.ts",
+        "line": 178,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "class=\"font-medium text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/contact']\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/receipt/receipt.component.ts",
+        "line": 227,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest (hover:underline only)",
+        "snippet": "*ngIf=\"it.slug; else noSlug\" class=\"font-semibold text-indigo-600 hover:underline dark:text-indigo-300\" [routerLink]=\"['/products', it.slug]\""
+      },
+      {
+        "pattern": "link-colour-only",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/tickets/tickets.component.ts",
+        "line": 47,
+        "tag": "a",
+        "detail": "link coloured but not underlined at rest",
+        "snippet": "routerLink=\"/contact\" class=\"text-sm font-medium text-indigo-600 dark:text-indigo-300\""
+      }
+    ],
+    "light-only-border": [
+      {
+        "pattern": "light-only-border",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/admin/support/admin-support.component.ts",
+        "line": 700,
+        "tag": "input",
+        "detail": "border-slate-300 with no dark:border-* counterpart",
+        "snippet": "type=\"checkbox\" class=\"h-4 w-4 rounded border-slate-300\" [(ngModel)]=\"templateActive\" /"
+      },
+      {
+        "pattern": "light-only-border",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/spinner.component.ts",
+        "line": 10,
+        "tag": "span",
+        "detail": "border-slate-300, border-t-slate-900 with no dark:border-* counterpart",
+        "snippet": "class=\"h-4 w-4 rounded-full border-2 border-slate-300 border-t-slate-900 animate-spin\""
+      }
+    ],
+    "light-only-bg": [
+      {
+        "pattern": "light-only-bg",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/pages/blog/blog-post.component.ts",
+        "line": 943,
+        "tag": "img",
+        "detail": "bg-black with no dark:bg-* counterpart",
+        "snippet": "*ngIf=\"lightboxImage() as img\" [src]=\"img.src\" [alt]=\"img.alt || ''\" class=\"w-full max-h-[78vh] object-contain rounded-2xl bg-black\" /"
+      }
+    ],
+    "img-no-alt": [
+      {
+        "pattern": "img-no-alt",
+        "file": "C:/Users/Prekzursil/Documents/GitHub/momentstudio-fix/frontend/src/app/shared/modal.component.ts",
+        "line": 313,
+        "tag": "img",
+        "detail": "<img> with no alt attribute (literal or bound)",
+        "snippet": ""
+      }
+    ]
+  }
+}
