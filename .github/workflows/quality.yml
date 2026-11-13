@@ -1,0 +1,39 @@
+# Lean 6-gate quality caller — QZP fleet baseline.
+# Thin caller of quality-zero-platform's reusable workflow, pinned to an exact
+# commit (the SHA the v1 tag resolves to). Gate changes happen in
+# quality-zero-platform, never here; this repo adopts them by bumping the pin
+# below. See CONTRIBUTING.md.
+name: quality
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  # a merge queue's synthetic commit must report the required check too
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  # a pull request's runs share one group, so a newer push cancels the superseded
+  # run; every other event (a push, a merge-queue commit) gets a group of its own
+  # commit, so no commit's run is ever replaced while it waits or left untested
+  group: quality-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    # Pinned to the exact commit the v1 tag resolves to (full SHA per the lean
+    # gate charter — a movable tag would let one platform push change every
+    # caller's gate at once). Bump the pin in a dedicated PR; the commits after
+    # this one also enforce a global 100% line+branch jsts coverage summary,
+    # which this repo does not meet yet (frontend measures ~53% global line —
+    # see the open coverage-program work). The deps lane at this commit already
+    # blocks on every osv-scanner finding (zero tolerance), matching the
+    # deps-severity-floor "any" policy.
+    uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-quality.yml@b4fbe38470fd2831f86f194df5b638a271bae8b8
+    with:
+      opengrep-paths: "backend frontend"
