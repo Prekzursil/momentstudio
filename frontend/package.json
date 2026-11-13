@@ -58,7 +58,7 @@
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^21.2.26",
-    "@angular/cli": "^21.2.26",
+    "@angular/cli": "^22.2.6",
     "@angular/compiler-cli": "21.2.25",
     "@applitools/eyes-playwright": "^1.50.1",
     "@chromatic-com/playwright": "^0.15.0",
