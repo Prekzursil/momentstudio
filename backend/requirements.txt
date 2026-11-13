@@ -12,7 +12,7 @@ email-validator==2.3.0
 python-multipart==0.0.32
 httpx==0.28.1
 simplejson==3.20.2
-redis==7.4.1
+redis==8.1.0
 pytest==9.2.0
 respx==0.23.1
 stripe==14.4.2
