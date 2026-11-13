@@ -20,7 +20,7 @@ Pillow==13.0.0
 defusedxml==0.7.1
 reportlab==4.5.1
 sentry-sdk==2.73.0
-webauthn==2.8.0
+webauthn==3.0.1
 
 # Transitive-dependency CVE pins for the osv-scanner deps gate (upgrade-to-clear
 # per osv-scanner.toml policy). Pulled in transitively; pinned to the fixed versions.
