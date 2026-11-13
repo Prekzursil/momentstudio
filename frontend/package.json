@@ -46,7 +46,7 @@
     "@nuintun/qrcode": "^5.0.3",
     "@sentry/browser": "^10.76.2",
     "@toast-ui/editor": "^3.2.2",
-    "diff": "^8.0.2",
+    "diff": "^9.0.0",
     "dompurify": "^3.4.17",
     "express": "^5.3.0",
     "highlight.js": "^11.12.0",
