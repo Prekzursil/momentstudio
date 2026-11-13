@@ -18,7 +18,7 @@ respx==0.23.1
 stripe==14.4.2
 Pillow==13.0.0
 defusedxml==0.7.1
-reportlab==4.5.1
+reportlab==5.1.0
 sentry-sdk==2.73.0
 webauthn==2.8.0
 
