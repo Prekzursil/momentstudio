@@ -166,6 +166,15 @@
     "nanoid@^3": "3.3.18",
     "socket.io-parser": "4.2.7",
     "@xmldom/xmldom": "0.8.15",
-    "immutable": "4.3.9"
+    "immutable": "4.3.9",
+    "@tufjs/models": {
+      "minimatch": "^11.0.1"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.1"
+    },
+    "ignore-walk": {
+      "minimatch": "^11.0.1"
+    }
   }
 }
