@@ -76,7 +76,7 @@
     "chromatic": "^13.3.2",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
-    "glob-parent": "^5.1.2",
+    "glob-parent": "^6.0.2",
     "jasmine-core": "~5.13.0",
     "karma": "~6.4.0",
     "karma-chrome-launcher": "~3.2.0",
