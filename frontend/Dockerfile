@@ -1,4 +1,4 @@
-FROM node:24-alpine AS build
+FROM node:26-alpine AS build
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN npm ci --loglevel=error
 COPY frontend/ ./
 RUN npm run build
 
-FROM nginx:1.29.5-alpine
+FROM nginx:1.31.7-alpine
 
 COPY frontend/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY frontend/nginx/99-runtime-config.sh /docker-entrypoint.d/99-runtime-config.sh

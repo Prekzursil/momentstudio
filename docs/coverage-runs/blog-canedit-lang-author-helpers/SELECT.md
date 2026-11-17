@@ -1,0 +1,1 @@
+Slice: BlogPostComponent canEditBlog/activeLang/authorLabel

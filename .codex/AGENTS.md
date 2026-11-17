@@ -22,7 +22,10 @@ The generated baseline enables GitHub, Context7, Exa, Memory, Playwright, and Se
 ## Workflow Files
 
 - `.claude/commands/feature-development.md`
-- `.claude/commands/add-100-percent-behavioral-test-coverage-for-component.md`
-- `.claude/commands/add-100-percent-behavioral-test-coverage-for-service.md`
+- `.claude/commands/add-100-percent-behavioral-test-coverage-for-component.md` (alias `/add-component-coverage`; INNER = PR-added `frontend/src` via `diff-coverage.mjs` + Karma; not jest/global 100%)
+- `.claude/commands/run-component-paired-e2e.md` (LaneOuter)
+- `.claude/commands/add-100-percent-behavioral-test-coverage-for-service.md` (rewrite deferred)
+- `docs/plans/2026-09-04-component-coverage-e2e-matrix.md`
+- `docs/plans/2026-09-04-coverage-autonomous-loop.md`
 
-Use these workflow files as reusable task scaffolds when the detected repository workflows recur.
+Use these workflow files as reusable task scaffolds when the detected repository workflows recur. Fleet decision SSOT lives in QZP `docs/plans/2026-09-04-fleet-autonomy-decision-log.md`.

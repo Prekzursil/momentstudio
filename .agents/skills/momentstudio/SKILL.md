@@ -5,7 +5,7 @@
 
 ## Overview
 
-This skill teaches the core development, testing, and coverage enforcement patterns used in the `momentstudio` TypeScript codebase. The repository emphasizes strict behavioral test coverage (100% for most files), clear code organization, and maintainable conventions for both code and tests. While Angular components and services are present, the patterns apply broadly to frontend TypeScript projects with a focus on robust testing and code quality.
+This skill teaches the core development, testing, and coverage enforcement patterns used in the `momentstudio` TypeScript codebase. Frontend unit coverage uses **Karma** (`npm run test:coverage`) plus a **PR-added-line** ratchet via `frontend/scripts/diff-coverage.mjs` (requires `GITHUB_BASE_REF`; skip ≠ green). Do **not** claim whole-repo or per-file istanbul global line/branch/function/statement 100%, and do **not** use jest for this gate. Component coverage WUs follow governed stages ending at draft PR only.
 
 ---
 
@@ -43,13 +43,14 @@ This skill teaches the core development, testing, and coverage enforcement patte
 ## Workflows
 
 ### Add 100% Behavioral Test Coverage for Component
-**Trigger:** When you want to ensure a frontend Angular component is fully tested and meets strict coverage gates.  
-**Command:** `/add-component-coverage`
+**Trigger:** When you want a governed coverage WU for a frontend Angular component (INNER ratchet + paired e2e + verify + draft PR).  
+**Command:** `/add-component-coverage` (alias) → `/add-100-percent-behavioral-test-coverage-for-component`
 
-1. Write or update the component's `.spec.ts` file to cover all logic branches, methods, and error paths.
-2. Annotate any genuinely unreachable code (e.g., SSR guards) with `/* istanbul ignore next */` and a comment explaining why.
-3. Run coverage tools (e.g., `jest --coverage`) to verify 100% line/branch/function/statement coverage.
-4. Commit both the `.spec.ts` and (if needed) the component `.ts` file with coverage annotations.
+1. Follow stages: Ground → Select → Impl → DeSlop → ValidateInner → LaneOuter → RepoVerify → Review → DraftPR.
+2. Write or update the colocated `.spec.ts` (TDD); annotate unreachable code with reasoned istanbul ignore only.
+3. ValidateInner: `export GITHUB_BASE_REF=<base>` then `npm run test:coverage` (Karma) and zero misses from `diff-coverage.mjs` on **PR-added executable `frontend/src` lines**. Skip-log = fail. Not global L/B/F/S 100%; not jest.
+4. LaneOuter: invoke `/run-component-paired-e2e`. Missing visual secrets → `outer:blocked` (not silent skip).
+5. RepoVerify: `make verify`. Independent Review required. Draft PR only when INNER ∧ LANE_OUTER ∧ REPO_VERIFY ∧ Review; never INNER-only; never merge.
 
 **Example:**
 ```typescript
@@ -85,7 +86,7 @@ describe('UserProfileComponent', () => {
 1. Write or update the service's `.spec.ts` file to cover all public methods and code branches.
 2. Assert correct HTTP verb, URL, params, and observable emissions for each method.
 3. Annotate any unreachable SSR or defensive code with `/* istanbul ignore next */` if needed.
-4. Run coverage tools to verify 100% coverage.
+4. Run coverage tools for the service lane (**rewrite deferred** — do not treat scaffold 100% language as the component INNER gate; component WUs use diff-coverage + Karma).
 5. Commit the `.spec.ts` file (and `.ts` if annotations are added).
 
 **Example:**
@@ -112,7 +113,7 @@ it('should call GET /api/data', () => {
 
 1. Write or update the `.spec.ts` file for the utility/guard/handler, covering all logic and error branches.
 2. Annotate any unreachable code (e.g., SSR-only logic) with `/* istanbul ignore next */`.
-3. Run coverage tools to verify 100% coverage.
+3. Run coverage tools (**utility lane scaffold**; component INNER gate is diff-coverage + Karma — see component workflow).
 4. Commit the `.spec.ts` file (and `.ts` if annotations are added).
 
 **Example:**
@@ -161,14 +162,13 @@ if (typeof window === 'undefined') {
 ## Testing Patterns
 
 - **Framework:**  
-  [Jest](https://jestjs.io/) is used for all testing.
+  Frontend unit tests run under **Karma** via `npm run test:coverage`. E2E uses Playwright. Do not use jest for the component INNER gate.
 
 - **Test File Pattern:**  
   All test files use the `.spec.ts` suffix and are colocated with their source files.
 
 - **Coverage Enforcement:**  
-  100% line/branch/function/statement coverage is enforced for most files.  
-  Unreachable code is annotated with Istanbul ignore directives and a comment explaining why.
+  INNER ratchet = 100% of **PR-added executable lines under `frontend/src`** via `diff-coverage.mjs` with `GITHUB_BASE_REF` set (skip ≠ green). Unreachable code is annotated with Istanbul ignore directives and a comment explaining why. Paired OUTER + `make verify` + Review required for WU done.
 
 - **Test Example:**
   ```typescript
@@ -193,9 +193,11 @@ if (typeof window === 'undefined') {
 
 | Command                 | Purpose                                                      |
 |-------------------------|--------------------------------------------------------------|
-| /add-component-coverage | Add or update a component spec to achieve 100% coverage      |
-| /add-service-coverage   | Add or update a service spec to achieve 100% coverage        |
-| /add-utility-coverage   | Add or update a utility/guard/handler spec for 100% coverage |
+| /add-component-coverage | Alias → `/add-100-percent-behavioral-test-coverage-for-component` (INNER diff-coverage + OUTER + verify + draft PR) |
+| /add-100-percent-behavioral-test-coverage-for-component | Governed component coverage WU (gate-truth: PR-added lines, Karma) |
+| /run-component-paired-e2e | LaneOuter Playwright map + visual blocked semantics |
+| /add-service-coverage   | Service coverage scaffold (rewrite deferred) |
+| /add-utility-coverage   | Add or update a utility/guard/handler spec |
 | /add-istanbul-ignore    | Annotate unreachable code branches with Istanbul directives  |
 | /merge-coverage-branch  | Merge a coverage feature branch into the main branch         |
 ```

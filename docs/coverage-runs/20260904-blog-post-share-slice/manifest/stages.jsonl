@@ -1,0 +1,16 @@
+{"event":"ground_select","status":"pass","note":"blog-post share/focal after shop-filters AGREED"}
+{"event":"impl","status":"pass","note":"+3 specs; focused 6 SUCCESS; tip_impl 998b58b8b4375a7c"}
+{"event":"deslop_artifact","status":"pass","artifact":"manifest/DESLOP.md"}
+{"event":"validate_inner_post_impl","status":"pass","evidence":"/tmp/blog2-inner-serial.log","exit":0,"total":2138,"diff_coverage":"OK 100% across 0 source file(s)"}
+{"event":"lane_outer","status":"outer:blocked","case":"B","blocker_id":"visual_secrets"}
+{"event":"repo_verify","status":"pass","evidence":"/tmp/blog2-verify-serial.log","exit":0,"serial":true,"backend_passed":3993,"frontend_total":2138}
+{"event":"review","status":"pass","agent":"bc-review-a7f3c291","verdict":"PASS","against":"tip_impl"}
+{"event":"draft_pr","status":"pending"}
+{"event":"adversary_scaffold","status":"pass","agent":"bc-34f2904a","blocker":"DRAFT_PR_FORBIDDEN"}
+{"event":"adversary_overclaim","status":"pass","agent":"bc-6efecc4f"}
+{"event":"adversary_deslop","status":"pass","agent":"bc-b83712b0"}
+{"event":"council","status":"conditional","reason":"draft_pr_forbidden"}
+{"event":"draft_pr","status":"blocked","blocker_id":"github_integration_forbidden"}
+{"event":"draft_pr","status":"pass","url":"https://github.com/Prekzursil/momentstudio/pull/712","number":712}
+{"event":"council","status":"agreed","note":"draft_pr_unlocked"}
+{"event":"council","status":"agreed","agents":["bc-ea338f18"],"draft_pr":712}

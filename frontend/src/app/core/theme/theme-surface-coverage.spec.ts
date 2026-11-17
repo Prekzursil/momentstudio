@@ -52,6 +52,13 @@ describe('theme surface-coverage (compiled alias output)', () => {
     touched.push(name);
     ROOT.style.setProperty(name, value);
   };
+  // These cases assert LIGHT compiled defaults. ThemeService (and similar) specs
+  // may leave `:root.dark` on the real documentElement; reset before each case
+  // so order/flake from earlier suites cannot poison getComputedStyle reads.
+  beforeEach(() => {
+    ROOT.classList.remove('dark');
+    ROOT.style.colorScheme = 'light';
+  });
   afterEach(() => {
     while (touched.length) {
       ROOT.style.removeProperty(touched.pop() as string);

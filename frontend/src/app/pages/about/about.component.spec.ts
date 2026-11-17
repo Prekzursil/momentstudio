@@ -244,4 +244,71 @@ describe('AboutComponent', () => {
       .find((t) => (t as { name?: string }).name === 'description');
     expect((descriptionCall as { content: string }).content.length).toBeGreaterThan(0);
   });
+
+  it('renders the hero image with alt text and focal object-position', () => {
+    const sentinelUrl = 'https://cdn.momentstudio.test/about-hero-wu4739.jpg';
+    const sentinelAlt = 'About hero sentinel wu4739';
+    api.get.and.returnValue(
+      of({
+        title: 'About Studio',
+        body_markdown: 'Body for markdown path',
+        meta: null,
+        images: [{ url: sentinelUrl, alt_text: sentinelAlt, focal_x: 12, focal_y: 88 }],
+      } as any),
+    );
+    const fixture = TestBed.createComponent(AboutComponent);
+    fixture.detectChanges();
+
+    const img: HTMLImageElement | null = fixture.nativeElement.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute('src')).toBe(sentinelUrl);
+    expect(img!.getAttribute('alt')).toBe(sentinelAlt);
+    expect(img!.style.objectPosition).toBe('12% 88%');
+  });
+
+  it('falls back document title to About | momentstudio when CMS title is empty', () => {
+    api.get.and.returnValue(
+      of({
+        title: '',
+        body_markdown: 'Success path with empty title sentinel',
+        meta: null,
+        images: [],
+      } as any),
+    );
+    const fixture = TestBed.createComponent(AboutComponent);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance.hasError()).toBeFalse();
+    expect(fixture.componentInstance.block()).not.toBeNull();
+    expect(title.setTitle).toHaveBeenCalledWith('About | momentstudio');
+    expect(meta.updateTag).toHaveBeenCalledWith({
+      property: 'og:title',
+      content: 'About | momentstudio',
+    });
+  });
+
+  it('uses the public about path when preview token is whitespace-only', () => {
+    queryParams$.next({ preview: '   \t  ' });
+    api.get.and.callFake((path: string) => {
+      if (path === '/content/pages/about/preview') {
+        throw new Error('whitespace preview must not hit preview endpoint');
+      }
+      if (path !== '/content/pages/about') throw new Error(`Unexpected path: ${path}`);
+      return of({
+        title: 'Public after whitespace preview',
+        body_markdown: 'Public body',
+        meta: null,
+        images: [],
+      } as any);
+    });
+    const fixture = TestBed.createComponent(AboutComponent);
+    fixture.detectChanges();
+
+    expect(api.get).toHaveBeenCalledWith('/content/pages/about', { lang: 'en' });
+    expect(api.get).not.toHaveBeenCalledWith(
+      '/content/pages/about/preview',
+      jasmine.objectContaining({ token: jasmine.any(String) }),
+    );
+    expect(title.setTitle).toHaveBeenCalledWith('Public after whitespace preview | momentstudio');
+  });
 });

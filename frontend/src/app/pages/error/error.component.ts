@@ -4,6 +4,12 @@ import { Subscription } from 'rxjs';
 
 import { SiteSocialService } from '../../core/site-social.service';
 import { ButtonComponent } from '../../shared/button.component';
+import {
+  errorNavLinks,
+  errorPageMessage,
+  resolveLocationReload,
+  shouldReloadOnRetry,
+} from './error.helpers';
 
 @Component({
   selector: 'app-error',
@@ -20,7 +26,7 @@ import { ButtonComponent } from '../../shared/button.component';
         Something went wrong
       </h1>
       <p class="text-slate-600 dark:text-slate-300">
-        We've logged the issue. Please try again, return home, or contact support.
+        {{ bodyMessage }}
       </p>
       <div class="flex justify-center gap-3 flex-wrap">
         <app-button label="Retry" (action)="onRetry()"></app-button>
@@ -36,7 +42,11 @@ import { ButtonComponent } from '../../shared/button.component';
 })
 export class ErrorComponent implements OnInit, OnDestroy {
   contactHref = signal('mailto:');
+  /** Exposed for specs / future *ngFor wiring; paths match template routerLinks. */
+  readonly navLinks = errorNavLinks();
+  readonly bodyMessage = errorPageMessage('generic');
   private socialSub?: Subscription;
+  private reloading = false;
 
   constructor(private readonly social: SiteSocialService) {}
 
@@ -50,7 +60,11 @@ export class ErrorComponent implements OnInit, OnDestroy {
     this.socialSub?.unsubscribe();
   }
 
-  onRetry(): void {
-    location.reload();
+  onRetry(reloadFn: (() => void) | null = resolveLocationReload()): void {
+    if (!shouldReloadOnRetry(reloadFn, this.reloading) || !reloadFn) {
+      return;
+    }
+    this.reloading = true;
+    reloadFn();
   }
 }

@@ -1,0 +1,4 @@
+{"stage":"select","status":"ok","slice":"bulkCategoryOptions+bulkCategoryLabel+canEditCategories/canEditProducts","n":3,"skipped":["openQuickView","pinProductToTop"]}
+{"stage":"impl","status":"ok","worktree":"/tmp/momentstudio-shop-quick-pin-bulk"}
+{"stage":"biome","status":"ok","tool":"@biomejs/biome@2.5.0"}
+{"stage":"inner","status":"ok","exit":0,"total":8,"scope":"shop.component.spec.ts"}

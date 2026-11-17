@@ -22,6 +22,14 @@ function mockMatchMedia(prefersDark: boolean) {
 describe('ThemeService', () => {
   beforeEach(() => {
     localStorage.clear();
+    document.documentElement.classList.remove('dark');
+    document.documentElement.style.colorScheme = '';
+  });
+
+  afterEach(() => {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.style.colorScheme = '';
+    document.getElementById('theme-color-override')?.remove();
   });
 
   it('defaults to system preference and applies dark class when system is dark', () => {

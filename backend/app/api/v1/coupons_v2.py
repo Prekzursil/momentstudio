@@ -1070,7 +1070,7 @@ async def admin_coupon_analytics(
         ).all()
 
         order_subtotals: dict[UUID, Decimal] = {}
-        for order_id, _, _, _, _, subtotal_val in item_rows:
+        for order_id, _prow_id, _pslug, _pname, _pqty, subtotal_val in item_rows:
             if not order_id:  # pragma: no cover -- OrderItem.order_id is a NOT NULL FK
                 continue
             order_subtotals[order_id] = order_subtotals.get(

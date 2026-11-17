@@ -4,6 +4,7 @@ import { Subscription } from 'rxjs';
 
 import { SiteSocialService } from '../../core/site-social.service';
 import { ButtonComponent } from '../../shared/button.component';
+import { notFoundHomeLinks, notFoundMessage, notFoundSuggestedPaths } from './not-found.helpers';
 
 @Component({
   selector: 'app-not-found',
@@ -11,16 +12,18 @@ import { ButtonComponent } from '../../shared/button.component';
   imports: [RouterLink, ButtonComponent],
   template: `
     <div class="text-center grid gap-4 py-16">
-      <p class="text-sm uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">404</p>
+      <p class="text-sm uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400">
+        {{ eyebrow }}
+      </p>
       <h1
         class="text-3xl font-semibold text-slate-900 dark:text-slate-50"
         data-route-heading="true"
         tabindex="-1"
       >
-        Page not found
+        {{ title }}
       </h1>
       <p class="text-slate-600 dark:text-slate-300">
-        The page you are looking for doesn't exist. Try heading back home or search the shop.
+        {{ body }}
       </p>
       <div class="flex justify-center gap-3 flex-wrap">
         <app-button routerLink="/" label="Back to home"></app-button>
@@ -35,6 +38,12 @@ import { ButtonComponent } from '../../shared/button.component';
 })
 export class NotFoundComponent implements OnInit, OnDestroy {
   contactHref = signal('mailto:');
+  /** Exposed for specs / future *ngFor wiring; paths match template routerLinks. */
+  readonly homeLinks = notFoundHomeLinks();
+  readonly suggestedPaths = notFoundSuggestedPaths();
+  readonly eyebrow = notFoundMessage('eyebrow');
+  readonly title = notFoundMessage('title');
+  readonly body = notFoundMessage('body');
   private socialSub?: Subscription;
 
   constructor(private readonly social: SiteSocialService) {}

@@ -317,6 +317,82 @@ describe('BlogListComponent interactions', () => {
     expect(nav).toHaveBeenCalled();
   });
 
+  it('changePage clamps to total_pages and clears page query when returning to first', () => {
+    const { cmp } = makeComponent();
+    const router = TestBed.inject(Router);
+    const nav = spyOn(router, 'navigate').and.resolveTo(true);
+
+    cmp.pageMeta = { page: 3, total_pages: 3, total_items: 30, limit: 9 };
+    cmp.changePage(1);
+    expect(nav).toHaveBeenCalledWith(
+      [],
+      jasmine.objectContaining({
+        queryParams: jasmine.objectContaining({ page: 3 }),
+      }),
+    );
+
+    nav.calls.reset();
+    cmp.pageMeta = { page: 2, total_pages: 3, total_items: 30, limit: 9 };
+    cmp.changePage(-1);
+    expect(nav).toHaveBeenCalledWith(
+      [],
+      jasmine.objectContaining({
+        queryParams: jasmine.objectContaining({ page: undefined }),
+      }),
+    );
+  });
+
+  it('suppresses hero on page > 1 and when sort is not newest', () => {
+    const { cmp } = makeComponent();
+    const items = [
+      { slug: 'a', title: 'A', excerpt: 'x', tags: [] },
+      { slug: 'b', title: 'B', excerpt: 'y', tags: [] },
+    ];
+    blog.listPosts.and.returnValue(
+      of({
+        items,
+        meta: { total_items: 12, total_pages: 2, page: 2, limit: 9 },
+      } as any),
+    );
+    cmp.sort = 'newest';
+    cmp.load(2);
+    expect(cmp.heroPost).toBeNull();
+    expect(cmp.gridPosts.length).toBe(2);
+
+    blog.listPosts.and.returnValue(
+      of({
+        items,
+        meta: { total_items: 2, total_pages: 1, page: 1, limit: 9 },
+      } as any),
+    );
+    cmp.sort = 'oldest';
+    cmp.load(1);
+    expect(cmp.heroPost).toBeNull();
+    expect(cmp.gridPosts.length).toBe(2);
+  });
+
+  it('applyFilters preserves trimmed search and non-newest sort on series routes', () => {
+    const { cmp } = makeComponent();
+    const router = TestBed.inject(Router);
+    const nav = spyOn(router, 'navigate').and.resolveTo(true);
+    cmp.searchQuery = '  brosa  ';
+    cmp.sort = 'most_viewed';
+    cmp.seriesQuery = 'wedding';
+    cmp.tagQuery = 'ignored-when-series';
+    cmp.applyFilters();
+    expect(cmp.tagQuery).toBe('');
+    expect(nav).toHaveBeenCalledWith(
+      ['/blog/series', 'wedding'],
+      jasmine.objectContaining({
+        queryParams: jasmine.objectContaining({
+          q: 'brosa',
+          sort: 'most_viewed',
+          page: undefined,
+        }),
+      }),
+    );
+  });
+
   it('applyFilters routes by series, tag, or the base blog route', () => {
     const { cmp } = makeComponent();
     const router = TestBed.inject(Router);

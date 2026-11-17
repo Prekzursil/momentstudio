@@ -1,0 +1,3 @@
+{"stage":"select","status":"ok","slice":"isSelected+toggleSelected+selectedCount+allSelected+toggleSelectAll+clearSelection","n":3,"exclude":"newsletter743+receipt744"}
+{"stage":"impl","status":"ok","tip_impl":"26faf17fb2b6b41200155ab972ff4d1111d3feae"}
+{"stage":"inner","status":"ok","exit":0,"total":3}

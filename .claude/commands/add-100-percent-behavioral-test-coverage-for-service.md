@@ -8,6 +8,8 @@ allowed_tools: ["Bash", "Read", "Write", "Grep", "Glob"]
 
 Use this workflow when working on **add-100-percent-behavioral-test-coverage-for-service** in `momentstudio`.
 
+> **Deferred:** Service-command rewrite is out of scope for the 2026-09-04 docs sculpture. Do not treat the scaffold Goal/Typical-Commit language below as the component INNER gate. Component WUs use `/add-100-percent-behavioral-test-coverage-for-component` (Karma + `diff-coverage.mjs`).
+
 ## Goal
 
 Adds or updates a spec file to achieve 100% behavioral test coverage for a frontend Angular service, asserting HTTP calls, observable emissions, and all code branches.

@@ -4,9 +4,25 @@ import { ShopComponent } from './shop.component';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { Title, Meta } from '@angular/platform-browser';
 import { of, Subject } from 'rxjs';
-import { CatalogService } from '../../core/catalog.service';
+import { CatalogService, Category } from '../../core/catalog.service';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { ToastService } from '../../core/toast.service';
+
+function shopCategory(slug: string, extra: Partial<Category> = {}): Category {
+  return {
+    id: `id-${slug}`,
+    slug,
+    name: `Cat ${slug}`,
+    parent_id: null,
+    sort_order: 0,
+    ...extra,
+  } as Category;
+}
+
+function seedCategoryTree(cmp: any, categories: Category[]): void {
+  cmp.categories = categories;
+  cmp.rebuildCategoryTree();
+}
 
 describe('ShopComponent i18n meta', () => {
   let meta: jasmine.SpyObj<Meta>;
@@ -163,5 +179,95 @@ describe('ShopComponent i18n meta', () => {
 
     expect(cmp.products.length).toBe(1);
     expect(cmp.products[0].id).toBe('new');
+  });
+
+  it('filterChips uses category map name for non-sale category chips', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+    cmp.activeCategorySlug = 'prints';
+    cmp.activeSubcategorySlug = '';
+    cmp.categoriesBySlug.clear();
+    cmp.categoriesBySlug.set('prints', { id: '1', slug: 'prints', name: 'Fine Prints' });
+    const chips = cmp.filterChips();
+    const cat = chips.find((c: any) => c.type === 'category');
+    expect(cat).toBeTruthy();
+    expect(cat.id).toBe('category:prints');
+    expect(cat.label).toBe('Fine Prints');
+    fixture.destroy();
+  });
+
+  it('filterChips falls back to category slug when the map misses', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+    cmp.activeCategorySlug = 'ghost-cat';
+    cmp.activeSubcategorySlug = '';
+    cmp.categoriesBySlug.clear();
+    const chips = cmp.filterChips();
+    const cat = chips.find((c: any) => c.type === 'category');
+    expect(cat).toBeTruthy();
+    expect(cat.id).toBe('category:ghost-cat');
+    expect(cat.label).toBe('ghost-cat');
+    fixture.destroy();
+  });
+
+  it('filterChips omits category chips when activeCategorySlug is empty', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+    cmp.activeCategorySlug = '';
+    cmp.activeSubcategorySlug = 'kids';
+    cmp.categoriesBySlug.clear();
+    cmp.categoriesBySlug.set('kids', { id: '2', slug: 'kids', name: 'Kids' });
+    const chips = cmp.filterChips();
+    expect(chips.some((c: any) => c.type === 'category')).toBe(false);
+    const sub = chips.find((c: any) => c.type === 'subcategory');
+    expect(sub?.label).toBe('Kids');
+    fixture.destroy();
+  });
+
+  it('bulkCategoryOptions flattens roots and descendants with id and name', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+    seedCategoryTree(cmp, [
+      shopCategory('root'),
+      shopCategory('child', { parent_id: 'id-root' }),
+      shopCategory('skip', { id: '', name: 'No id' }),
+      shopCategory('ghost', { name: '' }),
+    ]);
+    const options = cmp.bulkCategoryOptions();
+    expect(options.map((c: Category) => c.slug)).toEqual(['root', 'child']);
+    fixture.destroy();
+  });
+
+  it('bulkCategoryLabel joins ancestor names and stops on cyclic parent ids', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+    seedCategoryTree(cmp, [
+      shopCategory('root'),
+      shopCategory('child', { parent_id: 'id-root' }),
+      shopCategory('leaf', { parent_id: 'id-child' }),
+    ]);
+    const leaf = cmp.bulkCategoryOptions().find((c: Category) => c.slug === 'leaf');
+    expect(cmp.bulkCategoryLabel(leaf)).toBe('Cat root / Cat child / Cat leaf');
+    expect(cmp.bulkCategoryLabel(shopCategory('solo'))).toBe('Cat solo');
+
+    const a = shopCategory('a', { parent_id: 'id-b' });
+    const b = shopCategory('b', { parent_id: 'id-a' });
+    cmp.categoriesById.set('id-a', a);
+    cmp.categoriesById.set('id-b', b);
+    expect(cmp.bulkCategoryLabel(a)).toBe('Cat b / Cat a');
+    fixture.destroy();
+  });
+
+  it('canEditCategories and canEditProducts mirror storefront admin mode', () => {
+    const fixture = TestBed.createComponent(ShopComponent);
+    const cmp = fixture.componentInstance as any;
+    const enabledSpy = spyOn(cmp.storefrontAdminMode, 'enabled');
+    enabledSpy.and.returnValue(false);
+    expect(cmp.canEditCategories()).toBe(false);
+    expect(cmp.canEditProducts()).toBe(false);
+    enabledSpy.and.returnValue(true);
+    expect(cmp.canEditCategories()).toBe(true);
+    expect(cmp.canEditProducts()).toBe(true);
+    fixture.destroy();
   });
 });

@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { ButtonComponent } from '../../shared/button.component';
+import * as offlineHelpers from './offline.helpers';
 
 @Component({
   selector: 'app-offline',
@@ -26,7 +27,21 @@ import { ButtonComponent } from '../../shared/button.component';
   `,
 })
 export class OfflineComponent {
+  /** Exposed for specs / future *ngFor wiring; paths match template routerLinks. */
+  readonly navLinks = offlineHelpers.offlineNavLinks();
+
   onRetry(): void {
+    if (!this.canReloadNow()) return;
+    this.reloadPage();
+  }
+
+  /** Seam for specs — wraps online detection + retry gate. */
+  canReloadNow(): boolean {
+    return offlineHelpers.shouldReloadOnRetry(offlineHelpers.detectBrowserOnline());
+  }
+
+  /** Seam for specs — browsers reject spyOn(location, 'reload'). */
+  reloadPage(): void {
     location.reload();
   }
 }

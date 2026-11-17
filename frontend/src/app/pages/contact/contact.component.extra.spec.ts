@@ -112,6 +112,53 @@ describe('ContactComponent (extra branches)', () => {
     expect(api.get).toHaveBeenCalledWith('/content/pages/contact', { lang: 'en' });
   });
 
+  it('uses the public contact path when preview token is whitespace-only', () => {
+    api.get.and.callFake(((path: string) => {
+      if (path === '/content/pages/contact/preview') {
+        throw new Error('preview endpoint must not be called for whitespace token');
+      }
+      return of({ title: 'Contact', body_markdown: 'Hello', images: [] });
+    }) as ApiService['get']);
+    queryParams.next({ preview: '   \t  ' });
+    build();
+    expect(api.get).toHaveBeenCalledWith('/content/pages/contact', { lang: 'en' });
+    expect(api.get).not.toHaveBeenCalledWith('/content/pages/contact/preview', jasmine.anything());
+  });
+
+  it('renders facebook avatar initials when the page has no thumbnail_url', () => {
+    socialData = {
+      contact: { phone: '', email: '' },
+      instagramPages: [
+        { label: 'Studio IG', url: 'https://ig/x', thumbnail_url: 'https://img/ig.png' },
+      ],
+      facebookPages: [{ label: 'Studio FB', url: 'https://fb/x', thumbnail_url: '' }],
+    };
+    const fixture = TestBed.createComponent(ContactComponent);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement.textContent || '').replace(/\s+/g, ' ');
+    expect(text).toContain('SF');
+    expect(text).toContain('Studio FB');
+    const fbLink = Array.from(
+      fixture.nativeElement.querySelectorAll('a') as NodeListOf<HTMLAnchorElement>,
+    ).find((a) => a.href.includes('fb/x'));
+    expect(fbLink).toBeTruthy();
+    expect(fbLink!.querySelector('img')).toBeNull();
+  });
+
+  it('falls back the h1 to contact.title when the CMS title is empty', () => {
+    api.get.and.returnValue(of({ title: '', body_markdown: 'Body', images: [] } as never));
+    const translate = TestBed.inject(TranslateService);
+    translate.setTranslation('en', { contact: { title: 'Contact title sentinel' } }, true);
+    translate.use('en');
+    const fixture = TestBed.createComponent(ContactComponent);
+    fixture.detectChanges();
+    const heading = fixture.nativeElement.querySelector(
+      '[data-route-heading]',
+    ) as HTMLElement | null;
+    expect(heading).toBeTruthy();
+    expect((heading!.textContent || '').trim()).toBe('Contact title sentinel');
+  });
+
   it('shows an error state and fallback copy when loading fails', () => {
     api.get.and.returnValue(throwError(() => new Error('boom')));
     const cmp = build();
@@ -131,6 +178,47 @@ describe('ContactComponent (extra branches)', () => {
     expect(cmp.email()).toBe('shop@x.com');
     expect(cmp.instagramPages().length).toBe(1);
     expect(cmp.facebookPages().length).toBe(1);
+  });
+
+  it('renders an Instagram thumbnail image when thumbnail_url is present', () => {
+    socialData = {
+      contact: { phone: '', email: '' },
+      instagramPages: [
+        { label: 'Studio IG', url: 'https://ig/x', thumbnail_url: 'https://img/ig.png' },
+      ],
+      facebookPages: [{ label: 'Studio FB', url: 'https://fb/x', thumbnail_url: '' }],
+    };
+    const fixture = TestBed.createComponent(ContactComponent);
+    fixture.detectChanges();
+    const igLink = Array.from(
+      fixture.nativeElement.querySelectorAll('a') as NodeListOf<HTMLAnchorElement>,
+    ).find((a) => a.href.includes('ig/x'));
+    expect(igLink).toBeTruthy();
+    const img = igLink!.querySelector('img') as HTMLImageElement | null;
+    expect(img).toBeTruthy();
+    expect(img!.getAttribute('src')).toBe('https://img/ig.png');
+    expect(img!.getAttribute('alt')).toBe('Studio IG');
+    // Thumbnail path must not fall through to #instagramAvatar initials.
+    expect(igLink!.textContent || '').not.toContain('SI');
+  });
+
+  it('exposes tel and mailto hrefs from the social phone and email signals', () => {
+    socialData = {
+      contact: { phone: '+40111222333', email: 'hello@moment.test' },
+      instagramPages: [],
+      facebookPages: [],
+    };
+    const fixture = TestBed.createComponent(ContactComponent);
+    fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    const tel = root.querySelector('a[href="tel:+40111222333"]') as HTMLAnchorElement | null;
+    const mail = root.querySelector(
+      'a[href="mailto:hello@moment.test"]',
+    ) as HTMLAnchorElement | null;
+    expect(tel).toBeTruthy();
+    expect(mail).toBeTruthy();
+    expect((tel!.textContent || '').replace(/\s+/g, ' ')).toContain('+40111222333');
+    expect((mail!.textContent || '').replace(/\s+/g, ' ')).toContain('hello@moment.test');
   });
 
   describe('initialsForLabel', () => {
@@ -185,6 +273,22 @@ describe('ContactComponent (extra branches)', () => {
     it('reflects the storefront admin mode', () => {
       adminMode.enabled.and.returnValue(true);
       expect(build().canEditPage()).toBe(true);
+    });
+
+    it('shows the edit button in the DOM when storefront admin mode is enabled', () => {
+      adminMode.enabled.and.returnValue(true);
+      const translate = TestBed.inject(TranslateService);
+      translate.setTranslation('en', { page: { admin: { edit: 'Edit page sentinel' } } }, true);
+      translate.use('en');
+      const fixture = TestBed.createComponent(ContactComponent);
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      const text = (root.textContent || '').replace(/\s+/g, ' ');
+      expect(text).toContain('Edit page sentinel');
+      const editBtn = Array.from(root.querySelectorAll('button')).find((b) =>
+        (b.textContent || '').includes('Edit page sentinel'),
+      );
+      expect(editBtn).toBeTruthy();
     });
 
     it('navigates to the admin content page on edit', () => {

@@ -1,0 +1,1 @@
+Slice: submitNewsletter gates
