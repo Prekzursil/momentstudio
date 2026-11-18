@@ -10,6 +10,12 @@ VENV_DIR="${ROOT_DIR}/.venv"
 
 command -v python3 >/dev/null 2>&1 || { echo "python3 is required"; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "npm is required"; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "node is required (Node 24, see .nvmrc)"; exit 1; }
+NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]")"
+if [ "${NODE_MAJOR}" != "24" ]; then
+  echo "Node 24 is required (found $(node -v)). Use nvm/fnm to honor /.nvmrc. Node 22 breaks npm ci against this lockfile."
+  exit 1
+fi
 
 ENV_DOCTOR="${ROOT_DIR}/scripts/env/doctor.sh"
 if [ -x "${ENV_DOCTOR}" ]; then
@@ -283,15 +289,11 @@ if [ ! -d "${FRONTEND_DIR}/node_modules" ]; then
 fi
 
 cleanup() {
-  if [ -n "${PROXY_CONF:-}" ] && [ -f "${PROXY_CONF}" ]; then
-    rm -f "${PROXY_CONF}" || true
-  fi
   if [ -n "${BACKEND_PID:-}" ]; then
     kill "${BACKEND_PID}" 2>/dev/null || true
   fi
 }
 
-PROXY_CONF=""
 BACKEND_PID=""
 
 echo ""
@@ -310,23 +312,8 @@ trap 'cleanup; exit 143' TERM
 
 echo ""
 echo "Starting frontend dev server on http://localhost:${FRONTEND_PORT}"
-PROXY_CONF="$(mktemp "${TMPDIR:-/tmp}/adrianaart-proxy.XXXXXX.json")"
-cat >"${PROXY_CONF}" <<EOF
-{
-  "/api": {
-    "target": "http://${UVICORN_HOST}:${BACKEND_PORT}",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "warn"
-  },
-  "/media": {
-    "target": "http://${UVICORN_HOST}:${BACKEND_PORT}",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "warn"
-  }
-}
-EOF
+export DEV_API_TARGET="http://${UVICORN_HOST}:${BACKEND_PORT}"
+echo "Dev proxy /api and /media -> ${DEV_API_TARGET}"
 
 (cd "${FRONTEND_DIR}" && node scripts/generate-config.mjs)
 if [ -x "${ROOT_DIR}/scripts/env/status.sh" ]; then
@@ -334,4 +321,4 @@ if [ -x "${ROOT_DIR}/scripts/env/status.sh" ]; then
   echo "Environment summary:"
   "${ROOT_DIR}/scripts/env/status.sh" || true
 fi
-(cd "${FRONTEND_DIR}" && exec npx ng serve --proxy-config "${PROXY_CONF}" --port "${FRONTEND_PORT}")
+(cd "${FRONTEND_DIR}" && exec npx ng serve --proxy-config proxy.conf.cjs --port "${FRONTEND_PORT}" --host localhost)
