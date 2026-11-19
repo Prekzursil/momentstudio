@@ -11,13 +11,8 @@ PyJWT[crypto]==2.15.1
 email-validator==2.3.0
 python-multipart==0.0.33
 httpx==0.28.1
-<<<<<<< HEAD
 simplejson==4.3.0
 redis==8.1.0
-=======
-simplejson==4.2.0
-redis==8.1.0
->>>>>>> 73ee999117 (chore(deps): bump redis from 7.4.1 to 8.1.0)
 pytest==9.2.0
 respx==0.23.1
 stripe==16.1.0
