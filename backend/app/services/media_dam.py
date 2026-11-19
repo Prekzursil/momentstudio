@@ -9,11 +9,11 @@ import mimetypes
 import random
 import re
 import shutil
-from collections.abc import Awaitable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, Literal, cast
 from uuid import UUID, uuid4
 
 import anyio.to_thread
@@ -155,8 +155,6 @@ PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "web-1280": (1280, 1280),
     "social-1200": (1200, 1200),
 }
-
-T = TypeVar("T")
 
 
 @dataclass(slots=True)
@@ -607,10 +605,13 @@ async def queue_job(job_id: UUID) -> None:
     await _maybe_queue_job(job_id)
 
 
-async def _await_if_needed(result: Awaitable[T] | T) -> T:
+async def _await_if_needed(result: Any) -> Any:
+    # redis-py 8's typed sync/async overloads defeat TypeVar inference here
+    # (mypy resolves T=Never for `Awaitable[T] | T`); the runtime contract is
+    # simply "await if awaitable, else pass through" (sync fakes in tests).
     if inspect.isawaitable(result):
-        return await cast(Awaitable[T], result)
-    return cast(T, result)
+        return await result
+    return result
 
 
 async def _record_job_event(
