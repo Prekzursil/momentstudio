@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from PIL import Image
+from sqlalchemy.exc import MissingGreenlet
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.db.base import Base
@@ -146,6 +147,43 @@ def test_job_to_read_handles_tag_access_failure() -> None:
             raise RuntimeError("lazy load outside greenlet")
 
     read = md.job_to_read(_FakeJob())  # type: ignore[arg-type]
+    assert read.tags == []
+
+
+def test_job_to_read_handles_missing_greenlet() -> None:
+    """A ``MissingGreenlet`` error on ``job.tags`` hits its dedicated guard.
+
+    sqlalchemy 2.1 no longer raises this from the sync ``job.tags`` read the
+    way the async-lazy-load fixtures used to trigger, so the dedicated arm is
+    exercised directly — it still guards real greenlet-context accesses in
+    production."""
+
+    class _GreenletJob:
+        id = uuid.uuid4()
+        asset_id = None
+        job_type = MediaJobType.ingest
+        status = MediaJobStatus.queued
+        progress_pct = 0
+        attempt = 0
+        max_attempts = 0
+        next_retry_at = None
+        last_error_at = None
+        dead_lettered_at = None
+        triage_state = "open"
+        assigned_to_user_id = None
+        sla_due_at = None
+        incident_url = None
+        error_code = None
+        error_message = None
+        created_at = datetime.now(timezone.utc)
+        started_at = None
+        completed_at = None
+
+        @property
+        def tags(self):
+            raise MissingGreenlet("greenlet_spawn has not been run")
+
+    read = md.job_to_read(_GreenletJob())  # type: ignore[arg-type]
     assert read.tags == []
 
 
