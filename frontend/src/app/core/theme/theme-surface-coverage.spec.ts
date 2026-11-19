@@ -30,6 +30,24 @@ function computed(className: string, prop: string): string {
 
 /** Text/RGB of the first compiled rule whose selector text includes `needle`. */
 function ruleText(needle: string): string {
+  // Tailwind v4 emits utilities inside CSS cascade layers (`@layer utilities`),
+  // so a flat walk over top-level CSSStyleRule entries finds nothing — recurse
+  // into any grouping rule (layer/media/supports) to reach the actual rules.
+  const visit = (rules: CSSRuleList): string => {
+    for (const rule of Array.from(rules)) {
+      if (rule instanceof CSSStyleRule && rule.selectorText.includes(needle)) {
+        return rule.cssText;
+      }
+      const nested = (rule as { cssRules?: CSSRuleList | null }).cssRules;
+      if (nested && nested.length) {
+        const found = visit(nested);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return '';
+  };
   for (const sheet of Array.from(document.styleSheets)) {
     let rules: CSSRuleList;
     try {
@@ -37,10 +55,9 @@ function ruleText(needle: string): string {
     } catch {
       continue; // cross-origin sheet — skip
     }
-    for (const rule of Array.from(rules)) {
-      if (rule instanceof CSSStyleRule && rule.selectorText.includes(needle)) {
-        return rule.cssText;
-      }
+    const found = visit(rules);
+    if (found) {
+      return found;
     }
   }
   return '';
