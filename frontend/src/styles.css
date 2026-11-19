@@ -1,6 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4 CSS-first entry. The legacy v3 theme (token aliases, darkMode
+   class, content globs) still lives in tailwind.config.cjs and is loaded via
+   the @config directive below — v4's JS-config compat layer translates it. */
+@import "tailwindcss";
+@config "../tailwind.config.cjs";
+
 
 @font-face {
   font-family: Cinzel;
