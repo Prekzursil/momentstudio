@@ -25,9 +25,29 @@ def test_lock_id_handles_none() -> None:
     assert leader_lock._lock_id(None) == leader_lock._lock_id("")
 
 
-def test_is_postgres_false_on_sqlite() -> None:
-    # The test engine is sqlite -> not postgres.
+def test_is_postgres_false_on_sqlite(monkeypatch) -> None:
+    # Isolated from backend/.env: the app engine is Postgres in real dev.
+    class _Url:
+        def get_backend_name(self) -> str:
+            return "sqlite"
+
+    class _Engine:
+        url = _Url()
+
+    monkeypatch.setattr(leader_lock, "engine", _Engine())
     assert leader_lock._is_postgres() is False
+
+
+def test_is_postgres_true_on_postgresql(monkeypatch) -> None:
+    class _Url:
+        def get_backend_name(self) -> str:
+            return "postgresql"
+
+    class _Engine:
+        url = _Url()
+
+    monkeypatch.setattr(leader_lock, "engine", _Engine())
+    assert leader_lock._is_postgres() is True
 
 
 def test_leader_engine_is_cached(monkeypatch) -> None:

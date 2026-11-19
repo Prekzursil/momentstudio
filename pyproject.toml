@@ -39,3 +39,18 @@ omit = [
 
 [tool.coverage.report]
 show_missing = true
+
+# Backend lint contract (backend.yml "Ruff lint" lane runs `ruff check .` in
+# backend/ with no per-directory overrides). ruff <0.16 applied this rule set
+# implicitly as its DEFAULT selection; ruff 0.16+ expanded defaults pull in
+# hundreds of new style rules (B008, UP0xx, I001, FURB, RUF...) that this
+# codebase was never written against. Pin the previous effective contract
+# explicitly so the ruff minor bump (0.15.21 -> 0.17.5) lands without a
+# whole-repo style rewrite; adopting the wider set is a separate, deliberate
+# decision. Verified: `ruff check --select E4,E7,E9,F` on ruff 0.17.5 passes
+# clean on the same tree that passed ruff 0.15.21 defaults.
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

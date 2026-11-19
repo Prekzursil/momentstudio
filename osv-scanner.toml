@@ -74,3 +74,28 @@ reason = "zod memory-exhaustion while validating oversized constrained collectio
 id = "GHSA-g3hv-75wg-m249"
 ignoreUntil = 2027-01-31
 reason = "minimatch DoS via globparts amplification, fixed only in 11.0.1 (no 3.x/10.x backport). Rows are dev-only minimatch 3.1.5 (eslint 8/karma/resp-modifier) and 10.2.x (glob internals); forcing 11 on those is a breaking major migration. Time-boxed to 2027-01-31; re-check when eslint/karma toolchain moves to minimatch >=11."
+
+
+# ── ENTRY 3: GHSA-fc5q-39xc-vjpf (picomatch single-branch ReDoS) ─────────────
+# WHY IT EXISTS:
+#   * Advisory: "picomatch vulnerable to ReDoS through single-branch
+#     processing"; affected range covers <= 4.0.7, and 4.0.7 is the LATEST
+#     published release — NO fixed version exists anywhere on npm (verified
+#     2026-11-17: `npm view picomatch version` -> 4.0.7).
+#   * Lock rows: picomatch 2.3.2 (top-level dev resolution) and 4.0.4
+#     (tinyglobby) in frontend/package-lock.json — both devDependencies
+#     (build/test-time glob matching on first-party code, no
+#     attacker-controlled patterns reach them in production; the backend
+#     runtime is Python).
+#   * Per the policy above this is the textbook "no non-breaking upgrade
+#     exists" case: there is nothing to upgrade TO. Driving the rows to
+#     4.0.7 would still be inside the affected range.
+#
+# RE-CHECK ON EXPIRY: has picomatch published > 4.0.7 with the fix (then
+# DELETE this entry and upgrade), or is the advisory withdrawn? Otherwise
+# extend with a fresh dated note.
+
+[[IgnoredVulns]]
+id = "GHSA-fc5q-39xc-vjpf"
+ignoreUntil = 2027-01-31
+reason = "picomatch ReDoS via single-branch processing, affected <=4.0.7 with NO fixed release (4.0.7 is latest published, verified 2026-11-17); both rows are dev-only (2.3.2 root dev, 4.0.4 via tinyglobby) with no attacker-controlled patterns. Documented residual risk per fleet policy; re-check for a >4.0.7 release."
