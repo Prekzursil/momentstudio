@@ -7,10 +7,9 @@ import logging
 import os
 import socket
 import time
-from collections.abc import Awaitable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TypeVar, cast
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
@@ -24,7 +23,6 @@ from app.services import media_dam
 
 logger = logging.getLogger(__name__)
 QUEUE_KEY = media_dam.QUEUE_KEY
-T = TypeVar("T")
 HEARTBEAT_PREFIX = str(
     getattr(settings, "media_dam_worker_heartbeat_prefix", "media:workers:heartbeat")
     or "media:workers:heartbeat"
@@ -240,10 +238,13 @@ async def run_media_worker(poll_interval_seconds: float = 2.0) -> None:
             await asyncio.sleep(max(0.5, poll_interval_seconds))
 
 
-async def _await_if_needed(result: Awaitable[T] | T) -> T:
+async def _await_if_needed(result: Any) -> Any:
+    # redis-py 8's typed sync/async overloads defeat TypeVar inference here
+    # (mypy resolves T=Never for `Awaitable[T] | T`); the runtime contract is
+    # simply "await if awaitable, else pass through" (sync fakes in tests).
     if inspect.isawaitable(result):
-        return await cast(Awaitable[T], result)
-    return cast(T, result)
+        return await result
+    return result
 
 
 def main() -> None:  # pragma: no cover
