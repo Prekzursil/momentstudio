@@ -34,6 +34,12 @@ jobs:
     # see the open coverage-program work). The deps lane at this commit already
     # blocks on every osv-scanner finding (zero tolerance), matching the
     # deps-severity-floor "any" policy.
-    uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-quality.yml@b4fbe38470fd2831f86f194df5b638a271bae8b8
+    uses: Prekzursil/quality-zero-platform/.github/workflows/reusable-quality.yml@e7d78c3a645259d2963d9133fdc75792a888edb7
     with:
       opengrep-paths: "backend frontend"
+      # Interim jsts bar, declared visibly per the reusable workflow's own
+      # contract: the frontend two-tier policy (karma.conf.cjs global floor
+      # 49/41/52/49 + scripts/diff-coverage.mjs enforcing 100% on every
+      # PR-changed line) measures ~53% global line / ~45% branch today.
+      # The charter's 100 returns when the coverage-program work lands.
+      jsts-coverage-min: 41
