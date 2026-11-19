@@ -157,7 +157,6 @@ PROFILE_DIMENSIONS: dict[str, tuple[int, int]] = {
 }
 
 
-
 @dataclass(slots=True)
 class MediaListFilters:
     q: str = ""
