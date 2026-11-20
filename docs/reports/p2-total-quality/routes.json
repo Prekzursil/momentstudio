@@ -1,0 +1,656 @@
+{
+  "summary": {
+    "total": 92,
+    "storefront": 69,
+    "admin": 23,
+    "needs_auth": 38,
+    "from_sitemap": 30
+  },
+  "problems": [],
+  "routes": [
+    {
+      "url": "/admin",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts+routes.ts"
+    },
+    {
+      "url": "/admin/content",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts+routes.ts"
+    },
+    {
+      "url": "/admin/content/blog",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/content/home",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/content/media",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/content/pages",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/content/scheduling",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/content/settings",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/coupons",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/dashboard",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/inventory",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/ip-bypass",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/ops",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/orders",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/orders/1",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": true,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/orders/exports",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/products",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/returns",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/support",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/theme",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/users",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts+routes.ts"
+    },
+    {
+      "url": "/admin/users/gdpr",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/admin/users/segments",
+      "surface": "admin",
+      "auth": "owner",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/about",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap+routes.ts"
+    },
+    {
+      "url": "/about?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/account",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts+routes.ts"
+    },
+    {
+      "url": "/account/addresses",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/comments",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/coupons",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/notifications",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/notifications/settings",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/orders",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/overview",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/password",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/privacy",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/profile",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/security",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/account/wishlist",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/auth/google/callback",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/blog",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap+routes.ts"
+    },
+    {
+      "url": "/blog/series/white-cup",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": true,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/blog/tag/white-cup",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": true,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/blog/white-cup",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": true,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/blog?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/cart",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout/netopia/cancel",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout/netopia/return",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout/paypal/cancel",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout/paypal/return",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout/stripe/cancel",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout/stripe/return",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/checkout/success",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/contact",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap+routes.ts"
+    },
+    {
+      "url": "/contact?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/error",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/login",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/login/2fa",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/newsletter/confirm",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/newsletter/unsubscribe",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/offline",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/pages/anpc",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/anpc?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/care",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/care?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/privacy-policy",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/privacy-policy?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/terms",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/terms-and-conditions",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/terms-and-conditions?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/terms?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/pages/white-cup",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": true,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/password-reset",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/password-reset/confirm",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/products/blue-bowl",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/products/blue-bowl?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/products/white-cup",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap+routes.ts"
+    },
+    {
+      "url": "/products/white-cup?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/receipt/white-cup",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": true,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/register",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/shop",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap+routes.ts"
+    },
+    {
+      "url": "/shop/bowls",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/shop/bowls?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/shop/cups",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap+routes.ts"
+    },
+    {
+      "url": "/shop/cups?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/shop/plates",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/shop/plates?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/shop?lang=ro",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "sitemap"
+    },
+    {
+      "url": "/tickets",
+      "surface": "storefront",
+      "auth": "user",
+      "parameterised": false,
+      "origin": "routes.ts"
+    },
+    {
+      "url": "/verify-email",
+      "surface": "storefront",
+      "auth": "anon",
+      "parameterised": false,
+      "origin": "routes.ts"
+    }
+  ]
+}
