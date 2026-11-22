@@ -5,7 +5,7 @@ types-simplejson==4.3.0.20261112
 coverage==7.17.3
 
 # Transitive-dependency CVE pins for the osv-scanner deps gate (CI tooling deps).
-filelock==4.2.10
+filelock==4.2.12
 pip==26.3
 idna==3.20
 certifi==2026.10.23
